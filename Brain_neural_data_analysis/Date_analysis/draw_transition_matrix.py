@@ -6,8 +6,8 @@ from collections import Counter
 from matplotlib.sankey import Sankey
 
 # Step 1: Load the trace and clustering result data
-trace_file_path = './data/trace_homecage.xlsx'
-cluster_file_path = './data/kmeans_clustering_results.xlsx'
+trace_file_path = './data/2979 CSDS Day3.xlsx'
+cluster_file_path = './data/kmeans_clustering_results_2979_CSDS_Day3.xlsx'
 
 trace_df = pd.read_excel(trace_file_path)
 clustered_df = pd.read_excel(cluster_file_path)

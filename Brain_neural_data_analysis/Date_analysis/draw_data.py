@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 # Load the Excel file
 # file_path = './data/smoothed_trace_homecage.xlsx'
-file_path = './data/smoothed_normalized_trace_homecage.xlsx'
+file_path = './data/2979 CSDS Day3.xlsx'
 df = pd.read_excel(file_path)
 
 # Set up the plot
@@ -13,11 +13,11 @@ plt.figure(figsize=(10, 8))
 scaling_factor = 30
 
 # Plot each line at a different vertical level, with scaling applied
-for i in range(1, 52):
-    plt.plot(df['stamp'], df[f'n{i}'] * scaling_factor + i * 20, label=f'n{i}')  # Scaling and vertical stacking
+for i in range(1, 53):
+    plt.plot(df['stamp'], df[f'n{i}'] * scaling_factor + i * 30, label=f'n{i}')  # Scaling and vertical stacking
 
 # Set x-axis limits to 0 to 500
-plt.xlim(0,500)
+plt.xlim(0,3000)
 
 # Add vertical dashed lines and text annotations (adjusting to fit the new scale)
 for x_pos in []:
@@ -30,7 +30,7 @@ for x_pos in []:
 
 # Adding labels and title
 plt.xlabel('Stamp')
-plt.ylabel('Traces (n1 ~ n51)')
+plt.ylabel('Traces (n1 ~ n53)')
 plt.title('Traces with Increased Amplitude')
 
 # Adjust layout and show the plot

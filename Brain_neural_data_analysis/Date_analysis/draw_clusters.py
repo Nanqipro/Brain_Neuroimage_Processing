@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 # Step 1: Load the K-means clustering results (replace with your file path)
-file_path = './data/kmeans_clustering_results.xlsx'
+file_path = './data/kmeans_clustering_results_2979_CSDS_Day3.xlsx'
 clustering_results = pd.read_excel(file_path)
 
 # Step 2: Define the function for plotting the 3D scatter plot

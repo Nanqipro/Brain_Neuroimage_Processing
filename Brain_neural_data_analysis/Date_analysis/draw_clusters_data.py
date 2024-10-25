@@ -2,8 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load the data from the provided Excel files
-trace_file_path = './data/smoothed_normalized_trace_homecage.xlsx'
-cluster_file_path = './data/kmeans_clustering_results.xlsx'
+trace_file_path = './data/smoothed_normalized_2979_CSDS_Day3.xlsx'
+cluster_file_path = './data/kmeans_clustering_results_2979_CSDS_Day3.xlsx'
 
 # Read the trace data
 trace_df = pd.read_excel(trace_file_path)
@@ -36,7 +36,7 @@ for cluster_id in unique_clusters:
         plt.plot(trace_df['stamp'], trace_df[neuron] * scaling_factor + idx * vertical_separation, label=neuron)
 
     # 设置x轴范围
-    plt.xlim(0, 500)
+    plt.xlim(0, 3000)
 
     # # 添加垂直虚线
     # for x_pos in [100, 200, 300, 400]:

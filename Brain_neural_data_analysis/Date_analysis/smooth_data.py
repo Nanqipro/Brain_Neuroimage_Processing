@@ -82,7 +82,7 @@ def zscore_normalize(data):
     return zscore_data
 
 # Load your original data (make sure to adjust the file path as necessary)
-file_path = './data/trace_homecage.xlsx'
+file_path = './data/2979 CSDS Day3.xlsx'
 data = pd.read_excel(file_path)
 
 # Step 1: Apply the smoothing function to the ΔF/F data
@@ -92,7 +92,7 @@ smoothed_data = smooth_signal(data)
 normalized_data = zscore_normalize(smoothed_data)
 
 # Specify the file path where you want to save the smoothed and normalized data
-output_file_path = './data/smoothed_normalized_trace_homecage.xlsx'
+output_file_path = './data/smoothed_normalized_2979_CSDS_Day3.xlsx'
 
 # Save the smoothed and normalized data to an Excel file
 normalized_data.to_excel(output_file_path, index=False)

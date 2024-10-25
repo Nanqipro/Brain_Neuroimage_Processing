@@ -4,7 +4,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
 # Step 1: Load the provided Excel data (replace with your file path)
-file_path = './data/smoothed_trace_homecage.xlsx'
+file_path = './data/smoothed_normalized_2979_CSDS_Day3.xlsx'
 data = pd.read_excel(file_path)
 
 # Step 2: Define feature extraction function for K-means clustering
@@ -78,7 +78,7 @@ labels, kmeans_model = perform_kmeans_clustering(features, n_clusters=5)
 features['Cluster'] = labels
 
 # Step 7: Save the clustering results to a new Excel file (replace with your desired file path)
-output_file_path = './data/kmeans_clustering_results.xlsx'
+output_file_path = './data/kmeans_clustering_results_2979_CSDS_Day3.xlsx'
 features.to_excel(output_file_path, index=False)
 
 print(f"Clustering results saved to: {output_file_path}")
