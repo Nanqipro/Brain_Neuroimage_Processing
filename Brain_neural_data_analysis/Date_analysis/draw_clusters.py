@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 # Step 1: Load the K-means clustering results (replace with your file path)
-file_path = './data/kmeans_clustering_results_2979_CSDS_Day3.xlsx'
+file_path = './data/DBSCAN_clustering_results_2979_CSDS_Day6.xlsx'
 clustering_results = pd.read_excel(file_path)
 
 # Step 2: Define the function for plotting the 3D scatter plot
@@ -20,6 +20,8 @@ def plot_3d_clusters(data):
     fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection='3d')
 
+    print(data.columns)
+
     # Extract the three dimensions and the cluster labels
     x = data['Peak_Amplitude']
     y = data['Duration']
@@ -33,7 +35,7 @@ def plot_3d_clusters(data):
     ax.set_xlabel('Peak Amplitude')
     ax.set_ylabel('Duration')
     ax.set_zlabel('Frequency')
-    ax.set_title('3D K-means Clustering of Neuron Data')
+    ax.set_title('3D DBSCAN Clustering of Neuron Data')
 
     # Add a color bar to show cluster assignment
     cbar = fig.colorbar(scatter, ax=ax)

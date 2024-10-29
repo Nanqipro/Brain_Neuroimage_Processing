@@ -1,13 +1,13 @@
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+from sklearn_extra.cluster import KMedoids
 
 # Step 1: Load the provided Excel data (replace with your file path)
-file_path = './data/smoothed_normalized_2979_CSDS_Day6.xlsx'
+file_path = './data/smoothed_normalized_2979_CSDS_Day3.xlsx'
 data = pd.read_excel(file_path)
 
-# Step 2: Define feature extraction function for K-means clustering
+# Step 2: Define feature extraction function for K-medoids clustering
 def extract_features(data):
     """
     Extracts features such as peak amplitude, signal duration, and event frequency
@@ -48,37 +48,37 @@ def extract_features(data):
 # Step 3: Extract features from the smoothed data
 features = extract_features(data)
 
-# Step 4: Perform K-means clustering
-def perform_kmeans_clustering(features, n_clusters=5):
+# Step 4: Perform K-medoids clustering
+def perform_kmedoids_clustering(features, n_clusters=5):
     """
-    Perform K-means clustering on the extracted features from calcium signals.
+    Perform K-medoids clustering on the extracted features from calcium signals.
 
     Args:
     - features (DataFrame): Extracted features for each neuron.
-    - n_clusters (int): The number of clusters for K-means.
+    - n_clusters (int): The number of clusters for K-medoids.
 
     Returns:
     - labels (ndarray): Cluster labels for each neuron.
-    - kmeans (KMeans): The trained KMeans object.
+    - kmedoids (KMedoids): The trained KMedoids object.
     """
     # Standardize the features before clustering
     scaler = StandardScaler()
     scaled_features = scaler.fit_transform(features[['Peak_Amplitude', 'Duration', 'Frequency']])
 
-    # Perform K-means clustering
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    labels = kmeans.fit_predict(scaled_features)
+    # Perform K-medoids clustering
+    kmedoids = KMedoids(n_clusters=n_clusters, random_state=42)
+    labels = kmedoids.fit_predict(scaled_features)
 
-    return labels, kmeans
+    return labels, kmedoids
 
-# Step 5: Perform K-means clustering on the features
-labels, kmeans_model = perform_kmeans_clustering(features, n_clusters=5)
+# Step 5: Perform K-medoids clustering on the features
+labels, kmedoids_model = perform_kmedoids_clustering(features, n_clusters=5)
 
 # Step 6: Add cluster labels to the features DataFrame
 features['Cluster'] = labels
 
 # Step 7: Save the clustering results to a new Excel file (replace with your desired file path)
-output_file_path = './data/kmeans_clustering_results_2979_CSDS_Day6.xlsx'
+output_file_path = './data/kmedoids_clustering_results_2979_CSDS_Day3.xlsx'
 features.to_excel(output_file_path, index=False)
 
 print(f"Clustering results saved to: {output_file_path}")

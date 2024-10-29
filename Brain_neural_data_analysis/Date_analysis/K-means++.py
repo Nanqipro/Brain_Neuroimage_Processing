@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score
 
 # Step 1: Load the provided Excel data (replace with your file path)
 file_path = './data/smoothed_normalized_2979_CSDS_Day6.xlsx'
@@ -48,14 +49,14 @@ def extract_features(data):
 # Step 3: Extract features from the smoothed data
 features = extract_features(data)
 
-# Step 4: Perform K-means clustering
-def perform_kmeans_clustering(features, n_clusters=5):
+# Step 4: Perform K-means++ clustering with optimal number of clusters
+def perform_kmeans_plus_clustering(features):
     """
-    Perform K-means clustering on the extracted features from calcium signals.
+    Perform K-means++ clustering on the extracted features from calcium signals,
+    determining the optimal number of clusters.
 
     Args:
     - features (DataFrame): Extracted features for each neuron.
-    - n_clusters (int): The number of clusters for K-means.
 
     Returns:
     - labels (ndarray): Cluster labels for each neuron.
@@ -65,20 +66,33 @@ def perform_kmeans_clustering(features, n_clusters=5):
     scaler = StandardScaler()
     scaled_features = scaler.fit_transform(features[['Peak_Amplitude', 'Duration', 'Frequency']])
 
-    # Perform K-means clustering
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    labels = kmeans.fit_predict(scaled_features)
+    # Determine the optimal number of clusters using silhouette score
+    best_score = -1
+    optimal_k = 2
 
-    return labels, kmeans
+    for k in range(2, 11):  # Trying cluster sizes from 2 to 10
+        kmeans = KMeans(n_clusters=k, init='k-means++', random_state=42)
+        labels = kmeans.fit_predict(scaled_features)
+        score = silhouette_score(scaled_features, labels)
 
-# Step 5: Perform K-means clustering on the features
-labels, kmeans_model = perform_kmeans_clustering(features, n_clusters=5)
+        if score > best_score:
+            best_score = score
+            optimal_k = k
+
+    # Perform final K-means++ clustering with the optimal number of clusters
+    kmeans_final = KMeans(n_clusters=optimal_k, init='k-means++', random_state=42)
+    final_labels = kmeans_final.fit_predict(scaled_features)
+
+    return final_labels, kmeans_final
+
+# Step 5: Perform K-means++ clustering on the features
+labels, kmeans_model = perform_kmeans_plus_clustering(features)
 
 # Step 6: Add cluster labels to the features DataFrame
 features['Cluster'] = labels
 
 # Step 7: Save the clustering results to a new Excel file (replace with your desired file path)
-output_file_path = './data/kmeans_clustering_results_2979_CSDS_Day6.xlsx'
+output_file_path = './data/kmeans++_clustering_results_2979_CSDS_Day6.xlsx'
 features.to_excel(output_file_path, index=False)
 
 print(f"Clustering results saved to: {output_file_path}")

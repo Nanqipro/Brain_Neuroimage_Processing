@@ -2,8 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load the data from the provided Excel files
-trace_file_path = './data/smoothed_normalized_2979_CSDS_Day3.xlsx'
-cluster_file_path = './data/kmeans_clustering_results_2979_CSDS_Day3.xlsx'
+trace_file_path = './data/smoothed_normalized_2979_CSDS_Day6.xlsx'
+cluster_file_path = './data/kmeans_clustering_results_2979_CSDS_Day6.xlsx'
 
 # Read the trace data
 trace_df = pd.read_excel(trace_file_path)
@@ -21,6 +21,7 @@ unique_clusters = clustered_df['Cluster'].unique()
 
 # 为每个簇生成一个图
 for cluster_id in unique_clusters:
+    # print(clustered_df.columns)
     # 获取当前簇中对应的神经元
     neuron_names = clustered_df[clustered_df['Cluster'] == cluster_id]['Neuron'].values
 
