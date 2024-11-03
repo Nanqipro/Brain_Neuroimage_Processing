@@ -37,3 +37,6 @@ plt.title('Traces with Increased Amplitude')
 # Adjust layout and show the plot
 plt.tight_layout()
 plt.show()
+
+
+
