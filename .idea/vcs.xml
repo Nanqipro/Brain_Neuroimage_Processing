@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/python-RA/pythonProject" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/python-RA/标准化代码" vcs="Git" />
+  </component>
+</project>
