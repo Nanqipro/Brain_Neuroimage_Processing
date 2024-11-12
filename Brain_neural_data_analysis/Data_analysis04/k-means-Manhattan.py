@@ -9,11 +9,9 @@ metrics_df = pd.read_csv(file_path)
 features = ['Start Time', 'Amplitude', 'Peak', 'Decay Time', 'Rise Time', 'Latency', 'Frequency']
 X = metrics_df[features].values
 
-
 # 自定义函数：计算曼哈顿距离
 def manhattan_distance(point1, point2):
     return np.sum(np.abs(point1 - point2))
-
 
 # 自定义函数：基于曼哈顿距离的 K-means 算法
 def k_means_manhattan(X, n_clusters, max_iters=100, tol=1e-4, random_state=None):
@@ -49,7 +47,6 @@ def k_means_manhattan(X, n_clusters, max_iters=100, tol=1e-4, random_state=None)
                 centroids[k] = np.median(cluster_points, axis=0)
 
     return labels
-
 
 # 使用自定义的曼哈顿距离 K-means 进行聚类
 n_clusters = 5
