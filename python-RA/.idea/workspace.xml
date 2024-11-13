@@ -1,4 +1,167 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PropertiesComponent">{}</component>
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="11.13">
+      <change afterPath="$PROJECT_DIR$/图像处理代码/neuron_raster_plot.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/Day6 window_30_step_10.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/Day6 window_30_step_5.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/Day6 window_50_step_10.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/neuron_raster_plot_Day6win50step10.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/时间条形图.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day3/Day3.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day3/aligned_behavior_calcium_data Day3.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/30,10.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/DBSCAN聚类.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/Day6 behavior.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/Day6三维聚类.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/Day6数据.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/EMD CUDA.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/EMD滑动窗口聚类图像生成.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/aligned_behavior_calcium_data Day6.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/calcium_data.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/calcium_window_data_separate_sheets.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/calcium_window_emd_cluster_single_sheet.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/cluster_1_activity.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/cluster_2_activity.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/cluster_3_activity.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/day 6  cell 行为学标记.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/earth mover‘s distance kmeans.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/hausdorff kmeans.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/sample.xls" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/sliding window.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/sliding_window_long_format_processed.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/sliding_window_results.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/test1.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/单个神经元pattern分析.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/排序.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/数据对齐.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/曼哈顿距离.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/滑动窗口数据处理.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day6/行为对齐后聚类（曼哈顿距离）.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day9/DBSCAN 9.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day9/Day9三维聚类.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day9/calcium_data9.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day9/day 9  cell 行为学标记.xlsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/数据/Day9/排序.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/图像处理/图像结果/Day6 window_30_step_10.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/图像处理/图像结果/Day6 window_30_step_5.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/图像处理/图像结果/Day6 window_50_step_10.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/图像处理/时间条形图.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day3/Day3.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day3/aligned_behavior_calcium_data Day3.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/30,10.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/DBSCAN聚类.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/Day6三维聚类.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/Day6数据.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/EMD CUDA.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/EMD滑动窗口聚类图像生成.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/aligned_behavior_calcium_data Day6.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/calcium_data.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/calcium_window_data_separate_sheets.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/calcium_window_emd_cluster_single_sheet.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/cluster_1_activity.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/cluster_2_activity.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/cluster_3_activity.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/day 6  cell 行为学标记.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/earth mover‘s distance kmeans.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/hausdorff kmeans.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/sample.xls" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/sliding window.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/sliding_window_long_format_processed.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/sliding_window_results.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/test1.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/单个神经元pattern分析.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/排序.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/数据对齐.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/曼哈顿距离.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/滑动窗口数据处理.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day6/行为对齐后聚类（曼哈顿距离）.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day9/DBSCAN 9.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day9/Day9三维聚类.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day9/calcium_data9.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day9/day 9  cell 行为学标记.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据区/Day9/排序.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/聚类算法代码/基于EMD的K-means.py" beforeDir="false" afterPath="$PROJECT_DIR$/聚类算法代码/基于EMD的K-means.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 8
+}]]></component>
+  <component name="ProjectId" id="2omapK8Br4nHuwSj6S6eJRgPXsk" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python.时间条形图.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "panjiteng",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-5c90d61e3bab-JavaScript-PY-242.23726.102" />
+        <option value="bundled-python-sdk-5e1850174b45-399fe30bd8c1-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-242.23726.102" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="" />
+      <created>1731477387878</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1731477387878</updated>
+      <workItem from="1731477389124" duration="2372000" />
+    </task>
+    <task id="LOCAL-00001" summary="11.13">
+      <option name="closed" value="true" />
+      <created>1731477428931</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1731477428931</updated>
+    </task>
+    <task id="LOCAL-00002" summary="11.13">
+      <option name="closed" value="true" />
+      <created>1731477530227</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1731477530227</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="11.13" />
+    <option name="LAST_COMMIT_MESSAGE" value="11.13" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="时间条形图 覆盖结果" MODIFIED="1731479226836" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/图像处理代码" />
+  </component>
 </project>
