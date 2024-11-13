@@ -109,8 +109,8 @@
 import os
 import pandas as pd
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import cv2  # OpenCV 用于高维 EMD 计算
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from numba import jit
 import math
 
 # 设置输入和输出文件路径
@@ -131,36 +131,31 @@ weights = {
     'rise_time': 0.05
 }
 
-# EMD 计算函数 (使用 OpenCV 的 cv2.EMD)
-def emd_distance(a, b):
-    a = a.astype(np.float32).reshape(-1, 1)
-    b = b.astype(np.float32).reshape(-1, 1)
-    weights_a = np.ones((a.shape[0], 1), dtype=np.float32) / a.shape[0]
-    weights_b = np.ones((b.shape[0], 1), dtype=np.float32) / b.shape[0]
-    sig_a = np.hstack((weights_a, a))
-    sig_b = np.hstack((weights_b, b))
-    emd, _, _ = cv2.EMD(sig_a, sig_b, cv2.DIST_L2)
-    return emd
+# 近似 EMD 计算函数
+@jit(nopython=True)
+def weighted_distance(a, b, weights):
+    dist = 0.0
+    for i in range(len(a)):
+        dist += weights[i] * abs(a[i] - b[i])
+    return dist
 
-# 并行计算 EMD 距离矩阵
-def parallel_emd_distances(data_point, centers):
-    distances = [emd_distance(data_point, center) for center in centers]
-    return distances
-
-# K-means 聚类函数（基于并行化 EMD）
-def emd_kmeans(data, centers, max_iter=100):
+# 优化的 K-means 聚类函数
+@jit(nopython=True)
+def weighted_kmeans(data, centers, weights, max_iter=100):
     labels = np.zeros(len(data), dtype=np.int32)
     new_centers = np.empty_like(centers)
 
     for iteration in range(max_iter):
-        # 并行分配样本到最近的质心
-        with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(parallel_emd_distances, data[i], centers): i for i in range(len(data))}
-            for future in as_completed(futures):
-                i = futures[future]
-                distances = future.result()
-                min_index = np.argmin(distances)
-                labels[i] = min_index
+        # 分配样本到最近的质心
+        for i in range(len(data)):
+            min_dist = math.inf
+            min_index = 0
+            for j in range(len(centers)):
+                dist = weighted_distance(data[i], centers[j], weights)
+                if dist < min_dist:
+                    min_dist = dist
+                    min_index = j
+            labels[i] = min_index
 
         # 更新质心
         for j in range(n_clusters):
@@ -179,6 +174,9 @@ def emd_kmeans(data, centers, max_iter=100):
         centers = new_centers.copy()
 
     return labels, centers
+
+# 将权重数组准备为 NumPy 数组
+weight_values = np.array(list(weights.values()), dtype=np.float32)
 
 # 读取并处理 Excel 文件中的所有工作表
 with pd.ExcelWriter(output_file) as writer:
@@ -207,8 +205,8 @@ with pd.ExcelWriter(output_file) as writer:
         np.random.seed(42)
         initial_centers = data[np.random.choice(data.shape[0], n_clusters, replace=False)]
 
-        # 执行基于 EMD 的并行化 K-means 聚类
-        labels, centers = emd_kmeans(data, initial_centers, max_iter=max_iter)
+        # 执行优化后的 K-means 聚类
+        labels, centers = weighted_kmeans(data, initial_centers, weight_values, max_iter=max_iter)
 
         # 将聚类标签和结果添加到 DataFrame
         result_df = pd.DataFrame(data, columns=['Amplitude', 'Peak', 'Decay Time', 'Rise Time', 'Latency', 'Frequency'])
