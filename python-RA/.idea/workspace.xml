@@ -5,13 +5,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="11.13">
+      <change afterPath="$PROJECT_DIR$/图像处理代码/神经元标记算法.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/聚类结果映射时序图.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/聚类算法代码/基于EMD的K-means.py" beforeDir="false" afterPath="$PROJECT_DIR$/聚类算法代码/基于EMD的K-means.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
@@ -28,6 +36,7 @@
   "keyToString": {
     "Python.基于EMD的K-means.executor": "Run",
     "Python.时间条形图.executor": "Run",
+    "Python.聚类结果映射时序图.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "panjiteng",
     "ignore.virus.scanning.warn.message": "true",
@@ -56,7 +65,8 @@
       <option name="presentableId" value="Default" />
       <updated>1731477387878</updated>
       <workItem from="1731477389124" duration="2372000" />
-      <workItem from="1731479788790" duration="4626000" />
+      <workItem from="1731479788790" duration="6643000" />
+      <workItem from="1731552457972" duration="3957000" />
     </task>
     <task id="LOCAL-00001" summary="11.13">
       <option name="closed" value="true" />
@@ -98,7 +108,15 @@
       <option name="project" value="LOCAL" />
       <updated>1731481355576</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="11.13">
+      <option name="closed" value="true" />
+      <created>1731487976704</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1731487976704</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -110,6 +128,6 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/python_RA$EMDK_means.coverage" NAME="基于EMD的K-means 覆盖结果" MODIFIED="1731485649493" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
-    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="时间条形图 覆盖结果" MODIFIED="1731481037303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/图像处理代码" />
+    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="聚类结果映射时序图 覆盖结果" MODIFIED="1731554882019" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/图像处理代码" />
   </component>
 </project>
