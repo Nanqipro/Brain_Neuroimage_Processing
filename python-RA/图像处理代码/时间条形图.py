@@ -4,11 +4,11 @@ from tqdm import tqdm
 from collections import Counter
 
 # 设置数据文件路径
-file_path_neuron = r"C:\Users\PAN\PycharmProjects\GitHub\python-RA\聚类算法代码\聚类结果\calcium_window_emd_cluster_results_weighted PCA_sheets.xlsx"  # 请替换为你的神经元 Excel 文件路径
+file_path_neuron = r"C:\Users\PAN\PycharmProjects\GitHub\python-RA\聚类算法代码\聚类结果\calcium_window_Hausdorff_weighted_output.xlsx"  # 请替换为你的神经元 Excel 文件路径
 file_path_behavior = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day6\Day6 behavior.xlsx'  # 请替换为你的行为状态 Excel 文件路径
 
 # 从文件中读取神经元数据的特定工作表
-sheet_name_to_plot = 'Window_50_Step_10'  # 请指定要生成图像的工作表名称
+sheet_name_to_plot = 'Window_50_Step_5'  # 请指定要生成图像的工作表名称
 df = pd.read_excel(file_path_neuron, sheet_name=sheet_name_to_plot)
 
 # 读取行为状态数据，跳过第一行标签行
@@ -88,4 +88,4 @@ fig.update_layout(
 )
 
 # 显示交互式图像
-fig.write_html('neuron_raster_plot_EMD PCA_Day6win50step10.html')  # 保存图形为HTML文件
+fig.write_html('neuron_raster_plot_Day6win50step5.html')  # 保存图形为HTML文件
