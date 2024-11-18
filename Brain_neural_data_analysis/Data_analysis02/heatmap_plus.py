@@ -48,7 +48,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # 加载数据
-day3_data = pd.read_excel('./data/Day3_with_behavior_labels_filled.xlsx')
+day3_data = pd.read_excel('./data/Day9_with_behavior_labels_filled.xlsx')
 
 # 将 'stamp' 列设置为索引
 day3_data = day3_data.set_index('stamp')
@@ -104,7 +104,7 @@ for cd1_time in cd1_indices:
         # plt.text(cd1_position + 0.5, -0.5, '放入CD1', color='yellow', rotation=90,
         #          verticalalignment='bottom', fontsize=12)
 
-plt.title('Day3-heatmap (add CD1)', fontsize=16)
+plt.title('Day9-heatmap (add CD1)', fontsize=16)
 plt.xlabel('stamp', fontsize=20)
 plt.ylabel('neuron', fontsize=20)
 
