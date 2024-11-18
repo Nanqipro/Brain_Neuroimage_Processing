@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # 加载数据
-file_path = './data/Day6_Neuron_Calcium_Metrics.csv'  # 请替换为实际文件路径
-metrics_df = pd.read_csv(file_path)
+file_path = './data/Day6_Neuron_Calcium_Metrics.xlsx'  # 请替换为实际文件路径
+metrics_df = pd.read_excel(file_path,sheet_name='Windows100_step10')
 
 # 定义用于 PCA 的特征列
 features = ['Start Time', 'Amplitude', 'Peak', 'Decay Time', 'Rise Time', 'Latency', 'Frequency']
@@ -24,7 +24,7 @@ plt.figure(figsize=(10, 8))
 sns.scatterplot(
     x='PCA-1', y='PCA-2',
     data=metrics_df,
-    hue='k-means-ED',  # 使用聚类列区分颜色，可替换为其他聚类列
+    hue='GMM',  # 使用聚类列区分颜色，可替换为其他聚类列
     palette='viridis',
     legend='full'
 )
@@ -34,7 +34,7 @@ plt.ylabel("PCA Dimension 2")
 plt.show()
 
 # 保存结果至文件
-output_file_path = './data/Day6_Neuron_Calcium_Metrics_with_PCA.csv'
-metrics_df.to_csv(output_file_path, index=False)
+# output_file_path = './data/Day6_Neuron_Calcium_Metrics_with_PCA.csv'
+metrics_df.to_excel(file_path, index=False,sheet_name='Windows100_step10')
 
-print(f'PCA 降维结果已保存至: {output_file_path}')
+print(f'PCA 降维结果已保存至: {file_path}')

@@ -30,4 +30,4 @@ metrics_df['KMedoids-EMD'] = kmedoids.fit_predict(distance_matrix)
 # 将聚类结果保存至原文件
 metrics_df.to_csv(file_path, index=False)
 
-print(f'聚类结果已保存至原文件的 "k-means-ED" 列中: {file_path}')
+print(f'聚类结果已保存至原文件的 "KMedoids-EMD" 列中: {file_path}')

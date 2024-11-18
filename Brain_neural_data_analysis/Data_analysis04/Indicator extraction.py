@@ -102,7 +102,7 @@ import pandas as pd
 import numpy as np
 
 # 加载数据
-file_path = './data/Day9.xlsx'  # 请替换为实际文件路径
+file_path = './data/Day6.xlsx'  # 请替换为实际文件路径
 data = pd.read_excel(file_path)
 
 # 确保只处理数值列并忽略 FrameLost 列
@@ -110,8 +110,8 @@ neuron_columns = data.columns[1:]  # 假设 n1~n53 为神经元数据
 data[neuron_columns] = data[neuron_columns].apply(pd.to_numeric, errors='coerce')
 
 # 定义滑动窗口参数
-window_size = 30
-step_size = 5
+window_size = 100
+step_size = 10
 
 
 # 定义计算关键指标的函数
@@ -172,5 +172,5 @@ def calculate_metrics_for_neurons(data, window_size, step_size):
 metrics_df = calculate_metrics_for_neurons(data, window_size, step_size)
 
 # 保存或展示计算结果
-metrics_df.to_csv("./data/Day9_Neuron_Calcium_Metrics.csv", index=False)  # 将结果保存为CSV文件
+metrics_df.to_excel("./data/Day6_Neuron_Calcium_Metrics.xlsx", index=False,sheet_name= 'Windows100_step10')  # 将结果保存为CSV文件
 print(metrics_df.head())  # 或打印前几行结果
