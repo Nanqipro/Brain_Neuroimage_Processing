@@ -5,9 +5,9 @@ import math
 from numba import jit
 
 # 设置输入和输出文件路径
-file_path = r'C:\Users\PAN\PycharmProjects\Brain_Neuroimage_Processing\python-RA\Day6\calcium_window_data_separate_sheets.xlsx'
-output_folder = r'C:\Users\PAN\PycharmProjects\Brain_Neuroimage_Processing\python-RA\标准化代码'
-output_file = os.path.join(output_folder, 'calcium_window_result_weighted_output.xlsx')
+file_path = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day3\calcium_window_data_separate_sheets_Day3.xlsx'
+output_folder = r'C:\Users\PAN\PycharmProjects\Brain_Neuroimage_Processing\python-RA\数据\Day3'
+output_file = os.path.join(output_folder, 'calcium_window_result_weighted_output_Day3.xlsx')
 
 # 如果输出文件夹不存在，则创建
 os.makedirs(output_folder, exist_ok=True)
