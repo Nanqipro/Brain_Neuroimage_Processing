@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from tqdm import tqdm  # 用于显示进度条
 
 # 设置Excel文件路径
-file_path = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\聚类算法代码\聚类结果\calcium_window_Hausdorff_weighted_output.xlsx'
+file_path = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day3\calcium_window_result_weighted_output_Day3.xlsx'
 
 # 指定要处理的工作表名称
 sheet_name = input("请输入要处理的工作表名称: ")
