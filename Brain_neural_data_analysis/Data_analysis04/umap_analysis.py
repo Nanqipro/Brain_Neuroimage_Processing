@@ -23,7 +23,7 @@ metrics_df['UMAP-2'] = X_umap[:, 1]
 plt.figure(figsize=(10, 8))
 sns.scatterplot(
     x='UMAP-1', y='UMAP-2',
-    hue='GMM',
+    hue='k-means-Hausdorff',
     data=metrics_df,
     palette='viridis',
     legend='full'

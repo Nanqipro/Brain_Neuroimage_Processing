@@ -23,7 +23,7 @@ metrics_df['t-SNE-2'] = X_tsne[:, 1]
 plt.figure(figsize=(10, 8))
 sns.scatterplot(
     x='t-SNE-1', y='t-SNE-2',
-    hue='GMM',
+    hue='k-means-Hausdorff',
     data=metrics_df,
     palette='viridis',
     legend='full'
