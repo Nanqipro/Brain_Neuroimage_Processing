@@ -1,7 +1,7 @@
 import pandas as pd
 
 # 读取对齐好的钙离子浓度数据（假设文件包含时间、行为列，后续为各神经元数据列）
-data = pd.read_excel(r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day3\aligned_calcium_data Day3.xlsx')
+data = pd.read_excel(r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day9\calcium_data9.xlsx')
 
 # 设置不同的窗口大小和步长
 window_sizes = [30, 50, 100]
