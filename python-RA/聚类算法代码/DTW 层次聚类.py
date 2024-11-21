@@ -155,12 +155,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 
-# 添加以下代码来设置中文字体
+# 设置中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 使用黑体
 plt.rcParams['axes.unicode_minus'] = False    # 解决坐标轴负号显示问题
 
+# 定义数据标签（可编辑）
+data_label = 'Day 9'  # 这里可以修改为您需要的日期标签
+
 # 读取Excel文件
-df = pd.read_excel(r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day3\Day3.xlsx', header=0)
+df = pd.read_excel(r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day9\calcium_data9.xlsx', header=0)
 
 # 打印DataFrame的信息，检查数据是否正确读取
 print("DataFrame 信息：")
@@ -235,13 +238,13 @@ condensed_distance_matrix = squareform(distance_matrix)
 # 进行层次聚类
 linked = linkage(condensed_distance_matrix, method='average')
 
-# 绘制树状图
+# 绘制层次聚类树状图
 plt.figure(figsize=(12, 8))
 dendrogram(linked,
            labels=neuron_names[:num_segments],  # 可能有部分神经元被跳过，需要截取
            distance_sort='descending',
            show_leaf_counts=True)
-plt.title('层次聚类树状图')
+plt.title(f'{data_label} 层次聚类树状图')
 plt.xlabel('神经元')
 plt.ylabel('距离')
 plt.xticks(rotation=90)
@@ -250,7 +253,7 @@ plt.show()
 
 # 确定聚类数量并获取聚类标签
 # 您可以根据树状图选择合适的聚类数量
-num_clusters = 3  # 示例中选择3个聚类
+num_clusters = 5  # 选择n个聚类
 cluster_labels = fcluster(linked, num_clusters, criterion='maxclust')
 
 # 输出每个神经元的聚类标签
@@ -258,25 +261,49 @@ print('聚类结果：')
 for neuron, label in zip(neuron_names[:num_segments], cluster_labels):
     print(f'神经元 {neuron}: 聚类 {label}')
 
-# 将数据和聚类标签组合
+# 将数据、聚类标签和神经元名称组合
 data_with_labels = list(zip(data, cluster_labels, neuron_names[:num_segments]))
 
-# 在绘制钙波曲线时添加垂直偏移
+# 根据聚类标签对数据进行排序
+data_with_labels.sort(key=lambda x: x[1])  # 按照聚类标签排序
+
+# 绘制每个神经元的钙波曲线（排序后，y 轴上等间隔排列）
 plt.figure(figsize=(12, 8))
 colors = sns.color_palette('hls', num_clusters)
 
 y_offset = 2  # 定义每个曲线的垂直偏移量
-max_offset = y_offset * num_segments
 
 for idx, (signal, label, name) in enumerate(data_with_labels):
     offset = idx * y_offset  # 计算当前曲线的垂直偏移
     plt.plot(time_points, signal + offset, color=colors[label - 1], alpha=0.8)
-    # 可以在曲线左侧标注神经元名称
+    # 在曲线左侧标注神经元名称
     plt.text(time_points[0], signal[0] + offset, f'{name}', fontsize=8, verticalalignment='bottom')
+    # 在曲线右侧标注聚类编号（可选）
+    plt.text(time_points[-1], signal[-1] + offset, f'聚类 {label}', fontsize=8, verticalalignment='bottom', horizontalalignment='right')
 
-plt.title('添加垂直偏移的钙波片段聚类')
+plt.title(f'{data_label} 基于 DTW 距离的钙波片段聚类')
 plt.xlabel('时间')
 plt.ylabel('钙离子浓度（相对值）+ 垂直偏移')
 plt.yticks([])  # 隐藏 y 轴刻度
+plt.tight_layout()
+plt.show()
+
+# 绘制每个聚类的平均钙波（在 y 轴上隔开距离）
+plt.figure(figsize=(12, 8))
+
+for cluster_num in range(1, num_clusters + 1):
+    cluster_data = [d for d, label, name in data_with_labels if label == cluster_num]
+    if len(cluster_data) > 0:
+        mean_waveform = np.mean(cluster_data, axis=0)
+        offset = (cluster_num - 1) * y_offset  # 为每个聚类添加偏移
+        plt.plot(time_points, mean_waveform + offset, label=f'聚类 {cluster_num}')
+        # 在曲线左侧标注聚类编号
+        plt.text(time_points[0], mean_waveform[0] + offset, f'聚类 {cluster_num}', fontsize=10, verticalalignment='bottom')
+
+plt.title(f'{data_label} 每个聚类的平均钙波波形')
+plt.xlabel('时间')
+plt.ylabel('钙离子浓度（相对值）+ 垂直偏移')
+plt.yticks([])  # 隐藏 y 轴刻度
+plt.legend()
 plt.tight_layout()
 plt.show()

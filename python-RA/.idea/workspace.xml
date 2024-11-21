@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="11.20">
+    <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="11.21">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/testing.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/数据/Day9/calcium_data9.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/数据/Day9/calcium_data9.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/聚类算法代码/DTW 层次聚类.py" beforeDir="false" afterPath="$PROJECT_DIR$/聚类算法代码/DTW 层次聚类.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -93,7 +92,7 @@
       <workItem from="1731898118242" duration="14668000" />
       <workItem from="1731984974260" duration="11616000" />
       <workItem from="1732069741774" duration="11547000" />
-      <workItem from="1732156144460" duration="5773000" />
+      <workItem from="1732156144460" duration="7248000" />
     </task>
     <task id="LOCAL-00001" summary="11.13">
       <option name="closed" value="true" />
@@ -207,7 +206,15 @@
       <option name="project" value="LOCAL" />
       <updated>1732088206843</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="11.21">
+      <option name="closed" value="true" />
+      <created>1732170130629</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1732170130629</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -220,11 +227,12 @@
     <MESSAGE value="11.18" />
     <MESSAGE value="11.19" />
     <MESSAGE value="11.20" />
-    <option name="LAST_COMMIT_MESSAGE" value="11.20" />
+    <MESSAGE value="11.21" />
+    <option name="LAST_COMMIT_MESSAGE" value="11.21" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/python_RA$EMDK_means.coverage" NAME="基于EMD的K-means 覆盖结果" MODIFIED="1731485649493" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
-    <SUITE FILE_PATH="coverage/python_RA$DTW_.coverage" NAME="DTW 层次聚类 覆盖结果" MODIFIED="1732165313703" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
+    <SUITE FILE_PATH="coverage/python_RA$DTW_.coverage" NAME="DTW 层次聚类 覆盖结果" MODIFIED="1732170990264" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
     <SUITE FILE_PATH="coverage/python_RA$cnmf.coverage" NAME="cnmf 覆盖结果" MODIFIED="1731913823629" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/.venv/Lib/site-packages/caiman-1.11.3-py3.12-win-amd64.egg/caiman/source_extraction/cnmf" />
     <SUITE FILE_PATH="coverage/python_RA$caImAn.coverage" NAME="caImAn扫描神经元 覆盖结果" MODIFIED="1731652669491" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/图像处理代码" />
     <SUITE FILE_PATH="coverage/python_RA$demo_caiman_basic.coverage" NAME="demo_caiman_basic 覆盖结果" MODIFIED="1731918662618" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/CaImAn/demos/general" />
