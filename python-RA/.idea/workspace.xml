@@ -6,7 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="11.21">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/聚类算法代码/DTW 层次聚类.py" beforeDir="false" afterPath="$PROJECT_DIR$/聚类算法代码/DTW 层次聚类.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,37 +34,37 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.DTW 层次聚类.executor": "Run",
-    "Python.Hausdorff.executor": "Run",
-    "Python.caImAn Neuron.executor": "Run",
-    "Python.caImAn扫描神经元.executor": "Run",
-    "Python.cnmf.executor": "Run",
-    "Python.demo_behavior.executor": "Run",
-    "Python.demo_caiman_basic.executor": "Run",
-    "Python.demo_pipeline_voltage_imaging.executor": "Run",
-    "Python.sliding window.executor": "Run",
-    "Python.testing.executor": "Run",
-    "Python.基于EMD的K-means.executor": "Run",
-    "Python.时间条形图.executor": "Run",
-    "Python.滑动窗口数据处理.executor": "Run",
-    "Python.神经元手工标记扫描.executor": "Run",
-    "Python.神经元标记算法.executor": "Run",
-    "Python.聚类结果映射时序图.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "panjiteng",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "C:/Users/PAN/PycharmProjects/GitHub/python-RA/图像处理代码/图像结果/DTW层次聚类结果图",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.DTW 层次聚类.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Hausdorff.executor&quot;: &quot;Run&quot;,
+    &quot;Python.caImAn Neuron.executor&quot;: &quot;Run&quot;,
+    &quot;Python.caImAn扫描神经元.executor&quot;: &quot;Run&quot;,
+    &quot;Python.cnmf.executor&quot;: &quot;Run&quot;,
+    &quot;Python.demo_behavior.executor&quot;: &quot;Run&quot;,
+    &quot;Python.demo_caiman_basic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.demo_pipeline_voltage_imaging.executor&quot;: &quot;Run&quot;,
+    &quot;Python.sliding window.executor&quot;: &quot;Run&quot;,
+    &quot;Python.testing.executor&quot;: &quot;Run&quot;,
+    &quot;Python.基于EMD的K-means.executor&quot;: &quot;Run&quot;,
+    &quot;Python.时间条形图.executor&quot;: &quot;Run&quot;,
+    &quot;Python.滑动窗口数据处理.executor&quot;: &quot;Run&quot;,
+    &quot;Python.神经元手工标记扫描.executor&quot;: &quot;Run&quot;,
+    &quot;Python.神经元标记算法.executor&quot;: &quot;Run&quot;,
+    &quot;Python.聚类结果映射时序图.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;panjiteng&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/PAN/PycharmProjects/GitHub/python-RA/图像处理代码/图像结果/DTW层次聚类结果图&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -92,7 +91,8 @@
       <workItem from="1731898118242" duration="14668000" />
       <workItem from="1731984974260" duration="11616000" />
       <workItem from="1732069741774" duration="11547000" />
-      <workItem from="1732156144460" duration="14018000" />
+      <workItem from="1732156144460" duration="14630000" />
+      <workItem from="1732245165080" duration="596000" />
     </task>
     <task id="LOCAL-00001" summary="11.13">
       <option name="closed" value="true" />
@@ -222,7 +222,15 @@
       <option name="project" value="LOCAL" />
       <updated>1732173529754</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="11.21">
+      <option name="closed" value="true" />
+      <created>1732179946633</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1732179946633</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
