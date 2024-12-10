@@ -14,7 +14,7 @@ import plotly.io as pio
 pio.templates.default = ("plotly")
 
 # 1. 数据读取
-neuron_data = pd.read_excel(r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day6\calcium_data.xlsx')  # 请修改为您的数据路径
+neuron_data = pd.read_excel(r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day3\Day3.xlsx')  # 请修改为您的数据路径
 
 # 获取神经元ID列表
 neuron_ids = neuron_data.columns[1:]
@@ -239,4 +239,7 @@ fig = go.Figure(
 
 # 7. 显示或保存动画
 # 可以将动画保存为 HTML 文件
-fig.write_html('neuron_activity_animation_advanced.html')
+fig.write_html('neuron_activity_animation_mean_Day3.html')
+
+
+

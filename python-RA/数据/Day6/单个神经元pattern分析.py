@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 
 
 # 数据在 calcium_data文件中
-df = pd.read_excel('calcium_data.xlsx')
+df = pd.read_excel(r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day6\calcium_data.xlsx')
 calcium_data = df.to_numpy()
 
 # 取 calcium_data 的首列作为单个神经元的数据

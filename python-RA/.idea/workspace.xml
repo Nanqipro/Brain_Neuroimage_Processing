@@ -4,8 +4,69 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="11.21">
+    <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="12.2">
+      <change afterPath="$PROJECT_DIR$/Tensorflow 2  小鼠神经元/原始钙离子浓度数据归一化.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图 动态/neuron_activity_animation.gif" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_0.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_1.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_10.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_11.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_12.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_13.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_14.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_15.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_16.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_17.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_18.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_19.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_2.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_20.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_21.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_22.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_23.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_24.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_25.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_26.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_27.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_28.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_29.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_3.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_30.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_31.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_32.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_33.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_34.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_35.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_36.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_37.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_38.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_39.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_4.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_40.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_41.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_42.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_43.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_44.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_45.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_46.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_47.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_48.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_49.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_5.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_50.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_51.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_52.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_6.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_7.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_8.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/图像处理代码/图像结果/神经元拓扑结构图/plot_2024-11-26 14-20-07_9.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/聚类算法代码/聚类算法性能对比.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据/Day3/Day3.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/数据/Day3/Day3.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据/Day6/Day6 behavior.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/数据/Day6/Day6 behavior.xlsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/数据/Day6/单个神经元pattern分析.py" beforeDir="false" afterPath="$PROJECT_DIR$/数据/Day6/单个神经元pattern分析.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/聚类算法代码/神经元拓扑结构图plotly.py" beforeDir="false" afterPath="$PROJECT_DIR$/聚类算法代码/神经元拓扑结构图plotly.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/聚类算法代码/神经拓扑结构图.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,18 +105,25 @@
     &quot;Python.demo_behavior.executor&quot;: &quot;Run&quot;,
     &quot;Python.demo_caiman_basic.executor&quot;: &quot;Run&quot;,
     &quot;Python.demo_pipeline_voltage_imaging.executor&quot;: &quot;Run&quot;,
+    &quot;Python.learn.executor&quot;: &quot;Run&quot;,
     &quot;Python.sliding window.executor&quot;: &quot;Run&quot;,
     &quot;Python.testing.executor&quot;: &quot;Run&quot;,
+    &quot;Python.单个神经元pattern分析.executor&quot;: &quot;Run&quot;,
+    &quot;Python.原始钙离子浓度数据归一化.executor&quot;: &quot;Run&quot;,
     &quot;Python.基于EMD的K-means.executor&quot;: &quot;Run&quot;,
     &quot;Python.时间条形图.executor&quot;: &quot;Run&quot;,
     &quot;Python.滑动窗口数据处理.executor&quot;: &quot;Run&quot;,
     &quot;Python.神经元手工标记扫描.executor&quot;: &quot;Run&quot;,
+    &quot;Python.神经元拓扑结构图plotly.executor&quot;: &quot;Run&quot;,
     &quot;Python.神经元标记算法.executor&quot;: &quot;Run&quot;,
+    &quot;Python.神经拓扑结构图.executor&quot;: &quot;Run&quot;,
+    &quot;Python.聚类算法性能对比.executor&quot;: &quot;Run&quot;,
     &quot;Python.聚类结果映射时序图.executor&quot;: &quot;Run&quot;,
+    &quot;Python.行为分类任务.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;panjiteng&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/PAN/PycharmProjects/GitHub/python-RA/图像处理代码/图像结果/DTW层次聚类结果图&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/PAN/PycharmProjects/GitHub/python-RA/图像处理代码/图像结果/神经元拓扑结构图 动态&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -92,7 +160,16 @@
       <workItem from="1731984974260" duration="11616000" />
       <workItem from="1732069741774" duration="11547000" />
       <workItem from="1732156144460" duration="14630000" />
-      <workItem from="1732245165080" duration="596000" />
+      <workItem from="1732245165080" duration="2372000" />
+      <workItem from="1732595144625" duration="3955000" />
+      <workItem from="1732602107581" duration="5576000" />
+      <workItem from="1732675070742" duration="13016000" />
+      <workItem from="1732761254171" duration="5774000" />
+      <workItem from="1732859916799" duration="3199000" />
+      <workItem from="1733108465288" duration="6103000" />
+      <workItem from="1733365933313" duration="8337000" />
+      <workItem from="1733712282415" duration="10029000" />
+      <workItem from="1733798141653" duration="2359000" />
     </task>
     <task id="LOCAL-00001" summary="11.13">
       <option name="closed" value="true" />
@@ -230,7 +307,39 @@
       <option name="project" value="LOCAL" />
       <updated>1732179946633</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="11.21">
+      <option name="closed" value="true" />
+      <created>1732260904786</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1732260904786</updated>
+    </task>
+    <task id="LOCAL-00019" summary="11.27">
+      <option name="closed" value="true" />
+      <created>1732676991138</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1732676991138</updated>
+    </task>
+    <task id="LOCAL-00020" summary="11.27">
+      <option name="closed" value="true" />
+      <created>1732687240968</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1732687240968</updated>
+    </task>
+    <task id="LOCAL-00021" summary="12.2">
+      <option name="closed" value="true" />
+      <created>1733123895364</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1733123895364</updated>
+    </task>
+    <option name="localTasksCounter" value="22" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -255,18 +364,23 @@
     <MESSAGE value="11.19" />
     <MESSAGE value="11.20" />
     <MESSAGE value="11.21" />
-    <option name="LAST_COMMIT_MESSAGE" value="11.21" />
+    <MESSAGE value="11.27" />
+    <MESSAGE value="12.2" />
+    <option name="LAST_COMMIT_MESSAGE" value="12.2" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/python_RA$EMDK_means.coverage" NAME="基于EMD的K-means 覆盖结果" MODIFIED="1731485649493" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
-    <SUITE FILE_PATH="coverage/python_RA$DTW_.coverage" NAME="DTW 层次聚类 覆盖结果" MODIFIED="1732177546870" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
+    <SUITE FILE_PATH="coverage/python_RA$plotly.coverage" NAME="神经元拓扑结构图plotly 覆盖结果" MODIFIED="1732776187368" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
+    <SUITE FILE_PATH="coverage/python_RA$DTW_.coverage" NAME="DTW 层次聚类 覆盖结果" MODIFIED="1732596648316" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
     <SUITE FILE_PATH="coverage/python_RA$cnmf.coverage" NAME="cnmf 覆盖结果" MODIFIED="1731913823629" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/.venv/Lib/site-packages/caiman-1.11.3-py3.12-win-amd64.egg/caiman/source_extraction/cnmf" />
     <SUITE FILE_PATH="coverage/python_RA$caImAn.coverage" NAME="caImAn扫描神经元 覆盖结果" MODIFIED="1731652669491" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/图像处理代码" />
+    <SUITE FILE_PATH="coverage/python_RA$pattern.coverage" NAME="单个神经元pattern分析 覆盖结果" MODIFIED="1732596627669" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/数据/Day6" />
     <SUITE FILE_PATH="coverage/python_RA$demo_caiman_basic.coverage" NAME="demo_caiman_basic 覆盖结果" MODIFIED="1731918662618" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/CaImAn/demos/general" />
+    <SUITE FILE_PATH="coverage/python_RA$learn.coverage" NAME="learn 覆盖结果" MODIFIED="1733720658149" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/数据" />
     <SUITE FILE_PATH="coverage/python_RA$testing.coverage" NAME="testing 覆盖结果" MODIFIED="1732157906328" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/python_RA$demo_pipeline_voltage_imaging.coverage" NAME="demo_pipeline_voltage_imaging 覆盖结果" MODIFIED="1731908811562" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/CaImAn/demos/general" />
     <SUITE FILE_PATH="coverage/python_RA$Hausdorff.coverage" NAME="Hausdorff 覆盖结果" MODIFIED="1731998839287" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
-    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="时间条形图 覆盖结果" MODIFIED="1731998946267" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
+    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="原始钙离子浓度数据归一化 覆盖结果" MODIFIED="1733722384655" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Tensorflow 2  小鼠神经元" />
     <SUITE FILE_PATH="coverage/python_RA$caImAn_Neuron.coverage" NAME="caImAn Neuron 覆盖结果" MODIFIED="1731654197329" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/图像处理代码/calcium scan" />
     <SUITE FILE_PATH="coverage/python_RA$demo_behavior.coverage" NAME="demo_behavior 覆盖结果" MODIFIED="1731909898536" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/CaImAn/demos/general" />
     <SUITE FILE_PATH="coverage/python_RA$sliding_window.coverage" NAME="sliding window 覆盖结果" MODIFIED="1731986348162" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
