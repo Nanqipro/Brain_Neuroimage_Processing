@@ -9,7 +9,7 @@ import numpy as np
 matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
-image_path = r'C:\Users\PAN\Desktop\RA\数据集\NO2979\240924EM2\2979240924EM2.png'  # 替换为你的实际图像路径
+image_path = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\Neurons Position\240924EM\240924EM.jpg'  # 替换为你的实际图像路径
 img = mpimg.imread(image_path)
 img_height, img_width = img.shape[0], img.shape[1]
 

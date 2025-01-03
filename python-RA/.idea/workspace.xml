@@ -4,12 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="12.19">
-      <change afterPath="$PROJECT_DIR$/Neurons Position/手工标点/拓扑结构图 需导入坐标.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Neurons Position/手工标点/点位微调.py" afterDir="false" />
+    <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="12.30">
+      <change afterPath="$PROJECT_DIR$/DeepLearning/小鼠拓扑结构图 神经网络训练.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/DeepLearning/小鼠拓扑结构图提取.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Neurons Position/手工标点/manual positon.py" beforeDir="false" afterPath="$PROJECT_DIR$/Neurons Position/手工标点/manual positon.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Neurons Position/手工标点/相对坐标图day6 test.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Neurons Position/手工标点/拓扑结构图 需导入坐标.py" beforeDir="false" afterPath="$PROJECT_DIR$/Neurons Position/手工标点/拓扑结构图 需导入坐标.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,51 +43,52 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Python.DTW 层次聚类.executor&quot;: &quot;Run&quot;,
-    &quot;Python.Hausdorff.executor&quot;: &quot;Run&quot;,
-    &quot;Python.Neuronshed.executor&quot;: &quot;Run&quot;,
-    &quot;Python.Watershed.executor&quot;: &quot;Run&quot;,
-    &quot;Python.caImAn Neuron.executor&quot;: &quot;Run&quot;,
-    &quot;Python.caImAn扫描神经元.executor&quot;: &quot;Run&quot;,
-    &quot;Python.cnmf.executor&quot;: &quot;Run&quot;,
-    &quot;Python.demo_behavior.executor&quot;: &quot;Run&quot;,
-    &quot;Python.demo_caiman_basic.executor&quot;: &quot;Run&quot;,
-    &quot;Python.demo_pipeline_voltage_imaging.executor&quot;: &quot;Run&quot;,
-    &quot;Python.learn.executor&quot;: &quot;Run&quot;,
-    &quot;Python.manual positon.executor&quot;: &quot;Run&quot;,
-    &quot;Python.sliding window.executor&quot;: &quot;Run&quot;,
-    &quot;Python.study2.executor&quot;: &quot;Run&quot;,
-    &quot;Python.testing.executor&quot;: &quot;Run&quot;,
-    &quot;Python.xy坐标提取.executor&quot;: &quot;Run&quot;,
-    &quot;Python.单个神经元pattern分析.executor&quot;: &quot;Run&quot;,
-    &quot;Python.原始钙离子浓度数据归一化.executor&quot;: &quot;Run&quot;,
-    &quot;Python.基于EMD的K-means.executor&quot;: &quot;Run&quot;,
-    &quot;Python.拓扑结构图 需导入坐标.executor&quot;: &quot;Run&quot;,
-    &quot;Python.时间条形图.executor&quot;: &quot;Run&quot;,
-    &quot;Python.滑动窗口数据处理.executor&quot;: &quot;Run&quot;,
-    &quot;Python.点位微调.executor&quot;: &quot;Run&quot;,
-    &quot;Python.神经元手工标记扫描.executor&quot;: &quot;Run&quot;,
-    &quot;Python.神经元拓扑结构图plotly.executor&quot;: &quot;Run&quot;,
-    &quot;Python.神经元标记算法.executor&quot;: &quot;Run&quot;,
-    &quot;Python.神经拓扑结构图.executor&quot;: &quot;Run&quot;,
-    &quot;Python.聚类算法性能对比.executor&quot;: &quot;Run&quot;,
-    &quot;Python.聚类结果映射时序图.executor&quot;: &quot;Run&quot;,
-    &quot;Python.行为分类任务.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;panjiteng&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/PAN/PycharmProjects/GitHub/python-RA/图像处理代码/图像结果/神经元拓扑结构图 动态&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python.DTW 层次聚类.executor": "Run",
+    "Python.Hausdorff.executor": "Run",
+    "Python.Neuronshed.executor": "Run",
+    "Python.Watershed.executor": "Run",
+    "Python.caImAn Neuron.executor": "Run",
+    "Python.caImAn扫描神经元.executor": "Run",
+    "Python.cnmf.executor": "Run",
+    "Python.demo_behavior.executor": "Run",
+    "Python.demo_caiman_basic.executor": "Run",
+    "Python.demo_pipeline_voltage_imaging.executor": "Run",
+    "Python.learn.executor": "Run",
+    "Python.manual positon.executor": "Run",
+    "Python.sliding window.executor": "Run",
+    "Python.study2.executor": "Run",
+    "Python.testing.executor": "Run",
+    "Python.xy坐标提取.executor": "Run",
+    "Python.单个神经元pattern分析.executor": "Run",
+    "Python.原始钙离子浓度数据归一化.executor": "Run",
+    "Python.基于EMD的K-means.executor": "Run",
+    "Python.小鼠拓扑结构图提取.executor": "Run",
+    "Python.拓扑结构图 需导入坐标.executor": "Run",
+    "Python.时间条形图.executor": "Run",
+    "Python.滑动窗口数据处理.executor": "Run",
+    "Python.点位微调.executor": "Run",
+    "Python.神经元手工标记扫描.executor": "Run",
+    "Python.神经元拓扑结构图plotly.executor": "Run",
+    "Python.神经元标记算法.executor": "Run",
+    "Python.神经拓扑结构图.executor": "Run",
+    "Python.聚类算法性能对比.executor": "Run",
+    "Python.聚类结果映射时序图.executor": "Run",
+    "Python.行为分类任务.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "panjiteng",
+    "ignore.virus.scanning.warn.message": "true",
+    "last_opened_file_path": "C:/Users/PAN/PycharmProjects/GitHub/python-RA/图像处理代码/图像结果/神经元拓扑结构图 动态",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\PAN\PycharmProjects\GitHub\python-RA\Neurons Position" />
@@ -171,6 +173,10 @@
       <workItem from="1734923431570" duration="4054000" />
       <workItem from="1735013464607" duration="4095000" />
       <workItem from="1735182170313" duration="3912000" />
+      <workItem from="1735537302466" duration="1595000" />
+      <workItem from="1735786186903" duration="1229000" />
+      <workItem from="1735888577412" duration="1265000" />
+      <workItem from="1735890262512" duration="3341000" />
     </task>
     <task id="LOCAL-00001" summary="11.13">
       <option name="closed" value="true" />
@@ -364,7 +370,15 @@
       <option name="project" value="LOCAL" />
       <updated>1734586565560</updated>
     </task>
-    <option name="localTasksCounter" value="25" />
+    <task id="LOCAL-00025" summary="12.30">
+      <option name="closed" value="true" />
+      <created>1735537344297</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1735537344297</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -394,7 +408,8 @@
     <MESSAGE value="12.10" />
     <MESSAGE value="12.17" />
     <MESSAGE value="12.19" />
-    <option name="LAST_COMMIT_MESSAGE" value="12.19" />
+    <MESSAGE value="12.30" />
+    <option name="LAST_COMMIT_MESSAGE" value="12.30" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/python_RA$EMDK_means.coverage" NAME="基于EMD的K-means 覆盖结果" MODIFIED="1731485649493" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
@@ -408,13 +423,13 @@
     <SUITE FILE_PATH="coverage/python_RA$learn.coverage" NAME="learn 覆盖结果" MODIFIED="1733720658149" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/数据" />
     <SUITE FILE_PATH="coverage/python_RA$testing.coverage" NAME="testing 覆盖结果" MODIFIED="1732157906328" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/python_RA$Neuronshed.coverage" NAME="Neuronshed 覆盖结果" MODIFIED="1733976814661" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Neurons Position/tif watershed" />
-    <SUITE FILE_PATH="coverage/python_RA$study2.coverage" NAME="study2 覆盖结果" MODIFIED="1735183288141" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/数据" />
+    <SUITE FILE_PATH="coverage/python_RA$study2.coverage" NAME="study2 覆盖结果" MODIFIED="1735891843987" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/数据" />
     <SUITE FILE_PATH="coverage/python_RA$demo_pipeline_voltage_imaging.coverage" NAME="demo_pipeline_voltage_imaging 覆盖结果" MODIFIED="1731908811562" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/CaImAn/demos/general" />
     <SUITE FILE_PATH="coverage/python_RA$Hausdorff.coverage" NAME="Hausdorff 覆盖结果" MODIFIED="1731998839287" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
     <SUITE FILE_PATH="coverage/python_RA$xy.coverage" NAME="xy坐标提取 覆盖结果" MODIFIED="1733974518612" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Neurons Position" />
-    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="点位微调 覆盖结果" MODIFIED="1734590262181" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Neurons Position/手工标点" />
+    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="小鼠拓扑结构图提取 覆盖结果" MODIFIED="1735892245899" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/DeepLearning" />
     <SUITE FILE_PATH="coverage/python_RA$Watershed.coverage" NAME="Watershed 覆盖结果" MODIFIED="1733976758127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Neurons Position" />
-    <SUITE FILE_PATH="coverage/python_RA$manual_positon.coverage" NAME="manual positon 覆盖结果" MODIFIED="1734591991790" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Neurons Position/手工标点" />
+    <SUITE FILE_PATH="coverage/python_RA$manual_positon.coverage" NAME="manual positon 覆盖结果" MODIFIED="1735893321576" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Neurons Position/手工标点" />
     <SUITE FILE_PATH="coverage/python_RA$caImAn_Neuron.coverage" NAME="caImAn Neuron 覆盖结果" MODIFIED="1733975905986" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Neurons Position" />
     <SUITE FILE_PATH="coverage/python_RA$demo_behavior.coverage" NAME="demo_behavior 覆盖结果" MODIFIED="1731909898536" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/CaImAn/demos/general" />
     <SUITE FILE_PATH="coverage/python_RA$sliding_window.coverage" NAME="sliding window 覆盖结果" MODIFIED="1731986348162" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
