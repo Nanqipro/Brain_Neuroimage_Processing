@@ -1,5 +1,7 @@
+# import matplotlib
+# matplotlib.use('TkAgg')  # 使用支持交互的图形后端
 import matplotlib
-matplotlib.use('TkAgg')  # 使用支持交互的图形后端
+matplotlib.use('Qt5Agg')  # 改用 Qt5Agg 后端
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -9,7 +11,7 @@ import numpy as np
 matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
-image_path = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\Neurons Position\watershed_result.png'  # 替换为你的实际图像路径
+image_path = r'./data/MAX_day6.jpg'  # 替换为你的实际图像路径
 img = mpimg.imread(image_path)
 img_height, img_width = img.shape[0], img.shape[1]
 
@@ -65,11 +67,11 @@ for (x, y) in clicked_points:
 if len(relative_points) > 0:
     relative_points = np.array(relative_points)
     # 保存标注点相对坐标
-    output_file = 'clicked_points day6 test.csv'
+    output_file = './clicked_points_day6_test.csv'
     np.savetxt(output_file, relative_points, delimiter=',', header='relative_x,relative_y', comments='')
     print(f"已保存标记点相对坐标至 {output_file}")
 
-    # 绘制相对坐标系的散点分布
+    # 绘制相对坐标系的散点分布并保存
     fig2, ax2 = plt.subplots()
     sc = ax2.scatter(relative_points[:,0], relative_points[:,1], c='r', s=20)
     ax2.set_title('标记点在相对坐标系中的分布')
@@ -78,6 +80,8 @@ if len(relative_points) > 0:
     ax2.set_xlim([0,1])
     ax2.set_ylim([1,0])
     ax2.grid(True)
+    plt.savefig('./data/relative_points_distribution_day6.png')
+    plt.close(fig2)
     # 添加序号
     for i, (rx, ry) in enumerate(relative_points, start=1):
         ax2.text(rx+0.01, ry, str(i), color='red', fontsize=8)
