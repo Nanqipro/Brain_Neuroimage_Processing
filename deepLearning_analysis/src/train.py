@@ -18,7 +18,7 @@ from typing import Tuple, List, Optional
 from config.config import Config
 from utils.logger import setup_logger
 from models.cnn3d import CNN3D
-from utils.visualization import plot_training_history, visualize_sample, plot_confusion_matrix
+from utils.visualization import plot_training_history, visualize_sample, plot_confusion_matrix, visualize_gradcam
 
 # 设置日志
 logger = setup_logger('training', Config.OUTPUT_DIR / 'training.log')
@@ -276,6 +276,11 @@ def main():
     # 绘制混淆矩阵
     classes = label_encoder.classes_  # 使用原始的类别名称
     plot_confusion_matrix(all_labels, all_preds, classes, normalize=True)
+
+    # 可视化Grad-CAM
+    layer_name = 'features.2'  # 需要可视化的层名称
+    sample_idx = 0  # 选择第一个测试样本
+    visualize_gradcam(model, layer_name, sample_idx, test_loader, trainer.device)
 
 if __name__ == "__main__":
     main()

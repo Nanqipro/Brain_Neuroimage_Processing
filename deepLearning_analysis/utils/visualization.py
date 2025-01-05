@@ -130,4 +130,194 @@ def plot_confusion_matrix(
     # 保存图片
     save_path = Config.VISUALIZATION_DIR / f'confusion_matrix_{timestamp}.png'
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
-    plt.close() 
+    plt.close()
+
+def visualize_feature_maps(model, layer_name, sample_idx=0, test_loader=None, device='cpu'):
+    """
+    可视化特征图并保存。
+    
+    参数：
+    - model: PyTorch模型。
+    - layer_name: str, 需要可视化的层名称。
+    - sample_idx: int, 测试样本索引。
+    - test_loader: DataLoader, 测试数据加载器。
+    - device: str, 运行模型的设备。
+    
+    返回：
+    - None
+    """
+    import torch
+    activation = {}
+    
+    def get_activation(name):
+        def hook(model, input, output):
+            activation[name] = output.detach()
+        return hook
+
+    # 注册钩子
+    for name, layer in model.named_modules():
+        if name == layer_name:
+            layer.register_forward_hook(get_activation(name))
+    
+    # 获取样本数据
+    model.eval()
+    with torch.no_grad():
+        sample_input, _ = test_loader.dataset[sample_idx]
+        sample_input = sample_input.unsqueeze(0).to(device)  # 添加批量维度
+        output = model(sample_input)
+    
+    # 获取特征图
+    if layer_name in activation:
+        feature_maps = activation[layer_name].cpu().numpy()  # (1, C, T, H, W)
+        print(f"特征图形状: {feature_maps.shape}")
+    else:
+        print(f"未找到层名称: {layer_name}")
+        return
+    
+    # 可视化特征图
+    time_step = feature_maps.shape[3] // 2  # 中间时间步
+    num_features = min(8, feature_maps.shape[1])  # 可视化前8个特征图
+    
+    plt.figure(figsize=(20, 5))
+    for i in range(num_features):
+        plt.subplot(1, num_features, i+1)
+        plt.imshow(feature_maps[0, i, time_step, :, :], cmap='viridis')
+        plt.axis('off')
+        plt.title(f'Filter {i+1}')
+    plt.suptitle(f"特征映射 - 层 {layer_name}, 时间步 {time_step}")
+    
+    # 保存图片
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    save_path = Config.VISUALIZATION_DIR / f'feature_maps_{layer_name}_sample{sample_idx}_{timestamp}.png'
+    plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    plt.close()
+    print(f"特征图已保存到: {save_path}")
+
+def generate_gradcam(model, layer_name, sample_idx=0, class_idx=None, test_loader=None, device='cpu'):
+    """
+    生成Grad-CAM热力图。
+    
+    参数：
+    - model: PyTorch模型。
+    - layer_name: str, 需要可视化的层名称。
+    - sample_idx: int, 测试样本索引。
+    - class_idx: int, 预测类别索引。默认为None，使用模型的预测类别。
+    - test_loader: DataLoader, 测试数据的加载器。
+    - device: str, 运行模型的设备。
+    
+    返回：
+    - heatmap: numpy.ndarray, 热力图数组，形状为 (T', H', W')。
+    """
+    import torch
+    activation = {}
+    gradients = {}
+    
+    def forward_hook(module, input, output):
+        activation[layer_name] = output
+
+    def backward_hook(module, grad_in, grad_out):
+        gradients[layer_name] = grad_out[0]
+    
+    # 注册钩子
+    for name, layer in model.named_modules():
+        if name == layer_name:
+            layer.register_forward_hook(forward_hook)
+            layer.register_backward_hook(backward_hook)
+    
+    # 获取样本数据
+    model.eval()
+    sample_input, label = test_loader.dataset[sample_idx]
+    sample_input = sample_input.unsqueeze(0).to(device)
+    sample_input.requires_grad = True
+    
+    # 前向传播
+    output = model(sample_input)
+    
+    if class_idx is None:
+        class_idx = torch.argmax(output, dim=1).item()
+    
+    # 计算损失
+    loss = output[0, class_idx]
+    
+    # 反向传播
+    model.zero_grad()
+    loss.backward()
+    
+    # 获取梯度和激活
+    if layer_name in gradients and layer_name in activation:
+        grads = gradients[layer_name].cpu().numpy()[0]  # (C, T, H, W)
+        act = activation[layer_name].cpu().numpy()[0]   # (C, T, H, W)
+    else:
+        print(f"未找到层名称: {layer_name}")
+        return None
+    
+    # 计算权重
+    weights = np.mean(grads, axis=(1, 2, 3))  # (C,)
+    
+    # 生成热力图
+    heatmap = np.zeros(act.shape[1:])  # (T, H, W)
+    for i, w in enumerate(weights):
+        heatmap += w * act[i, :, :, :]
+    
+    heatmap = np.maximum(heatmap, 0)
+    heatmap /= np.max(heatmap) if np.max(heatmap) != 0 else 1
+    
+    return heatmap
+
+
+def display_gradcam(heatmap, slice_idx=None, cmap='viridis'):
+    """
+    显示Grad-CAM热力图。
+    
+    参数：
+    - heatmap: numpy.ndarray, 热力图数组，形状为 (T', H', W')。
+    - slice_idx: int, 指定时间步索引。默认为None，选择中间切片。
+    - cmap: str, 颜色映射方案。
+    
+    返回：
+    - None
+    """
+    if heatmap is None:
+        print("无热力图可显示。")
+        return
+
+    if slice_idx is None:
+        slice_idx = heatmap.shape[0] // 2  # 中间时间步
+    
+    plt.figure(figsize=(6,6))
+    plt.imshow(heatmap[slice_idx], cmap=cmap)
+    plt.title(f"Grad-CAM 热力图 - 时间步 {slice_idx}")
+    plt.colorbar()
+    plt.show()
+
+
+def visualize_gradcam(model, layer_name, sample_idx=0, test_loader=None, device='cpu'):
+    """
+    可视化并保存Grad-CAM热力图。
+    
+    参数：
+    - model: PyTorch模型对象。
+    - layer_name: str, 需要可视化的卷积层名称。
+    - sample_idx: int, 测试样本索引。
+    - test_loader: DataLoader, 测试数据的加载器。
+    - device: str, 运行模型的设备。
+    
+    返回：
+    - None
+    """
+    heatmap = generate_gradcam(model, layer_name, sample_idx=sample_idx, test_loader=test_loader, device=device)
+    if heatmap is not None:
+        slice_idx = heatmap.shape[0] // 2
+        plt.figure(figsize=(6,6))
+        plt.imshow(heatmap[slice_idx], cmap='viridis')
+        plt.title(f"Grad-CAM 热力图 - 时间步 {slice_idx}")
+        plt.colorbar()
+        
+        # 保存图片
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = Config.VISUALIZATION_DIR / f'gradcam_{layer_name}_sample{sample_idx}_{timestamp}.png'
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        plt.close()
+        print(f"Grad-CAM 热力图已保存到: {save_path}")
+    else:
+        print("无热力图可显示。") 
