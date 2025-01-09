@@ -195,7 +195,7 @@ def visualize_feature_maps(model, layer_name, sample_idx=0, test_loader=None, de
 
 def generate_gradcam(model, layer_name, sample_idx=0, class_idx=None, test_loader=None, device='cpu'):
     """
-    生成Grad-CAM热力图。
+    Generate Grad-CAM heatmap.
     
     参数：
     - model: PyTorch模型。
@@ -245,10 +245,10 @@ def generate_gradcam(model, layer_name, sample_idx=0, class_idx=None, test_loade
     
     # 获取梯度和激活
     if layer_name in gradients and layer_name in activation:
-        grads = gradients[layer_name].cpu().numpy()[0]  # (C, T, H, W)
-        act = activation[layer_name].cpu().numpy()[0]   # (C, T, H, W)
+        grads = gradients[layer_name].detach().cpu().numpy()[0]  # 添加 detach()
+        act = activation[layer_name].detach().cpu().numpy()[0]   # 添加 detach()
     else:
-        print(f"未找到层名称: {layer_name}")
+        print(f"Layer name not found: {layer_name}")
         return None
     
     # 计算权重
@@ -278,7 +278,7 @@ def display_gradcam(heatmap, slice_idx=None, cmap='viridis'):
     - None
     """
     if heatmap is None:
-        print("无热力图可显示。")
+        print("No heatmap to display.")
         return
 
     if slice_idx is None:
@@ -286,7 +286,7 @@ def display_gradcam(heatmap, slice_idx=None, cmap='viridis'):
     
     plt.figure(figsize=(6,6))
     plt.imshow(heatmap[slice_idx], cmap=cmap)
-    plt.title(f"Grad-CAM 热力图 - 时间步 {slice_idx}")
+    plt.title(f"Grad-CAM Heatmap - Time Step {slice_idx}")
     plt.colorbar()
     plt.show()
 
@@ -310,7 +310,7 @@ def visualize_gradcam(model, layer_name, sample_idx=0, test_loader=None, device=
         slice_idx = heatmap.shape[0] // 2
         plt.figure(figsize=(6,6))
         plt.imshow(heatmap[slice_idx], cmap='viridis')
-        plt.title(f"Grad-CAM 热力图 - 时间步 {slice_idx}")
+        plt.title(f"Grad-CAM Heatmap - Time Step {slice_idx}")
         plt.colorbar()
         
         # 保存图片
@@ -318,6 +318,6 @@ def visualize_gradcam(model, layer_name, sample_idx=0, test_loader=None, device=
         save_path = Config.VISUALIZATION_DIR / f'gradcam_{layer_name}_sample{sample_idx}_{timestamp}.png'
         plt.savefig(save_path, bbox_inches='tight', dpi=300)
         plt.close()
-        print(f"Grad-CAM 热力图已保存到: {save_path}")
+        print(f"Grad-CAM heatmap saved to: {save_path}")
     else:
-        print("无热力图可显示。") 
+        print("No heatmap to display.") 
