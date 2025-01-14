@@ -187,8 +187,8 @@ def main():
     analyzer = FrequencyAnalyzer(sampling_rate=10)
     
     # Set file paths
-    file_path = '../../datasets/Day6_with_behavior_labels_filled.xlsx'
-    output_dir = '../../graph/frequency_analysis_day6_extended'
+    file_path = '../../datasets/processed_Day3.xlsx'
+    output_dir = '../../graph/frequency_analysis_day3_extended'
     os.makedirs(output_dir, exist_ok=True)
     
     # Load data
@@ -211,7 +211,7 @@ def main():
     
     # Create and save features DataFrame
     features_df = pd.DataFrame(feature_data)
-    features_df.to_excel(os.path.join(output_dir, 'frequency_features.xlsx'), index=False)
+    features_df.to_excel(os.path.join('../../datasets/frequency_features_day3.xlsx'), index=False)
     
     print("Analysis complete!")
 

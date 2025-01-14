@@ -69,7 +69,7 @@ def main():
     # workspace_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
     
     # Parameters
-    file_path = '../../datasets/Day6_with_behavior_labels_filled.xlsx'
+    file_path = '../../processed_Day3.xlsx'
     sampling_rate = 10  # Hz (assuming 10 Hz sampling rate, adjust if different)
     
     # Load data
@@ -77,7 +77,7 @@ def main():
     df = load_data(file_path)
     
     # Create output directory if it doesn't exist
-    output_dir = '../../graph/frequency_analysis_day6'
+    output_dir = '../../graph/frequency_analysis_day3'
     os.makedirs(output_dir, exist_ok=True)
     
     # Analyze each neuron
