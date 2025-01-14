@@ -16,8 +16,15 @@ class FrequencyAnalyzer:
         self.delta_t = 1/sampling_rate
 
     def load_data(self, file_path):
-        """Load neuron time series data from Excel file"""
+        """Load neuron time series data and timestamps from Excel file"""
         df = pd.read_excel(file_path)
+        
+        # Get timestamps
+        if 'stamp' in df.columns:
+            self.timestamps = df['stamp'].values
+        else:
+            print("Warning: No 'stamp' column found, using default time indices")
+            self.timestamps = np.arange(len(df)) / self.fs
         
         # 获取所有包含'n'的列（不区分大小写）
         neuron_columns = [col for col in df.columns if 'n' in col.lower()]
@@ -126,13 +133,16 @@ class FrequencyAnalyzer:
         # Create figure with subplots
         fig = plt.figure(figsize=(15, 20))
         
+        # Use actual timestamps instead of generated time array
+        time = self.timestamps
+        
         # 1. Original Signal
         ax1 = plt.subplot(611)
-        time = np.arange(len(time_series))/self.fs
         ax1.plot(time, time_series)
         ax1.set_title(f'Original Signal - {neuron_id}')
-        ax1.set_xlabel('Time (s)')
+        ax1.set_xlabel('Time (stamp)')
         ax1.set_ylabel('Amplitude')
+        ax1.set_xlim(time[0], time[-1])  # Use actual time range
         
         # 2. FFT
         ax2 = plt.subplot(612)
@@ -158,7 +168,11 @@ class FrequencyAnalyzer:
         im = ax4.pcolormesh(times_spec, freqs_spec, 10 * np.log10(Sxx), shading='gouraud')
         ax4.set_title('Spectrogram')
         ax4.set_ylabel('Frequency (Hz)')
-        ax4.set_xlabel('Time (s)')
+        ax4.set_xlabel('Time (stamp)')
+        ax4.set_xlim(0, times_spec[-1])
+        ax4_twin = ax4.twiny()
+        ax4_twin.set_xlim(time[0], time[-1])
+        ax4_twin.set_xlabel('Actual Time Stamps')
         plt.colorbar(im, ax=ax4, label='Intensity (dB)')
         
         # 5. Filtered Signals
@@ -168,8 +182,9 @@ class FrequencyAnalyzer:
         ax5.plot(time, theta, label='Theta (4-8 Hz)')
         ax5.plot(time, gamma, label=f'Gamma (30-{min(100, self.fs/2 - 1)} Hz)')
         ax5.set_title('Filtered Signals')
-        ax5.set_xlabel('Time (s)')
+        ax5.set_xlabel('Time (stamp)')
         ax5.set_ylabel('Amplitude')
+        ax5.set_xlim(time[0], time[-1])  # Use actual time range
         ax5.legend()
         
         # 6. Phase Analysis
@@ -177,8 +192,9 @@ class FrequencyAnalyzer:
         amp_env, inst_phase = self.calculate_phase(time_series)
         ax6.plot(time, inst_phase)
         ax6.set_title('Instantaneous Phase')
-        ax6.set_xlabel('Time (s)')
+        ax6.set_xlabel('Time (stamp)')
         ax6.set_ylabel('Phase (radians)')
+        ax6.set_xlim(time[0], time[-1])  # Use actual time range
         
         plt.tight_layout()
         
@@ -191,8 +207,8 @@ def main():
     analyzer = FrequencyAnalyzer(sampling_rate=10)
     
     # Set file paths
-    file_path = '../../datasets/processed_Day3.xlsx'
-    output_dir = '../../graph/frequency_analysis_day3_extended'
+    file_path = '../../datasets/processed_Day9.xlsx'
+    output_dir = '../../graph/frequency_analysis_day9_extended'
     os.makedirs(output_dir, exist_ok=True)
     
     # Load data
@@ -215,7 +231,7 @@ def main():
     
     # Create and save features DataFrame
     features_df = pd.DataFrame(feature_data)
-    features_df.to_excel(os.path.join('../../datasets/frequency_features_day3.xlsx'), index=False)
+    features_df.to_excel(os.path.join('../../datasets/frequency_features_day9.xlsx'), index=False)
     
     print("Analysis complete!")
 

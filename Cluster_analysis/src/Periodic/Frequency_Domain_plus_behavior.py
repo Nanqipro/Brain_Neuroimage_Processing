@@ -386,14 +386,25 @@ def get_behavior_segments(df):
     """
     segments = {}
     
-    # Get behavior changes
+    # 确保数据是按时间戳排序的
+    df = df.sort_values('stamp').copy()
+    
+    # 处理可能的缺失值
+    if df['behavior'].isna().any():
+        print("Warning: Found NaN values in behavior column")
+        df['behavior'] = df['behavior'].fillna('Unknown')
+    
+    # 获取行为变化点
     behavior_changes = df['behavior'] != df['behavior'].shift()
     change_indices = df.index[behavior_changes].tolist()
     
-    # Add start and end indices
-    change_indices = [0] + change_indices + [len(df)]
+    # 添加起始和结束索引
+    if 0 not in change_indices:
+        change_indices = [0] + change_indices
+    if len(df)-1 not in change_indices:
+        change_indices = change_indices + [len(df)]
     
-    # Group segments by behavior
+    # 按行为分组
     for i in range(len(change_indices)-1):
         start_idx = change_indices[i]
         end_idx = change_indices[i+1]
@@ -402,13 +413,16 @@ def get_behavior_segments(df):
         start_time = df.iloc[start_idx]['stamp']
         end_time = df.iloc[end_idx-1]['stamp']
         
-        # Initialize list for this behavior if not exists
+        # 初始化该行为的列表
         if behavior not in segments:
             segments[behavior] = []
         
-        # Add segment if it's long enough (at least 5 seconds)
+        # 只添加足够长的片段（至少5秒）
         if end_time - start_time >= 5:
             segments[behavior].append((start_time, end_time))
+            
+        # 打印每个片段的信息，帮助调试
+        print(f"Found {behavior} segment: {start_time:.1f}s - {end_time:.1f}s (duration: {end_time-start_time:.1f}s)")
     
     return segments
 
@@ -417,8 +431,8 @@ def main():
     analyzer = FrequencyAnalyzer(sampling_rate=10)
     
     # Set file paths
-    file_path = '../../datasets/processed_Day3.xlsx'
-    output_base_dir = '../../graph/frequency_analysis_day3_behavior'
+    file_path = '../../datasets/processed_Day9.xlsx'
+    output_base_dir = '../../graph/frequency_analysis_day9_behavior'
     
     # Load full data
     print("Loading dataset...")

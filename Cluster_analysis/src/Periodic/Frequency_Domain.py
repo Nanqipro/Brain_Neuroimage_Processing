@@ -69,7 +69,7 @@ def main():
     # workspace_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
     
     # Parameters
-    file_path = '../../processed_Day3.xlsx'
+    file_path = '../../datasets/processed_Day3.xlsx'
     sampling_rate = 10  # Hz (assuming 10 Hz sampling rate, adjust if different)
     
     # Load data
