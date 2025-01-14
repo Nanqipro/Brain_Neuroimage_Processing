@@ -9,7 +9,7 @@ import numpy as np
 matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
-image_path = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\Neurons Position\240924EM\240924EM.jpg'  # 替换为你的实际图像路径
+image_path = r'C:\Users\PAN\Desktop\RA\数据集\NO2980\240924EM\2980240924EM.png'  # 替换为你的实际图像路径
 img = mpimg.imread(image_path)
 img_height, img_width = img.shape[0], img.shape[1]
 
@@ -65,7 +65,7 @@ for (x, y) in clicked_points:
 if len(relative_points) > 0:
     relative_points = np.array(relative_points)
     # 保存标注点相对坐标
-    output_file = 'clicked_points EM2.csv'
+    output_file = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\DeepLearning\2980 测试集\clicked_points 2980EM.csv'
     np.savetxt(output_file, relative_points, delimiter=',', header='relative_x,relative_y', comments='')
     print(f"已保存标记点相对坐标至 {output_file}")
 

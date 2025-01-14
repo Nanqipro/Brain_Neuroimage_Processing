@@ -1,259 +1,230 @@
 import pandas as pd
+import numpy as np  # 导入 NumPy 以处理无穷大值
 import torch
 from torch_geometric.data import Data, Dataset, DataLoader
 from sklearn.preprocessing import LabelEncoder
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
+from torch_geometric.nn import GCNConv, global_mean_pool
 import torch.optim as optim
 import os
-
-# ----------------------------
-# 1. 数据导入和预处理
-# ----------------------------
-
-# 定义文件路径
-NODES_FILE = 'network_structures_for_GNN.xlsx'
-EDGES_FILE = 'network_structures_for_GNN.xlsx'
-LABELS_FILE = 'network_structures_for_GNN.xlsx'
-BEHAVIOR_DATA_FILE = 'behavior_data.xlsx'  # 另一个行为数据的Excel文件
-
-# 读取Excel文件
-nodes_df = pd.read_excel(NODES_FILE, sheet_name='Nodes')
-edges_df = pd.read_excel(EDGES_FILE, sheet_name='Edges')
-labels_df = pd.read_excel(LABELS_FILE, sheet_name='Labels')
-behavior_data_df = pd.read_excel(BEHAVIOR_DATA_FILE, sheet_name='Sheet1')  # 请根据实际Sheet名称修改
-
-# 查看数据结构（可选）
-print("Nodes DataFrame:")
-print(nodes_df.head())
-print("\nEdges DataFrame:")
-print(edges_df.head())
-print("\nLabels DataFrame:")
-print(labels_df.head())
-print("\nBehavior Data DataFrame:")
-print(behavior_data_df.head())
-
-# 标签映射（将行为标签转换为数值）
-le = LabelEncoder()
-labels_df['behavior_num'] = le.fit_transform(labels_df['behavior'])
-label_mapping = {label: idx for idx, label in enumerate(le.classes_)}
-print("\nLabel Mapping:", label_mapping)
-
-# 确保行为数据和Labels数据对齐
-# 假设behavior_data_df中的'time'与labels_df中的'time'对应
-# 如果不对应，需要根据具体情况调整
-# 这里假设behavior_data_df的第三列是行为标签，与labels_df相同
-
-# 合并行为标签
-# 假设behavior_data_df有 'time' 和 'behavior' 两列，且与labels_df对应
-# 如果结构不同，请根据实际情况调整
-merged_labels_df = labels_df.copy()
-# 如果需要从behavior_data_df获取标签，可以执行如下操作
-# merged_labels_df = pd.merge(labels_df, behavior_data_df[['time', 'behavior']], on='time', how='left')
-# merged_labels_df['behavior_num'] = le.transform(merged_labels_df['behavior'])
-
-# 获取唯一时间点
-unique_times = nodes_df['time'].unique()
-print(f"\nUnique time points: {unique_times}")
-
-# 创建图列表
-graph_list = []
-
-for t in unique_times:
-    # 筛选当前时间点的节点和边
-    nodes_t = nodes_df[nodes_df['time'] == t]
-    edges_t = edges_df[edges_df['time'] == t]
-    label_t = merged_labels_df[merged_labels_df['time'] == t]['behavior_num'].values[0]
-
-    # 创建节点特征
-    # 使用 activity_value 和 state 作为节点特征
-    # 将 state 转换为数值（ON=1, OFF=0）
-    state_mapping = {'ON': 1, 'OFF': 0, None: 0}  # 根据实际数据调整
-    state_numeric = nodes_t['state'].map(state_mapping).fillna(0).values
-    activity_value = nodes_t['activity_value'].values
-    # 组合多个特征
-    x = torch.tensor(list(zip(activity_value, state_numeric)), dtype=torch.float)  # [num_nodes, 2]
-
-    # 创建节点名称到索引的映射
-    neuron_names = nodes_t['Neuron'].unique()
-    node_mapping = {node: idx for idx, node in enumerate(neuron_names)}
-
-    # 替换边中的节点名称为索引
-    edges_t_mapped = edges_t[['source', 'target']].replace(node_mapping)
-    edge_index = torch.tensor(edges_t_mapped.values, dtype=torch.long).t().contiguous()  # [2, num_edges]
-
-    # 创建图标签
-    y = torch.tensor([label_t], dtype=torch.long)
-
-    # 创建 Data 对象
-    data = Data(x=x, edge_index=edge_index, y=y)
-    data.time = t  # 可选属性，便于后续分析
-    graph_list.append(data)
-
-print(f"\nNumber of graphs in dataset: {len(graph_list)}")
-
-
-# 定义自定义数据集
-class NeuronDataset(Dataset):
-    def __init__(self, graphs):
-        super(NeuronDataset, self).__init__()
-        self.graphs = graphs
-
-    def len(self):
-        return len(self.graphs)
-
-    def get(self, idx):
-        return self.graphs[idx]
-
-
-# 创建数据集和数据加载器
-dataset = NeuronDataset(graph_list)
-batch_size = 32
-loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-print(f"Batch size: {batch_size}")
-
-
-# ----------------------------
-# 2. 定义图神经网络模型
-# ----------------------------
-
-class GCN(torch.nn.Module):
-    def __init__(self, num_features, hidden_dim, num_classes):
-        super(GCN, self).__init__()
-        self.conv1 = GCNConv(num_features, hidden_dim)
-        self.conv2 = GCNConv(hidden_dim, hidden_dim)
-        self.fc = torch.nn.Linear(hidden_dim, num_classes)
-
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-        # 第一层图卷积 + ReLU
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        # 第二层图卷积 + ReLU
-        x = self.conv2(x, edge_index)
-        x = F.relu(x)
-        # 全局平均池化
-        x = torch.mean(x, dim=0).unsqueeze(0)
-        # 全连接层
-        out = self.fc(x)
-        return F.log_softmax(out, dim=1)
-
-
-# ----------------------------
-# 3. 训练和评估
-# ----------------------------
-
-# 设置设备
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"\nUsing device: {device}")
-
-# 初始化模型、优化器和损失函数
-num_features = dataset[0].x.shape[1]  # 2
-num_classes = len(label_mapping)
-hidden_dim = 16
-
-model = GCN(num_features=num_features, hidden_dim=hidden_dim, num_classes=num_classes).to(device)
-optimizer = optim.Adam(model.parameters(), lr=0.01)
-criterion = torch.nn.CrossEntropyLoss()
-
-
-# 训练函数
-def train(model, loader, optimizer, criterion, device, epochs=100):
-    model.train()
-    for epoch in range(1, epochs + 1):
-        total_loss = 0
-        for batch in loader:
-            batch = batch.to(device)
-            optimizer.zero_grad()
-            out = model(batch)
-            loss = criterion(out, batch.y)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-        avg_loss = total_loss / len(loader)
-        if epoch % 10 == 0 or epoch == 1:
-            print(f"Epoch {epoch}, Loss: {avg_loss:.4f}")
-
-
-# 评估函数
-def evaluate(model, loader, device):
-    model.eval()
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for batch in loader:
-            batch = batch.to(device)
-            out = model(batch)
-            _, pred = torch.max(out, dim=1)
-            correct += (pred == batch.y).sum().item()
-            total += batch.y.size(0)
-    accuracy = correct / total
-    print(f"Accuracy: {accuracy * 100:.2f}%")
-    return accuracy
-
-
-# 开始训练
-epochs = 100
-print("\n开始训练模型...")
-train(model, loader, optimizer, criterion, device, epochs)
-
-# 评估模型
-print("\n评估模型性能...")
-evaluate(model, loader, device)
-
-# ----------------------------
-# 4. 额外功能（可选）
-# ----------------------------
-
-# 如果你希望记录损失并绘制损失曲线，可以修改训练函数如下：
-
 import matplotlib.pyplot as plt
+from itertools import combinations
 
+# =============== 1. 参数区（可灵活调整） ===============
+NODES_FILE = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\DeepLearning\Day6 训练结果\Nodes.csv'    # <-- 修改为 Nodes.csv 的路径
+EDGES_FILE = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\DeepLearning\Day6 训练结果\Edges.csv'    # <-- 修改为 Edges.csv 的路径
+LABELS_FILE = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\DeepLearning\Day6 训练结果\Labels.csv'  # <-- 修改为 Labels.csv 的路径
+BEHAVIOR_DATA_FILE = r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day6\day 6  cell 行为学标记.xlsx'  # <-- 可调整：中文行为数据Excel文件
 
-def train_with_logging(model, loader, optimizer, criterion, device, epochs=100):
-    model.train()
-    loss_values = []
-    for epoch in range(1, epochs + 1):
-        total_loss = 0
-        for batch in loader:
-            batch = batch.to(device)
-            optimizer.zero_grad()
-            out = model(batch)
-            loss = criterion(out, batch.y)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-        avg_loss = total_loss / len(loader)
-        loss_values.append(avg_loss)
-        if epoch % 10 == 0 or epoch == 1:
-            print(f"Epoch {epoch}, Loss: {avg_loss:.4f}")
-    return loss_values
+# 超参数
+BATCH_SIZE = 32       # <-- 可调整：批大小
+HIDDEN_DIM = 16       # <-- 可调整：GCN隐藏层大小
+LEARNING_RATE = 0.01  # <-- 可调整：学习率
+EPOCHS = 100          # <-- 可调整：训练轮数
 
+# =============== 2. 数据导入和预处理 ===============
+print("==== 加载 CSV 数据 ...")
 
-# 重新初始化模型和优化器
-model = GCN(num_features=num_features, hidden_dim=hidden_dim, num_classes=num_classes).to(device)
-optimizer = optim.Adam(model.parameters(), lr=0.01)
-criterion = torch.nn.CrossEntropyLoss()
+try:
+    nodes_df = pd.read_csv(NODES_FILE)
+    edges_df = pd.read_csv(EDGES_FILE)
+    labels_df = pd.read_csv(LABELS_FILE)
+    behavior_data_df = pd.read_excel(BEHAVIOR_DATA_FILE, sheet_name='CHB')  # 假设行为标签在 'CHB' sheet
+    print("Nodes DataFrame head:")
+    print(nodes_df.head())
+    print("Edges DataFrame head:")
+    print(edges_df.head())
+    print("Labels DataFrame head:")
+    print(labels_df.head())
+    print("Behavior Data DataFrame head (含中文行为):")
+    print(behavior_data_df.head())
+except Exception as e:
+    print("加载数据时出错:", e)
+    exit(1)
 
-# 训练并记录损失
-print("\n开始训练模型并记录损失...")
-loss_values = train_with_logging(model, loader, optimizer, criterion, device, epochs)
+print("==== 检查列名 ...")
+print("labels_df 的列名:", labels_df.columns.tolist())
+print("behavior_data_df 的列名:", behavior_data_df.columns.tolist())
 
-# 绘制损失曲线
-plt.figure(figsize=(10, 6))
-plt.plot(range(1, epochs + 1), loss_values, label='Training Loss')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.title('Training Loss over Epochs')
-plt.legend()
-plt.show()
+# 确认 'time' 列存在于 labels_df 中，'ID' 列存在于 behavior_data_df 中
+if 'time' not in labels_df.columns:
+    print("Error: 'time' 列在 labels_df 中不存在。请检查列名或数据源。")
+    exit(1)
 
-# ----------------------------
-# 5. 完整代码总结
-# ----------------------------
+if 'ID' not in behavior_data_df.columns:
+    print("Error: 'ID' 列在 behavior_data_df 中不存在。请检查列名或数据源。")
+    exit(1)
 
-# 为了方便，你可以将以上所有代码保存为一个 Python 脚本（例如 `train_gnn.py`），然后在命令行中运行：
-# python train_gnn.py
+print("==== 合并中文行为标签 ...")
 
-# 确保将 Excel 文件路径和 Sheet 名称根据你的实际数据进行调整。
+# 统一数据类型：将 'time' 和 'ID' 列转换为整数类型
+try:
+    # 检查 'time' 和 'ID' 列是否存在缺失值
+    print("Missing values in labels_df['time']:", labels_df['time'].isnull().sum())
+    print("Missing values in behavior_data_df['ID']:", behavior_data_df['ID'].isnull().sum())
 
+    # 检查 'time' 和 'ID' 列是否存在无穷大值
+    print("Number of inf in labels_df['time']:", np.isinf(labels_df['time']).sum())
+    print("Number of -inf in labels_df['time']:", np.isneginf(labels_df['time']).sum())
+    print("Number of inf in behavior_data_df['ID']:", np.isinf(behavior_data_df['ID']).sum())
+    print("Number of -inf in behavior_data_df['ID']:", np.isneginf(behavior_data_df['ID']).sum())
+
+    # 替换 'inf' 和 '-inf' 为 NaN
+    labels_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    behavior_data_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+    # 删除 'time' 或 'ID' 列中存在缺失值的行
+    labels_df = labels_df.dropna(subset=['time'])
+    behavior_data_df = behavior_data_df.dropna(subset=['ID'])
+
+    # 再次检查是否还有缺失值
+    print("After replacing inf, missing values in labels_df['time']:", labels_df['time'].isnull().sum())
+    print("After replacing inf, missing values in behavior_data_df['ID']:", behavior_data_df['ID'].isnull().sum())
+
+    # 将 'time' 和 'ID' 列转换为整数类型
+    labels_df['time'] = pd.to_numeric(labels_df['time'], errors='coerce').astype(int)
+    behavior_data_df['ID'] = pd.to_numeric(behavior_data_df['ID'], errors='coerce').astype(int)
+except Exception as e:
+    print("转换 'time' 或 'ID' 列为整数时出错:", e)
+    print("请检查 'labels_df' 和 'behavior_data_df' 中的 'time' 和 'ID' 列是否存在非数值值。")
+    exit(1)
+
+# 确保没有缺失值后进行合并
+try:
+    labels_merged = pd.merge(
+        labels_df,
+        behavior_data_df[['ID', 'FrameLost']],
+        how='left',
+        left_on='time',
+        right_on='ID'  # <-- 使用 labels_df 的 'time' 与 behavior_data_df 的 'ID' 进行合并
+    )
+    print("合并后的 DataFrame head:")
+    print(labels_merged.head())
+except Exception as e:
+    print("合并行为标签时出错:", e)
+    exit(1)
+
+# 使用 LabelEncoder 将中文行为（即 'FrameLost' 列）转为数字
+le = LabelEncoder()
+# 注意：如果 'FrameLost' 里有空值，则需要先填充或过滤
+labels_merged['FrameLost'] = labels_merged['FrameLost'].fillna('无行为')
+labels_merged['behavior_num'] = le.fit_transform(labels_merged['FrameLost'].astype(str))
+
+label_mapping = {label: idx for idx, label in enumerate(le.classes_)}
+print("标签映射（中文 -> 数字）：", label_mapping)
+
+# 更新 labels_df
+labels_df = labels_merged
+
+# =============== 3. 全局神经元映射 ===============
+print("==== 创建全局神经元映射 ...")
+all_neurons = sorted(nodes_df['Neuron'].unique())
+print(f"总共有 {len(all_neurons)} 个唯一的神经元。")
+neuron_mapping = {name: i for i, name in enumerate(all_neurons)}
+print("神经元映射示例:", list(neuron_mapping.items())[:5])
+
+# =============== 4. 计算激活阈值 ===============
+print("==== 计算每个神经元的激活阈值（平均浓度） ...")
+
+# 识别神经元列（排除 'time'）
+neuron_columns = [col for col in nodes_df.columns if col != 'time']
+print("神经元列名:")
+print(neuron_columns)
+
+# 确保神经元列的数据类型为数值型
+print("将神经元列转换为数值型...")
+for neuron in neuron_columns:
+    try:
+        nodes_df[neuron] = pd.to_numeric(nodes_df[neuron], errors='coerce')
+    except Exception as e:
+        print(f"转换神经元 {neuron} 时出错:", e)
+        # 根据需要决定是否退出或继续
+        continue
+
+# 计算每个神经元的平均浓度
+activation_thresholds = nodes_df[neuron_columns].mean().to_dict()
+print("激活阈值（每个神经元的平均浓度）:")
+print(activation_thresholds)
+
+# =============== 5. 确定每个时间戳的激活神经元 ===============
+print("==== 确定每个时间戳的激活神经元 ...")
+
+# 创建一个字典，键是时间戳 (time)，值是激活的神经元列表
+activated_neurons_per_time = {}
+
+for idx, row in nodes_df.iterrows():
+    time = row['time']  # 使用 'time' 作为时间戳
+    activated_neurons = []
+    for neuron, threshold in activation_thresholds.items():
+        concentration = row[neuron]
+        # 调试信息
+        if isinstance(concentration, pd.Series):
+            print(f"警告: Time {time}, Neuron {neuron} 的浓度是一个Series: {concentration}")
+            continue  # 跳过该神经元
+        if pd.notna(concentration) and concentration > threshold:
+            activated_neurons.append(neuron)
+    activated_neurons_per_time[time] = activated_neurons
+
+# 查看部分时间戳的激活神经元
+print("部分时间戳的激活神经元:")
+for time, neurons in list(activated_neurons_per_time.items())[:5]:
+    print(f"Time {time}: {neurons}")
+
+# =============== 6. 构建Nodes和Edges数据 ===============
+print("==== 构建Nodes和Edges数据 ...")
+nodes_data = []
+edges_set = set()  # 使用集合来存储唯一的边
+edges_data = []
+labels_data = []
+
+for time, neurons in activated_neurons_per_time.items():
+    # 处理Nodes
+    for neuron in neurons:
+        nodes_data.append({
+            'Neuron': neuron,
+            'state': 'ON',
+            'time': time  # 使用 'time' 作为时间戳
+            # 如果需要其他列，可以在这里添加，如 'color', 'group_id' 等
+        })
+
+    # 处理Edges，避免重复
+    for source, target in combinations(sorted(neurons), 2):
+        edge = (source, target)
+        if edge not in edges_set:
+            edges_set.add(edge)
+            edges_data.append({
+                'source': source,
+                'target': target,
+                'time': time  # 使用 'time' 作为时间戳
+                # 如果需要其他列，可以在这里添加，如 'color' 等
+            })
+
+    # 处理Labels
+    # 这里假设行为标签在 labels_df 中已包含 'behavior_num' 列
+    label_num = labels_df.loc[labels_df['time'] == time, 'behavior_num'].values
+    if label_num.size > 0:
+        label_t = label_num[0]
+    else:
+        label_t = -1  # 未找到对应标签
+
+    labels_data.append({
+        'time': time,
+        'behavior_num': label_t
+    })
+
+# 转换为DataFrame
+nodes_df_processed = pd.DataFrame(nodes_data)
+edges_df_processed = pd.DataFrame(edges_data)
+labels_df_processed = pd.DataFrame(labels_data).drop_duplicates()
+print("Nodes DataFrame shape:", nodes_df_processed.shape)
+print("Edges DataFrame shape:", edges_df_processed.shape)
+print("Labels DataFrame shape:", labels_df_processed.shape)
+
+print("Nodes DataFrame head:")
+print(nodes_df_processed.head())
+print("Edges DataFrame head:")
+print(edges_df_processed.head())
+print("Labels DataFrame head:")
+print(labels_df_processed.head())
+
+# 继续后续的数据处理和模型训练步骤...

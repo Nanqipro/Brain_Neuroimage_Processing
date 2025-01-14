@@ -1,359 +1,254 @@
 import pandas as pd
-import numpy as np
 import networkx as nx
-import plotly.graph_objects as go
-import itertools
-from tqdm import tqdm  # 用于添加程序运行进度条
-import warnings
-import matplotlib.cm as cm
-import matplotlib
-import json
+import os
+import logging
 
-warnings.filterwarnings('ignore')
+# 设置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 设置字体
-import plotly.io as pio
 
-pio.templates.default = "plotly"
+# 1. 读取Excel文件
+def read_calcium_data(file_path):
+    """
+    读取钙离子浓度Excel数据。
 
-# 1. 数据读取
-neuron_data = pd.read_excel(
-    r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\Neurons Position\240924EM\240924EM trace.xlsx')  # 请修改为您的数据路径
+    参数:
+    - file_path: Excel文件的路径。
 
-# 获取神经元ID列表
-neuron_ids = neuron_data.columns[1:]  # 假设第一列是Time，后面列是神经元ID
+    返回:
+    - df: 包含钙离子浓度数据的DataFrame。
+    """
+    try:
+        df = pd.read_excel(file_path)
+        logging.info(f"成功读取文件: {file_path}")
+        return df
+    except FileNotFoundError:
+        logging.error(f"文件未找到: {file_path}")
+        exit(1)
+    except Exception as e:
+        logging.error(f"读取文件时出错: {e}")
+        exit(1)
 
-# 读取先前标注的坐标数据
-positions_data = pd.read_csv(
-    r'C:\Users\PAN\PycharmProjects\GitHub\python-RA\Neurons Position\手工标点\clicked_points EM.csv')
 
-# 确保标点数与神经元数一致
-if len(positions_data) != len(neuron_ids):
-    raise ValueError("标记点数量与神经元数量不一致，请检查数据。")
+# 2. 计算每个神经元的平均钙离子浓度
+def compute_average(df):
+    """
+    计算每个神经元的平均钙离子浓度。
 
-# 将relative_x, relative_y转为pos
-pos = {}
-for nid, (rx, ry) in zip(neuron_ids, positions_data[['relative_x', 'relative_y']].values):
-    pos[nid] = (rx, ry)
+    参数:
+    - df: 钙离子浓度DataFrame。
 
-# 2. 为每个神经元计算平均值作为该神经元自己的阈值
-threshold_dict = neuron_data[neuron_ids].mean().to_dict()
+    返回:
+    - avg_series: 包含每个神经元平均值的Series。
+    """
+    avg_series = df.mean(axis=0)
+    logging.info("计算每个神经元的平均钙离子浓度完成")
+    return avg_series
 
-# 3. 初始化变量
-group_id_counter = itertools.count(1)
 
-N = 100  # 假设您最多有100个组
-cmap = cm.get_cmap('tab20', N)  # 使用tab20色图生成100个颜色
-color_list = [matplotlib.colors.to_hex(cmap(i)) for i in range(N)]
-color_cycle = itertools.cycle(color_list)
+# 3. 根据平均值将神经元状态分类为ON/OFF
+def classify_on_off(df, avg_series):
+    """
+    根据每个神经元的平均值将其状态分类为ON/OFF。
 
-# 4. 预计算所有帧的数据
-# 初始化用于存储每一帧的网络结构
-network_structures = []
+    参数:
+    - df: 钙离子浓度DataFrame。
+    - avg_series: 每个神经元的平均钙离子浓度。
 
-# 初始化用于存储每一帧的节点和边信息（用于动画）
-frame_node_x = []
-frame_node_y = []
-frame_node_text = []
-frame_node_color = []
-frame_edge_x = []
-frame_edge_y = []
-frame_titles = []
+    返回:
+    - on_off_df: 包含ON/OFF状态的DataFrame。
+    """
+    on_off_df = df > avg_series
+    on_off_df = on_off_df.astype(int)  # 1表示ON，0表示OFF
+    logging.info("分类ON/OFF状态完成")
+    return on_off_df
 
-current_groups = {}  # 组ID: 神经元列表
-neuron_to_group = {}  # 神经元ID: 组ID
-group_colors = {}
 
-# 5. 读取行为标签数据（假设有一个对应的CSV文件）
-# 如果没有行为标签，请跳过此部分或自行添加
-# 这里假设行为标签文件包含两列：Time 和 Behavior
-# behavior_data = pd.read_csv(r'path_to_behavior_labels.csv')
-# 将行为标签与neuron_data按Time进行匹配
-# 在这里我们假设 behavior_data 已经被正确读取和匹配
+# 4. 生成拓扑结构并记录边信息
+def generate_topologies(on_off_df, initial_edges=None):
+    """
+    根据ON/OFF状态生成每个时间戳的拓扑结构，并记录边信息。
 
-# 如果没有行为标签文件，可以创建一个示例标签
-# 请根据实际情况替换或删除此部分
-# 示例：假设每个时间点的行为标签为 "Behavior_{time}"
-# behavior_labels = {t: f"Behavior_{t}" for t in neuron_data['Time']}
-# 如果您有实际的行为标签，请替换上述代码
+    参数:
+    - on_off_df: 包含ON/OFF状态的DataFrame。
+    - initial_edges: 可选，初始的边列表，用于定义神经元之间的连接。
 
-# 示例：创建随机行为标签（请根据实际情况替换）
-# import random
-# possible_behaviors = ['Resting', 'Running', 'Eating', 'Exploring']
-# behavior_labels = {t: random.choice(possible_behaviors) for t in neuron_data['Time']}
+    返回:
+    - topologies: 包含每个时间戳拓扑结构的列表（NetworkX图对象）。
+    - edge_records: 包含时间戳、节点1、节点2的列表。
+    """
+    topologies = []
+    edge_records = []  # 用于记录所有边的信息
+    neurons = on_off_df.columns.tolist()
 
-# 请取消下面的注释并加载您的实际行为标签
-# behavior_labels = dict(zip(behavior_data['Time'], behavior_data['Behavior']))
+    for idx, row in on_off_df.iterrows():
+        time_stamp = idx + 1  # 假设时间戳从1开始
+        # 获取ON状态的神经元
+        on_neurons = row[row == 1].index.tolist()
 
-# 如果没有行为标签，使用默认标签
-behavior_labels = {t: f"Behavior_{t}" for t in neuron_data['Time']}
+        # 创建一个空图
+        G = nx.Graph()
 
-for num in tqdm(range(len(neuron_data)), desc="预计算帧数据"):
-    t = neuron_data['Time'].iloc[num]
-    activity_values = neuron_data[neuron_ids].iloc[num]
+        # 添加ON神经元作为节点
+        G.add_nodes_from(on_neurons)
 
-    # 对每个神经元使用其本身的平均值作为阈值进行判断
-    state = []
-    for nid, val in zip(neuron_ids, activity_values):
-        if val >= threshold_dict[nid]:
-            state.append('ON')
+        # 添加边
+        if initial_edges:
+            # 如果提供了初始边列表，只添加在initial_edges中的边
+            edges = [(u, v) for (u, v) in initial_edges if u in on_neurons and v in on_neurons]
         else:
-            state.append('OFF')
+            # 否则，假设所有ON神经元之间是全连接的
+            if len(on_neurons) > 1:
+                edges = [(on_neurons[i], on_neurons[j])
+                         for i in range(len(on_neurons))
+                         for j in range(i + 1, len(on_neurons))]
+            else:
+                edges = []
 
-    state_df = pd.DataFrame({
-        'neuron_id': neuron_ids,
-        'activity_value': activity_values.values,
-        'state': state
-    })
+        G.add_edges_from(edges)
 
-    # 更新神经元所属组
-    # 处理未激活的神经元
-    inactive_neurons = state_df[state_df['state'] == 'OFF']['neuron_id'].tolist()
-    for neuron in inactive_neurons:
-        if neuron in neuron_to_group:
-            group_id = neuron_to_group[neuron]
-            current_groups[group_id].remove(neuron)
-            if len(current_groups[group_id]) == 0:
-                # 如果组为空，删除该组
-                del current_groups[group_id]
-                del group_colors[group_id]
-            del neuron_to_group[neuron]
+        # 记录边信息
+        for edge in edges:
+            edge_records.append({'Time_Stamp': time_stamp, 'Neuron1': edge[0], 'Neuron2': edge[1]})
 
-    # 处理激活的神经元
-    active_neurons = state_df[state_df['state'] == 'ON']['neuron_id'].tolist()
-    # 找出未分配组的激活神经元
-    ungrouped_active_neurons = [n for n in active_neurons if n not in neuron_to_group]
+        topologies.append(G)
 
-    if ungrouped_active_neurons:
-        # 为这些神经元创建一个新的组
-        new_group_id = next(group_id_counter)
-        current_groups[new_group_id] = ungrouped_active_neurons
-        for neuron in ungrouped_active_neurons:
-            neuron_to_group[neuron] = new_group_id
-        # 分配一个颜色
-        group_colors[new_group_id] = next(color_cycle)
+        # 日志每100个时间戳
+        if (idx + 1) % 100 == 0:
+            logging.info(f"已生成 {idx + 1} 个拓扑结构")
 
-    # 构建当前时间点的图
-    G = nx.Graph()
-    G.add_nodes_from(neuron_ids)
+    logging.info("所有拓扑结构生成完成")
+    return topologies, edge_records
 
-    # 添加组内的连线
-    edges = []
-    edge_colors = []
-    for group_id, neurons in current_groups.items():
-        if len(neurons) < 2:
-            continue  # 需要至少两个神经元才能形成边
-        # 在组内选择一个神经元，连接其他神经元
-        representative_node = neurons[0]
-        group_edges = [(representative_node, neuron) for neuron in neurons[1:]]
-        edges.extend(group_edges)
-        edge_colors.extend([group_colors[group_id]] * len(group_edges))
 
-    G.add_edges_from(edges)
+# 5. 保存拓扑结构
+def save_topologies(topologies, save_format='gexf', save_dir='topologies'):
+    """
+    保存所有拓扑结构到指定目录。
 
-    # 为节点添加状态属性和颜色
-    node_x = []
-    node_y = []
-    node_text = []
-    node_color = []
-    node_features = []  # 用于存储节点特征，例如活动值
-    for node in G.nodes():
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
-        node_text.append(str(node))
-        if node in neuron_to_group:
-            group_id = neuron_to_group[node]
-            node_color.append(group_colors[group_id])
-        else:
-            node_color.append('lightgray')
+    参数:
+    - topologies: 包含所有NetworkX图对象的列表。
+    - save_format: 保存的文件格式，如 'gexf', 'graphml' 等。
+    - save_dir: 保存目录名称。
+    """
+    if not os.path.exists(save_dir):
+        try:
+            os.makedirs(save_dir)
+            logging.info(f"创建保存目录: {save_dir}")
+        except Exception as e:
+            logging.error(f"创建目录 {save_dir} 时出错: {e}")
+            exit(1)
 
-    # 边的坐标
-    edge_x = []
-    edge_y = []
-    for edge in edges:
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
+    for idx, G in enumerate(topologies):
+        time_stamp = idx + 1
+        file_path = os.path.join(save_dir, f"topology_{time_stamp}.{save_format}")
+        try:
+            if save_format == 'gexf':
+                nx.write_gexf(G, file_path)
+            elif save_format == 'graphml':
+                nx.write_graphml(G, file_path)
+            else:
+                logging.error("不支持的保存格式。使用 'gexf' 或 'graphml'。")
+                continue
+            if (idx + 1) % 100 == 0:
+                logging.info(f"已保存 {idx + 1} 个拓扑文件")
+        except Exception as e:
+            logging.error(f"保存时间戳 {time_stamp} 的拓扑结构时出错: {e}")
 
-    # 保存当前帧的节点和边信息
-    frame_node_x.append(node_x)
-    frame_node_y.append(node_y)
-    frame_node_text.append(node_text)
-    frame_node_color.append(node_color)
-    frame_edge_x.append(edge_x)
-    frame_edge_y.append(edge_y)
-    frame_titles.append(f"神经元拓扑结构图 - 时间点：{t}")
+    logging.info("所有拓扑结构文件保存完成")
 
-    # 保存网络结构到列表
-    network_structure = {
-        'time': t,
-        'nodes': [{'Neuron': node, 'x': pos[node][0], 'y': pos[node][1],
-                   'color': node_color[i], 'state': state_df[state_df['neuron_id'] == node]['state'].values[0],
-                   'activity_value': state_df[state_df['neuron_id'] == node]['activity_value'].values[0],
-                   'group_id': neuron_to_group.get(node, None)} for i, node in enumerate(G.nodes())],
-        'edges': [{'source': edge[0], 'target': edge[1], 'color': edge_colors[i]}
-                  for i, edge in enumerate(edges)],
-        'behavior': behavior_labels.get(t, "Unknown")  # 添加行为标签
-    }
-    network_structures.append(network_structure)
 
-# 6. 创建动画
-fig = go.Figure(
-    data=[
-        go.Scatter(
-            x=frame_edge_x[0],
-            y=frame_edge_y[0],
-            mode='lines',
-            line=dict(color='black', width=2),
-            hoverinfo='none',
-            showlegend=False
-        ),
-        go.Scatter(
-            x=frame_node_x[0],
-            y=frame_node_y[0],
-            mode='markers+text',
-            text=frame_node_text[0],
-            textposition='middle center',
-            marker=dict(color=frame_node_color[0], size=15),
-            hoverinfo='text',
-            showlegend=False
-        )
-    ],
-    layout=go.Layout(
-        title=frame_titles[0],
-        showlegend=False,
-        width=1437,  # 限制图的宽度
-        height=949,  # 限制图的高度
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, scaleanchor='y', scaleratio=1),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, autorange='reversed'),
-        plot_bgcolor='white',
-        sliders=[dict(
-            active=0,
-            currentvalue={"prefix": "帧: "},
-            pad={"t": 50},
-            steps=[dict(
-                label=str(i),
-                method="animate",
-                args=[[f"frame_{i}"], {"frame": {"duration": 1000, "redraw": True}, "mode": "immediate"}],
-            ) for i in range(len(frame_node_x))]
-        )],
-        updatemenus=[dict(
-            type='buttons',
-            showactive=False,
-            buttons=[dict(
-                label='Play',
-                method='animate',
-                args=[None, dict(frame=dict(duration=1000, redraw=True), fromcurrent=True)]
-            ), dict(
-                label='Pause',
-                method='animate',
-                args=[[None], dict(frame=dict(duration=0, redraw=False), mode='immediate')]
-            )]
-        )]
-    ),
-    frames=[
-        go.Frame(
-            data=[
-                go.Scatter(
-                    x=frame_edge_x[k],
-                    y=frame_edge_y[k],
-                    mode='lines',
-                    line=dict(color='black', width=2),
-                    hoverinfo='none',
-                    showlegend=False
-                ),
-                go.Scatter(
-                    x=frame_node_x[k],
-                    y=frame_node_y[k],
-                    mode='markers+text',
-                    text=frame_node_text[k],
-                    textposition='middle center',
-                    marker=dict(color=frame_node_color[k], size=15),
-                    hoverinfo='text',
-                    showlegend=False
-                )
-            ],
-            name=f"frame_{k}",
-            layout=go.Layout(title=frame_titles[k])
-        )
-        for k in range(len(frame_node_x))
-    ]
-)
+# 6. 保存边列表到表格
+def save_edge_list(edge_records, save_path='topology_edges.xlsx'):
+    """
+    保存所有边信息到一个Excel文件中。
 
-# 7. 添加背景图片（可选）
-import base64
+    参数:
+    - edge_records: 包含时间戳、节点1、节点2的列表。
+    - save_path: 保存文件的路径。
+    """
+    try:
+        edge_df = pd.DataFrame(edge_records)
+        edge_df.to_excel(save_path, index=False)
+        logging.info(f"已保存所有拓扑边信息到 '{save_path}'")
+    except Exception as e:
+        logging.error(f"保存边信息到表格时出错: {e}")
 
-# 将本地图片转换为 base64 编码
-image_path = r'C:\Users\PAN\Desktop\RA\数据集\NO2979\240924EM2\2979240924EM2.png'  # 替换为你的图片路径
-with open(image_path, "rb") as f:
-    image_data = f.read()
 
-encoded_image = base64.b64encode(image_data).decode("ascii")
-image_source = "data:image/jpg;base64," + encoded_image
+# 7. 主函数
+def main(file_path, save_topology_files=False,
+         topology_format='gexf', topology_dir='topologies',
+         save_edge_list_flag=True, edge_list_path='topology_edges.xlsx'):
+    """
+    主函数执行整个流程。
 
-# 使用add_layout_image将图片添加为背景
-fig.add_layout_image(
-    dict(
-        source=image_source,
-        xref='paper',
-        yref='paper',
-        x=0.07,
-        y=1.03,
-        sizex=1,
-        sizey=1,
-        opacity=0.5,  # 调整透明度，让前景元素更加醒目
-        layer='below'  # 将图片置于图形的下层
+    参数:
+    - file_path: Excel文件路径。
+    - save_topology_files: 是否保存拓扑结构文件。
+    - topology_format: 拓扑结构文件的格式，如 'gexf', 'graphml'。
+    - topology_dir: 拓扑结构文件的保存目录。
+    - save_edge_list_flag: 是否保存拓扑边列表表格。
+    - edge_list_path: 拓扑边列表表格的保存路径。
+
+    返回:
+    - topologies: 拓扑结构列表。
+    - on_off_df: ON/OFF状态DataFrame。
+    - df: 原始钙离子浓度DataFrame。
+    - edge_records: 拓扑边列表。
+    """
+    # 读取数据
+    df = read_calcium_data(file_path)
+
+    # 计算平均值
+    avg_series = compute_average(df)
+
+    # 分类ON/OFF
+    on_off_df = classify_on_off(df, avg_series)
+
+    # 生成拓扑结构并记录边信息
+    topologies, edge_records = generate_topologies(on_off_df)
+
+    # 保存ON/OFF状态
+    try:
+        on_off_df.to_excel("on_off_states.xlsx", index=False)
+        logging.info("已保存神经元的ON/OFF状态到 'on_off_states.xlsx'")
+    except Exception as e:
+        logging.error(f"保存ON/OFF状态时出错: {e}")
+
+    # 保存原始钙离子浓度数据（可选）
+    try:
+        df.to_excel("calcium_concentrations.xlsx", index=False)
+        logging.info("已保存钙离子浓度数据到 'calcium_concentrations.xlsx'")
+    except Exception as e:
+        logging.error(f"保存钙离子浓度数据时出错: {e}")
+
+    # 保存拓扑结构文件
+    if save_topology_files:
+        save_topologies(topologies, save_format=topology_format, save_dir=topology_dir)
+
+    # 保存拓扑边列表到表格
+    if save_edge_list_flag:
+        save_edge_list(edge_records, save_path=edge_list_path)
+
+    return topologies, on_off_df, df, edge_records
+
+
+if __name__ == "__main__":
+    # 示例用法
+    excel_file = r"C:\Users\PAN\PycharmProjects\GitHub\python-RA\数据\Day6\calcium_data.xlsx"  # 替换为你的Excel文件路径
+
+    # 参数说明：
+    # save_topology_files=True: 是否保存拓扑结构文件
+    # topology_format='gexf': 拓扑结构文件格式，可以是 'gexf' 或 'graphml'
+    # topology_dir='topologies': 拓扑结构文件保存目录
+    # save_edge_list_flag=True: 是否保存拓扑边列表表格
+    # edge_list_path='topology_edges.xlsx': 拓扑边列表表格的保存路径
+
+    topologies, on_off_df, df, edge_records = main(
+        file_path=excel_file,
+        save_topology_files=True,  # 设置为True以保存拓扑结构文件
+        topology_format='gexf',
+        topology_dir=r"C:\Users\PAN\PycharmProjects\GitHub\python-RA\DeepLearning\Day6 训练结果\topologies",
+        save_edge_list_flag=True,  # 设置为True以保存拓扑边列表表格
+        edge_list_path=r"C:\Users\PAN\PycharmProjects\GitHub\python-RA\DeepLearning\Day6 训练结果\topology_edges.xlsx"
     )
-)
-
-# 8. 保存动画为HTML文件
-fig.write_html('neuron_activity_animation_individual_threshold.html')
-print("动画已保存为 'neuron_activity_animation_individual_threshold.html'")
-
-# 9. 保存网络结构到 Excel
-# 为了确保Excel文件的可读性和易用性，我们将所有节点和边信息分别保存到两个单独的工作表中，
-# 并在每个表中添加时间戳列以区分不同时间点的数据。
-# 同时，我们将行为标签作为图的标签保存到另一个工作表中。
-
-# 创建空的DataFrame列表
-nodes_list = []
-edges_list = []
-labels_list = []
-
-for network in network_structures:
-    time = network['time']
-    behavior = network['behavior']
-    nodes = network['nodes']
-    edges = network['edges']
-
-    # 创建节点DataFrame
-    nodes_df = pd.DataFrame(nodes)
-    nodes_df['time'] = time
-    nodes_list.append(nodes_df)
-
-    # 创建边DataFrame
-    edges_df = pd.DataFrame(edges)
-    edges_df['time'] = time
-    edges_list.append(edges_df)
-
-    # 创建标签DataFrame
-    labels_df = pd.DataFrame([{'time': time, 'behavior': behavior}])
-    labels_list.append(labels_df)
-
-# 合并所有节点、边和标签数据
-all_nodes_df = pd.concat(nodes_list, ignore_index=True)
-all_edges_df = pd.concat(edges_list, ignore_index=True)
-all_labels_df = pd.concat(labels_list, ignore_index=True)
-
-# 将数据保存到Excel
-excel_output_path = 'network_structures_for_GNN.xlsx'
-with pd.ExcelWriter(excel_output_path) as writer:
-    all_nodes_df.to_excel(writer, sheet_name='Nodes', index=False)
-    all_edges_df.to_excel(writer, sheet_name='Edges', index=False)
-    all_labels_df.to_excel(writer, sheet_name='Labels', index=False)
-
-print(f"网络结构已保存为 '{excel_output_path}'")
-
-
