@@ -37,14 +37,16 @@ class FrequencyAnalyzer:
                 end_time = end_time if end_time is not None else df['stamp'].max()
                 df = df[(df['stamp'] >= start_time) & (df['stamp'] <= end_time)].copy()
         
-        # Select only neuron columns (n1 to n62)
-        neuron_columns = [f'n{i}' for i in range(1, 63)]
-        existing_neuron_cols = [col for col in neuron_columns if col in df.columns]
+        # 获取所有包含'n'的列（不区分大小写）
+        neuron_columns = [col for col in df.columns if 'n' in col.lower()]
+        if not neuron_columns:
+            raise ValueError("No neuron columns found in the Excel file!")
+        print(f"Found {len(neuron_columns)} neuron columns:", neuron_columns)
         
         # Store time information
         self.timestamps = df['stamp'].values if 'stamp' in df.columns else None
         
-        return df[existing_neuron_cols]
+        return df[neuron_columns]
 
     def perform_fft_analysis(self, signal_data):
         """Perform FFT analysis on the input signal"""
@@ -415,8 +417,8 @@ def main():
     analyzer = FrequencyAnalyzer(sampling_rate=10)
     
     # Set file paths
-    file_path = '../../datasets/processed_Day6.xlsx'
-    output_base_dir = '../../graph/frequency_analysis_day6_behavior'
+    file_path = '../../datasets/processed_Day3.xlsx'
+    output_base_dir = '../../graph/frequency_analysis_day3_behavior'
     
     # Load full data
     print("Loading dataset...")

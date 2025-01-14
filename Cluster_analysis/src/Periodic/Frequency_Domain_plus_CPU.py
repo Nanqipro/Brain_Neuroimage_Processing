@@ -18,10 +18,14 @@ class FrequencyAnalyzer:
     def load_data(self, file_path):
         """Load neuron time series data from Excel file"""
         df = pd.read_excel(file_path)
-        # Select only neuron columns (n1 to n62)
-        neuron_columns = [f'n{i}' for i in range(1, 63)]
-        existing_neuron_cols = [col for col in neuron_columns if col in df.columns]
-        return df[existing_neuron_cols]
+        
+        # 获取所有包含'n'的列（不区分大小写）
+        neuron_columns = [col for col in df.columns if 'n' in col.lower()]
+        if not neuron_columns:
+            raise ValueError("No neuron columns found in the Excel file!")
+        print(f"Found {len(neuron_columns)} neuron columns:", neuron_columns)
+        
+        return df[neuron_columns]
 
     def perform_fft_analysis(self, signal_data):
         """Perform FFT analysis on the input signal"""
