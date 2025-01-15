@@ -5,16 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c098210b-b26c-4016-b81f-663ae71b4109" name="更改" comment="1.14">
-      <change afterPath="$PROJECT_DIR$/神经元分析/单个神经元分析/周期性变化检测/FFT优化lag ACF与PACF.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/神经元分析/单个神经元分析/统计检验/ANOVA.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/拓扑结构与图像聚类/归一化与平滑化处理.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/拓扑结构与图像聚类/时序拓扑结构提取.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/拓扑结构与图像聚类/时序拓扑结构聚类.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/数据/Day3/Day3 behavior.xlsx" beforeDir="false" afterPath="$PROJECT_DIR$/数据/Day3/Day3 behavior.xlsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/数据/Day3/Day3.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/数据/Day6/calcium_data.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/数据/Day6/calcium_data.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/数据/Day9/calcium_data9.xlsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/数据/learn.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/神经元分析/单个神经元分析/周期性变化检测/FFT优化lag ACF.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Tensorflow 2  小鼠神经元/test.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Tensorflow 2  小鼠神经元/原始钙离子浓度数据归一化.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Tensorflow 2  小鼠神经元/数据集合/Day6 behavior.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Tensorflow 2  小鼠神经元/数据集合/calcium_data Day6.xlsx" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -64,6 +63,7 @@
     "Python.learn.executor": "Run",
     "Python.manual positon.executor": "Run",
     "Python.sliding window.executor": "Run",
+    "Python.smooth_data.executor": "Run",
     "Python.study2.executor": "Run",
     "Python.testing.executor": "Run",
     "Python.xy坐标提取.executor": "Run",
@@ -75,8 +75,11 @@
     "Python.基于EMD的K-means.executor": "Run",
     "Python.小鼠拓扑结构图 神经网络训练.executor": "Run",
     "Python.小鼠拓扑结构图提取.executor": "Run",
+    "Python.归一化与平滑化处理.executor": "Run",
     "Python.拓扑结构图 需导入坐标.executor": "Run",
     "Python.拓扑结果提取（NEW）.executor": "Run",
+    "Python.时序拓扑结构提取.executor": "Run",
+    "Python.时序拓扑结构聚类.executor": "Run",
     "Python.时间条形图.executor": "Run",
     "Python.滑动窗口数据处理.executor": "Run",
     "Python.点位微调.executor": "Run",
@@ -191,7 +194,8 @@
       <workItem from="1735890262512" duration="4293000" />
       <workItem from="1736134361659" duration="11270000" />
       <workItem from="1736739789214" duration="2454000" />
-      <workItem from="1736833524683" duration="9361000" />
+      <workItem from="1736833524683" duration="10030000" />
+      <workItem from="1736911905897" duration="5883000" />
     </task>
     <task id="LOCAL-00001" summary="11.13">
       <option name="closed" value="true" />
@@ -417,7 +421,15 @@
       <option name="project" value="LOCAL" />
       <updated>1736837049540</updated>
     </task>
-    <option name="localTasksCounter" value="29" />
+    <task id="LOCAL-00029" summary="1.14">
+      <option name="closed" value="true" />
+      <created>1736845930224</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1736845930224</updated>
+    </task>
+    <option name="localTasksCounter" value="30" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -454,6 +466,7 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/python_RA$plotly.coverage" NAME="神经元拓扑结构图plotly 覆盖结果" MODIFIED="1732776187368" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
+    <SUITE FILE_PATH="coverage/python_RA$smooth_data.coverage" NAME="smooth_data 覆盖结果" MODIFIED="1736920770896" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/拓扑结构与图像聚类" />
     <SUITE FILE_PATH="coverage/python_RA$cnmf.coverage" NAME="cnmf 覆盖结果" MODIFIED="1731913823629" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/.venv/Lib/site-packages/caiman-1.11.3-py3.12-win-amd64.egg/caiman/source_extraction/cnmf" />
     <SUITE FILE_PATH="coverage/python_RA$_.coverage" NAME="小鼠拓扑结构图 神经网络训练 覆盖结果" MODIFIED="1736834186801" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/DeepLearning" />
     <SUITE FILE_PATH="coverage/python_RA$pattern.coverage" NAME="单个神经元pattern分析 覆盖结果" MODIFIED="1732596627669" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/数据/Day6" />
@@ -475,7 +488,7 @@
     <SUITE FILE_PATH="coverage/python_RA$demo_pipeline_voltage_imaging.coverage" NAME="demo_pipeline_voltage_imaging 覆盖结果" MODIFIED="1731908811562" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/CaImAn/demos/general" />
     <SUITE FILE_PATH="coverage/python_RA$xy.coverage" NAME="xy坐标提取 覆盖结果" MODIFIED="1733974518612" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Neurons Position" />
     <SUITE FILE_PATH="coverage/python_RA$Hausdorff.coverage" NAME="Hausdorff 覆盖结果" MODIFIED="1731998839287" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/聚类算法代码" />
-    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="周期性变化检测与傅里叶变换 覆盖结果" MODIFIED="1736838530397" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/神经元分析/单个神经元分析/周期性变化检测" />
+    <SUITE FILE_PATH="coverage/python_RA$.coverage" NAME="归一化与平滑化处理 覆盖结果" MODIFIED="1736920962443" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/拓扑结构与图像聚类" />
     <SUITE FILE_PATH="coverage/python_RA$demo_behavior.coverage" NAME="demo_behavior 覆盖结果" MODIFIED="1731909898536" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/CaImAn/demos/general" />
   </component>
 </project>
