@@ -139,10 +139,10 @@ def plot_comprehensive_analysis(calcium_series, time_step, neuron, sheet_output_
 
 def main():
     # 1. Set input Excel file path
-    excel_file = '../../datasets/processed_Day3.xlsx'
+    excel_file = '../../datasets/processed_Day9.xlsx'
 
     # 2. Set output directory
-    output_dir = '../../graph/periodic_analysis_day3'
+    output_dir = '../../graph/periodic_analysis_day9'
     create_directory(output_dir)
 
     # 3. Read Excel file

@@ -271,6 +271,20 @@ class FrequencyAnalyzer:
     def plot_comprehensive_analysis(self, neuron_id, time_series, output_dir):
         """Generate comprehensive frequency analysis plots"""
         try:
+            # Set font sizes
+            SMALL_SIZE = 18    # was 12
+            MEDIUM_SIZE = 20   # was 14
+            BIGGER_SIZE = 24   # was 16
+            TITLE_SIZE = 28    # was 18
+            
+            plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+            plt.rc('axes', titlesize=BIGGER_SIZE)    # fontsize of the axes title
+            plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+            plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+            plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+            plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+            plt.rc('figure', titlesize=TITLE_SIZE)   # fontsize of the figure title
+            
             # Create figure with subplots
             plt.close('all')  # Close all existing figures
             fig = plt.figure(figsize=(15, 24))  # Increased figure height for autocorrelation plot
@@ -431,8 +445,8 @@ def main():
     analyzer = FrequencyAnalyzer(sampling_rate=10)
     
     # Set file paths
-    file_path = '../../datasets/processed_Day9.xlsx'
-    output_base_dir = '../../graph/frequency_analysis_day9_behavior'
+    file_path = '../../datasets/processed_Day3.xlsx'
+    output_base_dir = '../../graph/frequency_analysis_day3_behavior'
     
     # Load full data
     print("Loading dataset...")
