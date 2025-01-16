@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # 加载数据
-day3_data = pd.read_excel('../../datasets/Day3_with_behavior_labels_filled.xlsx')
+day6_data = pd.read_excel('../../datasets/Day6_with_behavior_labels_filled.xlsx')
 
 # 将 'stamp' 列设置为索引
-day3_data = day3_data.set_index('stamp')
+day6_data = day6_data.set_index('stamp')
 
 # 分离 'behavior' 列
-frame_lost = day3_data['behavior']
+frame_lost = day6_data['behavior']
 day3_data = day3_data.drop(columns=['behavior'])
 
 # 数据标准化（Z-score 标准化）
@@ -61,7 +61,7 @@ for cd1_time in cd1_indices:
         # plt.text(cd1_position + 0.5, -0.5, '放入CD1', color='yellow', rotation=90,
         #          verticalalignment='bottom', fontsize=12)
 
-plt.title('Day3-heatmap (add CD1)', fontsize=16)
+plt.title('Day6-heatmap (add CD1)', fontsize=16)
 plt.xlabel('stamp', fontsize=20)
 plt.ylabel('neuron', fontsize=20)
 
@@ -71,5 +71,5 @@ ax.set_yticklabels(ax.get_yticklabels(), fontsize=14, fontweight='bold')
 # 修改X轴标签（时间戳）的字体大小和粗细
 ax.set_xticklabels(ax.get_xticklabels(), fontsize=14, fontweight='bold')
 
-plt.savefig('../../graph/heatmap_sort_day3.png')
+plt.savefig('../../graph/heatmap_sort_day6.png')
 plt.close()
