@@ -4,7 +4,8 @@ The script allows users to:
 1. Click left mouse button to add points
 2. Click right mouse button to undo the last point
 3. Double click to skip the current number
-4. Close the window to save the points and view their relative positions
+4. Drag existing points to adjust their positions
+5. Close the window to save the points and view their relative positions
 """
 
 import matplotlib
@@ -13,12 +14,13 @@ matplotlib.use('TkAgg')  # Use interactive backend
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
 from matplotlib.text import Text
 import time
+import os
 
 # Configure matplotlib settings
 matplotlib.rcParams['font.sans-serif'] = ['SimHei']
@@ -43,7 +45,12 @@ class PointMarker:
         self.current_number = 1  # 当前编号
         self.last_click_time = 0  # 用于检测双击
         self.last_click_pos = (None, None)  # 用于存储上次点击位置
-        self.double_click_threshold = 0.3  # 双击时间阈值（秒）
+        self.double_click_threshold = 0.6  # 双击时间阈值（秒）
+        
+        # 拖动相关变量
+        self.dragging = False
+        self.drag_point_number: Optional[int] = None
+        self.drag_threshold = 5  # 拖动判定阈值（像素）
         
         self.fig, self.ax = plt.subplots()
         self.setup_plot()
@@ -51,8 +58,23 @@ class PointMarker:
     def setup_plot(self) -> None:
         """Set up the initial plot configuration."""
         self.ax.imshow(self.img)
-        self.ax.set_title('请用左键标点，右键撤销上一次标点，双击跳过编号 (关闭窗口结束)')
+        self.ax.set_title('请用左键标点，右键撤销上一次标点，双击跳过编号，拖动可调整点位 (关闭窗口结束)')
         self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+        self.fig.canvas.mpl_connect('button_release_event', self.onrelease)
+        self.fig.canvas.mpl_connect('motion_notify_event', self.onmotion)
+        
+    def find_nearest_point(self, x: float, y: float) -> Optional[int]:
+        """Find the number of the nearest point within threshold distance."""
+        min_dist = float('inf')
+        nearest_num = None
+        
+        for num, (px, py) in self.clicked_points.items():
+            dist = np.sqrt((x - px)**2 + (y - py)**2)
+            if dist < min_dist and dist < self.drag_threshold:
+                min_dist = dist
+                nearest_num = num
+                
+        return nearest_num
         
     def onclick(self, event) -> None:
         """
@@ -61,32 +83,63 @@ class PointMarker:
         Args:
             event: MouseEvent object containing click information
         """
-        if event.button == 1 and event.xdata is not None and event.ydata is not None:
+        if not event.inaxes:
+            return
+            
+        if event.button == 1:
             current_time = time.time()
             current_pos = (event.xdata, event.ydata)
             
-            # 检查是否是双击（时间间隔小于阈值且位置接近）
+            # 检查是否是双击
             is_double_click = (current_time - self.last_click_time < self.double_click_threshold and
                              self.last_click_pos[0] is not None and
                              abs(current_pos[0] - self.last_click_pos[0]) < 5 and
                              abs(current_pos[1] - self.last_click_pos[1]) < 5)
             
             if is_double_click:
-                # 双击，跳过当前编号
                 print(f"跳过编号 {self.current_number}")
                 self.current_number += 1
-                # 重置点击状态，避免连续跳过
                 self.last_click_time = 0
                 self.last_click_pos = (None, None)
-            else:
-                # 单击，添加点
-                self._add_point(event.xdata, event.ydata)
-                self.last_click_time = current_time
-                self.last_click_pos = current_pos
+                return
+                
+            # 检查是否点击了已存在的点
+            nearest_num = self.find_nearest_point(event.xdata, event.ydata)
+            if nearest_num is not None:
+                # 开始拖动已存在的点
+                self.dragging = True
+                self.drag_point_number = nearest_num
+                return
+                
+            self._add_point(event.xdata, event.ydata)
+            self.last_click_time = current_time
+            self.last_click_pos = current_pos
             
         elif event.button == 3:
             self._remove_last_point()
             
+    def onrelease(self, event) -> None:
+        """Handle mouse button release events."""
+        if event.button == 1:
+            self.dragging = False
+            self.drag_point_number = None
+            
+    def onmotion(self, event) -> None:
+        """Handle mouse motion events for dragging points."""
+        if not self.dragging or self.drag_point_number is None or not event.inaxes:
+            return
+            
+        # 更新点的位置
+        self.clicked_points[self.drag_point_number] = (event.xdata, event.ydata)
+        
+        # 更新点的显示位置
+        self.point_plots[self.drag_point_number].set_data([event.xdata], [event.ydata])
+        
+        # 更新标签位置
+        self.text_labels[self.drag_point_number].set_position((event.xdata + 5, event.ydata))
+        
+        plt.draw()
+        
     def _add_point(self, x: float, y: float) -> None:
         """Add a new point to the plot."""
         self.clicked_points[self.current_number] = (x, y)
@@ -160,12 +213,19 @@ class PointMarker:
             
     def _plot_relative_coordinates(self, relative_points: np.ndarray) -> None:
         """
-        Plot the relative coordinates in a scatter plot.
+        Plot the relative coordinates in a scatter plot and save it.
         Shows the original numbers (maintaining gaps from skipped numbers).
         
         Args:
             relative_points (np.ndarray): Array of relative coordinates to plot
         """
+        # 创建保存图像的目录
+        graph_dir = os.path.join(os.path.dirname(os.path.dirname(self.image_path)), 'graph')
+        os.makedirs(graph_dir, exist_ok=True)
+        
+        # 获取原始图像文件名（不含扩展名）
+        base_name = os.path.splitext(os.path.basename(self.image_path))[0]
+        
         fig2, ax2 = plt.subplots()
         ax2.scatter(relative_points[:,1], relative_points[:,2], c='r', s=20)
         ax2.set_title('标记点在相对坐标系中的分布')
@@ -177,6 +237,12 @@ class PointMarker:
         
         for num, rx, ry in relative_points:
             ax2.text(rx+0.01, ry, str(int(num)), color='red', fontsize=8)
+            
+        # 保存图像
+        save_path = os.path.join(graph_dir, f'{base_name}_coordinates.png')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"已保存坐标分布图至 {save_path}")
+        
         plt.show(block=True)
 
 def main():
