@@ -42,6 +42,7 @@ class PointMarker:
         
         self.current_number = 1  # 当前编号
         self.last_click_time = 0  # 用于检测双击
+        self.last_click_pos = (None, None)  # 用于存储上次点击位置
         self.double_click_threshold = 0.3  # 双击时间阈值（秒）
         
         self.fig, self.ax = plt.subplots()
@@ -60,19 +61,28 @@ class PointMarker:
         Args:
             event: MouseEvent object containing click information
         """
-        current_time = time.time()
-        
         if event.button == 1 and event.xdata is not None and event.ydata is not None:
-            # 检查是否是双击
-            if current_time - self.last_click_time < self.double_click_threshold:
+            current_time = time.time()
+            current_pos = (event.xdata, event.ydata)
+            
+            # 检查是否是双击（时间间隔小于阈值且位置接近）
+            is_double_click = (current_time - self.last_click_time < self.double_click_threshold and
+                             self.last_click_pos[0] is not None and
+                             abs(current_pos[0] - self.last_click_pos[0]) < 5 and
+                             abs(current_pos[1] - self.last_click_pos[1]) < 5)
+            
+            if is_double_click:
                 # 双击，跳过当前编号
+                print(f"跳过编号 {self.current_number}")
                 self.current_number += 1
-                print(f"跳过编号 {self.current_number - 1}")
+                # 重置点击状态，避免连续跳过
+                self.last_click_time = 0
+                self.last_click_pos = (None, None)
             else:
                 # 单击，添加点
                 self._add_point(event.xdata, event.ydata)
-            
-            self.last_click_time = current_time
+                self.last_click_time = current_time
+                self.last_click_pos = current_pos
             
         elif event.button == 3:
             self._remove_last_point()
@@ -116,23 +126,25 @@ class PointMarker:
         Convert clicked points to relative coordinates.
         
         Returns:
-            np.ndarray: Array of relative coordinates with their numbers
+            np.ndarray: Array of relative coordinates with their numbers.
+            Maintains original numbers (including gaps from skipped numbers).
         """
         if not self.clicked_points:
             return np.array([])
             
-        # 将字典转换为有序列表
+        # 将字典转换为有序列表，保持原始编号
         sorted_points = sorted(self.clicked_points.items())
         numbers = np.array([num for num, _ in sorted_points])
         coordinates = np.array([(x / self.img_width, y / self.img_height) 
                               for _, (x, y) in sorted_points])
         
-        # 组合编号和相对坐标
+        # 组合原始编号和相对坐标
         return np.column_stack((numbers, coordinates))
         
     def save_coordinates(self, output_file: str) -> None:
         """
         Save relative coordinates to a CSV file.
+        Maintains original numbers (including gaps from skipped numbers).
         
         Args:
             output_file (str): Path to save the coordinates
@@ -141,7 +153,7 @@ class PointMarker:
         if len(relative_points) > 0:
             np.savetxt(output_file, relative_points, delimiter=',',
                       header='number,relative_x,relative_y', comments='')
-            print(f"已保存标记点相对坐标至 {output_file}")
+            print(f"已保存标记点相对坐标至 {output_file}（共 {len(relative_points)} 个点，编号范围 {int(relative_points[0,0])} - {int(relative_points[-1,0])}）")
             self._plot_relative_coordinates(relative_points)
         else:
             print("未标记任何点，不生成输出文件及相对坐标系散点图。")
@@ -149,6 +161,7 @@ class PointMarker:
     def _plot_relative_coordinates(self, relative_points: np.ndarray) -> None:
         """
         Plot the relative coordinates in a scatter plot.
+        Shows the original numbers (maintaining gaps from skipped numbers).
         
         Args:
             relative_points (np.ndarray): Array of relative coordinates to plot

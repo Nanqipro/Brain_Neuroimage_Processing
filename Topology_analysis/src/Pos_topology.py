@@ -65,7 +65,7 @@ frame_edge_color = []
 frame_titles = []
 
 for num in tqdm(range(len(neuron_data)), desc="预计算帧数据"):
-    t = neuron_data['Time'].iloc[num]
+    t = neuron_data['stamp'].iloc[num]
     activity_values = neuron_data[neuron_ids].iloc[num]
 
     # 对每个神经元使用其本身的平均值作为阈值进行判断
