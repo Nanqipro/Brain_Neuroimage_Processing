@@ -215,7 +215,7 @@ def analyze_clusters(labels: np.ndarray, timestamps: np.ndarray) -> None:
         logging.info(f"\nCluster {cluster} timestamps:")
         logging.info(cluster_timestamps)
 
-def main(file_path: str = '../datasets/Day6_topology_matrix.xlsx', n_clusters: int = 6) -> None:
+def main(file_path: str = '../datasets/Day9_topology_matrix.xlsx', n_clusters: int = 6) -> None:
     """
     Execute the complete clustering analysis workflow.
 

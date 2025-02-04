@@ -173,7 +173,7 @@ def generate_topologies(on_off_df: pd.DataFrame) -> List[Dict[str, Any]]:
 
 def save_topology_matrix(
     edge_records: List[Dict[str, Any]],
-    save_path: str = '../datasets/Day6_topology_matrix.xlsx'
+    save_path: str = '../datasets/Day3_topology_matrix.xlsx'
 ) -> None:
     """
     Generate topology connection matrix and save to Excel.
@@ -225,7 +225,7 @@ def save_topology_matrix(
 def main(
     file_path: str,
     should_save_topology_matrix: bool = True,
-    topology_matrix_path: str = '../datasets/Day6_topology_matrix.xlsx',
+    topology_matrix_path: str = '../datasets/Day9_topology_matrix.xlsx',
     initial_edges: Optional[List[tuple]] = None
 ) -> List[Dict[str, Any]]:
     """
@@ -259,11 +259,11 @@ def main(
 
 if __name__ == "__main__":
     try:
-        excel_file = '../datasets/Day6_with_behavior_labels_filled.xlsx'
+        excel_file = '../datasets/Day9_with_behavior_labels_filled.xlsx'
         edge_records = main(
             file_path=excel_file,
             should_save_topology_matrix=True,
-            topology_matrix_path='../datasets/Day6_topology_matrix.xlsx',
+            topology_matrix_path='../datasets/Day9_topology_matrix.xlsx',
             initial_edges=None
         )
     except Exception as e:

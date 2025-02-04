@@ -2,8 +2,8 @@
 This script provides an interactive tool for marking points on an image and saving their relative coordinates.
 The script allows users to:
 1. Click left mouse button to add points
-2. Click right mouse button to undo the last point
-3. Double click to skip the current number
+2. Click left mouse button multiple times quickly in same position to skip that many numbers
+3. Click right mouse button to undo the last point
 4. Drag existing points to adjust their positions
 5. Close the window to save the points and view their relative positions
 """
@@ -90,17 +90,17 @@ class PointMarker:
             current_time = time.time()
             current_pos = (event.xdata, event.ydata)
             
-            # 检查是否是双击
-            is_double_click = (current_time - self.last_click_time < self.double_click_threshold and
+            # 检查是否是快速连续点击
+            is_consecutive_click = (current_time - self.last_click_time < self.double_click_threshold and
                              self.last_click_pos[0] is not None and
                              abs(current_pos[0] - self.last_click_pos[0]) < 5 and
                              abs(current_pos[1] - self.last_click_pos[1]) < 5)
             
-            if is_double_click:
-                print(f"跳过编号 {self.current_number}")
+            if is_consecutive_click:
                 self.current_number += 1
-                self.last_click_time = 0
-                self.last_click_pos = (None, None)
+                print(f"跳过编号 {self.current_number - 1}")
+                self.last_click_time = current_time
+                self.last_click_pos = current_pos
                 return
                 
             # 检查是否点击了已存在的点
@@ -247,8 +247,8 @@ class PointMarker:
 
 def main():
     """Main function to run the point marking tool."""
-    image_path = '../datasets/Day6_Max.png'
-    output_file = '../datasets/Day6_Max_position.csv'
+    image_path = '../datasets/Day9_Max.png'
+    output_file = '../datasets/Day9_Max_position.csv'
     
     marker = PointMarker(image_path)
     plt.show(block=True)
