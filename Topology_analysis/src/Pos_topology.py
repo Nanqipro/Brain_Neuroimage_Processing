@@ -129,8 +129,10 @@ class NeuronTopologyAnalyzer:
     def _load_background_image(self) -> None:
         """Load and prepare background image for visualization."""
         try:
+            print(f"Loading background image from: {self.background_image_path}")
             img = Image.open(self.background_image_path)
             self.background_image_size = img.size
+            print(f"Original image size: {self.background_image_size}")
             
             # 修改图像编码方式
             img_byte_arr = io.BytesIO()
@@ -138,6 +140,7 @@ class NeuronTopologyAnalyzer:
             img_byte_arr = img_byte_arr.getvalue()
             encoded_image = base64.b64encode(img_byte_arr).decode()
             self.background_image = encoded_image
+            print("Successfully encoded background image")
         except Exception as e:
             print(f"Warning: Failed to load background image: {e}")
             self.use_background = False
@@ -352,76 +355,113 @@ class NeuronTopologyAnalyzer:
         Create the layout for the animation.
         包含了背景图、坐标轴、动画控制等设置。
         """
+        # 设置基本布局配置
         layout_config = {
             'title': self.frames_data['titles'][0],
             'showlegend': False,
-            'xaxis': dict(
-                showgrid=False, 
-                zeroline=False, 
-                showticklabels=False,
-                scaleanchor='y', 
-                scaleratio=1,
-                range=[0, 1],
-                domain=[0, 1]
-            ),
-            'yaxis': dict(
-                showgrid=False, 
-                zeroline=False, 
-                showticklabels=False,
-                autorange='reversed',
-                range=[0, 1],
-                domain=[0, 1]
-            ),
             'plot_bgcolor': 'rgba(0,0,0,0)',
             'paper_bgcolor': 'rgba(0,0,0,0)',
             'margin': dict(l=0, r=0, t=30, b=0),
-            # 动画控制滑块
-            'sliders': [dict(
-                active=0,
-                steps=[dict(
-                    label=str(i),
-                    method="animate",
-                    args=[[f"frame_{i}"], {
-                        "frame": {"duration": self.frame_duration, "redraw": True},  # 使用自定义帧持续时间
-                        "mode": "immediate"
-                    }]
-                ) for i in range(len(self.frames_data['node_x']))]
-            )],
-            # 动画控制按钮
-            'updatemenus': [dict(
-                type='buttons',
-                showactive=False,
-                buttons=[dict(
+        }
+
+        # 如果有背景图，根据背景图设置画布大小和比例
+        if self.use_background and self.background_image and self.background_image_size:
+            # 获取图像尺寸
+            img_width, img_height = self.background_image_size
+            
+            # 设置画布大小（添加一些边距）
+            layout_config['width'] = img_width + 40
+            layout_config['height'] = img_height + 60  # 为标题留出更多空间
+            
+            # 计算坐标轴范围，确保图像比例正确
+            layout_config['xaxis'] = dict(
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+                range=[-0.05, 1.05],  # 添加5%的边距
+                domain=[0, 1],
+                scaleanchor='y',
+                scaleratio=1
+            )
+            
+            layout_config['yaxis'] = dict(
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+                range=[-0.05, 1.05],  # 添加5%的边距
+                domain=[0, 1],
+                autorange='reversed'  # 保持y轴方向
+            )
+            
+            # 添加背景图
+            layout_config['images'] = [{
+                'source': f'data:image/png;base64,{self.background_image}',
+                'xref': 'paper',
+                'yref': 'paper',
+                'x': 0,
+                'y': 1,
+                'sizex': 1,
+                'sizey': 1,
+                'sizing': 'stretch',
+                'opacity': self.background_opacity,
+                'layer': 'below'
+            }]
+        else:
+            # 如果没有背景图，使用默认设置
+            layout_config.update({
+                'width': 800,
+                'height': 800,
+                'xaxis': dict(
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    range=[-0.05, 1.05],
+                    domain=[0, 1],
+                    scaleanchor='y',
+                    scaleratio=1
+                ),
+                'yaxis': dict(
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    range=[-0.05, 1.05],
+                    domain=[0, 1],
+                    autorange='reversed'
+                )
+            })
+
+        # 添加动画控制
+        layout_config['sliders'] = [{
+            'active': 0,
+            'steps': [{
+                'label': str(i),
+                'method': "animate",
+                'args': [[f"frame_{i}"], {
+                    "frame": {"duration": self.frame_duration, "redraw": True},
+                    "mode": "immediate"
+                }]
+            } for i in range(len(self.frames_data['node_x']))]
+        }]
+        
+        layout_config['updatemenus'] = [{
+            'type': 'buttons',
+            'showactive': False,
+            'buttons': [
+                dict(
                     label='Play',
                     method='animate',
                     args=[None, dict(frame=dict(duration=self.frame_duration, redraw=True),
                                    fromcurrent=True)]
-                ), dict(
+                ),
+                dict(
                     label='Pause',
                     method='animate',
                     args=[[None], dict(frame=dict(duration=0, redraw=False),
                                      mode='immediate')]
-                )]
-            )]
-        }
+                )
+            ]
+        }]
 
-        # 添加背景图（如果启用）
-        if self.use_background and self.background_image and self.background_image_size:
-            layout_config['width'] = self.background_image_size[0]
-            layout_config['height'] = self.background_image_size[1]
-            layout_config['images'] = [dict(
-                source='data:image/png;base64,{}'.format(self.background_image),
-                xref="paper",
-                yref="paper",
-                x=0,
-                y=1,
-                sizex=1,
-                sizey=1,
-                sizing="stretch",
-                opacity=self.background_opacity,  # 使用自定义透明度
-                layer="below"
-            )]
-        
         return go.Layout(**layout_config)
         
     def _create_animation_frames(self) -> List[go.Frame]:
@@ -456,10 +496,17 @@ def main():
     """Main function to run the topology analysis."""
     # Define file paths
     base_dir = Path(__file__).parent.parent
-    neuron_data_path = base_dir / 'datasets/Day6_with_behavior_labels_filled.xlsx'
-    position_data_path = base_dir / 'datasets/Day6_Max_position.csv'
-    background_image_path = base_dir / 'datasets/Day6_Max.png'
-    output_path = base_dir / 'graph/Day6_pos_topology.html'
+    neuron_data_path = base_dir / 'datasets/Day9_with_behavior_labels_filled.xlsx'
+    position_data_path = base_dir / 'datasets/Day9_Max_position.csv'
+    background_image_path = base_dir / 'datasets/Day9_Max.png'
+    output_path = base_dir / 'graph/Day9_pos_topology.html'
+    
+    # 检查文件是否存在
+    print(f"Checking if background image exists: {background_image_path}")
+    if not background_image_path.exists():
+        print(f"Warning: Background image not found at {background_image_path}")
+    else:
+        print(f"Background image found at {background_image_path}")
     
     # Create output directory if it doesn't exist
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -469,7 +516,7 @@ def main():
         str(neuron_data_path),
         str(position_data_path),
         str(background_image_path),
-        use_background=False,  # 是否使用背景图
+        use_background=True,  # 是否使用背景图
         node_size=15,         # 节点大小
         node_text_position='middle center',  # 节点文本位置
         edge_width=2,         # 边的宽度
