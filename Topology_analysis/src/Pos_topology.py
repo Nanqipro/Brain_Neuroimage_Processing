@@ -27,18 +27,16 @@ class NeuronTopologyAnalyzer:
     A class to analyze and visualize the topological structure of neuron activity.
     """
     
-    def __init__(self, neuron_data_path: str, position_data_path: str, image_path: str):
+    def __init__(self, neuron_data_path: str, position_data_path: str):
         """
         Initialize the analyzer with data paths.
         
         Args:
             neuron_data_path (str): Path to the Excel file containing neuron activity data
             position_data_path (str): Path to the CSV file containing neuron positions
-            image_path (str): Path to the background image
         """
         self.neuron_data = pd.read_excel(neuron_data_path)
         self.positions_data = pd.read_csv(position_data_path)
-        self.image_path = image_path
         
         # Initialize neuron IDs and positions
         self.neuron_ids = self._get_neuron_ids()
@@ -233,9 +231,6 @@ class NeuronTopologyAnalyzer:
         # Add frames
         fig.frames = self._create_animation_frames()
         
-        # Add background image
-        self._add_background_image(fig)
-        
         # Save animation
         fig.write_html(output_path)
         print(f"Animation saved to {output_path}")
@@ -331,80 +326,16 @@ class NeuronTopologyAnalyzer:
             )
             for k in range(len(self.frames_data['node_x']))
         ]
-        
-    def _add_background_image(self, fig: go.Figure) -> None:
-        """Add background image to the figure."""
-        try:
-            print(f"Attempting to load image from: {self.image_path}")
-            
-            with open(self.image_path, "rb") as f:
-                image_data = f.read()
-                print(f"Successfully read image file, size: {len(image_data)} bytes")
-                encoded_image = base64.b64encode(image_data).decode("ascii")
-            
-            image_source = f"data:image/png;base64,{encoded_image}"
-            print("Successfully encoded image to base64")
-            
-            # First update the layout to ensure proper coordinate system
-            fig.update_layout(
-                xaxis=dict(
-                    range=[-0.05, 1.05],  # Slightly expanded range
-                    showgrid=False,
-                    zeroline=False,
-                    showticklabels=False,
-                    scaleanchor='y',
-                    scaleratio=1,
-                    constrain='domain'  # Ensure aspect ratio is maintained
-                ),
-                yaxis=dict(
-                    range=[1.05, -0.05],  # Slightly expanded range, reversed
-                    showgrid=False,
-                    zeroline=False,
-                    showticklabels=False,
-                    constrain='domain'  # Ensure aspect ratio is maintained
-                ),
-                plot_bgcolor='rgba(255,255,255,0)',  # Transparent background
-                paper_bgcolor='rgba(255,255,255,1)',  # White paper background
-                width=800,  # Fixed width
-                height=800,  # Fixed height to maintain square aspect ratio
-                margin=dict(l=50, r=50, t=50, b=50)  # Add some margin
-            )
-            
-            # Then add the background image
-            fig.add_layout_image(
-                dict(
-                    source=image_source,
-                    xref="x",
-                    yref="y",
-                    x=0,
-                    y=1,
-                    sizex=1,
-                    sizey=1,
-                    sizing="stretch",
-                    opacity=0.7,  # Slightly increased opacity
-                    layer="below",
-                    name="background"  # Add name for debugging
-                )
-            )
-            
-            print("Successfully added background image to figure")
-            
-        except Exception as e:
-            print(f"Error adding background image: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-            raise
 
 def main():
     """Main function to run the topology analysis."""
     # Define file paths
     neuron_data_path = '../datasets/Day6_with_behavior_labels_filled.xlsx'
     position_data_path = '../datasets/Day6_Max_position.csv'
-    image_path = '../datasets/Day6_Max.png'
     output_path = '../graph/Day6_pos_topology.html'
     
     # Create analyzer and process data
-    analyzer = NeuronTopologyAnalyzer(neuron_data_path, position_data_path, image_path)
+    analyzer = NeuronTopologyAnalyzer(neuron_data_path, position_data_path)
     analyzer.process_all_frames()
     analyzer.create_animation(output_path)
 
