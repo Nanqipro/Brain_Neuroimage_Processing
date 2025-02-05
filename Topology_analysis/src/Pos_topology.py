@@ -334,23 +334,66 @@ class NeuronTopologyAnalyzer:
         
     def _add_background_image(self, fig: go.Figure) -> None:
         """Add background image to the figure."""
-        with open(self.image_path, "rb") as f:
-            encoded_image = base64.b64encode(f.read()).decode("ascii")
-        
-        image_source = "data:image/jpg;base64," + encoded_image
-        fig.add_layout_image(
-            dict(
-                source=image_source,
-                xref='paper',
-                yref='paper',
-                x=0.07,
-                y=1.03,
-                sizex=1,
-                sizey=1,
-                opacity=0.5,
-                layer='below'
+        try:
+            print(f"Attempting to load image from: {self.image_path}")
+            
+            with open(self.image_path, "rb") as f:
+                image_data = f.read()
+                print(f"Successfully read image file, size: {len(image_data)} bytes")
+                encoded_image = base64.b64encode(image_data).decode("ascii")
+            
+            image_source = f"data:image/png;base64,{encoded_image}"
+            print("Successfully encoded image to base64")
+            
+            # First update the layout to ensure proper coordinate system
+            fig.update_layout(
+                xaxis=dict(
+                    range=[-0.05, 1.05],  # Slightly expanded range
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    scaleanchor='y',
+                    scaleratio=1,
+                    constrain='domain'  # Ensure aspect ratio is maintained
+                ),
+                yaxis=dict(
+                    range=[1.05, -0.05],  # Slightly expanded range, reversed
+                    showgrid=False,
+                    zeroline=False,
+                    showticklabels=False,
+                    constrain='domain'  # Ensure aspect ratio is maintained
+                ),
+                plot_bgcolor='rgba(255,255,255,0)',  # Transparent background
+                paper_bgcolor='rgba(255,255,255,1)',  # White paper background
+                width=800,  # Fixed width
+                height=800,  # Fixed height to maintain square aspect ratio
+                margin=dict(l=50, r=50, t=50, b=50)  # Add some margin
             )
-        )
+            
+            # Then add the background image
+            fig.add_layout_image(
+                dict(
+                    source=image_source,
+                    xref="x",
+                    yref="y",
+                    x=0,
+                    y=1,
+                    sizex=1,
+                    sizey=1,
+                    sizing="stretch",
+                    opacity=0.7,  # Slightly increased opacity
+                    layer="below",
+                    name="background"  # Add name for debugging
+                )
+            )
+            
+            print("Successfully added background image to figure")
+            
+        except Exception as e:
+            print(f"Error adding background image: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            raise
 
 def main():
     """Main function to run the topology analysis."""
