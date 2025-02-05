@@ -339,8 +339,8 @@ def analyze_clusters(labels: np.ndarray, timestamps: np.ndarray, algorithm_name:
         logging.info(cluster_timestamps)
 
 def main(
-    file_path: str = '../datasets/Day3_topology_matrix.xlsx',
-    algorithm_id: int = 1,
+    file_path: str = '../datasets/Day9_topology_matrix.xlsx',
+    algorithm_id: int = 2,
     **algorithm_params
 ) -> None:
     """
@@ -386,4 +386,4 @@ def main(
         raise
 
 if __name__ == "__main__":
-    main(algorithm_id=1)
+    main(algorithm_id=2)
