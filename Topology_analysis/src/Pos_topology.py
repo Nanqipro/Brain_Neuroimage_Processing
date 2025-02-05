@@ -15,6 +15,8 @@ import matplotlib
 from typing import Dict, List, Tuple, Iterator
 import plotly.io as pio
 import base64
+from PIL import Image
+import os
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -261,16 +263,65 @@ class NeuronTopologyAnalyzer:
         
     def _create_layout(self) -> go.Layout:
         """Create the layout for the animation."""
+        # Load and encode background image
+        bg_image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'datasets', 'Day6_Max.png')
+        img = Image.open(bg_image_path)
+        img_width, img_height = img.size
+        
+        # Convert image to base64 string
+        import io
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+        encoded_image = base64.b64encode(img_byte_arr).decode()
+        
+        # Calculate the aspect ratio
+        aspect_ratio = img_width / img_height
+        
         return go.Layout(
-            title=self.frames_data['titles'][0],
+            title=dict(
+                text=self.frames_data['titles'][0],
+                y=0.98  # 调整标题位置
+            ),
             showlegend=False,
-            width=1437,
-            height=949,
-            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
-                      scaleanchor='y', scaleratio=1),
-            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
-                      autorange='reversed'),
-            plot_bgcolor='white',
+            width=800,  # 设置固定宽度
+            height=int(800/aspect_ratio),  # 根据宽高比计算高度
+            xaxis=dict(
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False,
+                scaleanchor='y', 
+                scaleratio=1,
+                range=[0, 1],
+                domain=[0, 1],
+                constrain='domain'  # 确保x轴范围被限制在domain内
+            ),
+            yaxis=dict(
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False,
+                autorange='reversed',
+                range=[0, 1],
+                domain=[0, 1],
+                constrain='domain',  # 确保y轴范围被限制在domain内
+                scaleanchor='x',  # 确保x和y轴的缩放比例相同
+                scaleratio=1
+            ),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            images=[dict(
+                source='data:image/png;base64,{}'.format(encoded_image),
+                xref="paper",
+                yref="paper",
+                x=0,
+                y=1,
+                sizex=1,
+                sizey=1,
+                sizing="contain",  # 改为contain以保持图像比例
+                opacity=1,
+                layer="below"
+            )],
+            margin=dict(l=0, r=0, t=30, b=0),
             sliders=[dict(
                 active=0,
                 steps=[dict(
