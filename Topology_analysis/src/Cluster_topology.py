@@ -52,13 +52,18 @@ class KMeansClusterer(ClusteringAlgorithm):
         Initialize KMeans clusterer.
 
         Args:
-            max_k: Maximum number of clusters to test
-            default_n_clusters: Default number of clusters if optimal k is not determined
+            max_k: Maximum number of clusters to test in parameter selection visualization
+            default_n_clusters: Number of clusters to use in actual clustering
         """
         self.max_k = max_k
         self.default_n_clusters = default_n_clusters
     
     def determine_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+        """
+        Visualize parameter selection process but return manually specified n_clusters.
+        This method will show the elbow curve and silhouette scores for reference,
+        but won't automatically select the optimal k.
+        """
         inertia = []
         silhouette = []
         K_range = range(2, self.max_k + 1)
@@ -70,14 +75,21 @@ class KMeansClusterer(ClusteringAlgorithm):
             score = silhouette_score(X, kmeans.labels_)
             silhouette.append(score)
         
-        # Plot parameter selection graphs
+        # Plot parameter selection graphs for reference
         self._plot_parameter_selection(K_range, inertia, silhouette)
         
-        # Return optimal k based on silhouette score
+        # Calculate but don't use the optimal k
         optimal_k = K_range[np.argmax(silhouette)]
-        return {"n_clusters": optimal_k}
+        logging.info(f"Reference: Optimal k based on silhouette score would be {optimal_k}")
+        logging.info(f"Using manually specified n_clusters = {self.default_n_clusters}")
+        
+        # Return the manually specified n_clusters
+        return {"n_clusters": self.default_n_clusters}
     
     def fit_predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
+        """
+        Perform clustering with specified number of clusters.
+        """
         n_clusters = kwargs.get("n_clusters", self.default_n_clusters)
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
         return kmeans.fit_predict(X)
@@ -86,6 +98,9 @@ class KMeansClusterer(ClusteringAlgorithm):
         return "KMeans"
     
     def _plot_parameter_selection(self, K_range, inertia, silhouette):
+        """
+        Plot elbow curve and silhouette scores for reference.
+        """
         fig, ax1 = plt.subplots(figsize=(10, 5))
         color = 'tab:blue'
         ax1.set_xlabel('Number of Clusters (K)')
@@ -101,7 +116,7 @@ class KMeansClusterer(ClusteringAlgorithm):
         ax2.tick_params(axis='y', labelcolor=color)
         ax2.legend(loc='upper right')
         
-        plt.title('KMeans Parameter Selection')
+        plt.title('KMeans Parameter Selection Reference')
         plt.show()
 
 class DBSCANClusterer(ClusteringAlgorithm):
@@ -129,7 +144,7 @@ class DBSCANClusterer(ClusteringAlgorithm):
         plt.figure(figsize=(10, 5))
         plt.plot(distances)
         plt.ylabel(f'{self.k}-distance')
-        plt.xlabel('Points sorted by distance')
+        plt.xlabel('Points Sorted by Distance')
         plt.title(f'k-distance Graph (k={self.k}) for DBSCAN eps Selection')
         plt.show()
         
@@ -241,11 +256,9 @@ def visualize_clusters(
         algorithm_name: Name of the clustering algorithm
         interactive: Whether to create interactive plot
     """
-    # Perform PCA
     pca = PCA(n_components=3, random_state=42)
     X_pca = pca.fit_transform(X)
     
-    # Create DataFrame for visualization
     viz_df = pd.DataFrame({
         'PCA1': X_pca[:, 0],
         'PCA2': X_pca[:, 1],
@@ -256,7 +269,6 @@ def visualize_clusters(
     title = f'{algorithm_name} Clustering Results (PCA)'
     
     if interactive:
-        # Create interactive plot with Plotly
         fig = px.scatter(
             viz_df,
             x='PCA1',
@@ -267,7 +279,6 @@ def visualize_clusters(
         )
         fig.show()
     else:
-        # Create static plot with matplotlib
         plt.figure(figsize=(12, 8))
         scatter = sns.scatterplot(
             data=viz_df,
@@ -279,7 +290,6 @@ def visualize_clusters(
             alpha=0.7
         )
         
-        # Special handling for DBSCAN noise points
         if algorithm_name == 'DBSCAN':
             noise_mask = labels == -1
             if noise_mask.any():
@@ -292,7 +302,6 @@ def visualize_clusters(
                     alpha=0.5
                 )
         
-        # Add labels for selected points
         label_step = max(1, len(viz_df) // 20)
         for i in range(0, len(viz_df), label_step):
             plt.text(
@@ -330,7 +339,7 @@ def analyze_clusters(labels: np.ndarray, timestamps: np.ndarray, algorithm_name:
         logging.info(cluster_timestamps)
 
 def main(
-    file_path: str = '../datasets/Day9_topology_matrix.xlsx',
+    file_path: str = '../datasets/Day3_topology_matrix.xlsx',
     algorithm_id: int = 1,
     **algorithm_params
 ) -> None:
@@ -341,8 +350,12 @@ def main(
         file_path: Path to the topology matrix Excel file
         algorithm_id: ID of the clustering algorithm to use (1: KMeans, 2: DBSCAN)
         **algorithm_params: Algorithm-specific parameters
-            For KMeans: max_k, default_n_clusters
-            For DBSCAN: k, default_eps
+            For KMeans: 
+                - max_k: Maximum number of clusters to test in visualization (default: 10)
+                - default_n_clusters: Number of clusters to use (default: 6)
+            For DBSCAN:
+                - k: Number of neighbors (default: 4)
+                - default_eps: Epsilon value (default: 0.5)
     """
     try:
         # Get the selected clustering algorithm with custom parameters
@@ -352,9 +365,9 @@ def main(
         # Load and preprocess data
         X_scaled, timestamps, feature_cols = load_and_preprocess_data(file_path)
         
-        # Determine algorithm parameters
+        # Show parameter selection visualization and get specified parameters
         params = algorithm.determine_parameters(X_scaled)
-        logging.info(f"Determined parameters: {params}")
+        logging.info(f"Using parameters: {params}")
         
         # Perform clustering
         labels = algorithm.fit_predict(X_scaled, **params)
@@ -373,4 +386,4 @@ def main(
         raise
 
 if __name__ == "__main__":
-    main(algorithm_id=1)  # Default to KMeans
+    main(algorithm_id=1)
