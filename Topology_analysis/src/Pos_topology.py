@@ -1,6 +1,22 @@
 """
 This script analyzes and visualizes the topological structure of neuron activity over time.
 It creates an interactive visualization showing how neurons form groups based on their activity patterns.
+
+可自定义的参数说明：
+1. 背景图参数：
+   - use_background: 是否使用背景图
+   - background_opacity: 背景图透明度 (0-1)
+2. 节点（神经元）参数：
+   - node_size: 节点大小
+   - node_text_position: 节点文本位置
+3. 边（连接）参数：
+   - edge_width: 边的宽度
+   - edge_color: 边的颜色
+4. 颜色方案：
+   - color_scheme: 节点颜色方案 ('tab20', 'Set1', 'Set2' 等)
+   - max_groups: 最大组数
+5. 动画参数：
+   - frame_duration: 每帧持续时间（毫秒）
 """
 
 import pandas as pd
@@ -12,11 +28,13 @@ from tqdm import tqdm
 import warnings
 import matplotlib.cm as cm
 import matplotlib
-from typing import Dict, List, Tuple, Iterator
+from typing import Dict, List, Tuple, Iterator, Optional
 import plotly.io as pio
 import base64
 from PIL import Image
 import os
+from pathlib import Path
+import io
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -27,18 +45,54 @@ pio.templates.default = "plotly"
 class NeuronTopologyAnalyzer:
     """
     A class to analyze and visualize the topological structure of neuron activity.
+    支持自定义多个可视化参数，包括背景图、节点、边的显示效果，以及动画参数。
     """
     
-    def __init__(self, neuron_data_path: str, position_data_path: str):
+    def __init__(self, 
+                 neuron_data_path: str, 
+                 position_data_path: str, 
+                 background_image_path: Optional[str] = None,
+                 use_background: bool = True,
+                 node_size: int = 15,
+                 node_text_position: str = 'middle center',
+                 edge_width: int = 2,
+                 edge_color: str = 'black',
+                 background_opacity: float = 1.0,
+                 frame_duration: int = 1000,
+                 color_scheme: str = 'tab20',
+                 max_groups: int = 100):
         """
-        Initialize the analyzer with data paths.
+        Initialize the analyzer with data paths and visualization parameters.
         
         Args:
             neuron_data_path (str): Path to the Excel file containing neuron activity data
             position_data_path (str): Path to the CSV file containing neuron positions
+            background_image_path (Optional[str]): Path to the background image file
+            use_background (bool): Whether to use background image in visualization
+            node_size (int): Size of the nodes in the visualization
+            node_text_position (str): Position of node labels ('middle center', 'top center', etc.)
+            edge_width (int): Width of the edges connecting nodes
+            edge_color (str): Color of the edges
+            background_opacity (float): Opacity of the background image (0-1)
+            frame_duration (int): Duration of each frame in the animation (milliseconds)
+            color_scheme (str): Color scheme for node groups ('tab20', 'Set1', 'Set2', etc.)
+            max_groups (int): Maximum number of groups for color cycling
         """
+        # 保存数据路径
         self.neuron_data = pd.read_excel(neuron_data_path)
         self.positions_data = pd.read_csv(position_data_path)
+        self.background_image_path = background_image_path
+        
+        # 保存可视化参数
+        self.use_background = use_background
+        self.node_size = node_size
+        self.node_text_position = node_text_position
+        self.edge_width = edge_width
+        self.edge_color = edge_color
+        self.background_opacity = background_opacity
+        self.frame_duration = frame_duration
+        self.color_scheme = color_scheme
+        self.max_groups = max_groups
         
         # Initialize neuron IDs and positions
         self.neuron_ids = self._get_neuron_ids()
@@ -66,6 +120,28 @@ class NeuronTopologyAnalyzer:
             'edge_color': [], 'titles': []
         }
         
+        # Load background image if specified
+        self.background_image = None
+        self.background_image_size = None
+        if self.use_background and self.background_image_path:
+            self._load_background_image()
+        
+    def _load_background_image(self) -> None:
+        """Load and prepare background image for visualization."""
+        try:
+            img = Image.open(self.background_image_path)
+            self.background_image_size = img.size
+            
+            # 修改图像编码方式
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            img_byte_arr = img_byte_arr.getvalue()
+            encoded_image = base64.b64encode(img_byte_arr).decode()
+            self.background_image = encoded_image
+        except Exception as e:
+            print(f"Warning: Failed to load background image: {e}")
+            self.use_background = False
+        
     def _get_neuron_ids(self) -> List[str]:
         """Extract neuron IDs from the data columns."""
         neuron_ids = [col for col in self.neuron_data.columns if 'n' in col.lower()]
@@ -92,10 +168,12 @@ class NeuronTopologyAnalyzer:
         return self.neuron_data[self.neuron_ids].mean().to_dict()
         
     def _initialize_colors(self) -> Iterator[str]:
-        """Initialize color scheme for neuron groups."""
-        N = 100  # Maximum number of groups
-        cmap = cm.get_cmap('tab20', N)
-        color_list = [matplotlib.colors.to_hex(cmap(i)) for i in range(N)]
+        """
+        Initialize color scheme for neuron groups.
+        使用指定的颜色方案和最大组数生成颜色循环器。
+        """
+        cmap = cm.get_cmap(self.color_scheme, self.max_groups)
+        color_list = [matplotlib.colors.to_hex(cmap(i)) for i in range(self.max_groups)]
         return itertools.cycle(color_list)
         
     def _process_frame(self, frame_num: int) -> None:
@@ -241,20 +319,28 @@ class NeuronTopologyAnalyzer:
         """Create the base figure for the animation."""
         return go.Figure(
             data=[
+                # 创建边的散点图
                 go.Scatter(
                     x=self.frames_data['edge_x'][0],
                     y=self.frames_data['edge_y'][0],
                     mode='lines',
-                    line=dict(color='black', width=2),
+                    line=dict(
+                        color=self.edge_color,  # 使用自定义边颜色
+                        width=self.edge_width   # 使用自定义边宽度
+                    ),
                     hoverinfo='none'
                 ),
+                # 创建节点的散点图
                 go.Scatter(
                     x=self.frames_data['node_x'][0],
                     y=self.frames_data['node_y'][0],
                     mode='markers+text',
                     text=self.frames_data['node_text'][0],
-                    textposition='middle center',
-                    marker=dict(color=self.frames_data['node_color'][0], size=15),
+                    textposition=self.node_text_position,  # 使用自定义文本位置
+                    marker=dict(
+                        color=self.frames_data['node_color'][0], 
+                        size=self.node_size  # 使用自定义节点大小
+                    ),
                     hoverinfo='text'
                 )
             ],
@@ -262,84 +348,53 @@ class NeuronTopologyAnalyzer:
         )
         
     def _create_layout(self) -> go.Layout:
-        """Create the layout for the animation."""
-        # Load and encode background image
-        bg_image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'datasets', 'Day6_Max.png')
-        img = Image.open(bg_image_path)
-        img_width, img_height = img.size
-        
-        # Convert image to base64 string
-        import io
-        img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        encoded_image = base64.b64encode(img_byte_arr).decode()
-        
-        # Calculate the aspect ratio
-        aspect_ratio = img_width / img_height
-        
-        return go.Layout(
-            title=dict(
-                text=self.frames_data['titles'][0],
-                y=0.98  # 调整标题位置
-            ),
-            showlegend=False,
-            width=800,  # 设置固定宽度
-            height=int(800/aspect_ratio),  # 根据宽高比计算高度
-            xaxis=dict(
+        """
+        Create the layout for the animation.
+        包含了背景图、坐标轴、动画控制等设置。
+        """
+        layout_config = {
+            'title': self.frames_data['titles'][0],
+            'showlegend': False,
+            'xaxis': dict(
                 showgrid=False, 
                 zeroline=False, 
                 showticklabels=False,
                 scaleanchor='y', 
                 scaleratio=1,
                 range=[0, 1],
-                domain=[0, 1],
-                constrain='domain'  # 确保x轴范围被限制在domain内
+                domain=[0, 1]
             ),
-            yaxis=dict(
+            'yaxis': dict(
                 showgrid=False, 
                 zeroline=False, 
                 showticklabels=False,
                 autorange='reversed',
                 range=[0, 1],
-                domain=[0, 1],
-                constrain='domain',  # 确保y轴范围被限制在domain内
-                scaleanchor='x',  # 确保x和y轴的缩放比例相同
-                scaleratio=1
+                domain=[0, 1]
             ),
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            images=[dict(
-                source='data:image/png;base64,{}'.format(encoded_image),
-                xref="paper",
-                yref="paper",
-                x=0,
-                y=1,
-                sizex=1,
-                sizey=1,
-                sizing="contain",  # 改为contain以保持图像比例
-                opacity=1,
-                layer="below"
-            )],
-            margin=dict(l=0, r=0, t=30, b=0),
-            sliders=[dict(
+            'plot_bgcolor': 'rgba(0,0,0,0)',
+            'paper_bgcolor': 'rgba(0,0,0,0)',
+            'margin': dict(l=0, r=0, t=30, b=0),
+            # 动画控制滑块
+            'sliders': [dict(
                 active=0,
                 steps=[dict(
                     label=str(i),
                     method="animate",
                     args=[[f"frame_{i}"], {
-                        "frame": {"duration": 1000, "redraw": True},
+                        "frame": {"duration": self.frame_duration, "redraw": True},  # 使用自定义帧持续时间
                         "mode": "immediate"
                     }]
                 ) for i in range(len(self.frames_data['node_x']))]
             )],
-            updatemenus=[dict(
+            # 动画控制按钮
+            'updatemenus': [dict(
                 type='buttons',
                 showactive=False,
                 buttons=[dict(
                     label='Play',
                     method='animate',
-                    args=[None, dict(frame=dict(duration=1000, redraw=True),
+                    args=[None, dict(frame=dict(duration=self.frame_duration, redraw=True),
                                    fromcurrent=True)]
                 ), dict(
                     label='Pause',
@@ -348,10 +403,29 @@ class NeuronTopologyAnalyzer:
                                      mode='immediate')]
                 )]
             )]
-        )
+        }
+
+        # 添加背景图（如果启用）
+        if self.use_background and self.background_image and self.background_image_size:
+            layout_config['width'] = self.background_image_size[0]
+            layout_config['height'] = self.background_image_size[1]
+            layout_config['images'] = [dict(
+                source='data:image/png;base64,{}'.format(self.background_image),
+                xref="paper",
+                yref="paper",
+                x=0,
+                y=1,
+                sizex=1,
+                sizey=1,
+                sizing="stretch",
+                opacity=self.background_opacity,  # 使用自定义透明度
+                layer="below"
+            )]
+        
+        return go.Layout(**layout_config)
         
     def _create_animation_frames(self) -> List[go.Frame]:
-        """Create frames for the animation."""
+        """Create frames for the animation with custom parameters."""
         return [
             go.Frame(
                 data=[
@@ -359,7 +433,7 @@ class NeuronTopologyAnalyzer:
                         x=self.frames_data['edge_x'][k],
                         y=self.frames_data['edge_y'][k],
                         mode='lines',
-                        line=dict(color='black', width=2),
+                        line=dict(color=self.edge_color, width=self.edge_width),
                         hoverinfo='none'
                     ),
                     go.Scatter(
@@ -367,8 +441,8 @@ class NeuronTopologyAnalyzer:
                         y=self.frames_data['node_y'][k],
                         mode='markers+text',
                         text=self.frames_data['node_text'][k],
-                        textposition='middle center',
-                        marker=dict(color=self.frames_data['node_color'][k], size=15),
+                        textposition=self.node_text_position,
+                        marker=dict(color=self.frames_data['node_color'][k], size=self.node_size),
                         hoverinfo='text'
                     )
                 ],
@@ -381,14 +455,32 @@ class NeuronTopologyAnalyzer:
 def main():
     """Main function to run the topology analysis."""
     # Define file paths
-    neuron_data_path = '../datasets/Day6_with_behavior_labels_filled.xlsx'
-    position_data_path = '../datasets/Day6_Max_position.csv'
-    output_path = '../graph/Day6_pos_topology.html'
+    base_dir = Path(__file__).parent.parent
+    neuron_data_path = base_dir / 'datasets/Day6_with_behavior_labels_filled.xlsx'
+    position_data_path = base_dir / 'datasets/Day6_Max_position.csv'
+    background_image_path = base_dir / 'datasets/Day6_Max.png'
+    output_path = base_dir / 'graph/Day6_pos_topology.html'
     
-    # Create analyzer and process data
-    analyzer = NeuronTopologyAnalyzer(neuron_data_path, position_data_path)
+    # Create output directory if it doesn't exist
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # 创建分析器实例（可以自定义参数）
+    analyzer = NeuronTopologyAnalyzer(
+        str(neuron_data_path),
+        str(position_data_path),
+        str(background_image_path),
+        use_background=False,  # 是否使用背景图
+        node_size=15,         # 节点大小
+        node_text_position='middle center',  # 节点文本位置
+        edge_width=2,         # 边的宽度
+        edge_color='black',   # 边的颜色
+        background_opacity=0.8,  # 背景图透明度
+        frame_duration=1000,  # 帧持续时间（毫秒）
+        color_scheme='tab20',  # 颜色方案
+        max_groups=100        # 最大组数
+    )
     analyzer.process_all_frames()
-    analyzer.create_animation(output_path)
+    analyzer.create_animation(str(output_path))
 
 if __name__ == '__main__':
     main()
