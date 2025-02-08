@@ -33,8 +33,10 @@ def load_neuron_data(file_path):
     
     if not neuron_cols:
         raise ValueError("No neuron columns found in the Excel file!")
-    print(f"Found {len(neuron_cols)} neuron columns:", neuron_cols)
+    if 'behavior' not in data.columns:
+        raise ValueError("Behavior column not found in the Excel file!")
     
+    print(f"Found {len(neuron_cols)} neuron columns:", neuron_cols)
     return data, neuron_cols
 
 def calculate_threshold(data, method='mean'):
@@ -84,7 +86,8 @@ def process_frame_data(neuron_data, neuron_ids, threshold, pos):
     """
     frames_data = {
         'node_x': [], 'node_y': [], 'node_text': [], 'node_color': [],
-        'edge_x': [], 'edge_y': [], 'edge_color': [], 'titles': []
+        'edge_x': [], 'edge_y': [], 'edge_color': [], 'titles': [],
+        'behaviors': []  # 新增行为标签存储
     }
     
     current_groups = {}  # group_id: list of neurons
@@ -98,6 +101,7 @@ def process_frame_data(neuron_data, neuron_ids, threshold, pos):
 
     for num in tqdm(range(len(neuron_data)), desc="Processing frame data"):
         timestamp = neuron_data['stamp'].iloc[num]
+        behavior = neuron_data['behavior'].iloc[num]  # 获取行为标签
         activity_values = neuron_data[neuron_ids].iloc[num]
         state = np.where(activity_values >= threshold, 'ON', 'OFF')
         
@@ -145,6 +149,7 @@ def process_frame_data(neuron_data, neuron_ids, threshold, pos):
         for key, value in frame_data.items():
             frames_data[key].append(value)
         frames_data['titles'].append(f"Neuron Topology - Time: {timestamp}")
+        frames_data['behaviors'].append(behavior)  # 存储行为标签
     
     return frames_data
 
@@ -211,7 +216,7 @@ def create_animation(frames_data, output_path):
                 hoverinfo='text'
             )
         ],
-        layout=create_layout(frames_data['titles'][0], len(frames_data['node_x']))
+        layout=create_layout(frames_data['titles'][0], len(frames_data['node_x']), frames_data['behaviors'])
     )
     
     # Add frames to animation
@@ -236,24 +241,115 @@ def create_animation(frames_data, output_path):
                 )
             ],
             name=f"frame_{k}",
-            layout=go.Layout(title=frames_data['titles'][k])
+            layout=go.Layout(
+                title=frames_data['titles'][k],
+                annotations=[
+                    dict(
+                        x=0.02,
+                        y=0.98,
+                        xref='paper',
+                        yref='paper',
+                        text=f"Current Behavior: {frames_data['behaviors'][k]}",
+                        showarrow=False,
+                        font=dict(size=14),
+                        xanchor='left',
+                        yanchor='top'
+                    )
+                ]
+            )
         )
         for k in range(len(frames_data['node_x']))
     ]
     
     fig.write_html(output_path)
 
-def create_layout(initial_title, frame_count):
+def create_layout(initial_title, frame_count, behaviors):
     """
     Create the layout configuration for the animation.
     
     Args:
         initial_title (str): Title for the first frame
         frame_count (int): Total number of frames
+        behaviors (list): List of behaviors for each frame
         
     Returns:
         go.Layout: Layout configuration
     """
+    # 创建行为区间标记
+    behavior_shapes = []  # 用于存储形状（线条）
+    behavior_annotations = []  # 用于存储标签
+    current_behavior = behaviors[0]
+    start_idx = 0
+    
+    # 计算行为区间
+    for i in range(1, len(behaviors)):
+        if behaviors[i] != current_behavior:
+            # 添加竖线
+            behavior_shapes.append({
+                'type': 'line',
+                'x0': i / len(behaviors),  # 归一化坐标
+                'x1': i / len(behaviors),
+                'y0': -0.1,
+                'y1': -0.15,
+                'xref': 'paper',
+                'yref': 'paper',
+                'line': {'color': 'black', 'width': 1}
+            })
+            
+            # 添加行为标签
+            behavior_annotations.append({
+                'x': (start_idx + i) / (2 * len(behaviors)),  # 居中显示
+                'y': -0.15,
+                'xref': 'paper',
+                'yref': 'paper',
+                'text': current_behavior,
+                'showarrow': False,
+                'font': {'size': 12}
+            })
+            
+            current_behavior = behaviors[i]
+            start_idx = i
+    
+    # 添加最后一个行为区间的标签
+    behavior_annotations.append({
+        'x': (start_idx + len(behaviors)) / (2 * len(behaviors)),
+        'y': -0.15,
+        'xref': 'paper',
+        'yref': 'paper',
+        'text': current_behavior,
+        'showarrow': False,
+        'font': {'size': 12}
+    })
+    
+    # 添加底部的水平线
+    behavior_shapes.append({
+        'type': 'line',
+        'x0': 0,
+        'x1': 1,
+        'y0': -0.1,
+        'y1': -0.1,
+        'xref': 'paper',
+        'yref': 'paper',
+        'line': {'color': 'black', 'width': 1}
+    })
+    
+    # 合并所有注释
+    all_annotations = [
+        # 左上角的当前行为标签
+        dict(
+            x=0.02,
+            y=0.98,
+            xref='paper',
+            yref='paper',
+            text=f"Current Behavior: {behaviors[0]}",
+            showarrow=False,
+            font=dict(size=14),
+            xanchor='left',
+            yanchor='top'
+        )
+    ]
+    all_annotations.extend(behavior_annotations)
+    
     return go.Layout(
         title=initial_title,
         showlegend=False,
@@ -262,6 +358,7 @@ def create_layout(initial_title, frame_count):
         plot_bgcolor='white',
         sliders=[dict(
             active=0,
+            y=-0.2,  # 调整滑块位置，为行为标签留出空间
             steps=[dict(
                 label=str(i),
                 method="animate",
@@ -292,7 +389,9 @@ def create_layout(initial_title, frame_count):
                     )]
                 )
             ]
-        )]
+        )],
+        annotations=all_annotations,
+        shapes=behavior_shapes  # 只包含线条形状
     )
 
 def main():
@@ -309,7 +408,7 @@ def main():
     frames_data = process_frame_data(neuron_data, neuron_ids, threshold, pos)
     
     # Create and save animation
-    output_path = '../graph/neuron_activity_animation_mean_Day6.html'
+    output_path = '../graph/Day6_Time_Topology.html'
     create_animation(frames_data, output_path)
 
 if __name__ == "__main__":

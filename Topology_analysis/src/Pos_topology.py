@@ -80,6 +80,11 @@ class NeuronTopologyAnalyzer:
         """
         # 保存数据路径
         self.neuron_data = pd.read_excel(neuron_data_path)
+        
+        # 验证behavior列是否存在
+        if 'behavior' not in self.neuron_data.columns:
+            raise ValueError("Behavior column not found in the Excel file!")
+        
         self.positions_data = pd.read_csv(position_data_path)
         self.background_image_path = background_image_path
         
@@ -117,7 +122,7 @@ class NeuronTopologyAnalyzer:
         self.frames_data = {
             'node_x': [], 'node_y': [], 'node_text': [],
             'node_color': [], 'edge_x': [], 'edge_y': [],
-            'edge_color': [], 'titles': []
+            'edge_color': [], 'titles': [], 'behaviors': []
         }
         
         # Load background image if specified
@@ -188,6 +193,7 @@ class NeuronTopologyAnalyzer:
         """
         # Get timestamp and activity values
         t = self.neuron_data['stamp'].iloc[frame_num]
+        behavior = self.neuron_data['behavior'].iloc[frame_num]  # 获取行为标签
         activity_values = self.neuron_data[self.neuron_ids].iloc[frame_num]
         
         # Determine neuron states
@@ -197,7 +203,7 @@ class NeuronTopologyAnalyzer:
         self._update_neuron_groups(state_df)
         
         # Create and store frame visualization data
-        self._create_frame_visualization(t)
+        self._create_frame_visualization(t, behavior)
         
     def _get_neuron_states(self, activity_values: pd.Series) -> pd.DataFrame:
         """
@@ -247,12 +253,13 @@ class NeuronTopologyAnalyzer:
                 self.neuron_to_group[neuron] = new_group_id
             self.group_colors[new_group_id] = next(self.color_cycle)
             
-    def _create_frame_visualization(self, timestamp: float) -> None:
+    def _create_frame_visualization(self, timestamp: float, behavior: str) -> None:
         """
         Create visualization data for the current frame.
         
         Args:
             timestamp (float): Current frame timestamp
+            behavior (str): Current behavior label
         """
         G = nx.Graph()
         G.add_nodes_from(self.neuron_ids)
@@ -295,6 +302,7 @@ class NeuronTopologyAnalyzer:
         self.frames_data['edge_y'].append(edge_y)
         self.frames_data['edge_color'].append(edge_colors)
         self.frames_data['titles'].append(f"神经元拓扑结构图 - 时间点：{timestamp}")
+        self.frames_data['behaviors'].append(behavior)  # 存储行为标签
         
     def process_all_frames(self) -> None:
         """Process all frames in the neuron data."""
@@ -355,13 +363,71 @@ class NeuronTopologyAnalyzer:
         Create the layout for the animation.
         包含了背景图、坐标轴、动画控制等设置。
         """
+        # 创建行为区间标记
+        behavior_shapes = []  # 用于存储形状（线条）
+        behavior_annotations = []  # 用于存储标签
+        current_behavior = self.frames_data['behaviors'][0]
+        start_idx = 0
+        
+        # 计算行为区间
+        for i in range(1, len(self.frames_data['behaviors'])):
+            if self.frames_data['behaviors'][i] != current_behavior:
+                # 添加竖线
+                behavior_shapes.append({
+                    'type': 'line',
+                    'x0': i / len(self.frames_data['behaviors']),
+                    'x1': i / len(self.frames_data['behaviors']),
+                    'y0': -0.05,  # 调整竖线起点，更靠近时间轴
+                    'y1': -0.08,  # 调整竖线终点，更靠近时间轴
+                    'xref': 'paper',
+                    'yref': 'paper',
+                    'line': {'color': 'black', 'width': 1}
+                })
+                
+                # 添加行为标签
+                behavior_annotations.append({
+                    'x': (start_idx + i) / (2 * len(self.frames_data['behaviors'])),
+                    'y': -0.08,  # 调整标签位置，更靠近时间轴
+                    'xref': 'paper',
+                    'yref': 'paper',
+                    'text': current_behavior,
+                    'showarrow': False,
+                    'font': {'size': 12}
+                })
+                
+                current_behavior = self.frames_data['behaviors'][i]
+                start_idx = i
+        
+        # 添加最后一个行为区间的标签
+        behavior_annotations.append({
+            'x': (start_idx + len(self.frames_data['behaviors'])) / (2 * len(self.frames_data['behaviors'])),
+            'y': -0.08,  # 调整标签位置，更靠近时间轴
+            'xref': 'paper',
+            'yref': 'paper',
+            'text': current_behavior,
+            'showarrow': False,
+            'font': {'size': 12}
+        })
+        
+        # 添加底部的水平线
+        behavior_shapes.append({
+            'type': 'line',
+            'x0': 0,
+            'x1': 1,
+            'y0': -0.05,  # 调整水平线位置，更靠近时间轴
+            'y1': -0.05,
+            'xref': 'paper',
+            'yref': 'paper',
+            'line': {'color': 'black', 'width': 1}
+        })
+        
         # 设置基本布局配置
         layout_config = {
             'title': self.frames_data['titles'][0],
             'showlegend': False,
             'plot_bgcolor': 'rgba(0,0,0,0)',
             'paper_bgcolor': 'rgba(0,0,0,0)',
-            'margin': dict(l=0, r=0, t=30, b=0),
+            'margin': dict(l=0, r=0, t=30, b=60),  # 增加底部边距
         }
 
         # 如果有背景图，根据背景图设置画布大小和比例
@@ -430,9 +496,10 @@ class NeuronTopologyAnalyzer:
                 )
             })
 
-        # 添加动画控制
+        # 调整滑块位置
         layout_config['sliders'] = [{
             'active': 0,
+            'y': -0.12,  # 调整滑块位置，与行为标签保持适当距离
             'steps': [{
                 'label': str(i),
                 'method': "animate",
@@ -462,6 +529,25 @@ class NeuronTopologyAnalyzer:
             ]
         }]
 
+        # 添加当前行为标签和行为区间标签
+        all_annotations = [
+            # 左上角的当前行为标签
+            dict(
+                x=0.02,
+                y=0.98,
+                xref='paper',
+                yref='paper',
+                text=f"Current Behavior: {self.frames_data['behaviors'][0]}",
+                showarrow=False,
+                font=dict(size=14),
+                xanchor='left',
+                yanchor='top'
+            )
+        ]
+        all_annotations.extend(behavior_annotations)
+        layout_config['annotations'] = all_annotations
+        layout_config['shapes'] = behavior_shapes
+        
         return go.Layout(**layout_config)
         
     def _create_animation_frames(self) -> List[go.Frame]:
@@ -487,7 +573,22 @@ class NeuronTopologyAnalyzer:
                     )
                 ],
                 name=f"frame_{k}",
-                layout=go.Layout(title=self.frames_data['titles'][k])
+                layout=go.Layout(
+                    title=self.frames_data['titles'][k],
+                    annotations=[
+                        dict(
+                            x=0.02,
+                            y=0.98,
+                            xref='paper',
+                            yref='paper',
+                            text=f"Current Behavior: {self.frames_data['behaviors'][k]}",
+                            showarrow=False,
+                            font=dict(size=14),
+                            xanchor='left',
+                            yanchor='top'
+                        )
+                    ]
+                )
             )
             for k in range(len(self.frames_data['node_x']))
         ]
@@ -516,7 +617,7 @@ def main():
         str(neuron_data_path),
         str(position_data_path),
         str(background_image_path),
-        use_background=True,  # 是否使用背景图
+        use_background=False,  # 是否使用背景图
         node_size=15,         # 节点大小
         node_text_position='middle center',  # 节点文本位置
         edge_width=2,         # 边的宽度
