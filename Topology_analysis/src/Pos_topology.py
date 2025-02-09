@@ -363,71 +363,15 @@ class NeuronTopologyAnalyzer:
         Create the layout for the animation.
         包含了背景图、坐标轴、动画控制等设置。
         """
-        # 创建行为区间标记
-        behavior_shapes = []  # 用于存储形状（线条）
-        behavior_annotations = []  # 用于存储标签
-        current_behavior = self.frames_data['behaviors'][0]
-        start_idx = 0
-        
-        # 计算行为区间
-        for i in range(1, len(self.frames_data['behaviors'])):
-            if self.frames_data['behaviors'][i] != current_behavior:
-                # 添加竖线
-                behavior_shapes.append({
-                    'type': 'line',
-                    'x0': i / len(self.frames_data['behaviors']),
-                    'x1': i / len(self.frames_data['behaviors']),
-                    'y0': -0.05,  # 调整竖线起点，更靠近时间轴
-                    'y1': -0.08,  # 调整竖线终点，更靠近时间轴
-                    'xref': 'paper',
-                    'yref': 'paper',
-                    'line': {'color': 'black', 'width': 1}
-                })
-                
-                # 添加行为标签
-                behavior_annotations.append({
-                    'x': (start_idx + i) / (2 * len(self.frames_data['behaviors'])),
-                    'y': -0.08,  # 调整标签位置，更靠近时间轴
-                    'xref': 'paper',
-                    'yref': 'paper',
-                    'text': current_behavior,
-                    'showarrow': False,
-                    'font': {'size': 12}
-                })
-                
-                current_behavior = self.frames_data['behaviors'][i]
-                start_idx = i
-        
-        # 添加最后一个行为区间的标签
-        behavior_annotations.append({
-            'x': (start_idx + len(self.frames_data['behaviors'])) / (2 * len(self.frames_data['behaviors'])),
-            'y': -0.08,  # 调整标签位置，更靠近时间轴
-            'xref': 'paper',
-            'yref': 'paper',
-            'text': current_behavior,
-            'showarrow': False,
-            'font': {'size': 12}
-        })
-        
-        # 添加底部的水平线
-        behavior_shapes.append({
-            'type': 'line',
-            'x0': 0,
-            'x1': 1,
-            'y0': -0.05,  # 调整水平线位置，更靠近时间轴
-            'y1': -0.05,
-            'xref': 'paper',
-            'yref': 'paper',
-            'line': {'color': 'black', 'width': 1}
-        })
-        
         # 设置基本布局配置
         layout_config = {
             'title': self.frames_data['titles'][0],
             'showlegend': False,
             'plot_bgcolor': 'rgba(0,0,0,0)',
             'paper_bgcolor': 'rgba(0,0,0,0)',
-            'margin': dict(l=0, r=0, t=30, b=60),  # 增加底部边距
+            'margin': dict(l=10, r=10, t=30, b=60),  # 进一步减小左右边距
+            'width': 1200,
+            'height': 800
         }
 
         # 如果有背景图，根据背景图设置画布大小和比例
@@ -435,17 +379,17 @@ class NeuronTopologyAnalyzer:
             # 获取图像尺寸
             img_width, img_height = self.background_image_size
             
-            # 设置画布大小（添加一些边距）
-            layout_config['width'] = img_width + 40
-            layout_config['height'] = img_height + 60  # 为标题留出更多空间
+            # 设置画布大小（保持宽度1200，高度根据背景图比例调整）
+            layout_config['width'] = 1200
+            layout_config['height'] = int(1200 * img_height / img_width) + 60  # 为标题和时间轴留出空间
             
-            # 计算坐标轴范围，确保图像比例正确
+            # 计算坐标轴范围
             layout_config['xaxis'] = dict(
                 showgrid=False,
                 zeroline=False,
                 showticklabels=False,
-                range=[-0.05, 1.05],  # 添加5%的边距
-                domain=[0, 1],
+                range=[-0.05, 1.05],
+                domain=[0.05, 0.95],  # 调整domain，让图形在画布中居中
                 scaleanchor='y',
                 scaleratio=1
             )
@@ -454,9 +398,9 @@ class NeuronTopologyAnalyzer:
                 showgrid=False,
                 zeroline=False,
                 showticklabels=False,
-                range=[-0.05, 1.05],  # 添加5%的边距
-                domain=[0, 1],
-                autorange='reversed'  # 保持y轴方向
+                range=[-0.05, 1.05],
+                domain=[0.05, 0.95],  # 调整domain，让图形在画布中居中
+                autorange='reversed'
             )
             
             # 添加背景图
@@ -475,14 +419,12 @@ class NeuronTopologyAnalyzer:
         else:
             # 如果没有背景图，使用默认设置
             layout_config.update({
-                'width': 800,
-                'height': 800,
                 'xaxis': dict(
                     showgrid=False,
                     zeroline=False,
                     showticklabels=False,
                     range=[-0.05, 1.05],
-                    domain=[0, 1],
+                    domain=[0.05, 0.95],  # 调整domain，让图形在画布中居中
                     scaleanchor='y',
                     scaleratio=1
                 ),
@@ -491,28 +433,18 @@ class NeuronTopologyAnalyzer:
                     zeroline=False,
                     showticklabels=False,
                     range=[-0.05, 1.05],
-                    domain=[0, 1],
+                    domain=[0.05, 0.95],  # 调整domain，让图形在画布中居中
                     autorange='reversed'
                 )
             })
 
-        # 调整滑块位置
-        layout_config['sliders'] = [{
-            'active': 0,
-            'y': -0.12,  # 调整滑块位置，与行为标签保持适当距离
-            'steps': [{
-                'label': str(i),
-                'method': "animate",
-                'args': [[f"frame_{i}"], {
-                    "frame": {"duration": self.frame_duration, "redraw": True},
-                    "mode": "immediate"
-                }]
-            } for i in range(len(self.frames_data['node_x']))]
-        }]
-        
+        # 调整滑块和按钮位置
         layout_config['updatemenus'] = [{
             'type': 'buttons',
             'showactive': False,
+            'x': 0.1,
+            'y': 0.9,
+            'xanchor': 'left',
             'buttons': [
                 dict(
                     label='Play',
@@ -528,6 +460,85 @@ class NeuronTopologyAnalyzer:
                 )
             ]
         }]
+
+        # 调整滑块位置和宽度
+        layout_config['sliders'] = [{
+            'active': 0,
+            'y': -0.2,  # 与Time_topology.py完全一致
+            'xanchor': 'left',
+            'x': 0,     # 从画面最左端开始
+            'len': 1,   # 占据100%宽度
+            'steps': [{
+                'label': str(i),
+                'method': "animate",
+                'args': [[f"frame_{i}"], {
+                    "frame": {"duration": self.frame_duration, "redraw": True},
+                    "mode": "immediate"
+                }]
+            } for i in range(len(self.frames_data['node_x']))]
+        }]
+
+        # 行为标签和时间轴配置（与Time_topology.py完全一致）
+        behavior_shapes = []
+        behavior_annotations = []
+        current_behavior = self.frames_data['behaviors'][0]
+        start_idx = 0
+        label_alternate = True  # 用于交替显示标签位置
+        
+        # 计算行为区间
+        for i in range(1, len(self.frames_data['behaviors'])):
+            if self.frames_data['behaviors'][i] != current_behavior:
+                # 添加竖线
+                behavior_shapes.append({
+                    'type': 'line',
+                    'x0': i/len(self.frames_data['behaviors']),
+                    'x1': i/len(self.frames_data['behaviors']),
+                    'y0': -0.1,
+                    'y1': -0.15 if label_alternate else -0.05,  # 根据交替标志调整竖线长度
+                    'xref': 'paper',
+                    'yref': 'paper',
+                    'line': {'color': 'black', 'width': 1}
+                })
+                
+                # 添加行为标签（交替显示在上下方）
+                behavior_annotations.append({
+                    'x': (start_idx + i)/(2*len(self.frames_data['behaviors'])),
+                    'y': -0.17 if label_alternate else -0.03,  # 交替位置
+                    'xref': 'paper',
+                    'yref': 'paper',
+                    'text': current_behavior,
+                    'showarrow': False,
+                    'font': {'size': 12},
+                    'yanchor': 'top' if label_alternate else 'bottom'  # 调整锚点
+                })
+                
+                current_behavior = self.frames_data['behaviors'][i]
+                start_idx = i
+                label_alternate = not label_alternate  # 切换交替标志
+        
+        # 添加最后一个区间的标签
+        behavior_annotations.append({
+            'x': (start_idx + len(self.frames_data['behaviors']))/(2*len(self.frames_data['behaviors'])),
+            'y': -0.17 if label_alternate else -0.03,
+            'xref': 'paper',
+            'yref': 'paper',
+            'text': current_behavior,
+            'showarrow': False,
+            'font': {'size': 12},
+            'yanchor': 'top' if label_alternate else 'bottom'
+        })
+        
+        # 添加底部的水平线（保持原有位置）
+        behavior_shapes.append({
+            'type': 'line',
+            'x0': 0,
+            'x1': 1,
+            'y0': -0.1,
+            'y1': -0.1,
+            'xref': 'paper',
+            'yref': 'paper',
+            'line': {'color': 'black', 'width': 1}
+        })
 
         # 添加当前行为标签和行为区间标签
         all_annotations = [
@@ -597,10 +608,10 @@ def main():
     """Main function to run the topology analysis."""
     # Define file paths
     base_dir = Path(__file__).parent.parent
-    neuron_data_path = base_dir / 'datasets/Day9_with_behavior_labels_filled.xlsx'
-    position_data_path = base_dir / 'datasets/Day9_Max_position.csv'
-    background_image_path = base_dir / 'datasets/Day9_Max.png'
-    output_path = base_dir / 'graph/Day9_pos_topology.html'
+    neuron_data_path = base_dir / 'datasets/Day6_with_behavior_labels_filled.xlsx'
+    position_data_path = base_dir / 'datasets/Day6_Max_position.csv'
+    background_image_path = base_dir / 'datasets/Day6_Max.png'
+    output_path = base_dir / 'graph/Day6_pos_topology.html'
     
     # 检查文件是否存在
     print(f"Checking if background image exists: {background_image_path}")
