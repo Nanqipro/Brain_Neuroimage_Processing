@@ -23,9 +23,8 @@ import os
 
 # 文件路径配置
 DATA_DIR = '../datasets'  # 数据文件夹路径
-TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day6_topology_matrix.xlsx')  # 拓扑矩阵文件
+TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day6_topology_matrix_plus.xlsx')  # 拓扑矩阵文件
 BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day6_with_behavior_labels_filled.xlsx')  # 行为标签文件
-
 
 # Configure logging
 logging.basicConfig(
@@ -54,7 +53,7 @@ class ClusteringAlgorithm(ABC):
 class KMeansClusterer(ClusteringAlgorithm):
     """KMeans clustering implementation."""
     
-    def __init__(self, max_k: int = 10, default_n_clusters: int = 6):
+    def __init__(self, max_k: int = 10, default_n_clusters: int = 5):
         """
         Initialize KMeans clusterer.
 
@@ -189,7 +188,7 @@ class ClusteringFactory:
         algorithms = {
             1: KMeansClusterer(
                 max_k=kwargs.get('max_k', 10),
-                default_n_clusters=kwargs.get('default_n_clusters', 8)
+                default_n_clusters=kwargs.get('default_n_clusters', 5)
             ),
             2: DBSCANClusterer(
                 k=kwargs.get('k', 4),
@@ -205,11 +204,11 @@ class ClusteringFactory:
 def load_and_preprocess_data(file_path: str = TOPOLOGY_FILE, 
                            behavior_file_path: str = BEHAVIOR_FILE) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """
-    Load and preprocess topology matrix data.
+    Load and preprocess topology matrix data, excluding rows with 'Exp' behavior.
 
     Args:
         file_path: Path to the Excel file containing topology matrix
-        behavior_file_path: Path to the behavior labels file
+        behavior_file_path: Path to the Excel file containing behavior labels
 
     Returns:
         Tuple containing:
@@ -224,7 +223,17 @@ def load_and_preprocess_data(file_path: str = TOPOLOGY_FILE,
     try:
         # Load topology data
         df = pd.read_excel(file_path)
-        logging.info(f"Loaded data from {file_path}")
+        # Load behavior data
+        behavior_df = pd.read_excel(behavior_file_path)
+        
+        logging.info(f"Loaded data from {file_path} and {behavior_file_path}")
+        
+        # Filter out rows with 'Exp' behavior
+        non_exp_mask = behavior_df['behavior'] != 'Exp'
+        behavior_df = behavior_df[non_exp_mask]
+        
+        # Get corresponding timestamps from topology data
+        df = df[df['Time_Stamp'].isin(behavior_df['stamp'])]
         
         # Separate timestamps and features
         timestamp_col = 'Time_Stamp'
@@ -241,6 +250,8 @@ def load_and_preprocess_data(file_path: str = TOPOLOGY_FILE,
         # Standardize features
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
+        
+        logging.info(f"Data shape after excluding 'Exp' behavior: {X_scaled.shape}")
         
         return X_scaled, timestamps, feature_cols
     except Exception as e:
@@ -379,6 +390,7 @@ def main(
     **algorithm_params
 ) -> None:
     """
+
     Execute the complete clustering analysis workflow.
 
     Args:
