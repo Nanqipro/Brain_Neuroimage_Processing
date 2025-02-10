@@ -190,56 +190,16 @@ def collect_frame_data(G, pos, neuron_to_group, group_colors, edges):
     }
 
 def create_animation(frames_data, output_path):
-    """
-    Create and save the animation visualization.
-    
-    Args:
-        frames_data (dict): Processed frame data for visualization
-        output_path (str): Path to save the HTML animation file
-    """
+    """创建并保存动画"""
     fig = go.Figure(
-        data=[
-            go.Scatter(
-                x=frames_data['edge_x'][0],
-                y=frames_data['edge_y'][0],
-                mode='lines',
-                line=dict(color='black', width=2),
-                hoverinfo='none'
-            ),
-            go.Scatter(
-                x=frames_data['node_x'][0],
-                y=frames_data['node_y'][0],
-                mode='markers+text',
-                text=frames_data['node_text'][0],
-                textposition='middle center',
-                marker=dict(color=frames_data['node_color'][0], size=15),
-                hoverinfo='text'
-            )
-        ],
+        data=create_frame_traces(frames_data, 0),
         layout=create_layout(frames_data['titles'][0], len(frames_data['node_x']), frames_data['behaviors'])
     )
     
-    # Add frames to animation
+    # 添加动画帧
     fig.frames = [
         go.Frame(
-            data=[
-                go.Scatter(
-                    x=frames_data['edge_x'][k],
-                    y=frames_data['edge_y'][k],
-                    mode='lines',
-                    line=dict(color='black', width=2),
-                    hoverinfo='none'
-                ),
-                go.Scatter(
-                    x=frames_data['node_x'][k],
-                    y=frames_data['node_y'][k],
-                    mode='markers+text',
-                    text=frames_data['node_text'][k],
-                    textposition='middle center',
-                    marker=dict(color=frames_data['node_color'][k], size=15),
-                    hoverinfo='text'
-                )
-            ],
+            data=create_frame_traces(frames_data, k),
             name=f"frame_{k}",
             layout=go.Layout(
                 title=frames_data['titles'][k],
@@ -260,6 +220,115 @@ def create_animation(frames_data, output_path):
         )
         for k in range(len(frames_data['node_x']))
     ]
+    
+    # 修改动画控件配置
+    fig.update_layout(
+        updatemenus=[
+            # 播放/暂停按钮
+            {
+                "buttons": [
+                    {
+                        "label": "播放",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": 100, "redraw": True},
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                                "transition": {"duration": 0}
+                            }
+                        ]
+                    },
+                    {
+                        "label": "暂停",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {
+                                "frame": {"duration": 0, "redraw": False},
+                                "mode": "immediate",
+                                "transition": {"duration": 0}
+                            }
+                        ]
+                    }
+                ],
+                "direction": "left",
+                "pad": {"r": 10},
+                "showactive": False,
+                "type": "buttons",
+                "x": 0.9,
+                "y": 1.1,
+                "xanchor": "right",
+                "yanchor": "top"
+            }
+        ],
+        # 添加速度控制滑块和时间轴滑块
+        sliders=[
+            # 时间轴滑块
+            {
+                "active": 0,
+                "yanchor": "top",
+                "xanchor": "left",
+                "currentvalue": {
+                    "prefix": "时间点: ",
+                    "visible": True,
+                    "xanchor": "right"
+                },
+                "pad": {"b": 50, "t": 50},
+                "len": 1.0,
+                "x": 0,
+                "y": -0.1,
+                "steps": [
+                    {
+                        "args": [
+                            [f"frame_{k}"],
+                            {
+                                "frame": {"duration": 0, "redraw": True},
+                                "mode": "immediate",
+                                "transition": {"duration": 0}
+                            }
+                        ],
+                        "label": f"{k}" if k % 50 == 0 else "",
+                        "method": "animate"
+                    }
+                    for k in range(len(frames_data['node_x']))
+                ]
+            },
+            # 速度控制滑块
+            {
+                "active": 2,  # 默认选择正常速度
+                "yanchor": "top",
+                "xanchor": "left",
+                "currentvalue": {
+                    "prefix": "播放速度: ",
+                    "suffix": "x",
+                    "visible": True,
+                    "xanchor": "right"
+                },
+                "pad": {"b": 10, "t": 50},
+                "len": 0.3,  # 滑块长度
+                "x": 0.6,    # 位置
+                "y": 1.1,    # 位置
+                "steps": [
+                    {
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": int(200/speed), "redraw": True},
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                                "transition": {"duration": 0}
+                            }
+                        ],
+                        "label": str(speed),
+                        "method": "animate"
+                    }
+                    for speed in [0.25, 0.5, 1, 2, 4, 8]  # 速度选项
+                ]
+            }
+        ]
+    )
     
     fig.write_html(output_path)
 
@@ -356,6 +425,7 @@ def create_layout(initial_title, frame_count, behaviors):
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
         plot_bgcolor='white',
+        margin=dict(b=100, t=150),  # 增加顶部边距，为速度控制按钮留出空间
         sliders=[dict(
             active=0,
             y=-0.2,  # 调整滑块位置，为行为标签留出空间
@@ -393,6 +463,38 @@ def create_layout(initial_title, frame_count, behaviors):
         annotations=all_annotations,
         shapes=behavior_shapes  # 只包含线条形状
     )
+
+def create_frame_traces(frames_data, k):
+    """
+    创建单个帧的图形数据
+    
+    Args:
+        frames_data (dict): 所有帧的数据
+        k (int): 当前帧的索引
+        
+    Returns:
+        list: 包含边和节点的图形数据列表
+    """
+    return [
+        # 边的trace
+        go.Scatter(
+            x=frames_data['edge_x'][k],
+            y=frames_data['edge_y'][k],
+            mode='lines',
+            line=dict(color='black', width=2),
+            hoverinfo='none'
+        ),
+        # 节点的trace
+        go.Scatter(
+            x=frames_data['node_x'][k],
+            y=frames_data['node_y'][k],
+            mode='markers+text',
+            text=frames_data['node_text'][k],
+            textposition='middle center',
+            marker=dict(color=frames_data['node_color'][k], size=15),
+            hoverinfo='text'
+        )
+    ]
 
 def main():
     """Main function to run the neuron topology analysis."""

@@ -57,10 +57,10 @@ class NeuronTopologyAnalyzer:
                  node_text_position: str = 'middle center',
                  edge_width: int = 2,
                  edge_color: str = 'black',
-                 background_opacity: float = 1.0,
-                 frame_duration: int = 1000,
+                 background_opacity: float = 0.8,
+                 frame_duration: int = 200,
                  color_scheme: str = 'tab20',
-                 max_groups: int = 100):
+                 max_groups: int = 20):
         """
         Initialize the analyzer with data paths and visualization parameters.
         
@@ -438,45 +438,113 @@ class NeuronTopologyAnalyzer:
                 )
             })
 
-        # 调整滑块和按钮位置
-        layout_config['updatemenus'] = [{
-            'type': 'buttons',
-            'showactive': False,
-            'x': 0.1,
-            'y': 0.9,
-            'xanchor': 'left',
-            'buttons': [
-                dict(
-                    label='Play',
-                    method='animate',
-                    args=[None, dict(frame=dict(duration=self.frame_duration, redraw=True),
-                                   fromcurrent=True)]
-                ),
-                dict(
-                    label='Pause',
-                    method='animate',
-                    args=[[None], dict(frame=dict(duration=0, redraw=False),
-                                     mode='immediate')]
-                )
-            ]
-        }]
+        # 修改动画控制配置
+        layout_config['updatemenus'] = [
+            # 播放/暂停按钮
+            {
+                "buttons": [
+                    {
+                        "label": "播放",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": 100, "redraw": True},
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                                "transition": {"duration": 0}
+                            }
+                        ]
+                    },
+                    {
+                        "label": "暂停",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {
+                                "frame": {"duration": 0, "redraw": False},
+                                "mode": "immediate",
+                                "transition": {"duration": 0}
+                            }
+                        ]
+                    }
+                ],
+                "direction": "left",
+                "pad": {"r": 10},
+                "showactive": False,
+                "type": "buttons",
+                "x": 0.9,
+                "y": 1.1,
+                "xanchor": "right",
+                "yanchor": "top"
+            }
+        ]
 
-        # 调整滑块位置和宽度
-        layout_config['sliders'] = [{
-            'active': 0,
-            'y': -0.2,  # 与Time_topology.py完全一致
-            'xanchor': 'left',
-            'x': 0,     # 从画面最左端开始
-            'len': 1,   # 占据100%宽度
-            'steps': [{
-                'label': str(i),
-                'method': "animate",
-                'args': [[f"frame_{i}"], {
-                    "frame": {"duration": self.frame_duration, "redraw": True},
-                    "mode": "immediate"
-                }]
-            } for i in range(len(self.frames_data['node_x']))]
-        }]
+        # 修改滑块配置
+        layout_config['sliders'] = [
+            # 时间轴滑块
+            {
+                "active": 0,
+                "yanchor": "top",
+                "xanchor": "left",
+                "currentvalue": {
+                    "prefix": "时间点: ",
+                    "visible": True,
+                    "xanchor": "right"
+                },
+                "pad": {"b": 50, "t": 50},
+                "len": 1.0,
+                "x": 0,
+                "y": -0.1,
+                "steps": [
+                    {
+                        "args": [
+                            [f"frame_{k}"],
+                            {
+                                "frame": {"duration": 0, "redraw": True},
+                                "mode": "immediate",
+                                "transition": {"duration": 0}
+                            }
+                        ],
+                        "label": f"{k}" if k % 50 == 0 else "",
+                        "method": "animate"
+                    }
+                    for k in range(len(self.frames_data['node_x']))
+                ]
+            },
+            # 速度控制滑块
+            {
+                "active": 2,  # 默认选择正常速度
+                "yanchor": "top",
+                "xanchor": "left",
+                "currentvalue": {
+                    "prefix": "播放速度: ",
+                    "suffix": "x",
+                    "visible": True,
+                    "xanchor": "right"
+                },
+                "pad": {"b": 10, "t": 50},
+                "len": 0.3,  # 滑块长度
+                "x": 0.6,    # 位置
+                "y": 1.1,    # 位置
+                "steps": [
+                    {
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": int(200/speed), "redraw": True},
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                                "transition": {"duration": 0}
+                            }
+                        ],
+                        "label": str(speed),
+                        "method": "animate"
+                    }
+                    for speed in [0.25, 0.5, 1, 2, 4, 8]  # 速度选项
+                ]
+            }
+        ]
 
         # 行为标签和时间轴配置（与Time_topology.py完全一致）
         behavior_shapes = []
@@ -634,9 +702,9 @@ def main():
         edge_width=2,         # 边的宽度
         edge_color='black',   # 边的颜色
         background_opacity=0.8,  # 背景图透明度
-        frame_duration=1000,  # 帧持续时间（毫秒）
+        frame_duration=200,  # 帧持续时间（毫秒）
         color_scheme='tab20',  # 颜色方案
-        max_groups=100        # 最大组数
+        max_groups=20        # 最大组数
     )
     analyzer.process_all_frames()
     analyzer.create_animation(str(output_path))
