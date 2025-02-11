@@ -9,7 +9,10 @@ This module performs clustering analysis on neuron activation states to:
 
 import pandas as pd
 import numpy as np
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import (
+    KMeans, DBSCAN, AgglomerativeClustering,
+    MeanShift, estimate_bandwidth, AffinityPropagation
+)
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -20,6 +23,7 @@ from typing import Tuple, List, Dict, Any
 from abc import ABC, abstractmethod
 import logging
 import os
+from scipy.cluster.hierarchy import dendrogram
 
 # ===================== Configuration =====================
 # Base path configuration
@@ -176,6 +180,231 @@ class DBSCANClusterer(ClusteringAlgorithm):
     def get_name(self) -> str:
         return "DBSCAN"
 
+class AgglomerativeClusterer(ClusteringAlgorithm):
+    """Agglomerative Hierarchical clustering implementation."""
+    
+    def __init__(self, max_k: int = 10, default_n_clusters: int = 5, linkage: str = 'ward'):
+        self.max_k = max_k
+        self.default_n_clusters = default_n_clusters
+        self.linkage = linkage
+    
+    def determine_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+        silhouette = []
+        K_range = range(2, self.max_k + 1)
+        
+        for k in K_range:
+            clustering = AgglomerativeClustering(n_clusters=k, linkage=self.linkage)
+            labels = clustering.fit_predict(X)
+            score = silhouette_score(X, labels)
+            silhouette.append(score)
+        
+        # Plot silhouette scores
+        plt.figure(figsize=(10, 5))
+        plt.plot(K_range, silhouette, 'o-')
+        plt.xlabel('Number of Clusters (k)')
+        plt.ylabel('Silhouette Score')
+        plt.title('Silhouette Score vs Number of Clusters')
+        plt.show()
+        
+        # Plot dendrogram
+        self._plot_dendrogram(X)
+        
+        optimal_k = K_range[np.argmax(silhouette)]
+        logging.info(f"Optimal number of clusters based on silhouette score: {optimal_k}")
+        
+        return {"n_clusters": self.default_n_clusters, "linkage": self.linkage}
+    
+    def _plot_dendrogram(self, X: np.ndarray):
+        clustering = AgglomerativeClustering(
+            distance_threshold=0,
+            n_clusters=None,
+            linkage=self.linkage
+        )
+        clustering.fit(X)
+        
+        counts = np.zeros(clustering.children_.shape[0])
+        n_samples = len(clustering.labels_)
+        for i, merge in enumerate(clustering.children_):
+            current_count = 0
+            for child_idx in merge:
+                if child_idx < n_samples:
+                    current_count += 1
+                else:
+                    current_count += counts[child_idx - n_samples]
+            counts[i] = current_count
+
+        linkage_matrix = np.column_stack([
+            clustering.children_,
+            clustering.distances_,
+            counts
+        ]).astype(float)
+
+        plt.figure(figsize=(10, 7))
+        dendrogram(linkage_matrix)
+        plt.title('Hierarchical Clustering Dendrogram')
+        plt.xlabel('Sample index or (cluster size)')
+        plt.ylabel('Distance')
+        plt.show()
+    
+    def fit_predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
+        n_clusters = kwargs.get("n_clusters", self.default_n_clusters)
+        linkage = kwargs.get("linkage", self.linkage)
+        clustering = AgglomerativeClustering(n_clusters=n_clusters, linkage=linkage)
+        labels = clustering.fit_predict(X)
+        score = silhouette_score(X, labels)
+        logging.info(f"Agglomerative clustering completed, silhouette score: {score:.3f}")
+        return labels
+    
+    def get_name(self) -> str:
+        return "Agglomerative"
+
+class MeanShiftClusterer(ClusteringAlgorithm):
+    """MeanShift clustering implementation."""
+    
+    def __init__(self, quantile: float = 0.3, n_samples: int = 100):
+        self.quantile = quantile
+        self.n_samples = n_samples
+    
+    def determine_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+        # Estimate bandwidth using a subset of data
+        bandwidth = estimate_bandwidth(
+            X, 
+            quantile=self.quantile,
+            n_samples=min(self.n_samples, X.shape[0])
+        )
+        logging.info(f"Estimated bandwidth: {bandwidth:.3f}")
+        
+        # Test different quantiles
+        quantiles = [0.1, 0.2, 0.3, 0.4, 0.5]
+        bandwidths = []
+        n_clusters = []
+        silhouette_scores = []
+        
+        for q in quantiles:
+            bw = estimate_bandwidth(X, quantile=q, n_samples=min(self.n_samples, X.shape[0]))
+            ms = MeanShift(bandwidth=bw)
+            labels = ms.fit_predict(X)
+            
+            bandwidths.append(bw)
+            n_clusters.append(len(np.unique(labels)))
+            if len(np.unique(labels)) > 1:
+                silhouette_scores.append(silhouette_score(X, labels))
+            else:
+                silhouette_scores.append(0)
+        
+        # Plot results
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+        
+        ax1.plot(quantiles, bandwidths, 'o-')
+        ax1.set_xlabel('Quantile')
+        ax1.set_ylabel('Bandwidth')
+        ax1.set_title('Bandwidth vs Quantile')
+        
+        ax2.plot(quantiles, n_clusters, 'o-')
+        ax2.set_xlabel('Quantile')
+        ax2.set_ylabel('Number of Clusters')
+        ax2.set_title('Number of Clusters vs Quantile')
+        
+        plt.tight_layout()
+        plt.show()
+        
+        # Plot silhouette scores
+        plt.figure(figsize=(10, 5))
+        plt.plot(quantiles, silhouette_scores, 'o-')
+        plt.xlabel('Quantile')
+        plt.ylabel('Silhouette Score')
+        plt.title('Silhouette Score vs Quantile')
+        plt.show()
+        
+        return {"bandwidth": bandwidth}
+    
+    def fit_predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
+        bandwidth = kwargs.get("bandwidth")
+        ms = MeanShift(bandwidth=bandwidth)
+        labels = ms.fit_predict(X)
+        n_clusters = len(np.unique(labels))
+        logging.info(f"MeanShift found {n_clusters} clusters")
+        
+        if n_clusters > 1:
+            score = silhouette_score(X, labels)
+            logging.info(f"Silhouette score: {score:.3f}")
+        
+        return labels
+    
+    def get_name(self) -> str:
+        return "MeanShift"
+
+class AffinityPropagationClusterer(ClusteringAlgorithm):
+    """Affinity Propagation clustering implementation."""
+    
+    def __init__(self, damping: float = 0.5, preference: float = None):
+        self.damping = damping
+        self.preference = preference
+    
+    def determine_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+        # Test different damping values
+        damping_values = [0.5, 0.6, 0.7, 0.8, 0.9]
+        n_clusters = []
+        silhouette_scores = []
+        
+        for damping in damping_values:
+            af = AffinityPropagation(damping=damping, random_state=42)
+            labels = af.fit_predict(X)
+            
+            n_clusters.append(len(np.unique(labels)))
+            if len(np.unique(labels)) > 1:
+                silhouette_scores.append(silhouette_score(X, labels))
+            else:
+                silhouette_scores.append(0)
+        
+        # Plot results
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+        
+        ax1.plot(damping_values, n_clusters, 'o-')
+        ax1.set_xlabel('Damping')
+        ax1.set_ylabel('Number of Clusters')
+        ax1.set_title('Number of Clusters vs Damping')
+        
+        ax2.plot(damping_values, silhouette_scores, 'o-')
+        ax2.set_xlabel('Damping')
+        ax2.set_ylabel('Silhouette Score')
+        ax2.set_title('Silhouette Score vs Damping')
+        
+        plt.tight_layout()
+        plt.show()
+        
+        # Choose optimal damping
+        optimal_idx = np.argmax(silhouette_scores)
+        optimal_damping = damping_values[optimal_idx]
+        logging.info(f"Optimal damping: {optimal_damping}")
+        
+        return {
+            "damping": optimal_damping,
+            "preference": self.preference
+        }
+    
+    def fit_predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
+        damping = kwargs.get("damping", self.damping)
+        preference = kwargs.get("preference", self.preference)
+        
+        af = AffinityPropagation(
+            damping=damping,
+            preference=preference,
+            random_state=42
+        )
+        labels = af.fit_predict(X)
+        n_clusters = len(np.unique(labels))
+        logging.info(f"Affinity Propagation found {n_clusters} clusters")
+        
+        if n_clusters > 1:
+            score = silhouette_score(X, labels)
+            logging.info(f"Silhouette score: {score:.3f}")
+        
+        return labels
+    
+    def get_name(self) -> str:
+        return "AffinityPropagation"
+
 class ClusteringFactory:
     """Factory class for creating clustering algorithm instances."""
     
@@ -189,6 +418,19 @@ class ClusteringFactory:
             2: DBSCANClusterer(
                 k=kwargs.get('k', 4),
                 default_eps=kwargs.get('default_eps', 0.5)
+            ),
+            3: AgglomerativeClusterer(
+                max_k=kwargs.get('max_k', 10),
+                default_n_clusters=kwargs.get('default_n_clusters', 5),
+                linkage=kwargs.get('linkage', 'ward')
+            ),
+            4: MeanShiftClusterer(
+                quantile=kwargs.get('quantile', 0.3),
+                n_samples=kwargs.get('n_samples', 100)
+            ),
+            5: AffinityPropagationClusterer(
+                damping=kwargs.get('damping', 0.5),
+                preference=kwargs.get('preference', None)
             )
         }
         
@@ -313,7 +555,35 @@ def analyze_clusters(labels: np.ndarray, timestamps: np.ndarray, algorithm_name:
         logging.info(timestamps_str)
 
 def main(day: str = 'day6', algorithm_id: int = 1, **algorithm_params) -> None:
-    """Execute complete clustering analysis workflow."""
+    """
+    Execute complete clustering analysis workflow.
+    
+    Args:
+        day: Which day's data to analyze ('day3', 'day6', or 'day9')
+        algorithm_id: ID of the clustering algorithm to use
+            1: KMeans
+            2: DBSCAN
+            3: Agglomerative
+            4: MeanShift
+            5: AffinityPropagation
+        **algorithm_params: Algorithm-specific parameters
+            For KMeans:
+                - max_k: Maximum number of clusters to test
+                - default_n_clusters: Number of clusters to use
+            For DBSCAN:
+                - k: Number of neighbors
+                - default_eps: Epsilon value
+            For Agglomerative:
+                - max_k: Maximum number of clusters to test
+                - default_n_clusters: Number of clusters to use
+                - linkage: Linkage criterion ('ward', 'complete', 'average', 'single')
+            For MeanShift:
+                - quantile: Quantile for bandwidth estimation
+                - n_samples: Number of samples for bandwidth estimation
+            For AffinityPropagation:
+                - damping: Damping factor
+                - preference: Preference parameter
+    """
     try:
         # Get file paths
         files = DEFAULT_FILES[day]

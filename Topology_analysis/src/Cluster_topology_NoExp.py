@@ -9,7 +9,8 @@ and provides visualization tools for analysis.
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, SpectralClustering
+from sklearn.mixture import GaussianMixture
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -20,6 +21,7 @@ from typing import Tuple, List, Optional, Dict, Any
 from abc import ABC, abstractmethod
 import logging
 import os
+from scipy.cluster.hierarchy import dendrogram
 
 # 文件路径配置
 DATA_DIR = '../datasets'  # 数据文件夹路径
@@ -171,6 +173,155 @@ class DBSCANClusterer(ClusteringAlgorithm):
     def get_name(self) -> str:
         return "DBSCAN"
 
+class AgglomerativeClusterer(ClusteringAlgorithm):
+    """Agglomerative Hierarchical clustering implementation."""
+    
+    def __init__(self, max_k: int = 10, default_n_clusters: int = 5, linkage: str = 'ward'):
+        """
+        Initialize Agglomerative clusterer.
+
+        Args:
+            max_k: Maximum number of clusters to test
+            default_n_clusters: Default number of clusters
+            linkage: Linkage criterion to use ('ward', 'complete', 'average', 'single')
+        """
+        self.max_k = max_k
+        self.default_n_clusters = default_n_clusters
+        self.linkage = linkage
+    
+    def determine_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+        """Determine optimal parameters using silhouette scores."""
+        silhouette = []
+        K_range = range(2, self.max_k + 1)
+        
+        for k in K_range:
+            clustering = AgglomerativeClustering(n_clusters=k, linkage=self.linkage)
+            labels = clustering.fit_predict(X)
+            score = silhouette_score(X, labels)
+            silhouette.append(score)
+        
+        # Plot silhouette scores
+        plt.figure(figsize=(10, 5))
+        plt.plot(K_range, silhouette, 'o-')
+        plt.xlabel('Number of Clusters (k)')
+        plt.ylabel('Silhouette Score')
+        plt.title('Silhouette Score vs Number of Clusters')
+        plt.show()
+        
+        # Plot dendrogram for reference
+        self._plot_dendrogram(X)
+        
+        return {"n_clusters": self.default_n_clusters, "linkage": self.linkage}
+    
+    def _plot_dendrogram(self, X: np.ndarray):
+        """Plot dendrogram of hierarchical clustering."""
+        clustering = AgglomerativeClustering(distance_threshold=0, n_clusters=None, linkage=self.linkage)
+        clustering.fit(X)
+        
+        counts = np.zeros(clustering.children_.shape[0])
+        n_samples = len(clustering.labels_)
+        for i, merge in enumerate(clustering.children_):
+            current_count = 0
+            for child_idx in merge:
+                if child_idx < n_samples:
+                    current_count += 1
+                else:
+                    current_count += counts[child_idx - n_samples]
+            counts[i] = current_count
+
+        linkage_matrix = np.column_stack([
+            clustering.children_,
+            clustering.distances_,
+            counts
+        ]).astype(float)
+
+        plt.figure(figsize=(10, 7))
+        dendrogram(linkage_matrix)
+        plt.title('Hierarchical Clustering Dendrogram')
+        plt.xlabel('Sample index or (cluster size)')
+        plt.ylabel('Distance')
+        plt.show()
+    
+    def fit_predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
+        n_clusters = kwargs.get("n_clusters", self.default_n_clusters)
+        linkage = kwargs.get("linkage", self.linkage)
+        clustering = AgglomerativeClustering(n_clusters=n_clusters, linkage=linkage)
+        return clustering.fit_predict(X)
+    
+    def get_name(self) -> str:
+        return "Agglomerative"
+
+class SpectralClusterer(ClusteringAlgorithm):
+    """Spectral clustering implementation."""
+    
+    def __init__(self, max_k: int = 10, default_n_clusters: int = 5):
+        self.max_k = max_k
+        self.default_n_clusters = default_n_clusters
+    
+    def determine_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+        """Determine optimal parameters using silhouette scores."""
+        silhouette = []
+        K_range = range(2, self.max_k + 1)
+        
+        for k in K_range:
+            clustering = SpectralClustering(n_clusters=k, random_state=42)
+            labels = clustering.fit_predict(X)
+            score = silhouette_score(X, labels)
+            silhouette.append(score)
+        
+        # Plot silhouette scores
+        plt.figure(figsize=(10, 5))
+        plt.plot(K_range, silhouette, 'o-')
+        plt.xlabel('Number of Clusters (k)')
+        plt.ylabel('Silhouette Score')
+        plt.title('Spectral Clustering: Silhouette Score vs Number of Clusters')
+        plt.show()
+        
+        return {"n_clusters": self.default_n_clusters}
+    
+    def fit_predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
+        n_clusters = kwargs.get("n_clusters", self.default_n_clusters)
+        clustering = SpectralClustering(n_clusters=n_clusters, random_state=42)
+        return clustering.fit_predict(X)
+    
+    def get_name(self) -> str:
+        return "Spectral"
+
+class GMMClusterer(ClusteringAlgorithm):
+    """Gaussian Mixture Model clustering implementation."""
+    
+    def __init__(self, max_k: int = 10, default_n_components: int = 5):
+        self.max_k = max_k
+        self.default_n_components = default_n_components
+    
+    def determine_parameters(self, X: np.ndarray) -> Dict[str, Any]:
+        """Determine optimal parameters using BIC scores."""
+        bic = []
+        K_range = range(2, self.max_k + 1)
+        
+        for k in K_range:
+            gmm = GaussianMixture(n_components=k, random_state=42)
+            gmm.fit(X)
+            bic.append(gmm.bic(X))
+        
+        # Plot BIC scores
+        plt.figure(figsize=(10, 5))
+        plt.plot(K_range, bic, 'o-')
+        plt.xlabel('Number of Components (k)')
+        plt.ylabel('BIC Score')
+        plt.title('GMM: BIC Score vs Number of Components')
+        plt.show()
+        
+        return {"n_components": self.default_n_components}
+    
+    def fit_predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
+        n_components = kwargs.get("n_components", self.default_n_components)
+        gmm = GaussianMixture(n_components=n_components, random_state=42)
+        return gmm.fit_predict(X)
+    
+    def get_name(self) -> str:
+        return "GMM"
+
 class ClusteringFactory:
     """Factory class for creating clustering algorithm instances."""
     
@@ -180,10 +331,9 @@ class ClusteringFactory:
         Get clustering algorithm instance.
 
         Args:
-            algorithm_id: ID of the algorithm (1: KMeans, 2: DBSCAN)
+            algorithm_id: ID of the algorithm 
+                (1: KMeans, 2: DBSCAN, 3: Agglomerative, 4: Spectral, 5: GMM)
             **kwargs: Algorithm-specific parameters
-                For KMeans: max_k, default_n_clusters
-                For DBSCAN: k, default_eps
         """
         algorithms = {
             1: KMeansClusterer(
@@ -193,6 +343,19 @@ class ClusteringFactory:
             2: DBSCANClusterer(
                 k=kwargs.get('k', 4),
                 default_eps=kwargs.get('default_eps', 0.5)
+            ),
+            3: AgglomerativeClusterer(
+                max_k=kwargs.get('max_k', 10),
+                default_n_clusters=kwargs.get('default_n_clusters', 5),
+                linkage=kwargs.get('linkage', 'ward')
+            ),
+            4: SpectralClusterer(
+                max_k=kwargs.get('max_k', 10),
+                default_n_clusters=kwargs.get('default_n_clusters', 5)
+            ),
+            5: GMMClusterer(
+                max_k=kwargs.get('max_k', 10),
+                default_n_components=kwargs.get('default_n_components', 5)
             )
         }
         
@@ -396,7 +559,7 @@ def main(
     Args:
         file_path: Path to the topology matrix Excel file
         behavior_file_path: Path to the behavior labels Excel file
-        algorithm_id: ID of the clustering algorithm to use (1: KMeans, 2: DBSCAN)
+        algorithm_id: ID of the clustering algorithm to use (1: KMeans, 2: DBSCAN, 3: Agglomerative, 4: Spectral, 5: GMM)
         **algorithm_params: Algorithm-specific parameters
             For KMeans: 
                 - max_k: Maximum number of clusters to test in visualization (default: 10)
@@ -404,6 +567,16 @@ def main(
             For DBSCAN:
                 - k: Number of neighbors (default: 4)
                 - default_eps: Epsilon value (default: 0.5)
+            For Agglomerative:
+                - max_k: Maximum number of clusters to test
+                - default_n_clusters: Default number of clusters
+                - linkage: Linkage criterion to use ('ward', 'complete', 'average', 'single')
+            For Spectral:
+                - max_k: Maximum number of clusters to test
+                - default_n_clusters: Default number of clusters
+            For GMM:
+                - max_k: Maximum number of components to test
+                - default_n_components: Default number of components
     """
     try:
         # Get the selected clustering algorithm with custom parameters
