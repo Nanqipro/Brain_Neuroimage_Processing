@@ -27,8 +27,8 @@ from datetime import datetime
 # File path configuration
 DATA_DIR = '../datasets'  # Data directory path
 RESULT_DIR = '../result'  # Results directory path
-TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day6_topology_matrix_plus.xlsx')  # Topology matrix file
-BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day6_with_behavior_labels_filled.xlsx')  # Behavior labels file
+TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day9_topology_matrix_plus.xlsx')  # Topology matrix file
+BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day9_with_behavior_labels_filled.xlsx')  # Behavior labels file
 
 def setup_logging(algorithm_names: Union[str, List[str]]) -> str:
     """
@@ -422,7 +422,7 @@ class ClusteringFactory:
         algorithms = {
             1: KMeansClusterer(
                 max_k=kwargs.get('max_k', 10),
-                default_n_clusters=kwargs.get('default_n_clusters', 6)
+                default_n_clusters=kwargs.get('default_n_clusters', 4)
             ),
             2: DBSCANClusterer(
                 k=kwargs.get('k', 4),
@@ -560,18 +560,34 @@ def visualize_clusters(
     plt.tight_layout()
     plt.show()
 
-def analyze_clusters(labels: np.ndarray, timestamps: np.ndarray, algorithm_name: str, behavior_file_path: str = BEHAVIOR_FILE) -> None:
+def analyze_clusters(
+    labels: np.ndarray, 
+    timestamps: np.ndarray, 
+    algorithm_name: str, 
+    behavior_file_path: str = BEHAVIOR_FILE,
+    include_exp: bool = False
+) -> None:
     """
     Analyze and print the timestamps belonging to each cluster, and match behavior labels.
+    Can include or exclude 'Exp' behavior from distribution calculation.
 
     Args:
         labels: Cluster labels
         timestamps: Array of timestamps
         algorithm_name: Name of the clustering algorithm
         behavior_file_path: Path to the behavior labels file
+        include_exp: Whether to include 'Exp' behavior in distribution calculation
     """
     # Load behavior data
     behavior_df = pd.read_excel(behavior_file_path)
+    
+    # Get all unique behaviors and show them at the start
+    all_behaviors = sorted(behavior_df['behavior'].unique())
+    logging.info("\nAll behavior types in dataset:")
+    for behavior in all_behaviors:
+        behavior_count = len(behavior_df[behavior_df['behavior'] == behavior])
+        logging.info(f"- {behavior}: {behavior_count} total occurrences")
+    logging.info("\nStarting cluster analysis...")
     
     unique_labels = np.unique(labels)
     for label in unique_labels:
@@ -585,17 +601,39 @@ def analyze_clusters(labels: np.ndarray, timestamps: np.ndarray, algorithm_name:
         cluster_timestamps.sort()
         
         # Get behavior labels for this cluster
-        cluster_behaviors = behavior_df[behavior_df['stamp'].isin(cluster_timestamps)]['behavior'].value_counts()
-        total_timestamps = len(cluster_timestamps)
+        cluster_behaviors_df = behavior_df[behavior_df['stamp'].isin(cluster_timestamps)]
         
-        # Calculate behavior label percentages
-        behavior_percentages = (cluster_behaviors / total_timestamps * 100).round(2)
+        if include_exp:
+            # Include all behaviors in distribution
+            behaviors_count = cluster_behaviors_df['behavior'].value_counts()
+            total_count = len(cluster_behaviors_df)
+        else:
+            # Exclude 'Exp' from distribution calculation
+            non_exp_df = cluster_behaviors_df[cluster_behaviors_df['behavior'] != 'Exp']
+            behaviors_count = non_exp_df['behavior'].value_counts()
+            total_count = len(non_exp_df)
+        
+        # Calculate percentages
+        if total_count > 0:
+            behavior_percentages = (behaviors_count / total_count * 100).round(2)
+        else:
+            behavior_percentages = behaviors_count  # Empty series if no behaviors
         
         # Output cluster information
         logging.info(f"\n{cluster_name}:")
-        logging.info("Behavior distribution:")
+        logging.info(f"Behavior distribution ({'including' if include_exp else 'excluding'} Exp):")
+        
+        # Show only behaviors that appear in this cluster
         for behavior, percentage in behavior_percentages.items():
-            logging.info(f"- {behavior}: {percentage}% ({cluster_behaviors[behavior]} occurrences)")
+            count = behaviors_count[behavior]
+            logging.info(f"- {behavior}: {percentage}% ({count} occurrences)")
+        
+        # Log total number of timestamps and Exp information
+        total_timestamps = len(cluster_timestamps)
+        exp_count = len(cluster_behaviors_df[cluster_behaviors_df['behavior'] == 'Exp'])
+        logging.info(f"\nTotal timestamps in cluster: {total_timestamps}")
+        if not include_exp:
+            logging.info(f"Including {exp_count} Exp timestamps (not included in distribution)")
         
         logging.info("\nTimestamps:")
         # Format timestamp output, 10 per line
@@ -607,6 +645,7 @@ def main(
     file_path: str = TOPOLOGY_FILE,
     behavior_file_path: str = BEHAVIOR_FILE,
     algorithm_ids: Union[int, List[int]] = 3,
+    include_exp: bool = False,
     **algorithm_params
 ) -> None:
     """
@@ -621,10 +660,11 @@ def main(
             3: Agglomerative
             4: Spectral
             5: GMM
+        include_exp: Whether to include 'Exp' behavior in distribution calculation
         **algorithm_params: Algorithm-specific parameters
             For KMeans: 
                 - max_k: Maximum number of clusters to test (default: 10)
-                - default_n_clusters: Number of clusters to use (default: 8)
+                - default_n_clusters: Number of clusters to use (default: 4)
             For DBSCAN:
                 - k: Number of neighbors (default: 4)
                 - default_eps: Epsilon value (default: 0.5)
@@ -635,6 +675,7 @@ def main(
             For Spectral:
                 - max_k: Maximum number of clusters to test
                 - default_n_clusters: Default number of clusters
+                - gamma: Kernel coefficient for RBF kernel
             For GMM:
                 - max_k: Maximum number of components to test
                 - default_n_components: Default number of components
@@ -652,6 +693,7 @@ def main(
         log_file = setup_logging(algorithm_names)
         logging.info(f"Starting clustering analysis, results will be saved to: {log_file}")
         logging.info(f"Using algorithms: {', '.join(algorithm_names)}")
+        logging.info(f"Behavior distribution calculation: {'including' if include_exp else 'excluding'} Exp")
         
         # Load and preprocess data
         X_scaled, timestamps, feature_cols = load_and_preprocess_data(file_path, behavior_file_path)
@@ -673,7 +715,7 @@ def main(
             visualize_clusters(X_scaled, labels, timestamps, feature_cols, algorithm.get_name())
             
             # Analyze clustering results and match behaviors
-            analyze_clusters(labels, timestamps, algorithm.get_name(), behavior_file_path)
+            analyze_clusters(labels, timestamps, algorithm.get_name(), behavior_file_path, include_exp)
         
         logging.info("\nClustering analysis complete!")
         
@@ -683,6 +725,6 @@ def main(
 
 if __name__ == "__main__":
     # Example: Run multiple clustering algorithms
-    main(algorithm_ids=[5])  # Run KMeans
-    # Or run a single algorithm
-    # main(algorithm_id=3)  # Run only Agglomerative
+    main(algorithm_ids=[1], include_exp=False)  # Run KMeans, excluding Exp from distribution
+    # Or include Exp in distribution
+    # main(algorithm_ids=[1], include_exp=True)  # Run KMeans, including Exp in distribution
