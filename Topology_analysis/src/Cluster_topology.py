@@ -27,7 +27,7 @@ from datetime import datetime
 # File path configuration
 DATA_DIR = '../datasets'  # Data directory path
 RESULT_DIR = '../result'  # Results directory path
-TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day6_topology_matrix.xlsx')  # Topology matrix file
+TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day6_topology_matrix_plus.xlsx')  # Topology matrix file
 BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day6_with_behavior_labels_filled.xlsx')  # Behavior labels file
 
 def setup_logging(algorithm_names: Union[str, List[str]]) -> str:
@@ -329,12 +329,13 @@ class SpectralClusterer(ClusteringAlgorithm):
         plt.title('Spectral Clustering: Silhouette Score vs Number of Clusters')
         plt.show()
         
-        # Find optimal number of clusters
+        # Find optimal number of clusters for reference
         optimal_k = K_range[np.argmax(silhouette)]
-        logging.info(f"Optimal number of clusters based on silhouette score: {optimal_k}")
+        logging.info(f"Reference: Optimal number of clusters based on silhouette score would be {optimal_k}")
+        logging.info(f"Using manually specified n_clusters = {self.default_n_clusters}")
         
         return {
-            "n_clusters": optimal_k,  # Use optimal k instead of default
+            "n_clusters": self.default_n_clusters,  # Use manually specified value
             "affinity": 'rbf',
             "gamma": self.gamma,
             "assign_labels": 'kmeans'
@@ -362,6 +363,13 @@ class GMMClusterer(ClusteringAlgorithm):
     """Gaussian Mixture Model clustering implementation."""
     
     def __init__(self, max_k: int = 10, default_n_components: int = 6):
+        """
+        Initialize GMM clusterer.
+
+        Args:
+            max_k: Maximum number of components to test
+            default_n_components: Default number of components to use
+        """
         self.max_k = max_k
         self.default_n_components = default_n_components
     
@@ -382,6 +390,11 @@ class GMMClusterer(ClusteringAlgorithm):
         plt.ylabel('BIC Score')
         plt.title('GMM: BIC Score vs Number of Components')
         plt.show()
+        
+        # Find optimal number of components for reference
+        optimal_k = K_range[np.argmin(bic)]  # Lower BIC is better
+        logging.info(f"Reference: Optimal number of components based on BIC score would be {optimal_k}")
+        logging.info(f"Using manually specified n_components = {self.default_n_components}")
         
         return {"n_components": self.default_n_components}
     
@@ -409,7 +422,7 @@ class ClusteringFactory:
         algorithms = {
             1: KMeansClusterer(
                 max_k=kwargs.get('max_k', 10),
-                default_n_clusters=kwargs.get('default_n_clusters', 8)
+                default_n_clusters=kwargs.get('default_n_clusters', 6)
             ),
             2: DBSCANClusterer(
                 k=kwargs.get('k', 4),
@@ -417,17 +430,17 @@ class ClusteringFactory:
             ),
             3: AgglomerativeClusterer(
                 max_k=kwargs.get('max_k', 10),
-                default_n_clusters=kwargs.get('default_n_clusters', 8),
+                default_n_clusters=kwargs.get('default_n_clusters', 6),
                 linkage=kwargs.get('linkage', 'ward')
             ),
             4: SpectralClusterer(
                 max_k=kwargs.get('max_k', 10),
-                default_n_clusters=kwargs.get('default_n_clusters', 8),
+                default_n_clusters=kwargs.get('default_n_clusters', 6),
                 gamma=kwargs.get('gamma', 1.0)
             ),
             5: GMMClusterer(
                 max_k=kwargs.get('max_k', 10),
-                default_n_components=kwargs.get('default_n_components', 8)
+                default_n_components=kwargs.get('default_n_components', 3)
             )
         }
         
@@ -670,6 +683,6 @@ def main(
 
 if __name__ == "__main__":
     # Example: Run multiple clustering algorithms
-    main(algorithm_ids=[4])  # Run KMeans
+    main(algorithm_ids=[5])  # Run KMeans
     # Or run a single algorithm
     # main(algorithm_id=3)  # Run only Agglomerative
