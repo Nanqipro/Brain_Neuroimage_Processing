@@ -1,0 +1,3 @@
+2025-02-15 14:43:48,613 - INFO - Starting clustering analysis, results will be saved to: ../result\clustering_KMeans_20250215_144348.log
+2025-02-15 14:43:48,613 - INFO - Using algorithms: KMeans
+2025-02-15 14:43:48,613 - INFO - Behavior distribution calculation: excluding Exp

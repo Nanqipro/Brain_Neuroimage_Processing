@@ -27,8 +27,7 @@ from datetime import datetime
 # File path configuration
 DATA_DIR = '../datasets'  # Data directory path
 RESULT_DIR = '../result'  # Results directory path
-TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day9_topology_matrix_plus.xlsx')  # Topology matrix file
-BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day9_with_behavior_labels_filled.xlsx')  # Behavior labels file
+TOPOLOGY_FILE = os.path.join(DATA_DIR, 'integrated_topology_matrix.xlsx')  # Topology matrix file
 
 def setup_logging(algorithm_names: Union[str, List[str]]) -> str:
     """
@@ -449,23 +448,22 @@ class ClusteringFactory:
         
         return algorithms[algorithm_id]
 
-def load_and_preprocess_data(file_path: str = TOPOLOGY_FILE, 
-                           behavior_file_path: str = BEHAVIOR_FILE) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+def load_and_preprocess_data(file_path: str = TOPOLOGY_FILE) -> Tuple[np.ndarray, np.ndarray, List[str], pd.Series]:
     """
     Load and preprocess topology matrix data.
 
     Args:
         file_path: Path to the Excel file containing topology matrix
-        behavior_file_path: Path to the behavior labels file
 
     Returns:
         Tuple containing:
         - Preprocessed feature matrix
         - Array of timestamps
         - List of feature column names
+        - Series of behavior labels
 
     Raises:
-        FileNotFoundError: If the specified files don't exist
+        FileNotFoundError: If the specified file doesn't exist
         ValueError: If data is invalid or contains unexpected values
     """
     try:
@@ -473,14 +471,15 @@ def load_and_preprocess_data(file_path: str = TOPOLOGY_FILE,
         df = pd.read_excel(file_path)
         logging.info(f"Loaded data from {file_path}")
         
-        # Separate timestamps and features
+        # Separate timestamps, behaviors and features
         timestamp_col = 'Time_Stamp'
-        behavior_col = 'behavior'  # 排除behavior列
+        behavior_col = 'behavior'
         feature_cols = [col for col in df.columns if col not in [timestamp_col, behavior_col]]
         
         # 确保数据为数值类型
         X = df[feature_cols].astype(float).values
         timestamps = df[timestamp_col].values
+        behaviors = df[behavior_col] if behavior_col in df.columns else pd.Series(index=df.index)
         
         # 检查并处理缺失值
         if pd.isna(X).any():
@@ -491,7 +490,7 @@ def load_and_preprocess_data(file_path: str = TOPOLOGY_FILE,
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
-        return X_scaled, timestamps, feature_cols
+        return X_scaled, timestamps, feature_cols, behaviors
     except Exception as e:
         logging.error(f"Error in data preprocessing: {e}")
         raise
@@ -565,8 +564,8 @@ def visualize_clusters(
 def analyze_clusters(
     labels: np.ndarray, 
     timestamps: np.ndarray, 
-    algorithm_name: str, 
-    behavior_file_path: str = BEHAVIOR_FILE,
+    behaviors: pd.Series,
+    algorithm_name: str,
     include_exp: bool = False
 ) -> None:
     """
@@ -576,18 +575,15 @@ def analyze_clusters(
     Args:
         labels: Cluster labels
         timestamps: Array of timestamps
+        behaviors: Series of behavior labels
         algorithm_name: Name of the clustering algorithm
-        behavior_file_path: Path to the behavior labels file
         include_exp: Whether to include 'Exp' behavior in distribution calculation
     """
-    # Load behavior data
-    behavior_df = pd.read_excel(behavior_file_path)
-    
     # Get all unique behaviors and show them at the start
-    all_behaviors = sorted(behavior_df['behavior'].unique())
+    all_behaviors = sorted(behaviors.unique())
     logging.info("\nAll behavior types in dataset:")
     for behavior in all_behaviors:
-        behavior_count = len(behavior_df[behavior_df['behavior'] == behavior])
+        behavior_count = len(behaviors[behaviors == behavior])
         logging.info(f"- {behavior}: {behavior_count} total occurrences")
     logging.info("\nStarting cluster analysis...")
     
@@ -599,21 +595,19 @@ def analyze_clusters(
             cluster_name = f"{algorithm_name} Cluster {label}"
             
         # Get timestamps for this cluster and sort them
-        cluster_timestamps = np.unique(timestamps[labels == label])
-        cluster_timestamps.sort()
-        
-        # Get behavior labels for this cluster
-        cluster_behaviors_df = behavior_df[behavior_df['stamp'].isin(cluster_timestamps)]
+        cluster_mask = labels == label
+        cluster_timestamps = timestamps[cluster_mask]
+        cluster_behaviors = behaviors[cluster_mask]
         
         if include_exp:
             # Include all behaviors in distribution
-            behaviors_count = cluster_behaviors_df['behavior'].value_counts()
-            total_count = len(cluster_behaviors_df)
+            behaviors_count = cluster_behaviors.value_counts()
+            total_count = len(cluster_behaviors)
         else:
             # Exclude 'Exp' from distribution calculation
-            non_exp_df = cluster_behaviors_df[cluster_behaviors_df['behavior'] != 'Exp']
-            behaviors_count = non_exp_df['behavior'].value_counts()
-            total_count = len(non_exp_df)
+            non_exp_behaviors = cluster_behaviors[cluster_behaviors != 'Exp']
+            behaviors_count = non_exp_behaviors.value_counts()
+            total_count = len(non_exp_behaviors)
         
         # Calculate percentages
         if total_count > 0:
@@ -632,7 +626,7 @@ def analyze_clusters(
         
         # Log total number of timestamps and Exp information
         total_timestamps = len(cluster_timestamps)
-        exp_count = len(cluster_behaviors_df[cluster_behaviors_df['behavior'] == 'Exp'])
+        exp_count = len(cluster_behaviors[cluster_behaviors == 'Exp'])
         logging.info(f"\nTotal timestamps in cluster: {total_timestamps}")
         if not include_exp:
             logging.info(f"Including {exp_count} Exp timestamps (not included in distribution)")
@@ -645,7 +639,6 @@ def analyze_clusters(
 
 def main(
     file_path: str = TOPOLOGY_FILE,
-    behavior_file_path: str = BEHAVIOR_FILE,
     algorithm_ids: Union[int, List[int]] = 3,
     include_exp: bool = False,
     **algorithm_params
@@ -655,7 +648,6 @@ def main(
 
     Args:
         file_path: Path to topology matrix Excel file
-        behavior_file_path: Path to behavior labels Excel file
         algorithm_ids: ID(s) of clustering algorithm(s) to use (single ID or list)
             1: KMeans
             2: DBSCAN
@@ -664,23 +656,6 @@ def main(
             5: GMM
         include_exp: Whether to include 'Exp' behavior in distribution calculation
         **algorithm_params: Algorithm-specific parameters
-            For KMeans: 
-                - max_k: Maximum number of clusters to test (default: 10)
-                - default_n_clusters: Number of clusters to use (default: 4)
-            For DBSCAN:
-                - k: Number of neighbors (default: 4)
-                - default_eps: Epsilon value (default: 0.5)
-            For Agglomerative:
-                - max_k: Maximum number of clusters to test
-                - default_n_clusters: Default number of clusters
-                - linkage: Linkage criterion ('ward', 'complete', 'average', 'single')
-            For Spectral:
-                - max_k: Maximum number of clusters to test
-                - default_n_clusters: Default number of clusters
-                - gamma: Kernel coefficient for RBF kernel
-            For GMM:
-                - max_k: Maximum number of components to test
-                - default_n_components: Default number of components
     """
     try:
         # Convert single algorithm ID to list
@@ -698,7 +673,7 @@ def main(
         logging.info(f"Behavior distribution calculation: {'including' if include_exp else 'excluding'} Exp")
         
         # Load and preprocess data
-        X_scaled, timestamps, feature_cols = load_and_preprocess_data(file_path, behavior_file_path)
+        X_scaled, timestamps, feature_cols, behaviors = load_and_preprocess_data(file_path)
         
         # Execute clustering analysis for each algorithm
         for algorithm in algorithms:
@@ -717,7 +692,7 @@ def main(
             visualize_clusters(X_scaled, labels, timestamps, feature_cols, algorithm.get_name())
             
             # Analyze clustering results and match behaviors
-            analyze_clusters(labels, timestamps, algorithm.get_name(), behavior_file_path, include_exp)
+            analyze_clusters(labels, timestamps, behaviors, algorithm.get_name(), include_exp)
         
         logging.info("\nClustering analysis complete!")
         
@@ -727,6 +702,6 @@ def main(
 
 if __name__ == "__main__":
     # Example: Run multiple clustering algorithms
-    main(algorithm_ids=[1], include_exp=False)  # Run KMeans, excluding Exp from distribution
+    main(algorithm_ids=[1], include_exp=True)  # Run KMeans, excluding Exp from distribution
     # Or include Exp in distribution
     # main(algorithm_ids=[1], include_exp=True)  # Run KMeans, including Exp in distribution
