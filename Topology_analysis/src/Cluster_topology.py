@@ -27,8 +27,8 @@ from datetime import datetime
 # File path configuration
 DATA_DIR = '../datasets'  # Data directory path
 RESULT_DIR = '../result'  # Results directory path
-TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day9_topology_matrix_plus.xlsx')  # Topology matrix file
-BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day9_with_behavior_labels_filled.xlsx')  # Behavior labels file
+TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day3_topology_matrix_plus.xlsx')  # Topology matrix file
+BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day3_with_behavior_labels_filled.xlsx')  # Behavior labels file
 
 def setup_logging(algorithm_names: Union[str, List[str]]) -> str:
     """
@@ -727,6 +727,6 @@ def main(
 
 if __name__ == "__main__":
     # Example: Run multiple clustering algorithms
-    main(algorithm_ids=[1], include_exp=False)  # Run KMeans, excluding Exp from distribution
+    main(algorithm_ids=[1], include_exp=True)  # Run KMeans, excluding Exp from distribution
     # Or include Exp in distribution
     # main(algorithm_ids=[1], include_exp=True)  # Run KMeans, including Exp in distribution
