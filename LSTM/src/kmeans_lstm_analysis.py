@@ -67,6 +67,13 @@ class NeuronDataProcessor:
         self.label_encoder = LabelEncoder()
         
     def preprocess_data(self):
+        """
+        数据预处理函数：
+        1. 提取神经元数据
+        2. 处理缺失值
+        3. 标准化数据
+        4. 编码行为标签
+        """
         # Extract neuron columns
         neuron_cols = [f'n{i}' for i in range(1, 63)]
         
@@ -125,6 +132,12 @@ class NeuronDataProcessor:
 # LSTM dataset class
 class NeuronDataset(Dataset):
     def __init__(self, X, y, sequence_length):
+        """
+        参数：
+        X: 神经元活动数据
+        y: 行为标签
+        sequence_length: 序列长度
+        """
         self.X = torch.FloatTensor(X)
         self.y = torch.LongTensor(y)
         self.sequence_length = sequence_length
@@ -139,6 +152,13 @@ class NeuronDataset(Dataset):
 # LSTM model class
 class NeuronLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
+        """
+        参数：
+        input_size: 输入特征维度
+        hidden_size: LSTM隐藏层大小
+        num_layers: LSTM层数
+        num_classes: 输出类别数
+        """
         super(NeuronLSTM, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -154,6 +174,13 @@ class NeuronLSTM(nn.Module):
 
 # Training function
 def train_model(model, train_loader, criterion, optimizer, device, num_epochs, config):
+    """
+    模型训练函数：
+    1. 设置模型为训练模式
+    2. 按批次训练数据
+    3. 计算损失并反向传播
+    4. 记录训练损失
+    """
     model.train()
     train_losses = []
     
@@ -179,6 +206,10 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs, c
     return train_losses
 
 def plot_training_loss(train_losses, config):
+    """
+    绘制训练损失曲线：
+    展示模型训练过程中损失值的变化趋势
+    """
     plt.figure(figsize=(10, 6))
     plt.plot(train_losses)
     plt.title('Training Loss Over Time')
@@ -188,6 +219,11 @@ def plot_training_loss(train_losses, config):
     plt.close()
 
 def plot_clusters(X_scaled, cluster_labels, config):
+    """
+    绘制聚类结果可视化图：
+    1. 使用PCA降维到2维
+    2. 绘制散点图显示聚类结果
+    """
     pca = PCA(n_components=2)
     X_pca = pca.fit_transform(X_scaled)
     
@@ -201,6 +237,14 @@ def plot_clusters(X_scaled, cluster_labels, config):
     plt.close()
 
 def main():
+    """
+    主函数：
+    1. 初始化配置
+    2. 数据预处理
+    3. 应用K-means聚类
+    4. 训练LSTM模型
+    5. 保存结果和可视化
+    """
     # Initialize configuration
     config = Config()
     
