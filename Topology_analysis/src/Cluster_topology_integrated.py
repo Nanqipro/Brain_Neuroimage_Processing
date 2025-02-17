@@ -23,6 +23,10 @@ import logging
 import os
 from scipy.cluster.hierarchy import dendrogram
 from datetime import datetime
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.pipeline import Pipeline
+from collections import Counter
 
 # File path configuration
 DATA_DIR = '../datasets'  # Data directory path
@@ -421,7 +425,7 @@ class ClusteringFactory:
         algorithms = {
             1: KMeansClusterer(
                 max_k=kwargs.get('max_k', 10),
-                default_n_clusters=kwargs.get('default_n_clusters', 4)
+                default_n_clusters=kwargs.get('default_n_clusters', 8)
             ),
             2: DBSCANClusterer(
                 k=kwargs.get('k', 4),
@@ -637,71 +641,197 @@ def analyze_clusters(
             batch = cluster_timestamps[i:i+10]
             logging.info(', '.join(map(str, batch)))
 
+def balance_data(X: np.ndarray, behaviors: pd.Series, timestamps: np.ndarray, strategy: str = 'mixed', target_ratio: float = 0.5) -> Tuple[np.ndarray, pd.Series, np.ndarray]:
+    """
+    平衡数据集中的样本分布。
+
+    Args:
+        X: 特征矩阵
+        behaviors: 行为标签
+        timestamps: 时间戳数组
+        strategy: 平衡策略 ('over', 'under', 'mixed')
+        target_ratio: 对于混合采样，大类相对于最大类的目标比例
+
+    Returns:
+        平衡后的特征矩阵、行为标签和时间戳
+    """
+    if strategy not in ['over', 'under', 'mixed']:
+        raise ValueError("strategy must be one of 'over', 'under', 'mixed'")
+    
+    logging.info("\n开始数据平衡处理...")
+    logging.info("原始数据分布:")
+    original_dist = Counter(behaviors)
+    for label, count in original_dist.items():
+        logging.info(f"- {label}: {count}")
+    
+    # 移除样本数过少的类别（少于5个样本）
+    min_samples_threshold = 5
+    rare_classes = [label for label, count in original_dist.items() if count < min_samples_threshold]
+    if rare_classes:
+        logging.info(f"\n以下类别样本数过少（<{min_samples_threshold}），将被暂时移除:")
+        for label in rare_classes:
+            logging.info(f"- {label}: {original_dist[label]}个样本")
+        
+        mask = ~behaviors.isin(rare_classes)
+        X = X[mask]
+        behaviors = behaviors[mask]
+        timestamps = timestamps[mask]
+        logging.info("\n移除后的数据分布:")
+        for label, count in Counter(behaviors).items():
+            logging.info(f"- {label}: {count}")
+    
+    # 为每个样本创建唯一标识符
+    sample_indices = np.arange(len(behaviors))
+    
+    if strategy == 'over':
+        # 使用SMOTE进行上采样，设置较小的k_neighbors
+        sampler = SMOTE(random_state=42, k_neighbors=3)
+        X_resampled, y_resampled = sampler.fit_resample(X, behaviors)
+        # 对新样本使用最近邻的时间戳
+        n_original = len(behaviors)
+        n_resampled = len(y_resampled)
+        if n_resampled > n_original:
+            # 对于新生成的样本，使用原始样本的时间戳
+            timestamps_resampled = np.concatenate([
+                timestamps,
+                np.array([timestamps[i % n_original] for i in range(n_original, n_resampled)])
+            ])
+        else:
+            timestamps_resampled = timestamps[:n_resampled]
+            
+    elif strategy == 'under':
+        # 使用随机下采样
+        sampler = RandomUnderSampler(random_state=42)
+        X_resampled, y_resampled = sampler.fit_resample(X, behaviors)
+        # 创建一个DataFrame来追踪样本
+        df = pd.DataFrame({
+            'X_index': sample_indices,
+            'behavior': behaviors,
+            'timestamp': timestamps
+        })
+        # 获取下采样后的样本
+        df_resampled = pd.DataFrame({
+            'behavior': y_resampled,
+            'X_features': list(X_resampled)  # 将特征矩阵转换为列表
+        })
+        # 匹配原始样本
+        merged = pd.merge(
+            df_resampled,
+            df,
+            left_on=['behavior', 'X_features'],
+            right_on=['behavior', list(X)],
+            how='left'
+        )
+        timestamps_resampled = merged['timestamp'].values
+        
+    else:  # mixed
+        # 先下采样再上采样
+        max_samples = max(Counter(behaviors).values())
+        target_samples = int(max_samples * target_ratio)
+        
+        # 确保目标样本数不小于k_neighbors+1
+        k_neighbors = 3
+        target_samples = max(target_samples, k_neighbors + 1)
+        
+        sampling_strategy = {k: min(target_samples, v) for k, v in Counter(behaviors).items()}
+        
+        # 创建采样管道
+        pipeline = Pipeline([
+            ('under', RandomUnderSampler(sampling_strategy=sampling_strategy, random_state=42)),
+            ('over', SMOTE(random_state=42, k_neighbors=k_neighbors))
+        ])
+        
+        # 创建DataFrame来追踪样本
+        df = pd.DataFrame({
+            'X_index': sample_indices,
+            'behavior': behaviors,
+            'timestamp': timestamps
+        })
+        
+        X_resampled, y_resampled = pipeline.fit_resample(X, behaviors)
+        n_resampled = len(y_resampled)
+        
+        # 对新样本使用循环填充的时间戳
+        timestamps_resampled = np.array([timestamps[i % len(timestamps)] for i in range(n_resampled)])
+    
+    logging.info("\n平衡后的数据分布:")
+    balanced_dist = Counter(y_resampled)
+    for label, count in balanced_dist.items():
+        logging.info(f"- {label}: {count}")
+    
+    return X_resampled, pd.Series(y_resampled), timestamps_resampled
+
 def main(
     file_path: str = TOPOLOGY_FILE,
     algorithm_ids: Union[int, List[int]] = 3,
     include_exp: bool = False,
+    balance_strategy: Optional[str] = None,
+    target_ratio: float = 0.5,
     **algorithm_params
 ) -> None:
     """
-    Execute the complete clustering analysis workflow.
+    执行完整的聚类分析工作流。
 
     Args:
-        file_path: Path to topology matrix Excel file
-        algorithm_ids: ID(s) of clustering algorithm(s) to use (single ID or list)
-            1: KMeans
-            2: DBSCAN
-            3: Agglomerative
-            4: Spectral
-            5: GMM
-        include_exp: Whether to include 'Exp' behavior in distribution calculation
-        **algorithm_params: Algorithm-specific parameters
+        file_path: 拓扑矩阵Excel文件路径
+        algorithm_ids: 要使用的聚类算法ID（单个ID或列表）
+        include_exp: 是否在分布计算中包含'Exp'行为
+        balance_strategy: 数据平衡策略 ('over', 'under', 'mixed', None)
+        target_ratio: 混合采样时的目标比例
+        **algorithm_params: 算法特定参数
     """
     try:
-        # Convert single algorithm ID to list
+        # 转换单个算法ID为列表
         if isinstance(algorithm_ids, int):
             algorithm_ids = [algorithm_ids]
         
-        # Get all selected algorithm instances
+        # 获取所有选定的算法实例
         algorithms = [ClusteringFactory.get_algorithm(aid, **algorithm_params) for aid in algorithm_ids]
         algorithm_names = [alg.get_name() for alg in algorithms]
         
-        # Set up logging
+        # 设置日志
         log_file = setup_logging(algorithm_names)
-        logging.info(f"Starting clustering analysis, results will be saved to: {log_file}")
-        logging.info(f"Using algorithms: {', '.join(algorithm_names)}")
-        logging.info(f"Behavior distribution calculation: {'including' if include_exp else 'excluding'} Exp")
+        logging.info(f"开始聚类分析，结果将保存到: {log_file}")
+        logging.info(f"使用算法: {', '.join(algorithm_names)}")
+        logging.info(f"行为分布计算: {'包含' if include_exp else '不包含'} Exp")
         
-        # Load and preprocess data
+        # 加载和预处理数据
         X_scaled, timestamps, feature_cols, behaviors = load_and_preprocess_data(file_path)
         
-        # Execute clustering analysis for each algorithm
+        # 如果指定了平衡策略，执行数据平衡
+        if balance_strategy:
+            X_scaled, behaviors, timestamps = balance_data(X_scaled, behaviors, timestamps, balance_strategy, target_ratio)
+        
+        # 为每个算法执行聚类分析
         for algorithm in algorithms:
             logging.info(f"\n{'='*50}")
-            logging.info(f"Executing {algorithm.get_name()} clustering algorithm")
+            logging.info(f"执行 {algorithm.get_name()} 聚类算法")
             logging.info(f"{'='*50}")
             
-            # Show parameter selection visualization and get parameters
+            # 显示参数选择可视化并获取参数
             params = algorithm.determine_parameters(X_scaled)
-            logging.info(f"Using parameters: {params}")
+            logging.info(f"使用参数: {params}")
             
-            # Perform clustering
+            # 执行聚类
             labels = algorithm.fit_predict(X_scaled, **params)
             
-            # Visualize results
+            # 可视化结果
             visualize_clusters(X_scaled, labels, timestamps, feature_cols, algorithm.get_name())
             
-            # Analyze clustering results and match behaviors
+            # 分析聚类结果并匹配行为
             analyze_clusters(labels, timestamps, behaviors, algorithm.get_name(), include_exp)
         
-        logging.info("\nClustering analysis complete!")
+        logging.info("\n聚类分析完成！")
         
     except Exception as e:
-        logging.error(f"Error in clustering analysis: {e}")
+        logging.error(f"聚类分析出错: {e}")
         raise
 
 if __name__ == "__main__":
-    # Example: Run multiple clustering algorithms
-    main(algorithm_ids=[1], include_exp=True)  # Run KMeans, excluding Exp from distribution
-    # Or include Exp in distribution
-    # main(algorithm_ids=[1], include_exp=True)  # Run KMeans, including Exp in distribution
+    # 示例：运行多个聚类算法，使用混合采样策略
+    main(
+        algorithm_ids=[1],  # 运行KMeans
+        include_exp=True,   # 包含Exp在分布中
+        balance_strategy='mixed',  # 使用混合采样策略
+        target_ratio=0.3    # 大类样本量设置为最大类的30%
+    )

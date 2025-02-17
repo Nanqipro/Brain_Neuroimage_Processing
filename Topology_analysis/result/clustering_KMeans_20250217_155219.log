@@ -1,0 +1,17 @@
+2025-02-17 15:52:19,509 - INFO - 开始聚类分析，结果将保存到: ../result\clustering_KMeans_20250217_155219.log
+2025-02-17 15:52:19,509 - INFO - 使用算法: KMeans
+2025-02-17 15:52:19,509 - INFO - 行为分布计算: 包含 Exp
+2025-02-17 15:53:47,793 - INFO - Loaded data from ../datasets\integrated_topology_matrix.xlsx
+2025-02-17 15:53:47,965 - INFO - 
+开始数据平衡处理...
+2025-02-17 15:53:47,965 - INFO - 原始数据分布:
+2025-02-17 15:53:47,966 - INFO - - Exp: 4821
+2025-02-17 15:53:47,966 - INFO - - Gro: 523
+2025-02-17 15:53:47,966 - INFO - - Clim: 341
+2025-02-17 15:53:47,967 - INFO - - Sta: 152
+2025-02-17 15:53:47,967 - INFO - - CD1: 3
+2025-02-17 15:53:47,967 - INFO - - Scra: 25
+2025-02-17 15:53:47,967 - INFO - - Stiff: 2978
+2025-02-17 15:53:47,967 - INFO - - Trem: 113
+2025-02-17 15:53:47,967 - INFO - - Turn: 41
+2025-02-17 15:53:48,067 - ERROR - 聚类分析出错: Expected n_neighbors <= n_samples_fit, but n_neighbors = 6, n_samples_fit = 3, n_samples = 3
