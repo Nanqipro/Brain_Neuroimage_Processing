@@ -1,6 +1,0 @@
-2025-02-15 14:21:23,434 - INFO - Starting clustering analysis, results will be saved to: ../result\clustering_KMeans_20250215_142123.log
-2025-02-15 14:21:23,434 - INFO - Using algorithms: KMeans
-2025-02-15 14:21:23,434 - INFO - Behavior distribution calculation: excluding Exp
-2025-02-15 14:22:49,519 - INFO - Loaded data from ../datasets\integrated_topology_matrix.xlsx
-2025-02-15 14:22:49,637 - ERROR - Error in data preprocessing: ufunc 'isnan' not supported for the input types, and the inputs could not be safely coerced to any supported types according to the casting rule ''safe''
-2025-02-15 14:22:49,637 - ERROR - Error in clustering analysis: ufunc 'isnan' not supported for the input types, and the inputs could not be safely coerced to any supported types according to the casting rule ''safe''

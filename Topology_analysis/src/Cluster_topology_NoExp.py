@@ -27,8 +27,8 @@ from datetime import datetime
 # File path configuration
 DATA_DIR = '../datasets'  # Data directory path
 RESULT_DIR = '../result'  # Results directory path
-TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day6_topology_matrix.xlsx')  # Topology matrix file
-BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day6_with_behavior_labels_filled.xlsx')  # Behavior labels file
+TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day9_topology_matrix_plus.xlsx')  # Topology matrix file
+BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day9_with_behavior_labels_filled.xlsx')  # Behavior labels file
 
 def setup_logging(algorithm_names: Union[str, List[str]]) -> str:
     """
@@ -422,7 +422,7 @@ class ClusteringFactory:
         algorithms = {
             1: KMeansClusterer(
                 max_k=kwargs.get('max_k', 10),
-                default_n_clusters=kwargs.get('default_n_clusters', 5)
+                default_n_clusters=kwargs.get('default_n_clusters', 6)
             ),
             2: DBSCANClusterer(
                 k=kwargs.get('k', 4),
@@ -697,6 +697,6 @@ def main(
 
 if __name__ == "__main__":
     # Example: Run multiple clustering algorithms
-    main(algorithm_ids=[5])  # Run KMeans, Agglomerative, and Spectral
+    main(algorithm_ids=[1])  # Run KMeans, Agglomerative, and Spectral
     # Or run a single algorithm
     # main(algorithm_ids=3)  # Run only Agglomerative
