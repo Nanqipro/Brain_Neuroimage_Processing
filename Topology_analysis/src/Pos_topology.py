@@ -28,6 +28,7 @@ from tqdm import tqdm
 import warnings
 import matplotlib.cm as cm
 import matplotlib
+import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Iterator, Optional
 import plotly.io as pio
 import base64
@@ -35,6 +36,7 @@ from PIL import Image
 import os
 from pathlib import Path
 import io
+import imageio
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -672,6 +674,98 @@ class NeuronTopologyAnalyzer:
             for k in range(len(self.frames_data['node_x']))
         ]
 
+    def create_gif(self, output_path: str, fps: int = 10) -> None:
+        """
+        Generate GIF animation directly from frame data.
+        
+        Args:
+            output_path (str): Path to save the GIF file
+            fps (int): Frames per second, default is 10
+        """
+        print("Generating GIF animation...")
+        
+        # Create temporary directory for frame images
+        temp_dir = "temp_frames"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Set fixed figure size and DPI
+        fig = plt.figure(figsize=(12, 8), dpi=100)
+        
+        # Calculate fixed margins to ensure consistent frame size
+        left_margin = 0.1
+        right_margin = 0.9
+        bottom_margin = 0.1
+        top_margin = 0.9
+        
+        # Generate each frame
+        frame_files = []
+        for k in tqdm(range(len(self.frames_data['node_x'])), desc="Generating frames"):
+            plt.clf()  # Clear current figure
+            
+            # Create main axes with fixed position
+            ax_main = plt.axes([left_margin, bottom_margin, right_margin-left_margin, top_margin-bottom_margin])
+            
+            # Draw edges
+            if self.frames_data['edge_x'][k]:
+                edge_x = self.frames_data['edge_x'][k]
+                edge_y = self.frames_data['edge_y'][k]
+                ax_main.plot(edge_x, edge_y, color=self.edge_color, linewidth=self.edge_width, zorder=1)
+            
+            # Draw nodes
+            ax_main.scatter(self.frames_data['node_x'][k], 
+                          self.frames_data['node_y'][k],
+                          c=self.frames_data['node_color'][k],
+                          s=self.node_size*20,  # Adjust size to match HTML version
+                          zorder=2)
+            
+            # Add node labels
+            for i, txt in enumerate(self.frames_data['node_text'][k]):
+                ax_main.annotate(txt, 
+                               (self.frames_data['node_x'][k][i], self.frames_data['node_y'][k][i]),
+                               textcoords="offset points",
+                               xytext=(0, 0),
+                               ha='center',
+                               va='center',
+                               fontsize=8)
+            
+            # Set title and behavior label
+            # Convert Chinese title to English
+            title = self.frames_data['titles'][k].replace("神经元拓扑结构图 - 时间:", "Neuron Topology - Time:")
+            ax_main.set_title(title)
+            ax_main.text(0.02, 0.98, f"Current Behavior: {self.frames_data['behaviors'][k]}",
+                        transform=ax_main.transAxes,
+                        fontsize=10,
+                        verticalalignment='top')
+            
+            # Set axes limits
+            ax_main.set_xlim(-0.05, 1.05)
+            ax_main.set_ylim(1.05, -0.05)  # Reverse Y axis to match HTML version
+            ax_main.axis('off')
+            
+            # Add background if enabled
+            if self.use_background and self.background_image:
+                ax_main.imshow(Image.open(io.BytesIO(base64.b64decode(self.background_image))),
+                             extent=[-0.05, 1.05, -0.05, 1.05],
+                             alpha=self.background_opacity,
+                             zorder=0)
+            
+            # Save current frame with fixed size
+            frame_path = os.path.join(temp_dir, f"frame_{k:04d}.png")
+            plt.savefig(frame_path, bbox_inches=None, pad_inches=0)
+            frame_files.append(frame_path)
+        
+        # Read all frames and create GIF
+        frames = [imageio.imread(f) for f in frame_files]
+        imageio.mimsave(output_path, frames, fps=fps)
+        
+        # Clean up temporary files
+        for f in frame_files:
+            os.remove(f)
+        os.rmdir(temp_dir)
+        
+        plt.close()  # Close figure
+        print(f"GIF animation saved to: {output_path}")
+
 def main():
     """Main function to run the topology analysis."""
     # Define file paths
@@ -679,7 +773,8 @@ def main():
     neuron_data_path = base_dir / 'datasets/Day6_with_behavior_labels_filled.xlsx'
     position_data_path = base_dir / 'datasets/Day6_Max_position.csv'
     background_image_path = base_dir / 'datasets/Day6_Max.png'
-    output_path = base_dir / 'graph/Day6_pos_topology.html'
+    output_html_path = base_dir / 'graph/Day6_pos_topology.html'
+    output_gif_path = base_dir / 'graph/Day6_pos_topology.gif'
     
     # 检查文件是否存在
     print(f"Checking if background image exists: {background_image_path}")
@@ -689,7 +784,7 @@ def main():
         print(f"Background image found at {background_image_path}")
     
     # Create output directory if it doesn't exist
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_html_path.parent.mkdir(parents=True, exist_ok=True)
     
     # 创建分析器实例（可以自定义参数）
     analyzer = NeuronTopologyAnalyzer(
@@ -707,7 +802,12 @@ def main():
         max_groups=20        # 最大组数
     )
     analyzer.process_all_frames()
-    analyzer.create_animation(str(output_path))
+    
+    # 生成HTML动画
+    analyzer.create_animation(str(output_html_path))
+    
+    # 生成GIF动画
+    analyzer.create_gif(str(output_gif_path), fps=5)  # 使用较低的fps使动画更容易观察
 
 if __name__ == '__main__':
     main()

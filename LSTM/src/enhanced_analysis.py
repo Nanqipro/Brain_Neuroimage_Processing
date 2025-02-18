@@ -135,10 +135,28 @@ class EnhancedAnalyzer:
         
         # 输出关键发现
         print("\nKey Findings:")
-        # 1. 显示统计显著的神经元
-        print("\n1. Significant Neurons (p < 0.05):")
+        # 1. 显示统计显著的神经元（按效应量排序）
+        print("\n1. Significant Neurons (p < 0.05, sorted by effect size):")
         significant_neurons = np.where(p_values < self.config.analysis_params['p_value_threshold'])[0]
-        print(f"Found {len(significant_neurons)} significant neurons: {significant_neurons + 1}")
+        
+        # 计算显著性神经元的平均效应量
+        mean_effect_sizes = np.zeros(len(significant_neurons))
+        for i, neuron in enumerate(significant_neurons):
+            neuron_effects = [data['effect_sizes'][neuron] for data in effect_sizes.values() 
+                            if neuron in data['significant_neurons']]
+            mean_effect_sizes[i] = np.mean(neuron_effects) if neuron_effects else 0
+            
+        # 按效应量排序
+        sorted_indices = np.argsort(mean_effect_sizes)[::-1]  # 降序排列
+        sorted_neurons = significant_neurons[sorted_indices]
+        sorted_effects = mean_effect_sizes[sorted_indices]
+        
+        print(f"Found {len(sorted_neurons)} significant neurons:")
+        for neuron, effect in zip(sorted_neurons + 1, sorted_effects):
+            print(f"Neuron {neuron}: mean effect size = {effect:.3f}")
+            
+        # 绘制显著性神经元的效应量分布图
+        self.visualizer.plot_significant_neurons_effect_sizes(sorted_neurons + 1, sorted_effects)
         
         # 2. 显示每种行为特异性神经元
         print("\n2. Behavior-Specific Neurons:")

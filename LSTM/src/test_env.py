@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import matplotlib
 import os
 
 # 测试CUDA环境
@@ -32,7 +33,7 @@ print("="*50)
 print("NumPy版本:", np.__version__)
 print("Pandas版本:", pd.__version__)
 print("Scikit-learn版本:", StandardScaler().__class__.__module__.split('.')[0])
-print("Matplotlib版本:", plt.__version__)
+print("Matplotlib版本:", matplotlib.__version__)
 print("PyTorch版本:", torch.__version__)
 
 # 测试PyTorch GPU功能

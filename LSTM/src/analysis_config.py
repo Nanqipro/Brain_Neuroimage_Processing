@@ -15,15 +15,23 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_file = os.path.join(self.data_dir, 'Day9_with_behavior_labels_filled.xlsx')  # 原始数据文件
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
         self.model_dir = os.path.join(self.base_dir, 'models')    # 模型保存目录
         self.analysis_dir = os.path.join(self.output_dir, 'analysis')  # 分析结果目录
+        self.train_dir = os.path.join(self.output_dir, 'train')   # 训练结果目录
         
         # 模型文件路径
-        self.model_path = os.path.join(self.model_dir, 'neuron_lstm_model.pth')  # 训练好的模型文件路径
+        self.model_path = os.path.join(self.model_dir, 'neuron_lstm_model_9.pth')  # 训练好的模型文件路径
+        
+        # 训练结果文件路径配置
+        self.loss_plot = os.path.join(self.train_dir, 'training_loss.png')  # 训练损失曲线图
+        self.accuracy_plot = os.path.join(self.train_dir, 'accuracy_curves.png')  # 准确率曲线图
+        self.cluster_plot = os.path.join(self.train_dir, 'cluster_visualization.png')  # 聚类可视化图
+        self.metrics_log = os.path.join(self.train_dir, 'training_metrics.csv')  # 训练指标日志
+        self.error_log = os.path.join(self.train_dir, 'error_log.txt')  # 错误日志文件
         
         # 分析结果文件路径配置
         self.correlation_plot = os.path.join(self.analysis_dir, 'behavior_neuron_correlation.png')  # 行为-神经元相关性图
@@ -39,15 +47,15 @@ class AnalysisConfig:
         self.temporal_correlation_dir = os.path.join(self.analysis_dir, 'temporal_correlations')  # 时间相关性分析目录
         
         # 模型超参数配置
-        self.sequence_length = 10    # 序列长度：用于LSTM的输入序列长度
-        self.hidden_size = 128       # 隐藏层大小：LSTM隐藏状态的维度
-        self.num_layers = 2          # LSTM层数：模型中LSTM层的数量
-        self.batch_size = 32         # 批次大小：训练时的批量大小
-        self.learning_rate = 0.001   # 学习率：模型训练的学习率
-        self.num_epochs = 50         # 训练轮数：模型训练的总轮数
-        self.n_clusters = 5          # 聚类数量：K-means聚类的类别数
-        self.test_size = 0.2         # 测试集比例：数据集中测试集的占比
-        self.random_seed = 42        # 随机种子：确保结果可重复性
+        self.sequence_length = 10     # 序列长度：用于LSTM的输入序列长度
+        self.hidden_size = 256        # 隐藏层大小：LSTM隐藏状态的维度
+        self.num_layers = 3           # LSTM层数：模型中LSTM层的数量
+        self.batch_size = 64          # 批次大小：训练时的批量大小
+        self.learning_rate = 0.001    # 学习率：模型训练的学习率
+        self.num_epochs = 100         # 训练轮数：模型训练的总轮数
+        self.n_clusters = 5           # 聚类数量：K-means聚类的类别数
+        self.test_size = 0.2          # 测试集比例：数据集中测试集的占比
+        self.random_seed = 42         # 随机种子：确保结果可重复性
         
         # 分析参数配置
         self.analysis_params = {
@@ -58,7 +66,9 @@ class AnalysisConfig:
             'temporal_window_size': 50,  # 时间窗口分析的大小
             'top_neurons_count': 5,  # 每个行为选择的关键神经元数量
             'p_value_threshold': 0.05,  # 统计检验的显著性水平
-            'effect_size_threshold': 0.5  # 效应量的显著性阈值
+            'effect_size_threshold': 0.5,  # 效应量的显著性阈值
+            'gradient_clip_norm': 1.0,  # 梯度裁剪的最大范数
+            'weight_decay': 0.01  # AdamW优化器的权重衰减系数
         }
         
         # 可视化参数配置
@@ -68,12 +78,14 @@ class AnalysisConfig:
                 'temporal': (15, 5),      # 时间序列图尺寸
                 'transitions': (10, 8),    # 转换概率图尺寸
                 'key_neurons': (15, 8),    # 关键神经元图尺寸
-                'network': (20, 15)        # 网络图尺寸
+                'network': (20, 15),       # 网络图尺寸
+                'metrics': (15, 5)         # 训练指标图尺寸
             },
             'colormaps': {  # 不同类型图表的颜色方案
                 'correlation': 'coolwarm',  # 相关性图的颜色方案
                 'transitions': 'YlOrRd',    # 转换图的颜色方案
-                'network': 'viridis'        # 网络图的颜色方案
+                'network': 'viridis',       # 网络图的颜色方案
+                'clusters': 'viridis'       # 聚类图的颜色方案
             },
             'dpi': 300,              # 图像分辨率
             'save_format': 'png',    # 图像保存格式
@@ -83,18 +95,33 @@ class AnalysisConfig:
         
     def setup_directories(self):
         """
-        创建必要的目录结构
+        创建必要的目录结构并验证权限
         确保所有需要的输出目录都存在
         """
         directories = [
             self.output_dir,           # 结果输出目录
             self.model_dir,            # 模型保存目录
             self.analysis_dir,         # 分析结果目录
+            self.train_dir,            # 训练结果目录
             self.temporal_pattern_dir, # 时间模式分析目录
             self.temporal_correlation_dir  # 时间相关性分析目录
         ]
-        for directory in directories:
-            os.makedirs(directory, exist_ok=True)
+        
+        try:
+            for directory in directories:
+                os.makedirs(directory, exist_ok=True)
+                
+            # 验证目录是否可写
+            test_file_path = os.path.join(self.train_dir, 'test_write.tmp')
+            try:
+                with open(test_file_path, 'w') as f:
+                    f.write('test')
+                os.remove(test_file_path)
+            except Exception as e:
+                raise PermissionError(f"无法在目录中写入文件: {str(e)}")
+                
+        except Exception as e:
+            raise RuntimeError(f"创建目录结构失败: {str(e)}")
         
     def validate_paths(self):
         """
@@ -102,18 +129,23 @@ class AnalysisConfig:
         检查数据文件和模型文件是否存在
         如果缺少必要文件，抛出FileNotFoundError异常
         """
-        required_files = {
-            'Data file': self.data_file,    # 数据文件
-            'Model file': self.model_path    # 模型文件
+        # 检查数据文件
+        if not os.path.exists(self.data_file):
+            raise FileNotFoundError(f"数据文件未找到: {self.data_file}")
+        
+        # 检查目录结构
+        required_dirs = {
+            '输出目录': self.output_dir,
+            '模型目录': self.model_dir,
+            '分析目录': self.analysis_dir,
+            '训练目录': self.train_dir
         }
         
-        missing_files = []
-        for name, path in required_files.items():
+        for name, path in required_dirs.items():
             if not os.path.exists(path):
-                missing_files.append(f"{name}: {path}")
-        
-        if missing_files:
-            raise FileNotFoundError("Required files not found:\n" + "\n".join(missing_files))
+                raise NotADirectoryError(f"{name}不存在: {path}")
+            if not os.access(path, os.W_OK):
+                raise PermissionError(f"没有{name}的写入权限: {path}")
             
     def get_temporal_pattern_path(self, behavior):
         """

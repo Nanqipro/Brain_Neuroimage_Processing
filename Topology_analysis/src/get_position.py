@@ -248,7 +248,7 @@ class PointMarker:
 def main():
     """Main function to run the point marking tool."""
     image_path = '../datasets/Day9_Max.png'
-    output_file = '../datasets/Day9_Max_position.csv'
+    output_file = '../datasets/Day9_1_Max_position.csv'
     
     marker = PointMarker(image_path)
     plt.show(block=True)

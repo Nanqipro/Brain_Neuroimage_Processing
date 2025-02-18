@@ -132,22 +132,46 @@ class StatisticalAnalyzer:
             不同时间窗口的相关性字典
         """
         correlations = {}
-        min_length = float('inf')
         
-        # 首先计算每个窗口的相关性，并找到最短长度
+        # 确保数据有效
+        if len(X) == 0:
+            return correlations
+            
+        # 对每个时间窗口计算相关性
         for window in self.config.analysis_params['correlation_windows']:
+            # 确保窗口大小不超过数据长度
+            if window >= len(X):
+                print(f"Warning: Window size {window} is larger than data length {len(X)}. Skipping.")
+                continue
+                
             window_correlations = []
             for i in range(len(X) - window):
                 window_data = X[i:i+window]
-                corr_matrix = np.corrcoef(window_data.T)
-                window_correlations.append(np.mean(np.abs(corr_matrix)))
-            correlations[window] = window_correlations
-            min_length = min(min_length, len(window_correlations))
-        
-        # 截断所有数组到相同长度
-        for window in correlations:
-            correlations[window] = correlations[window][:min_length]
-        
+                # 计算相关系数矩阵
+                try:
+                    # 移除包含NaN的行
+                    valid_data = window_data[~np.isnan(window_data).any(axis=1)]
+                    if len(valid_data) > 1:  # 确保有足够的数据点
+                        corr_matrix = np.corrcoef(valid_data.T)
+                        # 只取上三角矩阵的值（排除对角线）
+                        upper_triangle = np.triu(corr_matrix, k=1)
+                        # 计算平均相关性（排除0值）
+                        non_zero = upper_triangle[upper_triangle != 0]
+                        if len(non_zero) > 0:
+                            mean_corr = np.mean(np.abs(non_zero))
+                            window_correlations.append(mean_corr)
+                        else:
+                            window_correlations.append(0)
+                    else:
+                        window_correlations.append(0)
+                except Exception as e:
+                    print(f"Warning: Error calculating correlation for window {i}: {str(e)}")
+                    window_correlations.append(0)
+            
+            # 只有在有有效的相关性值时才保存结果
+            if window_correlations:
+                correlations[window] = window_correlations
+            
         return correlations
 
 class ResultSaver:
@@ -182,17 +206,34 @@ class ResultSaver:
         参数:
             correlations: 时间相关性字典
         """
-        # 创建时间索引
-        time_points = range(len(next(iter(correlations.values()))))
+        if not correlations:  # 如果字典为空
+            print("Warning: No temporal correlations to save.")
+            return
+            
+        # 找到最长的时间序列长度
+        max_length = max(len(corr) for corr in correlations.values())
+        
+        # 创建一个填充了NaN的DataFrame
+        data = {}
+        for window, corr_values in correlations.items():
+            # 将较短的序列用NaN填充到相同长度
+            padded_values = corr_values + [np.nan] * (max_length - len(corr_values))
+            data[f'Window_{window}'] = padded_values
         
         # 创建DataFrame
-        corr_df = pd.DataFrame(correlations, index=time_points)
+        corr_df = pd.DataFrame(data)
         corr_df.index.name = 'Time Point'
-        corr_df.columns.name = 'Window Size'
         
         # 保存结果
         output_path = os.path.join(self.config.analysis_dir, 'temporal_correlations.csv')
         corr_df.to_csv(output_path)
+        
+        # 计算并保存每个窗口的平均相关性
+        mean_correlations = {window: np.nanmean(values) for window, values in correlations.items()}
+        mean_df = pd.DataFrame(list(mean_correlations.items()), 
+                             columns=['Window Size', 'Mean Correlation'])
+        mean_output_path = os.path.join(self.config.analysis_dir, 'temporal_correlations_summary.csv')
+        mean_df.to_csv(mean_output_path, index=False)
 
 class NumpyEncoder(json.JSONEncoder):
     """用于numpy类型的特殊JSON编码器"""

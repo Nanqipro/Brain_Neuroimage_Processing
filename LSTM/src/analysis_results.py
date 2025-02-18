@@ -6,8 +6,10 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import os
+
 from kmeans_lstm_analysis import NeuronLSTM, NeuronDataProcessor
 from analysis_config import AnalysisConfig
+
 import torch.nn.functional as F
 
 class ResultAnalyzer:
@@ -75,13 +77,21 @@ class ResultAnalyzer:
         
         # Create correlation heatmap
         behavior_activity_df = pd.DataFrame(behavior_means).T
-        behavior_activity_df.columns = [f'Neuron {i+1}' for i in range(behavior_activity_df.shape[1])]
+        behavior_activity_df.columns = [f'神经元 {i+1}' for i in range(behavior_activity_df.shape[1])]
         
-        plt.figure(figsize=self.config.figure_sizes['correlation'])
-        sns.heatmap(behavior_activity_df, cmap='coolwarm', center=0)
-        plt.title('Mean Correlation between Behaviors and Neural Activity')
-        plt.xlabel('Neurons')
-        plt.ylabel('Behaviors')
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['correlation'])
+        sns.heatmap(behavior_activity_df, 
+                   cmap=self.config.visualization_params['colormaps']['correlation'],
+                   center=0,
+                   annot=True,
+                   fmt='.2f',
+                   annot_kws={'size': 10},
+                   cbar_kws={'label': 'Correlation Coefficient'})
+        plt.title('Average Correlation between Behaviors and Neuron Activities', fontsize=14)
+        plt.xlabel('Neurons', fontsize=12)
+        plt.ylabel('Behaviors', fontsize=12)
+        plt.xticks(fontsize=11)
+        plt.yticks(fontsize=11)
         plt.savefig(self.config.correlation_plot)
         plt.close()
         
@@ -94,7 +104,7 @@ class ResultAnalyzer:
             X_scaled: 标准化后的神经元数据
             y: 行为标签
         """
-        window_size = self.config.temporal_window_size
+        window_size = self.config.analysis_params['temporal_window_size']
         
         for behavior_idx, behavior in enumerate(self.behavior_labels):
             behavior_mask = (y == behavior_idx)
@@ -105,14 +115,16 @@ class ResultAnalyzer:
                 rolling_mean = np.array([np.mean(behavior_data[i:i+window_size], axis=0) 
                                        for i in range(0, len(behavior_data)-window_size, window_size)])
                 
-                plt.figure(figsize=self.config.figure_sizes['temporal'])
+                plt.figure(figsize=self.config.visualization_params['figure_sizes']['temporal'])
                 for neuron in range(min(5, rolling_mean.shape[1])):
-                    plt.plot(rolling_mean[:, neuron], label=f'神经元 {neuron+1}')
+                    plt.plot(rolling_mean[:, neuron], label=f'Neuron {neuron+1}')
                 
-                plt.title(f'Neural Activity Temporal Patterns During {behavior}')
-                plt.xlabel('Time Window')
-                plt.ylabel('Normalized Activity')
-                plt.legend()
+                plt.title(f'Temporal Pattern of Neuron Activity During {behavior}', fontsize=14)
+                plt.xlabel('Time Window', fontsize=12)
+                plt.ylabel('Normalized Activity', fontsize=12)
+                plt.xticks(fontsize=11)
+                plt.yticks(fontsize=11)
+                plt.legend(fontsize=11)
                 plt.savefig(self.config.get_temporal_pattern_path(behavior))
                 plt.close()
     
@@ -133,14 +145,20 @@ class ResultAnalyzer:
         row_sums = transitions.sum(axis=1)
         transitions_norm = transitions / row_sums[:, np.newaxis]
         
-        plt.figure(figsize=self.config.figure_sizes['transitions'])
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['transitions'])
         sns.heatmap(transitions_norm, 
                    xticklabels=self.behavior_labels,
                    yticklabels=self.behavior_labels,
-                   cmap='YlOrRd')
-        plt.title('Behavior Transition Probabilities')
-        plt.xlabel('Target Behavior')
-        plt.ylabel('Starting Behavior')
+                   cmap=self.config.visualization_params['colormaps']['transitions'],
+                   annot=True,
+                   fmt='.2f',
+                   annot_kws={'size': 10},
+                   cbar_kws={'label': 'Transition Probability'})
+        plt.title('Behavior Transition Probability Matrix', fontsize=14)
+        plt.xlabel('Target Behavior', fontsize=12)
+        plt.ylabel('Initial Behavior', fontsize=12)
+        plt.xticks(fontsize=11, rotation=45)
+        plt.yticks(fontsize=11, rotation=0)
         plt.savefig(self.config.transition_plot)
         plt.close()
         
@@ -174,30 +192,43 @@ class ResultAnalyzer:
             effect_size = np.abs(behavior_mean - other_mean) / pooled_std
             
             # Get top neurons
-            top_neurons = np.argsort(effect_size)[-self.config.top_neurons_count:][::-1]
+            top_neurons = np.argsort(effect_size)[-self.config.analysis_params['top_neurons_count']:][::-1]
             behavior_importance[behavior] = {
                 'neurons': top_neurons + 1,  # +1 for 1-based indexing
                 'effect_sizes': effect_size[top_neurons]
             }
         
         # Plot results
-        plt.figure(figsize=self.config.figure_sizes['key_neurons'])
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['key_neurons'])
         x_pos = np.arange(len(behavior_importance))
         width = 0.15
         
-        for i in range(self.config.top_neurons_count):
+        # 创建颜色映射
+        colors = plt.cm.viridis(np.linspace(0, 1, self.config.analysis_params['top_neurons_count']))
+        
+        # 绘制柱状图并添加神经元编号标注
+        for i in range(self.config.analysis_params['top_neurons_count']):
             effect_sizes = [behavior_importance[b]['effect_sizes'][i] for b in self.behavior_labels]
-            plt.bar(x_pos + i*width, effect_sizes, width, label=f'Top {i+1}')
+            neuron_numbers = [behavior_importance[b]['neurons'][i] for b in self.behavior_labels]
+            bars = plt.bar(x_pos + i*width, effect_sizes, width, 
+                         color=colors[i], label=f'Top {i+1}')
+            
+            # 在每个柱子上方添加神经元编号
+            for idx, (rect, neuron_num) in enumerate(zip(bars, neuron_numbers)):
+                height = rect.get_height()
+                plt.text(rect.get_x() + rect.get_width()/2., height,
+                        f'N{neuron_num}',
+                        ha='center', va='bottom', rotation=45,
+                        fontsize=10)
         
-        plt.xlabel('Behavior')
-        plt.ylabel('Effect Size')
-        plt.title('Key Neurons for Each Behavior')
-        plt.xticks(x_pos + width*2, self.behavior_labels, rotation=45)
-        plt.legend()
+        plt.xlabel('Behavior', fontsize=12)
+        plt.ylabel('Effect Size', fontsize=12)
+        plt.title('Key Neurons for Each Behavior', fontsize=14)
+        plt.xticks(x_pos + width*2, self.behavior_labels, rotation=45, fontsize=11)
+        plt.legend(fontsize=11)
         plt.tight_layout()
-        plt.savefig(self.config.key_neurons_plot)
+        plt.savefig(self.config.key_neurons_plot, dpi=300, bbox_inches='tight')
         plt.close()
-        
         return behavior_importance
 
 def main():

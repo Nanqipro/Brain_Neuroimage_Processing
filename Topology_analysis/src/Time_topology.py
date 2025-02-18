@@ -11,6 +11,10 @@ import itertools
 from tqdm import tqdm
 import warnings
 import plotly.io as pio
+import matplotlib.pyplot as plt
+import os
+from pathlib import Path
+import imageio
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -496,11 +500,133 @@ def create_frame_traces(frames_data, k):
         )
     ]
 
+def create_gif(frames_data, output_path: str, fps: int = 10) -> None:
+    """
+    Generate GIF animation directly from frame data.
+    
+    Args:
+        frames_data (dict): Dictionary containing all frame data
+        output_path (str): Path to save the GIF file
+        fps (int): Frames per second, default is 10
+    """
+    print("Generating GIF animation...")
+    
+    # Create temporary directory for frame images
+    temp_dir = "temp_frames"
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Set fixed figure size and DPI
+    fig = plt.figure(figsize=(12, 8), dpi=100)
+    
+    # Calculate fixed margins to ensure consistent frame size
+    left_margin = 0.1
+    right_margin = 0.9
+    bottom_margin = 0.15  # Larger bottom margin for behavior timeline
+    top_margin = 0.9
+    
+    # Calculate behavior intervals only once
+    behavior_changes = []
+    current_behavior = frames_data['behaviors'][0]
+    start_idx = 0
+    for i in range(1, len(frames_data['behaviors'])):
+        if frames_data['behaviors'][i] != current_behavior:
+            behavior_changes.append((start_idx, i, current_behavior))
+            current_behavior = frames_data['behaviors'][i]
+            start_idx = i
+    behavior_changes.append((start_idx, len(frames_data['behaviors']), current_behavior))
+    
+    # Generate each frame
+    frame_files = []
+    for k in tqdm(range(len(frames_data['node_x'])), desc="Generating frames"):
+        plt.clf()  # Clear current figure
+        
+        # Create main axes with fixed position
+        ax_main = plt.axes([left_margin, bottom_margin, right_margin-left_margin, top_margin-bottom_margin])
+        
+        # Draw edges
+        if frames_data['edge_x'][k]:
+            edge_x = frames_data['edge_x'][k]
+            edge_y = frames_data['edge_y'][k]
+            ax_main.plot(edge_x, edge_y, color='black', linewidth=2, zorder=1)
+        
+        # Draw nodes
+        ax_main.scatter(frames_data['node_x'][k], 
+                       frames_data['node_y'][k],
+                       c=frames_data['node_color'][k],
+                       s=300,  # Node size
+                       zorder=2)
+        
+        # Add node labels
+        for i, txt in enumerate(frames_data['node_text'][k]):
+            ax_main.annotate(txt, 
+                           (frames_data['node_x'][k][i], frames_data['node_y'][k][i]),
+                           textcoords="offset points",
+                           xytext=(0, 0),
+                           ha='center',
+                           va='center',
+                           fontsize=8)
+        
+        # Set title and behavior label
+        # Convert Chinese title to English
+        title = frames_data['titles'][k].replace("神经元拓扑结构图 - 时间:", "Neuron Topology - Time:")
+        ax_main.set_title(title)
+        ax_main.text(0.02, 0.98, f"Current Behavior: {frames_data['behaviors'][k]}",
+                    transform=ax_main.transAxes,
+                    fontsize=10,
+                    verticalalignment='top')
+        
+        # Set axes limits
+        ax_main.set_xlim(-1.2, 1.2)
+        ax_main.set_ylim(-1.2, 1.2)
+        ax_main.axis('off')
+        
+        # Create behavior timeline axes with fixed position
+        ax_behavior = plt.axes([left_margin, 0.05, right_margin-left_margin, 0.02])
+        ax_behavior.set_xlim(0, len(frames_data['behaviors']))
+        ax_behavior.set_ylim(0, 1)
+        ax_behavior.axis('off')
+        
+        # Draw timeline base
+        ax_behavior.plot([0, len(frames_data['behaviors'])], [0.5, 0.5], 'k-', linewidth=1)
+        
+        # Mark current time point
+        ax_behavior.plot([k, k], [0.3, 0.7], 'r-', linewidth=2)
+        
+        # Add behavior interval markers
+        for start, end, behavior in behavior_changes:
+            # Draw interval separator
+            if start > 0:
+                ax_behavior.plot([start, start], [0.3, 0.7], 'k-', linewidth=1)
+            # Add behavior label
+            ax_behavior.text((start + end) / 2, 0.2 if (start//100)%2 == 0 else 0.8,
+                           behavior,
+                           ha='center',
+                           va='center',
+                           fontsize=8)
+        
+        # Save current frame with fixed size
+        frame_path = os.path.join(temp_dir, f"frame_{k:04d}.png")
+        plt.savefig(frame_path, bbox_inches=None, pad_inches=0)
+        frame_files.append(frame_path)
+    
+    # Read all frames and create GIF
+    frames = [imageio.imread(f) for f in frame_files]
+    imageio.mimsave(output_path, frames, fps=fps)
+    
+    # Clean up temporary files
+    for f in frame_files:
+        os.remove(f)
+    os.rmdir(temp_dir)
+    
+    plt.close()  # Close figure
+    print(f"GIF animation saved to: {output_path}")
+
 def main():
     """Main function to run the neuron topology analysis."""
     # Load data
-    data_path = '../datasets/Day6_with_behavior_labels_filled.xlsx'
-    neuron_data, neuron_ids = load_neuron_data(data_path)
+    base_dir = Path(__file__).parent.parent
+    data_path = base_dir / 'datasets/Day6_with_behavior_labels_filled.xlsx'
+    neuron_data, neuron_ids = load_neuron_data(str(data_path))
     
     # Calculate threshold and create layout
     threshold = calculate_threshold(neuron_data[neuron_ids], method='mean')
@@ -509,9 +635,14 @@ def main():
     # Process frame data
     frames_data = process_frame_data(neuron_data, neuron_ids, threshold, pos)
     
-    # Create and save animation
-    output_path = '../graph/Day6_Time_Topology.html'
-    create_animation(frames_data, output_path)
+    # Create and save HTML animation
+    output_html_path = base_dir / 'graph/Day6_Time_Topology.html'
+    create_animation(frames_data, str(output_html_path))
+    print(f"HTML animation saved to: {output_html_path}")
+    
+    # Create and save GIF animation
+    output_gif_path = base_dir / 'graph/Day6_Time_Topology.gif'
+    create_gif(frames_data, str(output_gif_path), fps=5)  # Use lower fps for easier observation
 
 if __name__ == "__main__":
     main()

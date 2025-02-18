@@ -27,8 +27,8 @@ from datetime import datetime
 # File path configuration
 DATA_DIR = '../datasets'  # Data directory path
 RESULT_DIR = '../result'  # Results directory path
-TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day9_topology_matrix_plus.xlsx')  # Topology matrix file
-BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day9_with_behavior_labels_filled.xlsx')  # Behavior labels file
+TOPOLOGY_FILE = os.path.join(DATA_DIR, 'Day6_topology_matrix_plus.xlsx')  # Topology matrix file
+BEHAVIOR_FILE = os.path.join(DATA_DIR, 'Day6_with_behavior_labels_filled.xlsx')  # Behavior labels file
 
 def setup_logging(algorithm_names: Union[str, List[str]]) -> str:
     """

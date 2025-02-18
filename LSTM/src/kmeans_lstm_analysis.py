@@ -12,87 +12,8 @@ from torch.utils.data import Dataset, DataLoader
 import warnings
 import os
 import datetime
+from analysis_config import AnalysisConfig
 warnings.filterwarnings('ignore')
-
-# Path Configuration
-class Config:
-    def __init__(self):
-        # Base directory
-        self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        # Data paths
-        self.data_dir = os.path.join(self.base_dir, 'datasets')
-        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')
-        
-        # Output paths
-        self.output_dir = os.path.join(self.base_dir, 'results')
-        self.model_dir = os.path.join(self.base_dir, 'models')
-        
-        # Result files
-        self.loss_plot = os.path.join(self.output_dir, 'training_loss.png')
-        self.cluster_plot = os.path.join(self.output_dir, 'cluster_visualization.png')
-        self.model_path = os.path.join(self.model_dir, 'neuron_lstm_model.pth')
-        self.accuracy_plot = os.path.join(self.output_dir, 'accuracy_curves.png')  # 准确率曲线图
-        self.metrics_log = os.path.join(self.output_dir, 'training_metrics.csv')   # 训练指标日志
-        
-        # Model parameters
-        self.sequence_length = 10    # LSTM输入序列的长度
-        self.hidden_size = 256        # 增加隐藏层大小
-        self.num_layers = 3           # 增加LSTM层数
-        self.batch_size = 64          # 增加批次大小
-        self.learning_rate = 0.001    # 保持不变
-        self.num_epochs = 100         # 增加训练轮数
-        self.n_clusters = 5           # 保持不变
-        self.test_size = 0.2          # 保持不变
-        self.random_seed = 42         # 保持不变
-        
-    def setup_directories(self):
-        """
-        创建必要的目录结构并验证权限
-        包括:
-        - 输出目录(output_dir)
-        - 模型保存目录(model_dir)
-        """
-        try:
-            # 创建输出目录
-            os.makedirs(self.output_dir, exist_ok=True)
-            os.makedirs(self.model_dir, exist_ok=True)
-            
-            # 验证目录是否可写
-            test_file_path = os.path.join(self.model_dir, 'test_write.tmp')
-            try:
-                with open(test_file_path, 'w') as f:
-                    f.write('test')
-                os.remove(test_file_path)
-            except Exception as e:
-                raise PermissionError(f"无法在模型目录写入文件: {str(e)}")
-            
-        except Exception as e:
-            raise RuntimeError(f"创建目录结构失败: {str(e)}")
-
-    def validate_paths(self):
-        """
-        验证所需文件和目录是否存在
-        检查:
-        - 数据文件是否存在
-        - 目录结构是否正确
-        - 文件权限是否正确
-        """
-        # 检查数据文件
-        if not os.path.exists(self.data_file):
-            raise FileNotFoundError(f"数据文件未找到: {self.data_file}")
-        
-        # 检查目录结构
-        required_dirs = {
-            '输出目录': self.output_dir,
-            '模型目录': self.model_dir
-        }
-        
-        for name, path in required_dirs.items():
-            if not os.path.exists(path):
-                raise NotADirectoryError(f"{name}不存在: {path}")
-            if not os.access(path, os.W_OK):
-                raise PermissionError(f"没有{name}的写入权限: {path}")
 
 # Set random seed
 def set_random_seed(seed):
@@ -302,7 +223,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
             loss.backward()
             
             # 梯度裁剪，防止梯度爆炸
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), config.analysis_params['gradient_clip_norm'])
             
             optimizer.step()
             
@@ -353,7 +274,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
             except Exception as e:
                 print(f"保存模型时出错: {str(e)}")
                 # 继续训练，但记录错误
-                with open(os.path.join(config.output_dir, 'error_log.txt'), 'a') as f:
+                with open(config.error_log, 'a') as f:
                     f.write(f"Epoch {epoch+1}: 保存模型失败 - {str(e)}\n")
         
         # 记录指标
@@ -379,28 +300,27 @@ def plot_training_metrics(metrics, config):
     绘制训练和验证指标的变化曲线
     包括损失值和准确率
     """
-    plt.figure(figsize=(15, 5))
+    plt.figure(figsize=config.visualization_params['figure_sizes']['metrics'])
     
     # 绘制损失曲线
     plt.subplot(1, 2, 1)
-    plt.plot(metrics['train_losses'], label='Training Loss')
-    plt.plot(metrics['val_losses'], label='Validation Loss')
-    plt.title('Loss Curve')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
+    plt.plot(metrics['train_losses'], label='Training Loss', linewidth=config.visualization_params['line_width'])
+    plt.plot(metrics['val_losses'], label='Validation Loss', linewidth=config.visualization_params['line_width'])
+    plt.title('Loss Curves', fontsize=config.visualization_params['font_size'])
+    plt.xlabel('Epochs', fontsize=config.visualization_params['font_size'])
+    plt.ylabel('Loss', fontsize=config.visualization_params['font_size'])
+    plt.legend(fontsize=config.visualization_params['font_size'])
     
-    # Plot accuracy curves
+    # 绘制准确率曲线
     plt.subplot(1, 2, 2)
-    plt.plot(metrics['train_accuracies'], label='Training Accuracy')
-    plt.plot(metrics['val_accuracies'], label='Validation Accuracy')
-    plt.title('Accuracy Curve')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy (%)')
-    plt.legend()
-    
+    plt.plot(metrics['train_accuracies'], label='Training Accuracy', linewidth=config.visualization_params['line_width'])
+    plt.plot(metrics['val_accuracies'], label='Validation Accuracy', linewidth=config.visualization_params['line_width'])
+    plt.title('Accuracy Curves', fontsize=config.visualization_params['font_size'])
+    plt.xlabel('Epochs', fontsize=config.visualization_params['font_size'])
+    plt.ylabel('Accuracy (%)', fontsize=config.visualization_params['font_size'])
+    plt.legend(fontsize=config.visualization_params['font_size'])
     plt.tight_layout()
-    plt.savefig(config.accuracy_plot)
+    plt.savefig(config.accuracy_plot, dpi=config.visualization_params['dpi'], format=config.visualization_params['save_format'])
     plt.close()
 
 def main():
@@ -415,7 +335,7 @@ def main():
     config = None
     try:
         # 初始化配置
-        config = Config()
+        config = AnalysisConfig()
         
         # 验证和创建目录
         print("正在验证目录结构...")
@@ -470,7 +390,7 @@ def main():
         optimizer = torch.optim.AdamW(
             model.parameters(),
             lr=config.learning_rate,
-            weight_decay=0.01
+            weight_decay=config.analysis_params['weight_decay']
         )
         
         print("\n开始训练模型...")
@@ -492,6 +412,7 @@ def main():
         print(f"训练指标曲线: {config.accuracy_plot}")
         print(f"训练日志: {config.metrics_log}")
         print(f"最佳验证集准确率: {metrics['best_val_acc']:.2f}%")
+        print(f"所有训练相关文件已保存到: {config.train_dir}")
         
     except FileNotFoundError as e:
         print(f"文件未找到: {str(e)}")
@@ -503,13 +424,12 @@ def main():
         print(f"发生未预期的错误: {str(e)}")
         if config:
             # 保存错误日志
-            error_log_path = os.path.join(config.output_dir, 'error_log.txt')
             try:
-                with open(error_log_path, 'a') as f:
+                with open(config.error_log, 'a') as f:
                     f.write(f"\n{'-'*50}\n")
                     f.write(f"时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                     f.write(f"错误: {str(e)}\n")
-                print(f"错误日志已保存到: {error_log_path}")
+                print(f"错误日志已保存到: {config.error_log}")
             except:
                 print("无法保存错误日志")
 

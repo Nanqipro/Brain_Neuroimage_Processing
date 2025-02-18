@@ -13,10 +13,19 @@ class VisualizationManager:
         sns.set_style("whitegrid")
         # 设置 matplotlib 的基本样式
         plt.style.use('default')
+        # 设置全局字体大小
+        plt.rcParams.update({
+            'font.size': 20,  # 基础字体大小
+            'axes.titlesize': 18,  # 标题字体大小
+            'axes.labelsize': 18,  # 轴标签字体大小
+            'xtick.labelsize': 18,  # x轴刻度标签字体大小
+            'ytick.labelsize': 18,  # y轴刻度标签字体大小
+            'legend.fontsize': 18,  # 图例字体大小
+            'figure.titlesize': 18  # 图形标题字体大小
+        })
         
     def set_plot_style(self):
         """设置全局绘图样式"""
-        plt.rcParams['font.size'] = self.config.visualization_params['font_size']
         plt.rcParams['lines.linewidth'] = self.config.visualization_params['line_width']
         
     def plot_behavior_neuron_correlation(self, behavior_activity_df):
@@ -85,8 +94,7 @@ class VisualizationManager:
                    xticklabels=behavior_labels,
                    yticklabels=behavior_labels,
                    cmap=self.config.visualization_params['colormaps']['transitions'],
-                   annot=True,
-                   fmt='.2f',
+                   annot=False,
                    cbar_kws={'label': 'Transition Probability'})
         plt.title('Behavior Transition Probabilities')
         plt.xlabel('To Behavior')
@@ -95,7 +103,6 @@ class VisualizationManager:
         plt.savefig(self.config.transition_plot,
                    dpi=self.config.visualization_params['dpi'])
         plt.close()
-    
     def plot_neuron_network(self, behavior_importance):
         """绘制行为-神经元网络关系图
         
@@ -134,7 +141,7 @@ class VisualizationManager:
         nx.draw_networkx_edges(G, pos, width=weights, alpha=0.5)
         
         # 添加标签
-        nx.draw_networkx_labels(G, pos, font_size=8)
+        nx.draw_networkx_labels(G, pos, font_size=20)
         
         plt.title('Behavior-Neuron Interaction Network')
         plt.axis('off')
@@ -199,5 +206,45 @@ class VisualizationManager:
         
         plt.tight_layout()
         plt.savefig(os.path.join(self.config.analysis_dir, 'statistical_summary.png'),
+                   dpi=self.config.visualization_params['dpi'])
+        plt.close()
+    
+    def plot_significant_neurons_effect_sizes(self, sorted_neurons, sorted_effects):
+        """绘制显著性神经元的效应量柱状图
+        
+        参数:
+            sorted_neurons: 按效应量排序的神经元编号列表
+            sorted_effects: 对应的效应量列表
+        """
+        # 创建图形和轴对象
+        fig, ax = plt.subplots(figsize=(15, 8))
+        
+        # 创建柱状图
+        bars = ax.bar(range(len(sorted_neurons)), sorted_effects)
+        
+        # 设置柱状图颜色，根据效应量大小渐变
+        norm = plt.Normalize(min(sorted_effects), max(sorted_effects))
+        colors = plt.cm.viridis(norm(sorted_effects))
+        for bar, color in zip(bars, colors):
+            bar.set_color(color)
+        
+        # 添加数值标签
+        for i, v in enumerate(sorted_effects):
+            ax.text(i, v, f'N{sorted_neurons[i]}', 
+                   ha='center', va='bottom', fontsize=8)
+        
+        # 设置标题和标签
+        ax.set_title('Distribution of Mean Effect Sizes for Significant Neurons')
+        ax.set_xlabel('Neuron Ranking')
+        ax.set_ylabel('Mean Effect Size')
+        ax.grid(True, alpha=0.3)
+        ax.set_xticks([])  # 隐藏x轴刻度，因为我们已经在柱子上标注了神经元编号
+        
+        # 添加颜色条
+        sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis, norm=norm)
+        plt.colorbar(sm, ax=ax, label='Effect Size Magnitude')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.config.analysis_dir, 'significant_neurons_effect_sizes.png'),
                    dpi=self.config.visualization_params['dpi'])
         plt.close() 
