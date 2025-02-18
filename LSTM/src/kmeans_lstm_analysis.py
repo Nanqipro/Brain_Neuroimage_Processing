@@ -11,6 +11,7 @@ import seaborn as sns
 from torch.utils.data import Dataset, DataLoader
 import warnings
 import os
+import datetime
 warnings.filterwarnings('ignore')
 
 # Path Configuration
@@ -31,40 +32,85 @@ class Config:
         self.loss_plot = os.path.join(self.output_dir, 'training_loss.png')
         self.cluster_plot = os.path.join(self.output_dir, 'cluster_visualization.png')
         self.model_path = os.path.join(self.model_dir, 'neuron_lstm_model.pth')
+        self.accuracy_plot = os.path.join(self.output_dir, 'accuracy_curves.png')  # 准确率曲线图
+        self.metrics_log = os.path.join(self.output_dir, 'training_metrics.csv')   # 训练指标日志
         
         # Model parameters
-        self.sequence_length = 10
-        self.hidden_size = 128
-        self.num_layers = 2
-        self.batch_size = 32
-        self.learning_rate = 0.001
-        self.num_epochs = 50
-        self.n_clusters = 5
-        self.test_size = 0.2
-        self.random_seed = 42
+        self.sequence_length = 10    # LSTM输入序列的长度
+        self.hidden_size = 256        # 增加隐藏层大小
+        self.num_layers = 3           # 增加LSTM层数
+        self.batch_size = 64          # 增加批次大小
+        self.learning_rate = 0.001    # 保持不变
+        self.num_epochs = 100         # 增加训练轮数
+        self.n_clusters = 5           # 保持不变
+        self.test_size = 0.2          # 保持不变
+        self.random_seed = 42         # 保持不变
         
     def setup_directories(self):
-        """Create necessary directories"""
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.model_dir, exist_ok=True)
-        
+        """
+        创建必要的目录结构并验证权限
+        包括:
+        - 输出目录(output_dir)
+        - 模型保存目录(model_dir)
+        """
+        try:
+            # 创建输出目录
+            os.makedirs(self.output_dir, exist_ok=True)
+            os.makedirs(self.model_dir, exist_ok=True)
+            
+            # 验证目录是否可写
+            test_file_path = os.path.join(self.model_dir, 'test_write.tmp')
+            try:
+                with open(test_file_path, 'w') as f:
+                    f.write('test')
+                os.remove(test_file_path)
+            except Exception as e:
+                raise PermissionError(f"无法在模型目录写入文件: {str(e)}")
+            
+        except Exception as e:
+            raise RuntimeError(f"创建目录结构失败: {str(e)}")
+
     def validate_paths(self):
-        """Validate required files and directories"""
+        """
+        验证所需文件和目录是否存在
+        检查:
+        - 数据文件是否存在
+        - 目录结构是否正确
+        - 文件权限是否正确
+        """
+        # 检查数据文件
         if not os.path.exists(self.data_file):
-            raise FileNotFoundError(f"Data file not found: {self.data_file}")
+            raise FileNotFoundError(f"数据文件未找到: {self.data_file}")
+        
+        # 检查目录结构
+        required_dirs = {
+            '输出目录': self.output_dir,
+            '模型目录': self.model_dir
+        }
+        
+        for name, path in required_dirs.items():
+            if not os.path.exists(path):
+                raise NotADirectoryError(f"{name}不存在: {path}")
+            if not os.access(path, os.W_OK):
+                raise PermissionError(f"没有{name}的写入权限: {path}")
 
 # Set random seed
 def set_random_seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-# Data loading and preprocessing class
+# 数据加载和预处理类
 class NeuronDataProcessor:
     def __init__(self, config):
+        """
+        初始化神经元数据处理器
+        参数:
+            config: 配置对象,包含数据文件路径等参数
+        """
         self.config = config
         self.data = pd.read_excel(config.data_file)
-        self.scaler = StandardScaler()
-        self.label_encoder = LabelEncoder()
+        self.scaler = StandardScaler()  # 用于数据标准化
+        self.label_encoder = LabelEncoder()  # 用于行为标签编码
         
     def preprocess_data(self):
         """
@@ -114,18 +160,18 @@ class NeuronDataProcessor:
         return X_scaled, y
 
     def apply_kmeans(self, X):
-        # Apply K-means clustering
-        print(f"\nApplying K-means clustering with {self.config.n_clusters} clusters")
+        # 应用K-means聚类
+        print(f"\n使用 {self.config.n_clusters} 个聚类进行K-means聚类")
         kmeans = KMeans(n_clusters=self.config.n_clusters, 
                        random_state=self.config.random_seed,
                        n_init=10)
         cluster_labels = kmeans.fit_predict(X)
         
-        # Print cluster distribution
+        # 打印聚类分布情况
         unique_labels, counts = np.unique(cluster_labels, return_counts=True)
-        print("\nCluster distribution:")
+        print("\n聚类分布:")
         for label, count in zip(unique_labels, counts):
-            print(f"Cluster {label}: {count} samples")
+            print(f"聚类 {label}: {count} 个样本")
         
         return kmeans, cluster_labels
 
@@ -153,39 +199,100 @@ class NeuronDataset(Dataset):
 class NeuronLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
         """
+        增强版LSTM模型
         参数：
-        input_size: 输入特征维度
-        hidden_size: LSTM隐藏层大小
-        num_layers: LSTM层数
-        num_classes: 输出类别数
+            input_size: 输入特征维度
+            hidden_size: LSTM隐藏层大小
+            num_layers: LSTM层数
+            num_classes: 输出类别数
+        结构：
+            1. 多层双向LSTM
+            2. 批标准化层
+            3. Dropout层
+            4. 多层全连接网络
         """
         super(NeuronLSTM, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, num_classes)
+        
+        # 双向LSTM层
+        self.lstm = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=True,  # 使用双向LSTM
+            dropout=0.2 if num_layers > 1 else 0  # 当层数大于1时添加dropout
+        )
+        
+        # 批标准化层
+        self.batch_norm = nn.BatchNorm1d(hidden_size * 2)  # *2是因为双向LSTM
+        
+        # 多层全连接网络
+        self.fc_layers = nn.Sequential(
+            nn.Linear(hidden_size * 2, hidden_size),  # 第一个全连接层
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.BatchNorm1d(hidden_size),
+            nn.Linear(hidden_size, hidden_size // 2),  # 第二个全连接层
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.BatchNorm1d(hidden_size // 2),
+            nn.Linear(hidden_size // 2, num_classes)  # 输出层
+        )
         
     def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        # 初始化隐藏状态和细胞状态
+        h0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)  # *2是因为双向LSTM
+        c0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)
+        
+        # LSTM前向传播
         out, _ = self.lstm(x, (h0, c0))
-        out = self.fc(out[:, -1, :])
+        
+        # 只使用最后一个时间步的输出
+        out = out[:, -1, :]
+        
+        # 批标准化
+        out = self.batch_norm(out)
+        
+        # 通过全连接层
+        out = self.fc_layers(out)
+        
         return out
 
 # Training function
-def train_model(model, train_loader, criterion, optimizer, device, num_epochs, config):
+def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs, config):
     """
-    模型训练函数：
+    增强版模型训练函数：
     1. 设置模型为训练模式
     2. 按批次训练数据
-    3. 计算损失并反向传播
-    4. 记录训练损失
+    3. 计算损失和准确率
+    4. 在验证集上评估
+    5. 记录所有指标
     """
     model.train()
     train_losses = []
+    train_accuracies = []
+    val_losses = []
+    val_accuracies = []
+    best_val_acc = 0.0
+    
+    # 创建学习率调度器
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='max', factor=0.5, patience=5, verbose=True
+    )
+    
+    # 创建指标日志文件
+    with open(config.metrics_log, 'w') as f:
+        f.write('epoch,train_loss,train_acc,val_loss,val_acc\n')
     
     for epoch in range(num_epochs):
+        # 训练阶段
+        model.train()
         total_loss = 0
+        correct = 0
+        total = 0
+        
         for batch_X, batch_y in train_loader:
             batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             
@@ -193,47 +300,107 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs, c
             outputs = model(batch_X)
             loss = criterion(outputs, batch_y)
             loss.backward()
+            
+            # 梯度裁剪，防止梯度爆炸
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
             optimizer.step()
             
             total_loss += loss.item()
-            
-        avg_loss = total_loss / len(train_loader)
-        train_losses.append(avg_loss)
+            _, predicted = torch.max(outputs.data, 1)
+            total += batch_y.size(0)
+            correct += (predicted == batch_y).sum().item()
         
-        if (epoch + 1) % 10 == 0:
-            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}')
-            
-    return train_losses
-
-def plot_training_loss(train_losses, config):
-    """
-    绘制训练损失曲线：
-    展示模型训练过程中损失值的变化趋势
-    """
-    plt.figure(figsize=(10, 6))
-    plt.plot(train_losses)
-    plt.title('Training Loss Over Time')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.savefig(config.loss_plot)
-    plt.close()
-
-def plot_clusters(X_scaled, cluster_labels, config):
-    """
-    绘制聚类结果可视化图：
-    1. 使用PCA降维到2维
-    2. 绘制散点图显示聚类结果
-    """
-    pca = PCA(n_components=2)
-    X_pca = pca.fit_transform(X_scaled)
+        avg_train_loss = total_loss / len(train_loader)
+        train_accuracy = 100 * correct / total
+        train_losses.append(avg_train_loss)
+        train_accuracies.append(train_accuracy)
+        
+        # 验证阶段
+        model.eval()
+        val_loss = 0
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():
+            for batch_X, batch_y in val_loader:
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                outputs = model(batch_X)
+                loss = criterion(outputs, batch_y)
+                
+                val_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                total += batch_y.size(0)
+                correct += (predicted == batch_y).sum().item()
+        
+        avg_val_loss = val_loss / len(val_loader)
+        val_accuracy = 100 * correct / total
+        val_losses.append(avg_val_loss)
+        val_accuracies.append(val_accuracy)
+        
+        # 更新学习率
+        scheduler.step(val_accuracy)
+        
+        # 修改保存模型的部分
+        if val_accuracy > best_val_acc:
+            best_val_acc = val_accuracy
+            try:
+                # 确保模型目录存在
+                os.makedirs(os.path.dirname(config.model_path), exist_ok=True)
+                # 保存模型
+                torch.save(model.state_dict(), config.model_path)
+                print(f"模型已保存到: {config.model_path}")
+            except Exception as e:
+                print(f"保存模型时出错: {str(e)}")
+                # 继续训练，但记录错误
+                with open(os.path.join(config.output_dir, 'error_log.txt'), 'a') as f:
+                    f.write(f"Epoch {epoch+1}: 保存模型失败 - {str(e)}\n")
+        
+        # 记录指标
+        with open(config.metrics_log, 'a') as f:
+            f.write(f'{epoch+1},{avg_train_loss:.4f},{train_accuracy:.2f},{avg_val_loss:.4f},{val_accuracy:.2f}\n')
+        
+        # 打印训练信息
+        if (epoch + 1) % 5 == 0:
+            print(f'Epoch [{epoch+1}/{num_epochs}]:')
+            print(f'  Training Loss: {avg_train_loss:.4f}, Accuracy: {train_accuracy:.2f}%')
+            print(f'  Validation Loss: {avg_val_loss:.4f}, Accuracy: {val_accuracy:.2f}%')
     
-    plt.figure(figsize=(10, 8))
-    scatter = plt.scatter(X_pca[:, 0], X_pca[:, 1], c=cluster_labels, cmap='viridis')
-    plt.title('Neuron Activity Clusters')
-    plt.xlabel('First Principal Component')
-    plt.ylabel('Second Principal Component')
-    plt.colorbar(scatter)
-    plt.savefig(config.cluster_plot)
+    return {
+        'train_losses': train_losses,
+        'train_accuracies': train_accuracies,
+        'val_losses': val_losses,
+        'val_accuracies': val_accuracies,
+        'best_val_acc': best_val_acc
+    }
+
+def plot_training_metrics(metrics, config):
+    """
+    绘制训练和验证指标的变化曲线
+    包括损失值和准确率
+    """
+    plt.figure(figsize=(15, 5))
+    
+    # 绘制损失曲线
+    plt.subplot(1, 2, 1)
+    plt.plot(metrics['train_losses'], label='Training Loss')
+    plt.plot(metrics['val_losses'], label='Validation Loss')
+    plt.title('Loss Curve')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    
+    # Plot accuracy curves
+    plt.subplot(1, 2, 2)
+    plt.plot(metrics['train_accuracies'], label='Training Accuracy')
+    plt.plot(metrics['val_accuracies'], label='Validation Accuracy')
+    plt.title('Accuracy Curve')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy (%)')
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.savefig(config.accuracy_plot)
     plt.close()
 
 def main():
@@ -245,42 +412,51 @@ def main():
     4. 训练LSTM模型
     5. 保存结果和可视化
     """
-    # Initialize configuration
-    config = Config()
-    
+    config = None
     try:
-        # Validate and create necessary directories
+        # 初始化配置
+        config = Config()
+        
+        # 验证和创建目录
+        print("正在验证目录结构...")
         config.validate_paths()
         config.setup_directories()
         
-        # Set random seed
+        print("正在设置随机种子...")
         set_random_seed(config.random_seed)
         
-        # Data preprocessing
+        print("正在进行数据预处理...")
         processor = NeuronDataProcessor(config)
         X_scaled, y = processor.preprocess_data()
         
-        # Apply K-means clustering
+        print("正在应用K-means聚类...")
         kmeans, cluster_labels = processor.apply_kmeans(X_scaled)
         
-        # Add clustering results to features
+        print("正在准备训练数据...")
         X_with_clusters = np.column_stack((X_scaled, cluster_labels))
-        
-        # Split training and test sets
         X_train, X_test, y_train, y_test = train_test_split(
             X_with_clusters, y, test_size=config.test_size, random_state=config.random_seed
         )
         
-        # Create data loader
+        # 创建数据加载器
         train_dataset = NeuronDataset(X_train, y_train, config.sequence_length)
+        val_dataset = NeuronDataset(X_test, y_test, config.sequence_length)
+        
         train_loader = DataLoader(
             train_dataset, 
             batch_size=config.batch_size, 
             shuffle=True
         )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            shuffle=False
+        )
         
-        # Initialize model
+        print("正在初始化模型...")
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"使用设备: {device}")
+        
         input_size = X_with_clusters.shape[1]
         num_classes = len(np.unique(y))
         model = NeuronLSTM(
@@ -290,14 +466,18 @@ def main():
             num_classes
         ).to(device)
         
-        # Define loss function and optimizer
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=config.learning_rate,
+            weight_decay=0.01
+        )
         
-        # Train model
-        train_losses = train_model(
+        print("\n开始训练模型...")
+        metrics = train_model(
             model, 
-            train_loader, 
+            train_loader,
+            val_loader, 
             criterion, 
             optimizer, 
             device, 
@@ -305,22 +485,33 @@ def main():
             config
         )
         
-        # Plot training loss
-        plot_training_loss(train_losses, config)
+        print("\n正在保存训练指标...")
+        plot_training_metrics(metrics, config)
         
-        # Save model
-        torch.save(model.state_dict(), config.model_path)
+        print("\n训练完成！结果已保存：")
+        print(f"训练指标曲线: {config.accuracy_plot}")
+        print(f"训练日志: {config.metrics_log}")
+        print(f"最佳验证集准确率: {metrics['best_val_acc']:.2f}%")
         
-        # Visualize clustering results
-        plot_clusters(X_scaled, cluster_labels, config)
-        
-        print("Analysis completed! Results saved to:")
-        print(f"Training loss plot: {config.loss_plot}")
-        print(f"Cluster visualization: {config.cluster_plot}")
-        print(f"Model file: {config.model_path}")
-        
+    except FileNotFoundError as e:
+        print(f"文件未找到: {str(e)}")
+    except PermissionError as e:
+        print(f"权限错误: {str(e)}")
+    except RuntimeError as e:
+        print(f"运行时错误: {str(e)}")
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
+        print(f"发生未预期的错误: {str(e)}")
+        if config:
+            # 保存错误日志
+            error_log_path = os.path.join(config.output_dir, 'error_log.txt')
+            try:
+                with open(error_log_path, 'a') as f:
+                    f.write(f"\n{'-'*50}\n")
+                    f.write(f"时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"错误: {str(e)}\n")
+                print(f"错误日志已保存到: {error_log_path}")
+            except:
+                print("无法保存错误日志")
 
 if __name__ == "__main__":
     main() 
