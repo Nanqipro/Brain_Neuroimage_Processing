@@ -15,7 +15,7 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'Day9_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -24,7 +24,7 @@ class AnalysisConfig:
         self.train_dir = os.path.join(self.output_dir, 'train')   # 训练结果目录
         
         # 模型文件路径
-        self.model_path = os.path.join(self.model_dir, 'neuron_lstm_model_9.pth')  # 训练好的模型文件路径
+        self.model_path = os.path.join(self.model_dir, 'neuron_lstm_model_6.pth')  # 训练好的模型文件路径
         
         # 训练结果文件路径配置
         self.loss_plot = os.path.join(self.train_dir, 'training_loss.png')  # 训练损失曲线图
