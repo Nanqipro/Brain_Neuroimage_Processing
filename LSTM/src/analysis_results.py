@@ -413,6 +413,7 @@ class ResultAnalyzer:
             behavior_importance: 每种行为的关键神经元及其重要性
         """
         behavior_importance = {}
+        effect_size_data = []  # 用于存储所有效应量数据
         
         for behavior_idx, behavior in enumerate(self.behavior_labels):
             behavior_mask = (y == behavior_idx)
@@ -428,12 +429,48 @@ class ResultAnalyzer:
             pooled_std = np.sqrt((behavior_std**2 + other_std**2) / 2)
             effect_size = np.abs(behavior_mean - other_mean) / pooled_std
             
-            # Get top neurons
-            top_neurons = np.argsort(effect_size)[-self.config.analysis_params['top_neurons_count']:][::-1]
+            # 获取所有神经元的效应量，并按效应量大小排序
+            sorted_indices = np.argsort(effect_size)[::-1]  # 从大到小排序
+            sorted_effect_sizes = effect_size[sorted_indices]
+            neuron_numbers = sorted_indices + 1  # +1 for 1-based indexing
+            
+            # 将该行为的所有神经元效应量数据添加到列表中
+            effect_size_data.append({
+                'behavior': behavior,
+                'neuron_numbers': neuron_numbers,
+                'effect_sizes': sorted_effect_sizes
+            })
+            
+            # Get top neurons for visualization
+            top_neurons = sorted_indices[:self.config.analysis_params['top_neurons_count']]
             behavior_importance[behavior] = {
                 'neurons': top_neurons + 1,  # +1 for 1-based indexing
                 'effect_sizes': effect_size[top_neurons]
             }
+        
+        # 保存效应量数据到CSV文件
+        # 创建一个包含所有神经元的DataFrame
+        all_neurons_df = pd.DataFrame()
+        
+        for data in effect_size_data:
+            behavior = data['behavior']
+            # 创建该行为的效应量数据字典
+            behavior_dict = {
+                f'Neuron_{num}': effect_size 
+                for num, effect_size in zip(data['neuron_numbers'], data['effect_sizes'])
+            }
+            # 将行为名称添加到字典中
+            behavior_dict['Behavior'] = behavior
+            # 将该行为的数据添加到DataFrame中
+            all_neurons_df = pd.concat([all_neurons_df, pd.DataFrame([behavior_dict])], ignore_index=True)
+        
+        # 设置'Behavior'列为索引
+        all_neurons_df.set_index('Behavior', inplace=True)
+        
+        # 保存到CSV文件
+        csv_path = os.path.join(self.config.analysis_dir, 'neuron_effect_sizes.csv')
+        all_neurons_df.to_csv(csv_path)
+        print(f"\n所有神经元的效应量数据已保存到: {csv_path}")
         
         # Plot results
         plt.figure(figsize=self.config.visualization_params['figure_sizes']['key_neurons'])
