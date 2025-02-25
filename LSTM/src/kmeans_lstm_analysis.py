@@ -337,10 +337,9 @@ def main():
         # 初始化配置
         config = AnalysisConfig()
         
-        # 验证和创建目录
-        print("正在验证目录结构...")
+        # 验证和创建目录（validate_paths 现在会自动调用 setup_directories）
+        print("正在验证并创建目录结构...")
         config.validate_paths()
-        config.setup_directories()
         
         print("正在设置随机种子...")
         set_random_seed(config.random_seed)

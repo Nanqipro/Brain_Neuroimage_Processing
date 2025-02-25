@@ -16,35 +16,36 @@ class AnalysisConfig:
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
         self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day6'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
         self.model_dir = os.path.join(self.base_dir, 'models')    # 模型保存目录
-        self.analysis_dir = os.path.join(self.output_dir, 'analysis')  # 分析结果目录
-        self.train_dir = os.path.join(self.output_dir, 'train')   # 训练结果目录
+        self.analysis_dir = os.path.join(self.output_dir, f'analysis_{self.data_identifier}')  # 分析结果目录
+        self.train_dir = os.path.join(self.output_dir, f'train_{self.data_identifier}')   # 训练结果目录
         
         # 模型文件路径
-        self.model_path = os.path.join(self.model_dir, 'neuron_lstm_model_6.pth')  # 训练好的模型文件路径
+        self.model_path = os.path.join(self.model_dir, f'neuron_lstm_model_{self.data_identifier}.pth')  # 训练好的模型文件路径
         
         # 训练结果文件路径配置
-        self.loss_plot = os.path.join(self.train_dir, 'training_loss.png')  # 训练损失曲线图
-        self.accuracy_plot = os.path.join(self.train_dir, 'accuracy_curves.png')  # 准确率曲线图
-        self.cluster_plot = os.path.join(self.train_dir, 'cluster_visualization.png')  # 聚类可视化图
-        self.metrics_log = os.path.join(self.train_dir, 'training_metrics.csv')  # 训练指标日志
-        self.error_log = os.path.join(self.train_dir, 'error_log.txt')  # 错误日志文件
+        self.loss_plot = os.path.join(self.train_dir, f'training_loss_{self.data_identifier}.png')  # 训练损失曲线图
+        self.accuracy_plot = os.path.join(self.train_dir, f'accuracy_curves_{self.data_identifier}.png')  # 准确率曲线图
+        self.cluster_plot = os.path.join(self.train_dir, f'cluster_visualization_{self.data_identifier}.png')  # 聚类可视化图
+        self.metrics_log = os.path.join(self.train_dir, f'training_metrics_{self.data_identifier}.csv')  # 训练指标日志
+        self.error_log = os.path.join(self.train_dir, f'error_log_{self.data_identifier}.txt')  # 错误日志文件
         
         # 分析结果文件路径配置
-        self.correlation_plot = os.path.join(self.analysis_dir, 'behavior_neuron_correlation.png')  # 行为-神经元相关性图
-        self.transition_plot = os.path.join(self.analysis_dir, 'behavior_transitions.png')  # 行为转换概率图
-        self.key_neurons_plot = os.path.join(self.analysis_dir, 'key_neurons.png')  # 关键神经元分析图
-        self.temporal_pattern_dir = os.path.join(self.analysis_dir, 'temporal_patterns')  # 时间模式分析目录
-        self.network_plot = os.path.join(self.analysis_dir, 'behavior_neuron_network.png')  # 行为-神经元网络图
+        self.correlation_plot = os.path.join(self.analysis_dir, f'behavior_neuron_correlation_{self.data_identifier}.png')  # 行为-神经元相关性图
+        self.transition_plot = os.path.join(self.analysis_dir, f'behavior_transitions_{self.data_identifier}.png')  # 行为转换概率图
+        self.key_neurons_plot = os.path.join(self.analysis_dir, f'key_neurons_{self.data_identifier}.png')  # 关键神经元分析图
+        self.temporal_pattern_dir = os.path.join(self.analysis_dir, f'temporal_patterns_{self.data_identifier}')  # 时间模式分析目录
+        self.network_plot = os.path.join(self.analysis_dir, f'behavior_neuron_network_{self.data_identifier}.png')  # 行为-神经元网络图
         
         # 结果数据文件路径配置
-        self.behavior_importance_csv = os.path.join(self.analysis_dir, 'behavior_importance.csv')  # 行为重要性数据
-        self.neuron_specificity_json = os.path.join(self.analysis_dir, 'neuron_specificity.json')  # 神经元特异性数据
-        self.statistical_results_csv = os.path.join(self.analysis_dir, 'statistical_analysis.csv')  # 统计分析结果
-        self.temporal_correlation_dir = os.path.join(self.analysis_dir, 'temporal_correlations')  # 时间相关性分析目录
+        self.behavior_importance_csv = os.path.join(self.analysis_dir, f'behavior_importance_{self.data_identifier}.csv')  # 行为重要性数据
+        self.neuron_specificity_json = os.path.join(self.analysis_dir, f'neuron_specificity_{self.data_identifier}.json')  # 神经元特异性数据
+        self.statistical_results_csv = os.path.join(self.analysis_dir, f'statistical_analysis_{self.data_identifier}.csv')  # 统计分析结果
+        self.temporal_correlation_dir = os.path.join(self.analysis_dir, f'temporal_correlations_{self.data_identifier}')  # 时间相关性分析目录
         
         # 模型超参数配置
         self.sequence_length = 10     # 序列长度：用于LSTM的输入序列长度
@@ -107,9 +108,13 @@ class AnalysisConfig:
             self.temporal_correlation_dir  # 时间相关性分析目录
         ]
         
+        created_dirs = []
         try:
             for directory in directories:
-                os.makedirs(directory, exist_ok=True)
+                if not os.path.exists(directory):
+                    os.makedirs(directory, exist_ok=True)
+                    created_dirs.append(directory)
+                    print(f"创建目录: {directory}")
                 
             # 验证目录是否可写
             test_file_path = os.path.join(self.train_dir, 'test_write.tmp')
@@ -121,6 +126,13 @@ class AnalysisConfig:
                 raise PermissionError(f"无法在目录中写入文件: {str(e)}")
                 
         except Exception as e:
+            # 如果创建过程中出错，尝试删除已创建的目录
+            for dir_path in created_dirs:
+                try:
+                    if os.path.exists(dir_path):
+                        os.rmdir(dir_path)
+                except:
+                    pass
             raise RuntimeError(f"创建目录结构失败: {str(e)}")
         
     def validate_paths(self):
@@ -129,6 +141,9 @@ class AnalysisConfig:
         检查数据文件和模型文件是否存在
         如果缺少必要文件，抛出FileNotFoundError异常
         """
+        # 首先确保目录结构存在
+        self.setup_directories()
+        
         # 检查数据文件
         if not os.path.exists(self.data_file):
             raise FileNotFoundError(f"数据文件未找到: {self.data_file}")
