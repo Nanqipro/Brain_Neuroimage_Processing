@@ -6,11 +6,21 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import os
+from torch.serialization import add_safe_globals
+import networkx as nx
+from scipy.stats import pearsonr
+from scipy.cluster import hierarchy
+from community import community_louvain
+from sklearn.cluster import SpectralClustering
+import json
 
-from kmeans_lstm_analysis import NeuronLSTM, NeuronDataProcessor
+from kmeans_lstm_analysis import EnhancedNeuronLSTM, NeuronDataProcessor
 from analysis_config import AnalysisConfig
 
 import torch.nn.functional as F
+
+# 添加安全的全局变量
+add_safe_globals(['_reconstruct'])
 
 class ResultAnalyzer:
     """
@@ -111,14 +121,27 @@ class ResultAnalyzer:
     def load_model_and_data(self):
         """
         加载预训练模型和预处理数据
-        返回：
+        返回:
             model: 训练好的LSTM模型
             X_scaled: 标准化后的神经元数据
             y: 行为标签
         """
-        # Load and preprocess data
+        # 加载和预处理数据
         X_scaled, y = self.processor.preprocess_data()
         self.behavior_labels = self.processor.label_encoder.classes_
+        
+        # 打印数据集信息
+        n_neurons = X_scaled.shape[1]
+        print(f"\n数据集信息:")
+        print(f"神经元数量: {n_neurons}")
+        print(f"样本数量: {len(X_scaled)}")
+        print(f"行为类别数: {len(self.behavior_labels)}")
+        
+        # 打印行为标签映射和样本数量
+        print("\n行为标签统计:")
+        unique_labels, counts = np.unique(y, return_counts=True)
+        for label, count in zip(self.behavior_labels, counts):
+            print(f"{label}: {count} 个样本")
         
         # 数据平衡处理
         if hasattr(self.config, 'analysis_params') and 'min_samples_per_behavior' in self.config.analysis_params:
@@ -128,21 +151,34 @@ class ResultAnalyzer:
             X_scaled, y, self.behavior_labels = self.merge_rare_behaviors(
                 X_scaled, y, self.behavior_labels, min_samples
             )
-
-        # Load trained model
+        
+        # 加载训练好的模型
         input_size = X_scaled.shape[1] + 1  # +1 for cluster label
         num_classes = len(np.unique(y))
         
-        model = NeuronLSTM(
+        model = EnhancedNeuronLSTM(
             input_size=input_size,
             hidden_size=self.config.hidden_size,
             num_layers=self.config.num_layers,
-            num_classes=num_classes
+            num_classes=num_classes,
+            latent_dim=self.config.analysis_params.get('latent_dim', 32),
+            num_heads=self.config.analysis_params.get('num_heads', 4),
+            dropout=self.config.analysis_params.get('dropout', 0.2)
         ).to(self.device)
         
-        model.load_state_dict(torch.load(self.config.model_path))
-        model.eval()
+        try:
+            # 尝试使用 weights_only=True 加载模型
+            checkpoint = torch.load(self.config.model_path, weights_only=True)
+            model.load_state_dict(checkpoint['model_state_dict'])
+        except Exception as e1:
+            try:
+                print("尝试使用 weights_only=False 加载模型...")
+                checkpoint = torch.load(self.config.model_path, weights_only=False)
+                model.load_state_dict(checkpoint['model_state_dict'])
+            except Exception as e2:
+                raise RuntimeError(f"加载模型失败。错误1: {str(e1)}\n错误2: {str(e2)}")
         
+        model.eval()
         return model, X_scaled, y
     
     def analyze_behavior_neuron_correlation(self, X_scaled, y):
@@ -505,6 +541,276 @@ class ResultAnalyzer:
         plt.close()
         return behavior_importance
 
+    def build_neuron_network(self, X_scaled, threshold=0.3):
+        """
+        构建神经元功能连接网络
+        参数:
+            X_scaled: 标准化后的神经元活动数据
+            threshold: 相关性阈值
+        返回:
+            G: NetworkX图对象
+            correlation_matrix: 相关性矩阵
+            available_neurons: 可用神经元列表
+        """
+        print("\n构建神经元功能连接网络...")
+        
+        # 获取实际的神经元数量
+        n_neurons = X_scaled.shape[1]
+        
+        # 创建相关性矩阵
+        correlation_matrix = np.zeros((n_neurons, n_neurons))
+        
+        # 计算相关性矩阵
+        for i in range(n_neurons):
+            for j in range(i+1, n_neurons):
+                corr, _ = pearsonr(X_scaled[:, i], X_scaled[:, j])
+                correlation_matrix[i, j] = corr
+                correlation_matrix[j, i] = corr
+        
+        # 创建图对象
+        G = nx.Graph()
+        
+        # 添加节点(使用实际的神经元编号)
+        available_neurons = [f'n{i+1}' for i in range(n_neurons)]
+        for neuron in available_neurons:
+            G.add_node(neuron)
+        
+        # 添加边(基于相关性阈值)
+        for i in range(n_neurons):
+            for j in range(i+1, n_neurons):
+                if abs(correlation_matrix[i, j]) >= threshold:
+                    G.add_edge(available_neurons[i], 
+                              available_neurons[j], 
+                              weight=abs(correlation_matrix[i, j]))
+        
+        print(f"网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
+        return G, correlation_matrix, available_neurons
+
+    def analyze_network_topology(self, G):
+        """
+        分析神经元网络的拓扑特征
+        参数:
+            G: NetworkX图对象
+        返回:
+            metrics: 包含各种拓扑指标的字典
+        """
+        print("\n分析网络拓扑特征...")
+        
+        metrics = {}
+        
+        try:
+            # 基本网络指标
+            metrics['node_count'] = G.number_of_nodes()
+            metrics['edge_count'] = G.number_of_edges()
+            metrics['average_degree'] = float(2 * G.number_of_edges()) / G.number_of_nodes()
+            
+            # 中心性指标
+            print("计算中心性指标...")
+            metrics['degree_centrality'] = nx.degree_centrality(G)
+            metrics['betweenness_centrality'] = nx.betweenness_centrality(G)
+            metrics['clustering_coefficient'] = nx.clustering(G)
+            metrics['average_clustering'] = nx.average_clustering(G)
+            
+            # 连通性分析
+            print("分析网络连通性...")
+            if nx.is_connected(G):
+                metrics['is_connected'] = True
+                metrics['average_shortest_path_length'] = nx.average_shortest_path_length(G)
+                metrics['diameter'] = nx.diameter(G)
+            else:
+                metrics['is_connected'] = False
+                components = list(nx.connected_components(G))
+                metrics['number_of_components'] = len(components)
+                metrics['largest_component_size'] = len(max(components, key=len))
+            
+            # 社区检测
+            print("执行社区检测...")
+            try:
+                communities_generator = nx.community.girvan_newman(G)
+                communities = tuple(sorted(c) for c in next(communities_generator))
+                
+                # 将社区信息转换为字典格式
+                community_dict = {}
+                for i, community in enumerate(communities):
+                    for node in community:
+                        community_dict[node] = i
+                        
+                metrics['communities'] = community_dict
+                metrics['number_of_communities'] = len(communities)
+                
+                # 计算模块度
+                metrics['modularity'] = nx.community.modularity(G, communities)
+                
+            except Exception as e:
+                print(f"社区检测警告: {str(e)}")
+                # 使用连通分量作为备选方案
+                connected_components = list(nx.connected_components(G))
+                community_dict = {}
+                for i, component in enumerate(connected_components):
+                    for node in component:
+                        community_dict[node] = i
+                metrics['communities'] = community_dict
+                metrics['number_of_communities'] = len(connected_components)
+                metrics['modularity'] = 0.0
+            
+            # 网络密度和其他统计指标
+            metrics['density'] = nx.density(G)
+            metrics['average_neighbor_degree'] = nx.average_neighbor_degree(G)
+            
+            print("网络分析完成")
+            
+        except Exception as e:
+            print(f"网络分析过程中出现错误: {str(e)}")
+            # 返回基本指标
+            metrics['node_count'] = G.number_of_nodes()
+            metrics['edge_count'] = G.number_of_edges()
+            metrics['error'] = str(e)
+        
+        return metrics
+
+    def identify_functional_modules(self, G, correlation_matrix, available_neurons):
+        """
+        识别神经元功能模块
+        
+        参数：
+            G: networkx图对象
+            correlation_matrix: 相关性矩阵
+            available_neurons: 可用神经元列表
+            
+        返回：
+            modules: 识别出的功能模块列表
+        """
+        print("\n识别功能模块...")
+        
+        # 使用谱聚类识别功能模块
+        n_clusters = min(int(np.sqrt(len(G.nodes))), 10)  # 动态确定模块数量
+        clustering = SpectralClustering(n_clusters=n_clusters, 
+                                      affinity='precomputed',
+                                      random_state=42)
+        
+        # 将相关性矩阵转换为相似度矩阵
+        similarity_matrix = np.abs(correlation_matrix)
+        np.fill_diagonal(similarity_matrix, 1)
+        
+        # 执行聚类
+        labels = clustering.fit_predict(similarity_matrix)
+        
+        # 整理模块信息
+        modules = {}
+        for i in range(n_clusters):
+            module_neurons = [available_neurons[j] for j in range(len(labels)) if labels[j] == i]
+            modules[f'Module_{i+1}'] = {
+                'neurons': module_neurons,
+                'size': len(module_neurons),
+                'internal_density': self._calculate_module_density(G, module_neurons)
+            }
+        
+        return modules
+
+    def _calculate_module_density(self, G, module_neurons):
+        """
+        计算模块内部的连接密度
+        """
+        subgraph = G.subgraph(module_neurons)
+        n = len(module_neurons)
+        if n <= 1:
+            return 0
+        max_edges = (n * (n - 1)) / 2
+        return len(subgraph.edges()) / max_edges if max_edges > 0 else 0
+
+    def visualize_network_topology(self, G, metrics, modules):
+        """
+        可视化网络拓扑分析结果
+        
+        参数：
+            G: networkx图对象
+            metrics: 拓扑分析指标
+            modules: 功能模块信息
+        """
+        print("\n可视化网络拓扑分析结果...")
+        
+        # 1. 网络结构可视化
+        plt.figure(figsize=(15, 15))
+        pos = nx.spring_layout(G, k=1/np.sqrt(len(G.nodes())), iterations=50)
+        
+        # 根据模块给节点着色
+        colors = plt.cm.rainbow(np.linspace(0, 1, len(modules)))
+        node_colors = []
+        for node in G.nodes():
+            for i, (_, module) in enumerate(modules.items()):
+                if node in module['neurons']:
+                    node_colors.append(colors[i])
+                    break
+        
+        # 绘制网络
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=100)
+        nx.draw_networkx_edges(G, pos, alpha=0.2)
+        plt.title('Neuron Functional Network', fontsize=16)
+        plt.savefig(os.path.join(self.config.analysis_dir, 'neuron_network.png'), 
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # 2. 中心性指标可视化
+        plt.figure(figsize=(12, 6))
+        degree_values = list(metrics['degree_centrality'].values())
+        betweenness_values = list(metrics['betweenness_centrality'].values())
+        
+        plt.subplot(1, 2, 1)
+        plt.hist(degree_values, bins=20)
+        plt.title('Degree Centrality Distribution')
+        plt.xlabel('Degree Centrality')
+        plt.ylabel('Count')
+        
+        plt.subplot(1, 2, 2)
+        plt.hist(betweenness_values, bins=20)
+        plt.title('Betweenness Centrality Distribution')
+        plt.xlabel('Betweenness Centrality')
+        plt.ylabel('Count')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.config.analysis_dir, 'centrality_metrics.png'),
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # 3. 模块分析结果可视化
+        plt.figure(figsize=(10, 6))
+        module_sizes = [m['size'] for m in modules.values()]
+        module_densities = [m['internal_density'] for m in modules.values()]
+        
+        plt.bar(range(len(modules)), module_densities)
+        plt.title('Module Internal Density')
+        plt.xlabel('Module ID')
+        plt.ylabel('Density')
+        plt.xticks(range(len(modules)), [f'M{i+1}' for i in range(len(modules))])
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.config.analysis_dir, 'module_analysis.png'),
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+
+def convert_to_serializable(obj):
+    """
+    将对象转换为可JSON序列化的格式
+    
+    参数：
+        obj: 需要转换的对象
+    返回：
+        转换后的可序列化对象
+    """
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_to_serializable(item) for item in obj]
+    elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
+        return int(obj)
+    elif isinstance(obj, (np.float64, np.float32, np.float16)):
+        return float(obj)
+    elif isinstance(obj, (set, frozenset)):
+        return list(obj)
+    return obj
+
 def main():
     """
     主函数：执行完整的分析流程
@@ -552,7 +858,36 @@ def main():
             for i, (neuron, effect) in enumerate(zip(data['neurons'], data['effect_sizes'])):
                 print(f"  神经元 {neuron}: 效应量 = {effect:.3f}")
         
-        print(f"\n分析完成！所有结果已保存到: {config.analysis_dir}")
+        print("\n开始神经元网络拓扑分析...")
+        # 构建神经元功能连接网络
+        G, correlation_matrix, available_neurons = analyzer.build_neuron_network(
+            X_scaled, 
+            threshold=config.analysis_params['correlation_threshold']
+        )
+        
+        # 分析网络拓扑特征
+        topology_metrics = analyzer.analyze_network_topology(G)
+        
+        # 识别功能模块
+        functional_modules = analyzer.identify_functional_modules(G, correlation_matrix, available_neurons)
+        
+        # 可视化分析结果
+        analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
+        
+        # 保存分析结果
+        results = {
+            'topology_metrics': topology_metrics,
+            'functional_modules': functional_modules
+        }
+        
+        # 将结果保存为JSON文件
+        results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
+        print(f"\n保存分析结果到: {results_path}")
+        with open(results_path, 'w', encoding='utf-8') as f:
+            serializable_results = convert_to_serializable(results)
+            json.dump(serializable_results, f, indent=4, ensure_ascii=False)
+            
+        print("分析完成！所有结果已保存。")
         
     except Exception as e:
         print(f"分析过程中出现错误: {str(e)}")

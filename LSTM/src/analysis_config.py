@@ -15,8 +15,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
-        self.data_identifier = 'Day6'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'Day3_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day3'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -69,7 +69,22 @@ class AnalysisConfig:
             'p_value_threshold': 0.05,  # 统计检验的显著性水平
             'effect_size_threshold': 0.5,  # 效应量的显著性阈值
             'gradient_clip_norm': 1.0,  # 梯度裁剪的最大范数
-            'weight_decay': 0.01  # AdamW优化器的权重衰减系数
+            'weight_decay': 0.01,  # AdamW优化器的权重衰减系数
+            
+            # 新增的增强型LSTM模型参数
+            'latent_dim': 32,  # 自编码器潜在空间维度
+            'num_heads': 4,    # 多头注意力的头数
+            'dropout': 0.2,    # Dropout率
+            'reconstruction_loss_weight': 0.1,  # 重构损失的权重
+            'attention_dropout': 0.1,  # 注意力机制的dropout率
+            'autoencoder_hidden_dim': 128,  # 自编码器隐藏层维度
+            
+            # 新增的网络拓扑分析参数
+            'correlation_threshold': 0.3,  # 构建功能连接网络的相关性阈值
+            'min_module_size': 3,  # 功能模块的最小神经元数量
+            'max_modules': 10,  # 最大功能模块数量
+            'edge_weight_threshold': 0.5,  # 边权重阈值
+            'community_resolution': 1.0,  # 社区检测的分辨率参数
         }
         
         # 可视化参数配置
@@ -80,18 +95,26 @@ class AnalysisConfig:
                 'transitions': (10, 8),    # 转换概率图尺寸
                 'key_neurons': (15, 8),    # 关键神经元图尺寸
                 'network': (20, 15),       # 网络图尺寸
-                'metrics': (15, 5)         # 训练指标图尺寸
+                'metrics': (15, 5),        # 训练指标图尺寸
+                'attention': (20, 10),     # 注意力权重图尺寸
+                'autoencoder': (15, 5)     # 自编码器重构图尺寸
             },
             'colormaps': {  # 不同类型图表的颜色方案
                 'correlation': 'coolwarm',  # 相关性图的颜色方案
                 'transitions': 'YlOrRd',    # 转换图的颜色方案
                 'network': 'viridis',       # 网络图的颜色方案
-                'clusters': 'viridis'       # 聚类图的颜色方案
+                'clusters': 'viridis',      # 聚类图的颜色方案
+                'attention': 'RdYlBu_r'     # 注意力权重图的颜色方案
             },
             'dpi': 300,              # 图像分辨率
             'save_format': 'png',    # 图像保存格式
             'font_size': 10,         # 字体大小
-            'line_width': 2          # 线条宽度
+            'line_width': 2,         # 线条宽度
+            'attention_plot_style': {
+                'cmap': 'RdYlBu_r',
+                'interpolation': 'nearest',
+                'aspect': 'auto'
+            }
         }
         
     def setup_directories(self):

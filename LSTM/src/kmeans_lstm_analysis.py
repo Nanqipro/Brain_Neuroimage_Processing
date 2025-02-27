@@ -116,87 +116,195 @@ class NeuronDataset(Dataset):
         return (self.X[idx:idx+self.sequence_length], 
                 self.y[idx+self.sequence_length-1])
 
-# LSTM model class
-class NeuronLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, num_classes):
-        """
-        增强版LSTM模型
-        参数：
-            input_size: 输入特征维度
-            hidden_size: LSTM隐藏层大小
-            num_layers: LSTM层数
-            num_classes: 输出类别数
-        结构：
-            1. 多层双向LSTM
-            2. 批标准化层
-            3. Dropout层
-            4. 多层全连接网络
-        """
-        super(NeuronLSTM, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
+class NeuronAutoencoder(nn.Module):
+    """神经元活动数据的自编码器
+    用于特征提取和降维
+    """
+    def __init__(self, input_size, hidden_size, latent_dim):
+        super(NeuronAutoencoder, self).__init__()
         
-        # 双向LSTM层
-        self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=True,  # 使用双向LSTM
-            dropout=0.2 if num_layers > 1 else 0  # 当层数大于1时添加dropout
+        # 编码器
+        self.encoder = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.BatchNorm1d(hidden_size),
+            nn.Dropout(0.2),
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.ReLU(),
+            nn.BatchNorm1d(hidden_size // 2),
+            nn.Linear(hidden_size // 2, latent_dim)
         )
         
-        # 批标准化层
-        self.batch_norm = nn.BatchNorm1d(hidden_size * 2)  # *2是因为双向LSTM
-        
-        # 多层全连接网络
-        self.fc_layers = nn.Sequential(
-            nn.Linear(hidden_size * 2, hidden_size),  # 第一个全连接层
+        # 解码器
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim, hidden_size // 2),
             nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, hidden_size // 2),  # 第二个全连接层
-            nn.ReLU(),
-            nn.Dropout(0.2),
             nn.BatchNorm1d(hidden_size // 2),
-            nn.Linear(hidden_size // 2, num_classes)  # 输出层
+            nn.Dropout(0.2),
+            nn.Linear(hidden_size // 2, hidden_size),
+            nn.ReLU(),
+            nn.BatchNorm1d(hidden_size),
+            nn.Linear(hidden_size, input_size),
+            nn.Tanh()  # 使用Tanh确保输出在[-1,1]范围内
         )
         
     def forward(self, x):
-        # 初始化隐藏状态和细胞状态
-        h0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)  # *2是因为双向LSTM
-        c0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return encoded, decoded
+
+class MultiHeadAttention(nn.Module):
+    """多头注意力机制
+    用于捕捉神经元之间的关联关系
+    """
+    def __init__(self, input_dim, num_heads, dropout=0.1):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.head_dim = input_dim // num_heads
+        assert self.head_dim * num_heads == input_dim, "input_dim必须能被num_heads整除"
         
-        # LSTM前向传播
-        out, _ = self.lstm(x, (h0, c0))
+        self.query = nn.Linear(input_dim, input_dim)
+        self.key = nn.Linear(input_dim, input_dim)
+        self.value = nn.Linear(input_dim, input_dim)
         
-        # 只使用最后一个时间步的输出
-        out = out[:, -1, :]
+        self.dropout = nn.Dropout(dropout)
+        self.output_linear = nn.Linear(input_dim, input_dim)
+        
+    def forward(self, x, mask=None):
+        batch_size = x.size(0)
+        
+        # 线性变换并分头
+        query = self.query(x).view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
+        key = self.key(x).view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
+        value = self.value(x).view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
+        
+        # 计算注意力分数
+        scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32))
+        
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, -1e9)
+        
+        attention_weights = torch.softmax(scores, dim=-1)
+        attention_weights = self.dropout(attention_weights)
+        
+        # 应用注意力权重
+        context = torch.matmul(attention_weights, value)
+        
+        # 重组并线性变换
+        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.num_heads * self.head_dim)
+        output = self.output_linear(context)
+        
+        return output, attention_weights
+
+class TemporalAttention(nn.Module):
+    """时间注意力机制
+    用于捕捉时间序列中的重要模式
+    """
+    def __init__(self, hidden_size):
+        super(TemporalAttention, self).__init__()
+        self.attention = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.Tanh(),
+            nn.Linear(hidden_size // 2, 1)
+        )
+        
+    def forward(self, hidden_states):
+        attention_weights = self.attention(hidden_states)
+        attention_weights = torch.softmax(attention_weights, dim=1)
+        attended = torch.sum(hidden_states * attention_weights, dim=1)
+        return attended, attention_weights
+
+class EnhancedNeuronLSTM(nn.Module):
+    """增强版神经元LSTM模型
+    整合了自编码器、双向LSTM和多层注意力机制
+    """
+    def __init__(self, input_size, hidden_size, num_layers, num_classes, 
+                 latent_dim=32, num_heads=4, dropout=0.2):
+        super(EnhancedNeuronLSTM, self).__init__()
+        
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        
+        # 自编码器用于特征提取
+        self.autoencoder = NeuronAutoencoder(input_size, hidden_size, latent_dim)
+        
+        # 双向LSTM
+        self.lstm = nn.LSTM(
+            input_size=latent_dim,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout if num_layers > 1 else 0
+        )
+        
+        # 多头注意力机制
+        self.multihead_attention = MultiHeadAttention(hidden_size * 2, num_heads)
+        
+        # 时间注意力机制
+        self.temporal_attention = TemporalAttention(hidden_size * 2)
         
         # 批标准化
-        out = self.batch_norm(out)
+        self.batch_norm = nn.BatchNorm1d(hidden_size * 2)
         
-        # 通过全连接层
-        out = self.fc_layers(out)
+        # 分类器
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_size * 2, hidden_size),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.BatchNorm1d(hidden_size),
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.BatchNorm1d(hidden_size // 2),
+            nn.Linear(hidden_size // 2, num_classes)
+        )
         
-        return out
+    def forward(self, x):
+        batch_size = x.size(0)
+        
+        # 1. 通过自编码器进行特征提取
+        encoded_features = []
+        for t in range(x.size(1)):
+            encoded, _ = self.autoencoder(x[:, t, :])
+            encoded_features.append(encoded)
+        encoded_sequence = torch.stack(encoded_features, dim=1)
+        
+        # 2. 双向LSTM处理
+        h0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size).to(x.device)
+        c0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size).to(x.device)
+        lstm_out, _ = self.lstm(encoded_sequence, (h0, c0))
+        
+        # 3. 多头注意力处理
+        attended_features, attention_weights = self.multihead_attention(lstm_out)
+        
+        # 4. 时间注意力处理
+        temporal_context, temporal_weights = self.temporal_attention(attended_features)
+        
+        # 5. 批标准化
+        normalized_features = self.batch_norm(temporal_context)
+        
+        # 6. 分类
+        output = self.classifier(normalized_features)
+        
+        return output, attention_weights, temporal_weights
 
 # Training function
 def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs, config):
     """
-    增强版模型训练函数：
-    1. 设置模型为训练模式
-    2. 按批次训练数据
-    3. 计算损失和准确率
-    4. 在验证集上评估
-    5. 记录所有指标
+    增强版模型训练函数
+    添加了自编码器损失和注意力权重的可视化
     """
     model.train()
     train_losses = []
     train_accuracies = []
     val_losses = []
     val_accuracies = []
+    reconstruction_losses = []
     best_val_acc = 0.0
+    
+    # 添加重构损失
+    reconstruction_criterion = nn.MSELoss()
     
     # 创建学习率调度器
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -205,12 +313,12 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
     
     # 创建指标日志文件
     with open(config.metrics_log, 'w') as f:
-        f.write('epoch,train_loss,train_acc,val_loss,val_acc\n')
+        f.write('epoch,train_loss,train_acc,val_loss,val_acc,reconstruction_loss\n')
     
     for epoch in range(num_epochs):
-        # 训练阶段
         model.train()
         total_loss = 0
+        total_recon_loss = 0
         correct = 0
         total = 0
         
@@ -218,26 +326,40 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
             batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             
             optimizer.zero_grad()
-            outputs = model(batch_X)
-            loss = criterion(outputs, batch_y)
+            
+            # 前向传播
+            outputs, attention_weights, temporal_weights = model(batch_X)
+            
+            # 计算分类损失
+            classification_loss = criterion(outputs, batch_y)
+            
+            # 计算重构损失
+            _, decoded = model.autoencoder(batch_X.view(-1, batch_X.size(-1)))
+            reconstruction_loss = reconstruction_criterion(decoded, batch_X.view(-1, batch_X.size(-1)))
+            
+            # 总损失
+            loss = classification_loss + 0.1 * reconstruction_loss
+            
             loss.backward()
-            
-            # 梯度裁剪，防止梯度爆炸
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.analysis_params['gradient_clip_norm'])
-            
             optimizer.step()
             
-            total_loss += loss.item()
+            total_loss += classification_loss.item()
+            total_recon_loss += reconstruction_loss.item()
             _, predicted = torch.max(outputs.data, 1)
             total += batch_y.size(0)
             correct += (predicted == batch_y).sum().item()
         
         avg_train_loss = total_loss / len(train_loader)
+        avg_recon_loss = total_recon_loss / len(train_loader)
         train_accuracy = 100 * correct / total
+        
+        # 记录训练指标
         train_losses.append(avg_train_loss)
         train_accuracies.append(train_accuracy)
+        reconstruction_losses.append(avg_recon_loss)
         
-        # 验证阶段
+        # 验证
         model.eval()
         val_loss = 0
         correct = 0
@@ -246,7 +368,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         with torch.no_grad():
             for batch_X, batch_y in val_loader:
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-                outputs = model(batch_X)
+                outputs, _, _ = model(batch_X)
                 loss = criterion(outputs, batch_y)
                 
                 val_loss += loss.item()
@@ -256,43 +378,53 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         
         avg_val_loss = val_loss / len(val_loader)
         val_accuracy = 100 * correct / total
+        
+        # 记录验证指标
         val_losses.append(avg_val_loss)
         val_accuracies.append(val_accuracy)
         
         # 更新学习率
         scheduler.step(val_accuracy)
         
-        # 修改保存模型的部分
+        # 保存最佳模型
         if val_accuracy > best_val_acc:
             best_val_acc = val_accuracy
             try:
-                # 确保模型目录存在
                 os.makedirs(os.path.dirname(config.model_path), exist_ok=True)
-                # 保存模型
-                torch.save(model.state_dict(), config.model_path)
+                torch.save({
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'epoch': epoch,
+                    'best_val_acc': best_val_acc,
+                    'attention_weights': attention_weights.detach().cpu().numpy(),
+                    'temporal_weights': temporal_weights.detach().cpu().numpy()
+                }, config.model_path)
                 print(f"模型已保存到: {config.model_path}")
             except Exception as e:
                 print(f"保存模型时出错: {str(e)}")
-                # 继续训练，但记录错误
                 with open(config.error_log, 'a') as f:
                     f.write(f"Epoch {epoch+1}: 保存模型失败 - {str(e)}\n")
         
         # 记录指标
         with open(config.metrics_log, 'a') as f:
-            f.write(f'{epoch+1},{avg_train_loss:.4f},{train_accuracy:.2f},{avg_val_loss:.4f},{val_accuracy:.2f}\n')
+            f.write(f'{epoch+1},{avg_train_loss:.4f},{train_accuracy:.2f},{avg_val_loss:.4f},{val_accuracy:.2f},{avg_recon_loss:.4f}\n')
         
         # 打印训练信息
         if (epoch + 1) % 5 == 0:
             print(f'Epoch [{epoch+1}/{num_epochs}]:')
             print(f'  Training Loss: {avg_train_loss:.4f}, Accuracy: {train_accuracy:.2f}%')
             print(f'  Validation Loss: {avg_val_loss:.4f}, Accuracy: {val_accuracy:.2f}%')
+            print(f'  Reconstruction Loss: {avg_recon_loss:.4f}')
     
     return {
         'train_losses': train_losses,
         'train_accuracies': train_accuracies,
         'val_losses': val_losses,
         'val_accuracies': val_accuracies,
-        'best_val_acc': best_val_acc
+        'best_val_acc': best_val_acc,
+        'reconstruction_losses': reconstruction_losses,
+        'attention_weights': attention_weights.detach().cpu().numpy(),
+        'temporal_weights': temporal_weights.detach().cpu().numpy()
     }
 
 def plot_training_metrics(metrics, config):
@@ -300,27 +432,39 @@ def plot_training_metrics(metrics, config):
     绘制训练和验证指标的变化曲线
     包括损失值和准确率
     """
-    plt.figure(figsize=config.visualization_params['figure_sizes']['metrics'])
+    plt.figure(figsize=(15, 5))
     
     # 绘制损失曲线
-    plt.subplot(1, 2, 1)
-    plt.plot(metrics['train_losses'], label='Training Loss', linewidth=config.visualization_params['line_width'])
-    plt.plot(metrics['val_losses'], label='Validation Loss', linewidth=config.visualization_params['line_width'])
-    plt.title('Loss Curves', fontsize=config.visualization_params['font_size'])
-    plt.xlabel('Epochs', fontsize=config.visualization_params['font_size'])
-    plt.ylabel('Loss', fontsize=config.visualization_params['font_size'])
-    plt.legend(fontsize=config.visualization_params['font_size'])
+    plt.subplot(1, 3, 1)
+    plt.plot(metrics['train_losses'], label='Training Loss', linewidth=2)
+    plt.plot(metrics['val_losses'], label='Validation Loss', linewidth=2)
+    plt.title('Loss Curves')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
     
     # 绘制准确率曲线
-    plt.subplot(1, 2, 2)
-    plt.plot(metrics['train_accuracies'], label='Training Accuracy', linewidth=config.visualization_params['line_width'])
-    plt.plot(metrics['val_accuracies'], label='Validation Accuracy', linewidth=config.visualization_params['line_width'])
-    plt.title('Accuracy Curves', fontsize=config.visualization_params['font_size'])
-    plt.xlabel('Epochs', fontsize=config.visualization_params['font_size'])
-    plt.ylabel('Accuracy (%)', fontsize=config.visualization_params['font_size'])
-    plt.legend(fontsize=config.visualization_params['font_size'])
+    plt.subplot(1, 3, 2)
+    plt.plot(metrics['train_accuracies'], label='Training Accuracy', linewidth=2)
+    plt.plot(metrics['val_accuracies'], label='Validation Accuracy', linewidth=2)
+    plt.title('Accuracy Curves')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy (%)')
+    plt.legend()
+    plt.grid(True)
+    
+    # 绘制重构损失曲线
+    plt.subplot(1, 3, 3)
+    plt.plot(metrics['reconstruction_losses'], label='Reconstruction Loss', linewidth=2)
+    plt.title('Reconstruction Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+    
     plt.tight_layout()
-    plt.savefig(config.accuracy_plot, dpi=config.visualization_params['dpi'], format=config.visualization_params['save_format'])
+    plt.savefig(config.accuracy_plot, dpi=300, bbox_inches='tight')
     plt.close()
 
 def main():
@@ -378,7 +522,7 @@ def main():
         
         input_size = X_with_clusters.shape[1]
         num_classes = len(np.unique(y))
-        model = NeuronLSTM(
+        model = EnhancedNeuronLSTM(
             input_size, 
             config.hidden_size, 
             config.num_layers, 

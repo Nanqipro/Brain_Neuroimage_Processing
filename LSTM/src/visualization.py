@@ -4,6 +4,7 @@ import numpy as np
 import networkx as nx
 from matplotlib.colors import LinearSegmentedColormap
 import os
+from sklearn.decomposition import PCA
 
 class VisualizationManager:
     """可视化管理器类,用于生成各种数据分析的可视化图表"""
@@ -247,4 +248,160 @@ class VisualizationManager:
         plt.tight_layout()
         plt.savefig(os.path.join(self.config.analysis_dir, 'significant_neurons_effect_sizes.png'),
                    dpi=self.config.visualization_params['dpi'])
+        plt.close()
+
+    def plot_attention_weights(self, attention_weights, temporal_weights, save_path):
+        """
+        可视化注意力权重
+        参数:
+            attention_weights: 多头注意力权重 [batch_size, num_heads, seq_len, seq_len]
+            temporal_weights: 时间注意力权重 [batch_size, seq_len]
+            save_path: 保存路径
+        """
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['attention'])
+        
+        # 1. 多头注意力权重可视化
+        plt.subplot(2, 1, 1)
+        avg_attention = attention_weights.mean(axis=(0, 1))  # 平均所有批次和头
+        sns.heatmap(avg_attention, 
+                   cmap=self.config.visualization_params['attention_plot_style']['cmap'],
+                   xticklabels=5, 
+                   yticklabels=5)
+        plt.title('Multi-head Attention Weights')
+        plt.xlabel('Time Step')
+        plt.ylabel('Time Step')
+        
+        # 2. 时间注意力权重可视化
+        plt.subplot(2, 1, 2)
+        avg_temporal = temporal_weights.mean(axis=0)
+        plt.plot(avg_temporal, linewidth=2)
+        plt.title('Temporal Attention Weights')
+        plt.xlabel('Time Step')
+        plt.ylabel('Weight')
+        plt.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=self.config.visualization_params['dpi'])
+        plt.close()
+
+    def plot_autoencoder_reconstruction(self, original, reconstructed, sample_indices, save_path):
+        """
+        可视化自编码器的重构结果
+        参数:
+            original: 原始数据
+            reconstructed: 重构数据
+            sample_indices: 要可视化的样本索引
+            save_path: 保存路径
+        """
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['autoencoder'])
+        
+        n_samples = len(sample_indices)
+        for i, idx in enumerate(sample_indices):
+            plt.subplot(n_samples, 1, i+1)
+            plt.plot(original[idx], label='Original', alpha=0.7)
+            plt.plot(reconstructed[idx], label='Reconstructed', alpha=0.7)
+            plt.title(f'Sample {idx}')
+            plt.legend()
+            plt.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=self.config.visualization_params['dpi'])
+        plt.close()
+
+    def plot_neuron_embeddings(self, encoded_features, behavior_labels, save_path):
+        """
+        可视化神经元在潜在空间中的分布
+        参数:
+            encoded_features: 编码后的特征 [n_samples, latent_dim]
+            behavior_labels: 行为标签
+            save_path: 保存路径
+        """
+        # 使用PCA降维到2D进行可视化
+        pca = PCA(n_components=2)
+        features_2d = pca.fit_transform(encoded_features)
+        
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['network'])
+        scatter = plt.scatter(features_2d[:, 0], features_2d[:, 1], 
+                            c=behavior_labels, 
+                            cmap='tab10',
+                            alpha=0.6)
+        plt.colorbar(scatter)
+        plt.title('Neuron Embeddings in Latent Space')
+        plt.xlabel('First Principal Component')
+        plt.ylabel('Second Principal Component')
+        plt.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=self.config.visualization_params['dpi'])
+        plt.close()
+
+    def plot_training_metrics(self, metrics):
+        """
+        绘制增强版训练指标图表
+        参数:
+            metrics: 包含训练指标的字典
+        """
+        plt.figure(figsize=(20, 5))
+        
+        # 1. 分类损失和准确率
+        plt.subplot(1, 3, 1)
+        plt.plot(metrics['train_losses'], label='Training Loss', linewidth=2)
+        plt.plot(metrics['val_losses'], label='Validation Loss', linewidth=2)
+        plt.title('Classification Loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        
+        # 2. 准确率
+        plt.subplot(1, 3, 2)
+        plt.plot(metrics['train_accuracies'], label='Training Accuracy', linewidth=2)
+        plt.plot(metrics['val_accuracies'], label='Validation Accuracy', linewidth=2)
+        plt.title('Model Accuracy')
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy (%)')
+        plt.legend()
+        plt.grid(True)
+        
+        # 3. 重构损失
+        plt.subplot(1, 3, 3)
+        plt.plot(metrics['reconstruction_losses'], label='Reconstruction Loss', linewidth=2)
+        plt.title('Autoencoder Reconstruction Loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(self.config.accuracy_plot, dpi=self.config.visualization_params['dpi'])
+        plt.close()
+
+    def plot_attention_analysis(self, attention_weights, behavior_labels, save_path):
+        """
+        分析不同行为下的注意力模式
+        参数:
+            attention_weights: 注意力权重
+            behavior_labels: 行为标签
+            save_path: 保存路径
+        """
+        unique_behaviors = np.unique(behavior_labels)
+        n_behaviors = len(unique_behaviors)
+        
+        plt.figure(figsize=(20, 4*n_behaviors))
+        
+        for i, behavior in enumerate(unique_behaviors):
+            mask = behavior_labels == behavior
+            behavior_attention = attention_weights[mask].mean(axis=0)
+            
+            plt.subplot(n_behaviors, 1, i+1)
+            sns.heatmap(behavior_attention, 
+                       cmap=self.config.visualization_params['attention_plot_style']['cmap'],
+                       xticklabels=5, 
+                       yticklabels=5)
+            plt.title(f'Attention Pattern for {behavior}')
+            plt.xlabel('Time Step')
+            plt.ylabel('Time Step')
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=self.config.visualization_params['dpi'])
         plt.close() 
