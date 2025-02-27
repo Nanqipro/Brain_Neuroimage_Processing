@@ -13,6 +13,12 @@ from scipy.cluster import hierarchy
 from community import community_louvain
 from sklearn.cluster import SpectralClustering
 import json
+from hmmlearn import hmm
+from scipy.stats import zscore
+from sklearn.preprocessing import MinMaxScaler
+from scipy.signal import find_peaks
+import warnings
+warnings.filterwarnings('ignore')
 
 from kmeans_lstm_analysis import EnhancedNeuronLSTM, NeuronDataProcessor
 from analysis_config import AnalysisConfig
@@ -788,6 +794,300 @@ class ResultAnalyzer:
                    dpi=300, bbox_inches='tight')
         plt.close()
 
+    def analyze_behavior_state_transitions(self, X_scaled, y):
+        """
+        Analyze behavior state transitions using HMM
+        Args:
+            X_scaled: Standardized neural activity data
+            y: Behavior labels
+        Returns:
+            hmm_results: HMM analysis results dictionary
+        """
+        print("\nAnalyzing behavior state transitions...")
+        
+        # Initialize HMM model
+        n_states = len(np.unique(y))
+        model = hmm.GaussianHMM(
+            n_components=n_states, 
+            covariance_type="full",
+            n_iter=100,
+            random_state=42
+        )
+        
+        # Train HMM model
+        try:
+            model.fit(X_scaled)
+            
+            # Predict hidden state sequence
+            hidden_states = model.predict(X_scaled)
+            
+            # Calculate transition probability matrix
+            transition_matrix = model.transmat_
+            
+            # Analyze state durations
+            state_durations = []
+            current_state = hidden_states[0]
+            current_duration = 1
+            
+            for state in hidden_states[1:]:
+                if state == current_state:
+                    current_duration += 1
+                else:
+                    state_durations.append((current_state, current_duration))
+                    current_state = state
+                    current_duration = 1
+            state_durations.append((current_state, current_duration))
+            
+            # Calculate average duration for each state
+            avg_durations = {}
+            for state in range(n_states):
+                durations = [d for s, d in state_durations if s == state]
+                avg_durations[state] = np.mean(durations) if durations else 0
+            
+            hmm_results = {
+                'transition_matrix': transition_matrix,
+                'hidden_states': hidden_states,
+                'avg_durations': avg_durations,
+                'model_score': model.score(X_scaled)
+            }
+            
+            # Visualize HMM results
+            self._visualize_hmm_results(hmm_results, self.behavior_labels)
+            
+            return hmm_results
+            
+        except Exception as e:
+            print(f"HMM analysis error: {str(e)}")
+            return None
+    
+    def analyze_neuron_state_relationships(self, X_scaled, hidden_states):
+        """
+        Analyze relationships between neuron activity patterns and state transitions
+        Args:
+            X_scaled: Standardized neural activity data
+            hidden_states: Hidden state sequence predicted by HMM
+        Returns:
+            relationships: Neuron-state relationship analysis results
+        """
+        print("\nAnalyzing neuron activity and state transition relationships...")
+        
+        n_neurons = X_scaled.shape[1]
+        n_states = len(np.unique(hidden_states))
+        
+        # Calculate neuron activity features for each state
+        state_features = {}
+        for state in range(n_states):
+            state_mask = (hidden_states == state)
+            state_data = X_scaled[state_mask]
+            
+            state_features[state] = {
+                'mean_activity': np.mean(state_data, axis=0),
+                'std_activity': np.std(state_data, axis=0),
+                'peak_frequency': np.sum(state_data > np.mean(state_data), axis=0) / len(state_data)
+            }
+        
+        # Identify characteristic neurons for each state
+        characteristic_neurons = {}
+        for state in range(n_states):
+            # Calculate neuron significance scores for the state
+            significance_scores = (
+                state_features[state]['mean_activity'] * 
+                state_features[state]['peak_frequency'] / 
+                (state_features[state]['std_activity'] + 1e-6)
+            )
+            
+            # Select neurons with highest significance scores
+            top_neurons = np.argsort(significance_scores)[-5:]  # Top 5 neurons for each state
+            characteristic_neurons[state] = {
+                'neuron_indices': top_neurons,
+                'significance_scores': significance_scores[top_neurons]
+            }
+        
+        # Analyze neuron activity patterns during state transitions
+        transition_patterns = self._analyze_transition_patterns(X_scaled, hidden_states)
+        
+        relationships = {
+            'state_features': state_features,
+            'characteristic_neurons': characteristic_neurons,
+            'transition_patterns': transition_patterns
+        }
+        
+        # Visualize results
+        self._visualize_neuron_state_relationships(relationships, n_states)
+        
+        return relationships
+    
+    def predict_transition_points(self, X_scaled, hidden_states):
+        """
+        Predict key time points of state transitions
+        Args:
+            X_scaled: Standardized neural activity data
+            hidden_states: Hidden state sequence predicted by HMM
+        Returns:
+            transition_points: Predicted transition point information
+        """
+        print("\nPredicting state transition points...")
+        
+        # Calculate overall change rate of neural activity
+        activity_derivative = np.diff(X_scaled, axis=0)
+        activity_change = np.sum(np.abs(activity_derivative), axis=1)
+        
+        # Standardize change rate
+        activity_change = zscore(activity_change)
+        
+        # Detect peaks as potential transition points
+        peaks, properties = find_peaks(activity_change, 
+                                     height=1.5,  # Only consider significant peaks
+                                     distance=10)  # Minimum distance between peaks
+        
+        # Get actual state transition points
+        true_transitions = np.where(np.diff(hidden_states) != 0)[0]
+        
+        # Analyze predicted transition points
+        transition_points = {
+            'predicted': peaks,
+            'actual': true_transitions,
+            'activity_change': activity_change,
+            'prediction_scores': properties['peak_heights']
+        }
+        
+        # Evaluate prediction accuracy
+        prediction_accuracy = self._evaluate_transition_predictions(
+            peaks, true_transitions, tolerance=5
+        )
+        transition_points['accuracy'] = prediction_accuracy
+        
+        # Visualize transition point prediction results
+        self._visualize_transition_points(transition_points, X_scaled)
+        
+        return transition_points
+    
+    def _analyze_transition_patterns(self, X_scaled, hidden_states):
+        """
+        Analyze neuron activity patterns during state transitions
+        Args:
+            X_scaled: Standardized neural activity data
+            hidden_states: Hidden state sequence
+        Returns:
+            patterns: List of transition pattern information
+        """
+        transitions = np.where(np.diff(hidden_states) != 0)[0]
+        window_size = 5  # Time window before and after transition
+        
+        patterns = []
+        for t in transitions:
+            if t >= window_size and t < len(X_scaled) - window_size:
+                before_transition = X_scaled[t-window_size:t]
+                after_transition = X_scaled[t+1:t+window_size+1]
+                
+                patterns.append({
+                    'time_point': t,
+                    'from_state': hidden_states[t],
+                    'tostate': hidden_states[t+1],
+                    'before_pattern': np.mean(before_transition, axis=0),
+                    'after_pattern': np.mean(after_transition, axis=0),
+                    'change_magnitude': np.mean(np.abs(after_transition - before_transition))
+                })
+        
+        return patterns
+    
+    def _evaluate_transition_predictions(self, predicted, actual, tolerance):
+        """Evaluate prediction accuracy"""
+        correct_predictions = 0
+        
+        for pred in predicted:
+            # Check if predicted point is within tolerance range of actual transition points
+            if np.any(np.abs(actual - pred) <= tolerance):
+                correct_predictions += 1
+        
+        precision = correct_predictions / len(predicted) if len(predicted) > 0 else 0
+        recall = correct_predictions / len(actual) if len(actual) > 0 else 0
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+        
+        return {
+            'precision': precision,
+            'recall': recall,
+            'f1_score': f1_score,
+            'tolerance': tolerance
+        }
+    
+    def _visualize_hmm_results(self, hmm_results, behavior_labels):
+        """Visualize HMM analysis results"""
+        # 1. State transition probability matrix heatmap
+        plt.figure(figsize=(12, 5))
+        
+        plt.subplot(1, 2, 1)
+        sns.heatmap(hmm_results['transition_matrix'], 
+                   annot=True, 
+                   fmt='.2f',
+                   xticklabels=behavior_labels,
+                   yticklabels=behavior_labels)
+        plt.title('State Transition Probability Matrix')
+        
+        # 2. State duration distribution
+        plt.subplot(1, 2, 2)
+        durations = list(hmm_results['avg_durations'].values())
+        plt.bar(range(len(durations)), durations)
+        plt.xticks(range(len(durations)), behavior_labels)
+        plt.title('Average State Duration')
+        plt.ylabel('Time Steps')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.config.analysis_dir, 'hmm_analysis.png'),
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    def _visualize_neuron_state_relationships(self, relationships, n_states):
+        """Visualize neuron-state relationship analysis results"""
+        plt.figure(figsize=(15, 10))
+        
+        # Plot characteristic neuron activity patterns
+        for state in range(n_states):
+            plt.subplot(n_states, 1, state+1)
+            neurons = relationships['characteristic_neurons'][state]['neuron_indices']
+            scores = relationships['characteristic_neurons'][state]['significance_scores']
+            
+            plt.bar(neurons, scores)
+            plt.title(f'Characteristic Neurons for State {state}')
+            plt.xlabel('Neuron ID')
+            plt.ylabel('Significance Score')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.config.analysis_dir, 'neuron_state_relationships.png'),
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    def _visualize_transition_points(self, transition_points, X_scaled):
+        """Visualize state transition point prediction results"""
+        plt.figure(figsize=(15, 8))
+        
+        # Plot neural activity change rate and predicted transition points
+        plt.plot(transition_points['activity_change'], 'b-', label='Activity Change Rate')
+        plt.plot(transition_points['predicted'], 
+                transition_points['activity_change'][transition_points['predicted']], 
+                'ro', label='Predicted Transitions')
+        plt.plot(transition_points['actual'],
+                transition_points['activity_change'][transition_points['actual']],
+                'go', label='Actual Transitions')
+        
+        plt.title('State Transition Point Prediction')
+        plt.xlabel('Time Steps')
+        plt.ylabel('Neural Activity Change Rate')
+        plt.legend()
+        
+        # Add prediction accuracy information
+        accuracy = transition_points['accuracy']
+        plt.text(0.02, 0.98, 
+                f'Precision: {accuracy["precision"]:.2f}\nRecall: {accuracy["recall"]:.2f}\nF1 Score: {accuracy["f1_score"]:.2f}',
+                transform=plt.gca().transAxes,
+                verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.config.analysis_dir, 'transition_points.png'),
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+
 def convert_to_serializable(obj):
     """
     将对象转换为可JSON序列化的格式
@@ -874,11 +1174,39 @@ def main():
         # 可视化分析结果
         analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
         
-        # 保存分析结果
-        results = {
-            'topology_metrics': topology_metrics,
-            'functional_modules': functional_modules
-        }
+        # 执行行为状态转换分析
+        print("\n开始行为状态转换分析...")
+        
+        # 1. HMM分析
+        hmm_results = analyzer.analyze_behavior_state_transitions(X_scaled, y)
+        if hmm_results is not None:
+            # 2. 分析神经元与状态转换的关系
+            relationships = analyzer.analyze_neuron_state_relationships(
+                X_scaled, 
+                hmm_results['hidden_states']
+            )
+            
+            # 3. 预测状态转换点
+            transition_points = analyzer.predict_transition_points(
+                X_scaled,
+                hmm_results['hidden_states']
+            )
+            
+            # 将状态转换分析结果添加到总结果中
+            results = {
+                'topology_metrics': topology_metrics,
+                'functional_modules': functional_modules,
+                'state_transitions': {
+                    'hmm_results': hmm_results,
+                    'neuron_state_relationships': relationships,
+                    'transition_points': transition_points
+                }
+            }
+        else:
+            results = {
+                'topology_metrics': topology_metrics,
+                'functional_modules': functional_modules
+            }
         
         # 将结果保存为JSON文件
         results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
