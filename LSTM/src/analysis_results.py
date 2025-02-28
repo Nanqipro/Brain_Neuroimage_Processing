@@ -19,6 +19,7 @@ from sklearn.preprocessing import MinMaxScaler
 from scipy.signal import find_peaks
 import warnings
 warnings.filterwarnings('ignore')
+from sklearn.decomposition import PCA
 
 from kmeans_lstm_analysis import EnhancedNeuronLSTM, NeuronDataProcessor
 from analysis_config import AnalysisConfig
@@ -796,35 +797,75 @@ class ResultAnalyzer:
 
     def analyze_behavior_state_transitions(self, X_scaled, y):
         """
-        Analyze behavior state transitions using HMM
-        Args:
-            X_scaled: Standardized neural activity data
-            y: Behavior labels
-        Returns:
-            hmm_results: HMM analysis results dictionary
+        使用HMM分析行为状态转换
+        
+        参数：
+            X_scaled: 标准化后的神经元活动数据
+            y: 行为标签
+            
+        返回：
+            hmm_results: HMM分析结果字典
         """
-        print("\nAnalyzing behavior state transitions...")
+        print("\n分析行为状态转换...")
         
-        # Initialize HMM model
-        n_states = len(np.unique(y))
-        model = hmm.GaussianHMM(
-            n_components=n_states, 
-            covariance_type="full",
-            n_iter=100,
-            random_state=42
-        )
+        # 行为样本平衡处理
+        X_balanced, y_balanced = self.balance_behaviors_for_hmm(X_scaled, y)
         
-        # Train HMM model
+        # 进一步降维处理，减少特征数量
+        n_components_pca = min(X_balanced.shape[1] // 5, 10)  # 更激进的降维
+        print(f"对输入数据进行PCA降维，从 {X_balanced.shape[1]} 减少到 {n_components_pca} 个特征")
+        pca = PCA(n_components=n_components_pca)
+        X_reduced = pca.fit_transform(X_balanced)
+        
+        # 使用模型选择找到最优HMM参数
+        best_params = self.select_optimal_hmm_params(X_reduced, y_balanced, max_states=4)
+        
+        # 如果没有找到有效参数，则尝试更小的降维和状态数
+        if not best_params:
+            print("尝试更简单的模型配置...")
+            n_components_pca = min(X_balanced.shape[1] // 10, 5)  # 更极端的降维
+            print(f"重新进行PCA降维，从 {X_balanced.shape[1]} 减少到 {n_components_pca} 个特征")
+            pca = PCA(n_components=n_components_pca)
+            X_reduced = pca.fit_transform(X_balanced)
+            
+            n_states = 2  # 固定使用2个状态
+            print(f"使用最小状态数: {n_states}")
+            
+            model = hmm.GaussianHMM(
+                n_components=n_states, 
+                covariance_type="tied",  # 使用共享协方差矩阵
+                n_iter=50,
+                random_state=42
+            )
+        else:
+            # 使用找到的最优参数
+            n_states = best_params['n_states']
+            model = best_params['model']
+        
+        # 计算并显示模型参数数量
+        n_features = X_reduced.shape[1]
+        if hasattr(model, 'covariance_type') and model.covariance_type == 'diag':
+            n_params = n_states * n_states + n_states * n_features + n_states * n_features
+        elif hasattr(model, 'covariance_type') and model.covariance_type == 'tied':
+            n_params = n_states * n_states + n_states * n_features + n_features*(n_features+1)//2
+        else:
+            n_params = n_states * n_states + n_states * n_features + n_states * n_features * (n_features+1) // 2
+            
+        n_samples = X_reduced.shape[0]
+        print(f"HMM模型参数数量: {n_params}, 数据样本数: {n_samples}")
+        
+        # 训练HMM模型
         try:
-            model.fit(X_scaled)
+            if not best_params:
+                model.fit(X_reduced)
             
-            # Predict hidden state sequence
-            hidden_states = model.predict(X_scaled)
+            # 预测隐藏状态序列
+            hidden_states = model.predict(X_reduced)
             
-            # Calculate transition probability matrix
+            # 计算转移概率矩阵
             transition_matrix = model.transmat_
             
-            # Analyze state durations
+            # 分析状态持续时间
             state_durations = []
             current_state = hidden_states[0]
             current_duration = 1
@@ -838,43 +879,60 @@ class ResultAnalyzer:
                     current_duration = 1
             state_durations.append((current_state, current_duration))
             
-            # Calculate average duration for each state
+            # 计算每个状态的平均持续时间
             avg_durations = {}
             for state in range(n_states):
                 durations = [d for s, d in state_durations if s == state]
                 avg_durations[state] = np.mean(durations) if durations else 0
             
+            # 分析状态-行为映射关系
+            mapping_probs = self.analyze_state_behavior_mapping(hidden_states, y_balanced)
+            
+            # 整理分析结果
+            model_score = model.score(X_reduced)
             hmm_results = {
                 'transition_matrix': transition_matrix,
                 'hidden_states': hidden_states,
                 'avg_durations': avg_durations,
-                'model_score': model.score(X_scaled)
+                'model_score': model_score,
+                'pca': pca,
+                'X_reduced': X_reduced,
+                'mapping_probs': mapping_probs,
+                'n_states': n_states,
+                'covariance_type': model.covariance_type if hasattr(model, 'covariance_type') else 'unknown',
+                'pca_components': n_components_pca,
+                'pca_explained_variance': pca.explained_variance_ratio_.tolist()
             }
             
-            # Visualize HMM results
+            # 可视化HMM结果
             self._visualize_hmm_results(hmm_results, self.behavior_labels)
             
             return hmm_results
             
         except Exception as e:
-            print(f"HMM analysis error: {str(e)}")
+            print(f"HMM分析错误: {str(e)}")
+            # 保存更详细的错误信息
+            import traceback
+            print(f"详细错误信息: {traceback.format_exc()}")
             return None
     
     def analyze_neuron_state_relationships(self, X_scaled, hidden_states):
         """
-        Analyze relationships between neuron activity patterns and state transitions
-        Args:
-            X_scaled: Standardized neural activity data
-            hidden_states: Hidden state sequence predicted by HMM
-        Returns:
-            relationships: Neuron-state relationship analysis results
+        分析神经元活动模式与状态转换之间的关系
+        
+        参数：
+            X_scaled: 标准化后的神经元活动数据
+            hidden_states: HMM预测的隐藏状态序列
+            
+        返回：
+            relationships: 神经元-状态关系分析结果
         """
-        print("\nAnalyzing neuron activity and state transition relationships...")
+        print("\n分析神经元活动与状态转换关系...")
         
         n_neurons = X_scaled.shape[1]
         n_states = len(np.unique(hidden_states))
         
-        # Calculate neuron activity features for each state
+        # 计算每个状态下的神经元活动特征
         state_features = {}
         for state in range(n_states):
             state_mask = (hidden_states == state)
@@ -919,31 +977,33 @@ class ResultAnalyzer:
     
     def predict_transition_points(self, X_scaled, hidden_states):
         """
-        Predict key time points of state transitions
-        Args:
-            X_scaled: Standardized neural activity data
-            hidden_states: Hidden state sequence predicted by HMM
-        Returns:
-            transition_points: Predicted transition point information
-        """
-        print("\nPredicting state transition points...")
+        预测状态转换的关键时间点
         
-        # Calculate overall change rate of neural activity
+        参数：
+            X_scaled: 标准化后的神经元活动数据
+            hidden_states: HMM预测的隐藏状态序列
+            
+        返回：
+            transition_points: 预测的转换点信息
+        """
+        print("\n预测状态转换点...")
+        
+        # 计算神经元活动的整体变化率
         activity_derivative = np.diff(X_scaled, axis=0)
         activity_change = np.sum(np.abs(activity_derivative), axis=1)
         
-        # Standardize change rate
+        # 标准化变化率
         activity_change = zscore(activity_change)
         
-        # Detect peaks as potential transition points
+        # 检测峰值作为潜在的转换点
         peaks, properties = find_peaks(activity_change, 
-                                     height=1.5,  # Only consider significant peaks
-                                     distance=10)  # Minimum distance between peaks
+                                     height=1.5,  # 仅考虑显著的峰值
+                                     distance=10)  # 峰值之间的最小距离
         
-        # Get actual state transition points
+        # 获取实际的状态转换点
         true_transitions = np.where(np.diff(hidden_states) != 0)[0]
         
-        # Analyze predicted transition points
+        # 分析预测的转换点
         transition_points = {
             'predicted': peaks,
             'actual': true_transitions,
@@ -951,28 +1011,30 @@ class ResultAnalyzer:
             'prediction_scores': properties['peak_heights']
         }
         
-        # Evaluate prediction accuracy
+        # 评估预测准确性
         prediction_accuracy = self._evaluate_transition_predictions(
             peaks, true_transitions, tolerance=5
         )
         transition_points['accuracy'] = prediction_accuracy
         
-        # Visualize transition point prediction results
+        # 可视化转换点预测结果
         self._visualize_transition_points(transition_points, X_scaled)
         
         return transition_points
     
     def _analyze_transition_patterns(self, X_scaled, hidden_states):
         """
-        Analyze neuron activity patterns during state transitions
-        Args:
-            X_scaled: Standardized neural activity data
-            hidden_states: Hidden state sequence
-        Returns:
-            patterns: List of transition pattern information
+        分析状态转换期间的神经元活动模式
+        
+        参数:
+            X_scaled: 标准化后的神经元活动数据
+            hidden_states: 隐藏状态序列
+            
+        返回:
+            patterns: 转换模式信息列表
         """
         transitions = np.where(np.diff(hidden_states) != 0)[0]
-        window_size = 5  # Time window before and after transition
+        window_size = 5  # 转换前后的时间窗口大小
         
         patterns = []
         for t in transitions:
@@ -983,7 +1045,7 @@ class ResultAnalyzer:
                 patterns.append({
                     'time_point': t,
                     'from_state': hidden_states[t],
-                    'tostate': hidden_states[t+1],
+                    'to_state': hidden_states[t+1],
                     'before_pattern': np.mean(before_transition, axis=0),
                     'after_pattern': np.mean(after_transition, axis=0),
                     'change_magnitude': np.mean(np.abs(after_transition - before_transition))
@@ -992,11 +1054,21 @@ class ResultAnalyzer:
         return patterns
     
     def _evaluate_transition_predictions(self, predicted, actual, tolerance):
-        """Evaluate prediction accuracy"""
+        """
+        评估转换点预测的准确性
+        
+        参数:
+            predicted: 预测的转换点
+            actual: 实际的转换点
+            tolerance: 容忍误差范围
+            
+        返回:
+            评估指标字典，包含精确率、召回率和F1分数
+        """
         correct_predictions = 0
         
         for pred in predicted:
-            # Check if predicted point is within tolerance range of actual transition points
+            # 检查预测点是否在实际转换点的容忍范围内
             if np.any(np.abs(actual - pred) <= tolerance):
                 correct_predictions += 1
         
@@ -1012,25 +1084,33 @@ class ResultAnalyzer:
         }
     
     def _visualize_hmm_results(self, hmm_results, behavior_labels):
-        """Visualize HMM analysis results"""
-        # 1. State transition probability matrix heatmap
+        """可视化HMM分析结果"""
+        # 1. 状态转换概率矩阵热图
         plt.figure(figsize=(12, 5))
+        
+        # 获取实际的状态数量
+        n_states = len(hmm_results['transition_matrix'])
+        
+        # 生成适当的状态标签
+        state_labels = [f'State {i+1}' for i in range(n_states)]
         
         plt.subplot(1, 2, 1)
         sns.heatmap(hmm_results['transition_matrix'], 
                    annot=True, 
                    fmt='.2f',
-                   xticklabels=behavior_labels,
-                   yticklabels=behavior_labels)
-        plt.title('State Transition Probability Matrix')
+                   xticklabels=state_labels,
+                   yticklabels=state_labels)
+        plt.title('State Transition Probability Matrix', fontsize=14)
+        plt.xlabel('Target State', fontsize=12)
+        plt.ylabel('Initial State', fontsize=12)
         
-        # 2. State duration distribution
+        # 2. 状态持续时间分布
         plt.subplot(1, 2, 2)
         durations = list(hmm_results['avg_durations'].values())
         plt.bar(range(len(durations)), durations)
-        plt.xticks(range(len(durations)), behavior_labels)
-        plt.title('Average State Duration')
-        plt.ylabel('Time Steps')
+        plt.xticks(range(len(durations)), state_labels)
+        plt.title('Average State Duration', fontsize=14)
+        plt.ylabel('Time Steps', fontsize=12)
         
         plt.tight_layout()
         plt.savefig(os.path.join(self.config.analysis_dir, 'hmm_analysis.png'),
@@ -1038,19 +1118,19 @@ class ResultAnalyzer:
         plt.close()
     
     def _visualize_neuron_state_relationships(self, relationships, n_states):
-        """Visualize neuron-state relationship analysis results"""
+        """可视化神经元与状态关系分析结果"""
         plt.figure(figsize=(15, 10))
         
-        # Plot characteristic neuron activity patterns
+        # 绘制各状态的特征神经元活动模式
         for state in range(n_states):
             plt.subplot(n_states, 1, state+1)
             neurons = relationships['characteristic_neurons'][state]['neuron_indices']
             scores = relationships['characteristic_neurons'][state]['significance_scores']
             
             plt.bar(neurons, scores)
-            plt.title(f'Characteristic Neurons for State {state}')
-            plt.xlabel('Neuron ID')
-            plt.ylabel('Significance Score')
+            plt.title(f'Characteristic Neurons for State {state+1}', fontsize=14)
+            plt.xlabel('Neuron ID', fontsize=12)
+            plt.ylabel('Significance Score', fontsize=12)
         
         plt.tight_layout()
         plt.savefig(os.path.join(self.config.analysis_dir, 'neuron_state_relationships.png'),
@@ -1058,24 +1138,24 @@ class ResultAnalyzer:
         plt.close()
     
     def _visualize_transition_points(self, transition_points, X_scaled):
-        """Visualize state transition point prediction results"""
+        """可视化状态转换点预测结果"""
         plt.figure(figsize=(15, 8))
         
-        # Plot neural activity change rate and predicted transition points
-        plt.plot(transition_points['activity_change'], 'b-', label='Activity Change Rate')
+        # 绘制神经元活动变化率和预测的转换点
+        plt.plot(transition_points['activity_change'], 'b-', label='Neural Activity Change Rate')
         plt.plot(transition_points['predicted'], 
                 transition_points['activity_change'][transition_points['predicted']], 
-                'ro', label='Predicted Transitions')
+                'ro', label='Predicted Transition Points')
         plt.plot(transition_points['actual'],
                 transition_points['activity_change'][transition_points['actual']],
-                'go', label='Actual Transitions')
+                'go', label='Actual Transition Points')
         
-        plt.title('State Transition Point Prediction')
-        plt.xlabel('Time Steps')
-        plt.ylabel('Neural Activity Change Rate')
-        plt.legend()
+        plt.title('State Transition Point Prediction', fontsize=14)
+        plt.xlabel('Time Steps', fontsize=12)
+        plt.ylabel('Neural Activity Change Rate', fontsize=12)
+        plt.legend(fontsize=11)
         
-        # Add prediction accuracy information
+        # 添加预测准确性信息
         accuracy = transition_points['accuracy']
         plt.text(0.02, 0.98, 
                 f'Precision: {accuracy["precision"]:.2f}\nRecall: {accuracy["recall"]:.2f}\nF1 Score: {accuracy["f1_score"]:.2f}',
@@ -1087,6 +1167,174 @@ class ResultAnalyzer:
         plt.savefig(os.path.join(self.config.analysis_dir, 'transition_points.png'),
                    dpi=300, bbox_inches='tight')
         plt.close()
+
+    def balance_behaviors_for_hmm(self, X_scaled, y):
+        """
+        平衡行为样本用于HMM分析
+        
+        参数：
+            X_scaled: 标准化后的神经元活动数据
+            y: 行为标签
+            
+        返回：
+            X_filtered: 处理后的神经元活动数据
+            y_filtered: 处理后的行为标签
+        """
+        unique_labels, counts = np.unique(y, return_counts=True)
+        min_samples = 5  # 每个类别至少需要5个样本
+        
+        # 找出样本数不足的行为
+        rare_behaviors = [label for label, count in zip(unique_labels, counts) if count < min_samples]
+        
+        if not rare_behaviors:
+            return X_scaled, y
+        
+        print(f"对样本量少于{min_samples}的行为进行处理: {[self.behavior_labels[b] for b in rare_behaviors]}")
+        
+        # 处理方法1: 移除极少样本的行为
+        mask = np.array([label not in rare_behaviors for label in y])
+        X_filtered = X_scaled[mask]
+        y_filtered = y[mask]
+        
+        # 更新样本统计信息
+        remaining_labels, remaining_counts = np.unique(y_filtered, return_counts=True)
+        print("处理后的行为样本统计:")
+        for label, count in zip(remaining_labels, remaining_counts):
+            print(f"  {self.behavior_labels[label]}: {count} 个样本")
+        
+        return X_filtered, y_filtered
+
+    def select_optimal_hmm_params(self, X_reduced, y, max_states=5):
+        """
+        选择最优HMM参数
+        
+        参数:
+            X_reduced: 降维后的数据
+            y: 行为标签
+            max_states: 最大状态数
+            
+        返回:
+            best_params: 包含最优参数的字典
+        """
+        print("选择最优HMM参数...")
+        best_score = -np.inf
+        best_params = {}
+        
+        # 测试不同的状态数量
+        for n_states in range(2, min(max_states, len(np.unique(y)))+1):
+            # 测试不同的协方差类型
+            for cov_type in ['diag', 'tied']:
+                try:
+                    model = hmm.GaussianHMM(
+                        n_components=n_states,
+                        covariance_type=cov_type,
+                        n_iter=50,
+                        random_state=42
+                    )
+                    
+                    # 计算参数数量
+                    n_features = X_reduced.shape[1]
+                    if cov_type == 'diag':
+                        n_params = n_states * n_states + n_states * n_features + n_states * n_features
+                    elif cov_type == 'tied':
+                        n_params = n_states * n_states + n_states * n_features + n_features*(n_features+1)//2
+                    else:
+                        n_params = n_states * n_states + n_states * n_features + n_states * n_features * (n_features+1) // 2
+                    
+                    n_samples = X_reduced.shape[0]
+                    
+                    # 如果参数过多，跳过此配置
+                    if n_params >= n_samples:
+                        print(f"  跳过: 状态数={n_states}, 协方差类型={cov_type}, 参数数量({n_params})>=样本数({n_samples})")
+                        continue
+                        
+                    print(f"  尝试: 状态数={n_states}, 协方差类型={cov_type}, 参数数量={n_params}")
+                    model.fit(X_reduced)
+                    score = model.score(X_reduced)
+                    
+                    print(f"  结果: 状态数={n_states}, 协方差类型={cov_type}, 分数={score:.2f}")
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_params = {
+                            'n_states': n_states,
+                            'cov_type': cov_type,
+                            'score': score,
+                            'model': model
+                        }
+                except Exception as e:
+                    print(f"  尝试参数(状态数={n_states}, 协方差类型={cov_type})失败: {str(e)}")
+                    continue
+        
+        if best_params:
+            print(f"最优HMM参数: 状态数={best_params['n_states']}, 协方差类型={best_params['cov_type']}, 分数={best_params['score']:.2f}")
+        else:
+            print("未找到有效的HMM参数配置")
+            
+        return best_params
+
+    def analyze_state_behavior_mapping(self, hidden_states, y):
+        """
+        分析HMM状态与行为标签的对应关系
+        
+        参数:
+            hidden_states: HMM预测的隐藏状态序列
+            y: 行为标签
+            
+        返回:
+            mapping_probs: 状态-行为映射概率矩阵
+        """
+        print("\n分析状态-行为映射关系...")
+        n_states = len(np.unique(hidden_states))
+        n_behaviors = len(np.unique(y))
+        
+        # 创建映射矩阵（状态 x 行为）
+        mapping_matrix = np.zeros((n_states, n_behaviors))
+        
+        # 统计每个状态对应不同行为的频次
+        for i in range(len(y)):
+            state = hidden_states[i]
+            behavior = y[i]
+            mapping_matrix[state, behavior] += 1
+        
+        # 按行归一化，得到每个状态对应各行为的概率
+        row_sums = mapping_matrix.sum(axis=1).reshape(-1, 1)
+        mapping_probs = np.zeros_like(mapping_matrix)
+        non_zero_rows = (row_sums > 0).flatten()
+        
+        if np.any(non_zero_rows):
+            mapping_probs[non_zero_rows] = mapping_matrix[non_zero_rows] / row_sums[non_zero_rows]
+        
+        # 生成行为标签
+        behavior_labels = [self.behavior_labels[i] for i in range(n_behaviors) if i in np.unique(y)]
+        
+        # 可视化映射关系
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(mapping_probs, 
+                   cmap='viridis',
+                   annot=True,
+                   fmt='.2f',
+                   xticklabels=behavior_labels,
+                   yticklabels=[f'State {i+1}' for i in range(n_states)])
+        plt.title('HMM State-Behavior Mapping Relationship', fontsize=14)
+        plt.xlabel('Behavior Labels', fontsize=12)
+        plt.ylabel('HMM States', fontsize=12)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.config.analysis_dir, 'state_behavior_mapping.png'),
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # 输出映射结果
+        print("状态-行为映射概率:")
+        for state in range(n_states):
+            state_behaviors = []
+            for behavior_idx in range(n_behaviors):
+                if behavior_idx in np.unique(y) and mapping_probs[state, behavior_idx] > 0.1:
+                    state_behaviors.append(f"{self.behavior_labels[behavior_idx]}({mapping_probs[state, behavior_idx]:.2f})")
+            
+            print(f"  状态{state+1} 主要对应行为: {', '.join(state_behaviors)}")
+        
+        return mapping_probs
 
 def convert_to_serializable(obj):
     """
@@ -1197,7 +1445,16 @@ def main():
                 'topology_metrics': topology_metrics,
                 'functional_modules': functional_modules,
                 'state_transitions': {
-                    'hmm_results': hmm_results,
+                    'hmm_results': {
+                        'transition_matrix': hmm_results['transition_matrix'],
+                        'avg_durations': hmm_results['avg_durations'],
+                        'model_score': float(hmm_results['model_score']),
+                        'n_states': hmm_results['n_states'],
+                        'covariance_type': hmm_results['covariance_type'],
+                        'pca_components': hmm_results['pca_components'],
+                        'pca_explained_variance': hmm_results['pca_explained_variance'],
+                        'mapping_probs': hmm_results['mapping_probs'].tolist() if 'mapping_probs' in hmm_results else None
+                    },
                     'neuron_state_relationships': relationships,
                     'transition_points': transition_points
                 }
