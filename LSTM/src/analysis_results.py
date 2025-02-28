@@ -765,9 +765,16 @@ class ResultAnalyzer:
                     node_colors.append(colors[i])
                     break
         
+        # 创建节点ID标签 - 为每个节点分配1,2,3...的编号
+        node_id_labels = {node: str(i+1) for i, node in enumerate(G.nodes())}
+        
         # 绘制网络
         nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=100)
         nx.draw_networkx_edges(G, pos, alpha=0.2)
+        
+        # 添加节点ID标签
+        nx.draw_networkx_labels(G, pos, labels=node_id_labels, font_size=8, font_color='black', font_weight='bold')
+        
         plt.title('Neuron Functional Network', fontsize=16)
         plt.savefig(os.path.join(self.config.analysis_dir, 'neuron_network.png'), 
                    dpi=300, bbox_inches='tight')
@@ -1373,6 +1380,15 @@ def convert_to_serializable(obj):
         return float(obj)
     elif isinstance(obj, (set, frozenset)):
         return list(obj)
+    elif 'networkx' in str(type(obj)):
+        try:
+            # 如果是NetworkX图对象，转换为边列表和节点列表
+            return {
+                'nodes': list(obj.nodes()),
+                'edges': [(u, v, d.get('weight', 1.0)) for u, v, d in obj.edges(data=True)]
+            }
+        except:
+            return str(obj)
     return obj
 
 def main():
@@ -1438,6 +1454,16 @@ def main():
         # 可视化分析结果
         analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
         
+        # 生成交互式神经元网络可视化
+        try:
+            from visualization import VisualizationManager
+            visualizer = VisualizationManager(config)
+            interactive_path = visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
+            if interactive_path:
+                print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
+        except Exception as e:
+            print(f"生成交互式神经元网络可视化时出错: {str(e)}")
+        
         # 执行行为状态转换分析
         print("\n开始行为状态转换分析...")
         
@@ -1484,6 +1510,11 @@ def main():
         # 将结果保存为JSON文件
         results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
         print(f"\n保存分析结果到: {results_path}")
+        
+        # 添加网络图对象到结果中
+        if 'topology_metrics' in results:
+            results['topology_metrics']['graph'] = G
+            
         with open(results_path, 'w', encoding='utf-8') as f:
             serializable_results = convert_to_serializable(results)
             json.dump(serializable_results, f, indent=4, ensure_ascii=False)
