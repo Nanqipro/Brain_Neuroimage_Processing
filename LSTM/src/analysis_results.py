@@ -564,6 +564,15 @@ class ResultAnalyzer:
         # 获取实际的神经元数量
         n_neurons = X_scaled.shape[1]
         
+        # 获取可用的神经元编号列表（排除缺失的神经元）
+        neuron_cols = [f'n{i}' for i in range(1, 63)]  # 假设总共有62个可能的神经元
+        available_neurons = self.processor.available_neuron_cols
+        
+        if not hasattr(self.processor, 'available_neuron_cols'):
+            # 如果处理器没有保存可用神经元列表，使用默认方法
+            print("警告: 找不到可用神经元列表，使用连续编号")
+            available_neurons = [f'n{i+1}' for i in range(n_neurons)]
+        
         # 创建相关性矩阵
         correlation_matrix = np.zeros((n_neurons, n_neurons))
         
@@ -578,7 +587,6 @@ class ResultAnalyzer:
         G = nx.Graph()
         
         # 添加节点(使用实际的神经元编号)
-        available_neurons = [f'n{i+1}' for i in range(n_neurons)]
         for neuron in available_neurons:
             G.add_node(neuron)
         
@@ -702,10 +710,18 @@ class ResultAnalyzer:
         # 执行聚类
         labels = clustering.fit_predict(similarity_matrix)
         
+        # 创建神经元索引到名称的映射
+        if len(available_neurons) != len(labels):
+            print(f"警告: 神经元列表长度({len(available_neurons)})与标签长度({len(labels)})不匹配")
+            
+        # 确保有足够的神经元标签
+        neurons_by_index = {i: neuron for i, neuron in enumerate(available_neurons)}
+        
         # 整理模块信息
         modules = {}
         for i in range(n_clusters):
-            module_neurons = [available_neurons[j] for j in range(len(labels)) if labels[j] == i]
+            # 使用映射获取该模块的神经元
+            module_neurons = [neurons_by_index[j] for j in range(len(labels)) if labels[j] == i]
             modules[f'Module_{i+1}'] = {
                 'neurons': module_neurons,
                 'size': len(module_neurons),

@@ -50,6 +50,9 @@ class NeuronDataProcessor:
         print(f"Available neurons: {len(available_cols)}")
         print(f"Missing neurons: {set(neuron_cols) - set(available_cols)}")
         
+        # 保存可用的神经元列名列表，以便其他方法使用
+        self.available_neuron_cols = available_cols
+        
         # Get only available neuron data
         X = self.data[available_cols].values
         
