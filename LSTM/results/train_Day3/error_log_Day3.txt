@@ -2,3 +2,13 @@ Epoch 8: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\mo
 Epoch 12: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.
 Epoch 4: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.
 Epoch 13: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.
+
+--------------------------------------------------
+时间: 2025-02-28 20:12:51
+错误: LSTM: Expected input to be 2D or 3D, got 4D instead
+Epoch 5: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.
+Epoch 7: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.
+Epoch 8: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.
+Epoch 13: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.
+Epoch 20: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.
+Epoch 33: 保存模型失败 - File D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day3.pth cannot be opened.

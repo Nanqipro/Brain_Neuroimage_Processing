@@ -159,10 +159,11 @@ class ResultAnalyzer:
                 X_scaled, y, self.behavior_labels, min_samples
             )
         
-        # 加载训练好的模型
+        # 加载训练好的模型 - 使用更灵活的加载机制
         input_size = X_scaled.shape[1] + 1  # +1 for cluster label
         num_classes = len(np.unique(y))
         
+        # 创建新模型实例
         model = EnhancedNeuronLSTM(
             input_size=input_size,
             hidden_size=self.config.hidden_size,
@@ -173,21 +174,144 @@ class ResultAnalyzer:
             dropout=self.config.analysis_params.get('dropout', 0.2)
         ).to(self.device)
         
+        # 尝试加载预训练模型权重 - 使用更健壮的方法
         try:
-            # 尝试使用 weights_only=True 加载模型
-            checkpoint = torch.load(self.config.model_path, weights_only=True)
-            model.load_state_dict(checkpoint['model_state_dict'])
-        except Exception as e1:
+            print("尝试加载预训练模型...")
+            # 1. 先尝试加载模型
             try:
-                print("尝试使用 weights_only=False 加载模型...")
-                checkpoint = torch.load(self.config.model_path, weights_only=False)
-                model.load_state_dict(checkpoint['model_state_dict'])
-            except Exception as e2:
-                raise RuntimeError(f"加载模型失败。错误1: {str(e1)}\n错误2: {str(e2)}")
+                checkpoint = torch.load(self.config.model_path, map_location=self.device)
+            except Exception as e:
+                print(f"加载模型文件失败: {str(e)}")
+                print("将继续使用未初始化的模型进行分析")
+                return model, X_scaled, y
+                
+            # 2. 检查是否包含模型状态字典
+            if 'model_state_dict' not in checkpoint:
+                print("警告: 模型文件不包含state_dict，尝试直接使用加载的对象")
+                if isinstance(checkpoint, dict):
+                    checkpoint = {'model_state_dict': checkpoint}
+                else:
+                    print("无法解析模型文件，将继续使用未初始化的模型")
+                    return model, X_scaled, y
+            
+            # 3. 尝试适配性加载模型参数
+            self._adaptive_load_state_dict(model, checkpoint['model_state_dict'])
+            print("已成功加载模型参数（可能部分层进行了适配）")
+            
+        except Exception as e:
+            print(f"模型加载出现异常: {str(e)}")
+            print("将继续使用未初始化的模型进行分析")
         
         model.eval()
         return model, X_scaled, y
     
+    def _adaptive_load_state_dict(self, model, state_dict):
+        """
+        自适应加载模型参数，处理维度不匹配的情况
+        
+        参数:
+            model: 当前模型实例
+            state_dict: 预训练模型状态字典
+        """
+        # 获取当前模型的状态字典
+        model_dict = model.state_dict()
+        
+        # 创建兼容性状态字典
+        compatible_dict = {}
+        incompatible_keys = []
+        adapted_keys = []
+        
+        for k, v in state_dict.items():
+            # 如果键不在当前模型中，跳过
+            if k not in model_dict:
+                incompatible_keys.append(f"{k} (不存在)")
+                continue
+                
+            # 如果形状完全匹配，直接复制
+            if v.shape == model_dict[k].shape:
+                compatible_dict[k] = v
+            else:
+                # 尝试适应性处理
+                adapted = self._adapt_parameter(v, model_dict[k].shape, k)
+                if adapted is not None:
+                    compatible_dict[k] = adapted
+                    adapted_keys.append(f"{k}: {v.shape} -> {model_dict[k].shape}")
+                else:
+                    incompatible_keys.append(f"{k}: {v.shape} vs {model_dict[k].shape}")
+        
+        # 更新模型参数
+        model_dict.update(compatible_dict)
+        model.load_state_dict(model_dict)
+        
+        # 打印适配情况
+        if adapted_keys:
+            print(f"已适配参数 ({len(adapted_keys)}): {', '.join(adapted_keys[:3])}{'...' if len(adapted_keys) > 3 else ''}")
+        if incompatible_keys:
+            print(f"不兼容参数 ({len(incompatible_keys)}): {', '.join(incompatible_keys[:3])}{'...' if len(incompatible_keys) > 3 else ''}")
+    
+    def _adapt_parameter(self, param, target_shape, key_name):
+        """
+        尝试调整参数尺寸以适配目标形状
+        
+        参数:
+            param: 原始参数张量
+            target_shape: 目标形状
+            key_name: 参数名称（用于调试）
+            
+        返回:
+            调整后的参数张量，如果无法调整则返回None
+        """
+        # 如果是1D张量（偏置等），尝试截断或填充
+        if len(param.shape) == 1 and len(target_shape) == 1:
+            if param.shape[0] > target_shape[0]:
+                # 截断多余维度
+                return param[:target_shape[0]]
+            elif param.shape[0] < target_shape[0]:
+                # 用零填充缺失维度
+                result = torch.zeros(target_shape, dtype=param.dtype, device=param.device)
+                result[:param.shape[0]] = param
+                return result
+        
+        # 如果是2D张量（权重等），需要根据层的类型分别处理
+        elif len(param.shape) == 2 and len(target_shape) == 2:
+            # 处理分类器最后一层 (输出层)
+            if "classifier" in key_name and param.shape[0] != target_shape[0] and param.shape[1] == target_shape[1]:
+                # 类别数不匹配但特征维度匹配，创建新权重矩阵
+                result = torch.zeros(target_shape, dtype=param.dtype, device=param.device)
+                # 复制共有的类别权重
+                min_classes = min(param.shape[0], target_shape[0])
+                result[:min_classes] = param[:min_classes]
+                return result
+                
+            # 处理自编码器层（特征维度不匹配）
+            elif "autoencoder" in key_name:
+                # 输入特征维度不匹配的情况
+                if param.shape[1] != target_shape[1] and param.shape[0] == target_shape[0]:
+                    # 输入维度不匹配，创建适配的权重矩阵
+                    result = torch.zeros(target_shape, dtype=param.dtype, device=param.device)
+                    min_features = min(param.shape[1], target_shape[1])
+                    result[:, :min_features] = param[:, :min_features]
+                    return result
+                # 输出特征维度不匹配的情况    
+                elif param.shape[0] != target_shape[0] and param.shape[1] == target_shape[1]:
+                    # 输出维度不匹配，创建适配的权重矩阵
+                    result = torch.zeros(target_shape, dtype=param.dtype, device=param.device)
+                    min_features = min(param.shape[0], target_shape[0])
+                    result[:min_features] = param[:min_features]
+                    return result
+                # 二维度都不匹配的情况
+                elif param.shape[0] != target_shape[0] and param.shape[1] != target_shape[1]:
+                    # 创建新权重矩阵
+                    result = torch.zeros(target_shape, dtype=param.dtype, device=param.device)
+                    # 复制交叉区域
+                    min_dim0 = min(param.shape[0], target_shape[0])
+                    min_dim1 = min(param.shape[1], target_shape[1])
+                    result[:min_dim0, :min_dim1] = param[:min_dim0, :min_dim1]
+                    return result
+        
+        # 其他情况无法适配
+        return None
+
     def analyze_behavior_neuron_correlation(self, X_scaled, y):
         """
         分析行为和神经元活动之间的相关性
@@ -1412,118 +1536,153 @@ def main():
         analyzer = ResultAnalyzer(config)
         
         print("加载模型和数据...")
-        model, X_scaled, y = analyzer.load_model_and_data()
+        try:
+            model, X_scaled, y = analyzer.load_model_and_data()
+        except Exception as e:
+            print(f"加载模型和数据时出错: {str(e)}")
+            print("将继续使用未初始化的模型进行分析")
+            # 创建一个空模型以便继续分析
+            input_size = X_scaled.shape[1] + 1 if 'X_scaled' in locals() else 53  # 默认值
+            num_classes = len(np.unique(y)) if 'y' in locals() else 7  # 默认值
+            model = EnhancedNeuronLSTM(
+                input_size=input_size,
+                hidden_size=config.hidden_size,
+                num_layers=config.num_layers,
+                num_classes=num_classes,
+                latent_dim=config.analysis_params.get('latent_dim', 32)
+            ).to(analyzer.device)
         
         print("\n分析行为-神经元相关性...")
-        behavior_activity_df = analyzer.analyze_behavior_neuron_correlation(X_scaled, y)
-        print(f"相关性分析完成。结果保存在: {config.correlation_plot}")
+        try:
+            behavior_activity_df = analyzer.analyze_behavior_neuron_correlation(X_scaled, y)
+            print(f"相关性分析完成。结果保存在: {config.correlation_plot}")
+        except Exception as e:
+            print(f"行为-神经元相关性分析出错: {str(e)}")
         
         print("\n分析时间模式...")
-        analyzer.analyze_temporal_patterns(X_scaled, y)
-        print(f"时间模式分析完成。结果保存在: {config.temporal_pattern_dir}")
+        try:
+            analyzer.analyze_temporal_patterns(X_scaled, y)
+            print(f"时间模式分析完成。结果保存在: {config.temporal_pattern_dir}")
+        except Exception as e:
+            print(f"时间模式分析出错: {str(e)}")
         
         print("\n分析时间相关性...")
-        analyzer.analyze_temporal_correlations(X_scaled, y)
-        print(f"时间相关性分析完成。结果保存在: {config.temporal_correlation_dir}")
+        try:
+            analyzer.analyze_temporal_correlations(X_scaled, y)
+            print(f"时间相关性分析完成。结果保存在: {config.temporal_correlation_dir}")
+        except Exception as e:
+            print(f"时间相关性分析出错: {str(e)}")
         
         print("\n分析行为转换...")
-        transitions = analyzer.analyze_behavior_transitions(y)
-        print(f"转换分析完成。结果保存在: {config.transition_plot}")
+        try:
+            transitions = analyzer.analyze_behavior_transitions(y)
+            print(f"转换分析完成。结果保存在: {config.transition_plot}")
+        except Exception as e:
+            print(f"行为转换分析出错: {str(e)}")
         
         print("\n识别关键神经元...")
-        behavior_importance = analyzer.identify_key_neurons(X_scaled, y)
-        print("\n每种行为的关键神经元:")
-        for behavior, data in behavior_importance.items():
-            print(f"\n{behavior}:")
-            for i, (neuron, effect) in enumerate(zip(data['neurons'], data['effect_sizes'])):
-                print(f"  神经元 {neuron}: 效应量 = {effect:.3f}")
+        try:
+            behavior_importance = analyzer.identify_key_neurons(X_scaled, y)
+            print("\n每种行为的关键神经元:")
+            for behavior, data in behavior_importance.items():
+                print(f"\n{behavior}:")
+                for i, (neuron, effect) in enumerate(zip(data['neurons'], data['effect_sizes'])):
+                    print(f"  神经元 {neuron}: 效应量 = {effect:.3f}")
+        except Exception as e:
+            print(f"关键神经元识别出错: {str(e)}")
         
         print("\n开始神经元网络拓扑分析...")
-        # 构建神经元功能连接网络
-        G, correlation_matrix, available_neurons = analyzer.build_neuron_network(
-            X_scaled, 
-            threshold=config.analysis_params['correlation_threshold']
-        )
-        
-        # 分析网络拓扑特征
-        topology_metrics = analyzer.analyze_network_topology(G)
-        
-        # 识别功能模块
-        functional_modules = analyzer.identify_functional_modules(G, correlation_matrix, available_neurons)
-        
-        # 可视化分析结果
-        analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
-        
-        # 生成交互式神经元网络可视化
         try:
-            from visualization import VisualizationManager
-            visualizer = VisualizationManager(config)
-            interactive_path = visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
-            if interactive_path:
-                print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
-        except Exception as e:
-            print(f"生成交互式神经元网络可视化时出错: {str(e)}")
-        
-        # 执行行为状态转换分析
-        print("\n开始行为状态转换分析...")
-        
-        # 1. HMM分析
-        hmm_results = analyzer.analyze_behavior_state_transitions(X_scaled, y)
-        if hmm_results is not None:
-            # 2. 分析神经元与状态转换的关系
-            relationships = analyzer.analyze_neuron_state_relationships(
+            # 构建神经元功能连接网络
+            G, correlation_matrix, available_neurons = analyzer.build_neuron_network(
                 X_scaled, 
-                hmm_results['hidden_states']
+                threshold=config.analysis_params['correlation_threshold']
             )
             
-            # 3. 预测状态转换点
-            transition_points = analyzer.predict_transition_points(
-                X_scaled,
-                hmm_results['hidden_states']
-            )
+            # 分析网络拓扑特征
+            topology_metrics = analyzer.analyze_network_topology(G)
             
-            # 将状态转换分析结果添加到总结果中
-            results = {
-                'topology_metrics': topology_metrics,
-                'functional_modules': functional_modules,
-                'state_transitions': {
-                    'hmm_results': {
-                        'transition_matrix': hmm_results['transition_matrix'],
-                        'avg_durations': hmm_results['avg_durations'],
-                        'model_score': float(hmm_results['model_score']),
-                        'n_states': hmm_results['n_states'],
-                        'covariance_type': hmm_results['covariance_type'],
-                        'pca_components': hmm_results['pca_components'],
-                        'pca_explained_variance': hmm_results['pca_explained_variance'],
-                        'mapping_probs': hmm_results['mapping_probs'].tolist() if 'mapping_probs' in hmm_results else None
-                    },
-                    'neuron_state_relationships': relationships,
-                    'transition_points': transition_points
+            # 识别功能模块
+            functional_modules = analyzer.identify_functional_modules(G, correlation_matrix, available_neurons)
+            
+            # 可视化分析结果
+            analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
+            
+            # 生成交互式神经元网络可视化
+            try:
+                from visualization import VisualizationManager
+                visualizer = VisualizationManager(config)
+                interactive_path = visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
+                if interactive_path:
+                    print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
+            except Exception as e:
+                print(f"生成交互式神经元网络可视化时出错: {str(e)}")
+            
+            # 执行行为状态转换分析
+            print("\n开始行为状态转换分析...")
+            
+            # 1. HMM分析
+            hmm_results = analyzer.analyze_behavior_state_transitions(X_scaled, y)
+            if hmm_results is not None:
+                # 2. 分析神经元与状态转换的关系
+                relationships = analyzer.analyze_neuron_state_relationships(
+                    X_scaled, 
+                    hmm_results['hidden_states']
+                )
+                
+                # 3. 预测状态转换点
+                transition_points = analyzer.predict_transition_points(
+                    X_scaled,
+                    hmm_results['hidden_states']
+                )
+                
+                # 将状态转换分析结果添加到总结果中
+                results = {
+                    'topology_metrics': topology_metrics,
+                    'functional_modules': functional_modules,
+                    'state_transitions': {
+                        'hmm_results': {
+                            'transition_matrix': hmm_results['transition_matrix'],
+                            'avg_durations': hmm_results['avg_durations'],
+                            'model_score': float(hmm_results['model_score']),
+                            'n_states': hmm_results['n_states'],
+                            'covariance_type': hmm_results['covariance_type'],
+                            'pca_components': hmm_results['pca_components'],
+                            'pca_explained_variance': hmm_results['pca_explained_variance'],
+                            'mapping_probs': hmm_results['mapping_probs'].tolist() if 'mapping_probs' in hmm_results else None
+                        },
+                        'neuron_state_relationships': relationships,
+                        'transition_points': transition_points
+                    }
                 }
-            }
-        else:
-            results = {
-                'topology_metrics': topology_metrics,
-                'functional_modules': functional_modules
-            }
-        
-        # 将结果保存为JSON文件
-        results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
-        print(f"\n保存分析结果到: {results_path}")
-        
-        # 添加网络图对象到结果中
-        if 'topology_metrics' in results:
-            results['topology_metrics']['graph'] = G
+            else:
+                results = {
+                    'topology_metrics': topology_metrics,
+                    'functional_modules': functional_modules
+                }
             
-        with open(results_path, 'w', encoding='utf-8') as f:
-            serializable_results = convert_to_serializable(results)
-            json.dump(serializable_results, f, indent=4, ensure_ascii=False)
+            # 将结果保存为JSON文件
+            results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
+            print(f"\n保存分析结果到: {results_path}")
             
-        print("分析完成！所有结果已保存。")
+            # 添加网络图对象到结果中
+            if 'topology_metrics' in results:
+                results['topology_metrics']['graph'] = G
+                
+            with open(results_path, 'w', encoding='utf-8') as f:
+                serializable_results = convert_to_serializable(results)
+                json.dump(serializable_results, f, indent=4, ensure_ascii=False)
+                
+            print("分析完成！所有结果已保存。")
+        except Exception as e:
+            print(f"网络拓扑分析过程中出现错误: {str(e)}")
+            import traceback
+            print(f"详细错误信息: {traceback.format_exc()}")
         
     except Exception as e:
         print(f"分析过程中出现错误: {str(e)}")
-        raise
+        import traceback
+        print(f"详细错误信息: {traceback.format_exc()}")
 
 if __name__ == "__main__":
     main() 

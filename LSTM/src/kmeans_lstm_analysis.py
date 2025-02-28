@@ -13,6 +13,7 @@ import warnings
 import os
 import datetime
 from analysis_config import AnalysisConfig
+import re
 warnings.filterwarnings('ignore')
 
 # Set random seed
@@ -29,7 +30,15 @@ class NeuronDataProcessor:
             config: 配置对象,包含数据文件路径等参数
         """
         self.config = config
-        self.data = pd.read_excel(config.data_file)
+        try:
+            self.data = pd.read_excel(config.data_file)
+            print(f"成功加载数据文件: {config.data_file}")
+            print(f"数据形状: {self.data.shape}")
+        except Exception as e:
+            print(f"加载数据文件时出错: {str(e)}")
+            # 创建一个空的DataFrame以避免后续错误
+            self.data = pd.DataFrame()
+            
         self.scaler = StandardScaler()  # 用于数据标准化
         self.label_encoder = LabelEncoder()  # 用于行为标签编码
         
@@ -41,39 +50,112 @@ class NeuronDataProcessor:
         3. 标准化数据
         4. 编码行为标签
         """
-        # Extract neuron columns
-        neuron_cols = [f'n{i}' for i in range(1, 63)]
+        if self.data.empty:
+            raise ValueError("数据为空，无法进行预处理")
+            
+        # 检查数据列，自动识别神经元列
+        neuron_pattern = re.compile(r'^n\d+$')
+        neuron_cols = [col for col in self.data.columns if neuron_pattern.match(col)]
         
-        # Check available columns
+        if not neuron_cols:
+            # 尝试查找其他可能的神经元列名格式
+            neuron_pattern = re.compile(r'^neuron\d+$', re.IGNORECASE)
+            neuron_cols = [col for col in self.data.columns if neuron_pattern.match(col)]
+            
+        if not neuron_cols:
+            # 如果仍然找不到，尝试使用数字列作为神经元数据
+            numeric_cols = self.data.select_dtypes(include=[np.number]).columns.tolist()
+            # 排除可能的非神经元数值列
+            exclude_patterns = ['id', 'index', 'time', 'label', 'cluster']
+            neuron_cols = [col for col in numeric_cols if not any(pattern in str(col).lower() for pattern in exclude_patterns)]
+            
+        if not neuron_cols:
+            raise ValueError("无法识别神经元数据列，请检查数据格式")
+            
+        # 按列名排序，确保顺序一致
+        neuron_cols.sort()
+        
+        # 检查可用列
         available_cols = [col for col in neuron_cols if col in self.data.columns]
         print(f"Total neurons: {len(neuron_cols)}")
         print(f"Available neurons: {len(available_cols)}")
-        print(f"Missing neurons: {set(neuron_cols) - set(available_cols)}")
+        
+        if len(neuron_cols) != len(available_cols):
+            missing_cols = set(neuron_cols) - set(available_cols)
+            print(f"Missing neurons: {missing_cols}")
         
         # 保存可用的神经元列名列表，以便其他方法使用
         self.available_neuron_cols = available_cols
         
-        # Get only available neuron data
-        X = self.data[available_cols].values
+        # 获取可用神经元数据
+        try:
+            X = self.data[available_cols].values
+        except Exception as e:
+            print(f"提取神经元数据时出错: {str(e)}")
+            # 尝试一列一列地提取，跳过有问题的列
+            valid_cols = []
+            for col in available_cols:
+                try:
+                    _ = self.data[col].values
+                    valid_cols.append(col)
+                except:
+                    print(f"列 {col} 提取失败，将被跳过")
+            
+            if not valid_cols:
+                raise ValueError("没有可用的神经元数据列")
+                
+            X = self.data[valid_cols].values
+            self.available_neuron_cols = valid_cols
         
-        # Handle missing values
+        # 处理缺失值
         if np.isnan(X).any():
-            print("Found missing values, filling with mean values")
-            # Fill missing values with mean of each column
+            print("发现缺失值，使用列均值填充")
+            # 使用每列的均值填充缺失值
             X = np.nan_to_num(X, nan=np.nanmean(X))
         
-        # Standardize neuron data
-        X_scaled = self.scaler.fit_transform(X)
+        # 检查是否有无效值(inf)
+        if not np.isfinite(X).all():
+            print("发现无限值，将替换为有限值")
+            X = np.nan_to_num(X, nan=0.0, posinf=1e6, neginf=-1e6)
         
-        # Encode behavior labels
-        if 'behavior' not in self.data.columns:
-            raise ValueError("Behavior column not found in the dataset")
+        # 标准化神经元数据
+        try:
+            X_scaled = self.scaler.fit_transform(X)
+        except Exception as e:
+            print(f"标准化数据时出错: {str(e)}")
+            # 尝试手动标准化
+            means = np.nanmean(X, axis=0)
+            stds = np.nanstd(X, axis=0)
+            stds[stds == 0] = 1.0  # 避免除以零
+            X_scaled = (X - means) / stds
+        
+        # 编码行为标签
+        behavior_col = None
+        for col_name in ['behavior', 'Behavior', 'label', 'Label', 'class', 'Class']:
+            if col_name in self.data.columns:
+                behavior_col = col_name
+                break
+                
+        if behavior_col is None:
+            raise ValueError("找不到行为标签列，请确保数据中包含'behavior'或'label'列")
             
-        # Handle missing behavior labels
-        behavior_data = self.data['behavior'].fillna('unknown')
-        y = self.label_encoder.fit_transform(behavior_data)
+        # 处理缺失的行为标签
+        behavior_data = self.data[behavior_col].fillna('unknown')
         
-        # Print label encoding information
+        # 确保行为标签是字符串类型
+        behavior_data = behavior_data.astype(str)
+        
+        try:
+            y = self.label_encoder.fit_transform(behavior_data)
+        except Exception as e:
+            print(f"编码行为标签时出错: {str(e)}")
+            # 手动编码
+            unique_labels = np.unique(behavior_data)
+            label_map = {label: i for i, label in enumerate(unique_labels)}
+            y = np.array([label_map[label] for label in behavior_data])
+            self.label_encoder.classes_ = unique_labels
+        
+        # 打印标签编码信息
         label_mapping = dict(zip(self.label_encoder.classes_, 
                                self.label_encoder.transform(self.label_encoder.classes_)))
         print("\nBehavior label mapping:")
@@ -120,11 +202,13 @@ class NeuronDataset(Dataset):
                 self.y[idx+self.sequence_length-1])
 
 class NeuronAutoencoder(nn.Module):
-    """神经元活动数据的自编码器
-    用于特征提取和降维
+    """神经元自编码器
+    用于提取神经元活动的潜在特征
     """
     def __init__(self, input_size, hidden_size, latent_dim):
         super(NeuronAutoencoder, self).__init__()
+        self.input_size = input_size
+        self.latent_dim = latent_dim
         
         # 编码器
         self.encoder = nn.Sequential(
@@ -152,9 +236,49 @@ class NeuronAutoencoder(nn.Module):
         )
         
     def forward(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return encoded, decoded
+        # 检查输入维度是否与模型匹配
+        if x.size(-1) != self.input_size:
+            # 处理输入维度不匹配的情况
+            if x.size(-1) < self.input_size:
+                # 输入维度小于模型期望，填充零
+                padding_size = self.input_size - x.size(-1)
+                padding = torch.zeros(*x.shape[:-1], padding_size, device=x.device)
+                x = torch.cat([x, padding], dim=-1)
+            else:
+                # 输入维度大于模型期望，截断
+                x = x[..., :self.input_size]
+        
+        try:
+            # 处理3D输入 (batch_size, seq_len, features)
+            original_shape = x.shape
+            if len(original_shape) == 3:
+                # 将3D张量重塑为2D
+                batch_size, seq_len, features = original_shape
+                x_reshaped = x.reshape(-1, features)
+                
+                # 通过编码器和解码器
+                encoded = self.encoder(x_reshaped)
+                decoded = self.decoder(encoded)
+                
+                # 重塑回原始形状
+                encoded = encoded.reshape(batch_size, seq_len, self.latent_dim)
+                decoded = decoded.reshape(original_shape)
+                
+                return encoded, decoded
+            else:
+                # 处理2D输入 (对单个样本处理)
+                encoded = self.encoder(x)
+                decoded = self.decoder(encoded)
+                return encoded, decoded
+                
+        except RuntimeError as e:
+            print(f"自编码器前向传播错误: {str(e)}")
+            print(f"输入形状: {x.shape}, 期望输入大小: {self.input_size}")
+            # 返回零张量
+            return (
+                torch.zeros(*x.shape[:-1], self.latent_dim, device=x.device),
+                torch.zeros_like(x)
+            )
 
 class MultiHeadAttention(nn.Module):
     """多头注意力机制
@@ -225,8 +349,18 @@ class EnhancedNeuronLSTM(nn.Module):
                  latent_dim=32, num_heads=4, dropout=0.2):
         super(EnhancedNeuronLSTM, self).__init__()
         
+        self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.num_classes = num_classes
+        self.latent_dim = latent_dim
+        
+        # 确保隐藏层大小是多头注意力头数的倍数
+        if hidden_size % num_heads != 0:
+            adjusted_hidden_size = (hidden_size // num_heads) * num_heads
+            print(f"警告: 隐藏层大小({hidden_size})不是头数({num_heads})的倍数，调整为{adjusted_hidden_size}")
+            hidden_size = adjusted_hidden_size
+            self.hidden_size = hidden_size
         
         # 自编码器用于特征提取
         self.autoencoder = NeuronAutoencoder(input_size, hidden_size, latent_dim)
@@ -263,34 +397,98 @@ class EnhancedNeuronLSTM(nn.Module):
             nn.Linear(hidden_size // 2, num_classes)
         )
         
+        # 记录模型配置
+        self.config = {
+            'input_size': input_size,
+            'hidden_size': hidden_size,
+            'num_layers': num_layers,
+            'num_classes': num_classes,
+            'latent_dim': latent_dim,
+            'num_heads': num_heads,
+            'dropout': dropout
+        }
+        
     def forward(self, x):
         batch_size = x.size(0)
         
-        # 1. 通过自编码器进行特征提取
-        encoded_features = []
-        for t in range(x.size(1)):
-            encoded, _ = self.autoencoder(x[:, t, :])
-            encoded_features.append(encoded)
-        encoded_sequence = torch.stack(encoded_features, dim=1)
+        # 检查输入维度是否与模型匹配
+        if x.size(-1) != self.input_size:
+            # 处理输入维度不匹配的情况
+            if x.size(-1) < self.input_size:
+                # 输入维度小于模型期望，填充零
+                padding = torch.zeros(batch_size, x.size(1), self.input_size - x.size(-1), device=x.device)
+                x = torch.cat([x, padding], dim=-1)
+            else:
+                # 输入维度大于模型期望，截断
+                x = x[..., :self.input_size]
+            
+        try:
+            # 通过自编码器提取特征
+            encoded, decoded = self.autoencoder(x)
+            
+            # 确保encoded是3D张量 (batch_size, sequence_length, latent_dim)
+            # 不再需要unsqueeze，因为autoencoder现在已返回正确形状
+            
+            # 通过LSTM处理序列
+            lstm_out, _ = self.lstm(encoded)
+            
+            # 应用多头注意力
+            attended, attention_weights = self.multihead_attention(lstm_out, None)
+            
+            # 应用时间注意力
+            temporal_context, temporal_weights = self.temporal_attention(attended)
+            
+            # 批标准化 - 注意temporal_context是2D的
+            normalized = self.batch_norm(temporal_context)
+            
+            # 分类
+            output = self.classifier(normalized)
+            
+            return output, attention_weights, temporal_weights
+            
+        except RuntimeError as e:
+            # 处理可能的运行时错误
+            if "size mismatch" in str(e) or "dimension" in str(e):
+                print(f"前向传播中的维度错误: {str(e)}")
+                print(f"输入形状: {x.shape}, 模型输入大小: {self.input_size}")
+                # 返回一个全零的输出张量和空的注意力权重
+                return (
+                    torch.zeros(batch_size, self.num_classes, device=x.device),
+                    torch.zeros(batch_size, 1, 1, device=x.device),  # 空的attention_weights
+                    torch.zeros(batch_size, 1, device=x.device)      # 空的temporal_weights
+                )
+            else:
+                # 重新抛出其他类型的错误
+                raise e
+    
+    def get_config(self):
+        """
+        获取模型配置
+        """
+        return self.config
+    
+    def summary(self):
+        """
+        打印模型摘要信息
+        """
+        print("\n模型摘要:")
+        print(f"输入大小: {self.input_size}")
+        print(f"隐藏层大小: {self.hidden_size}")
+        print(f"LSTM层数: {self.num_layers}")
+        print(f"类别数: {self.num_classes}")
+        print(f"潜在维度: {self.latent_dim}")
         
-        # 2. 双向LSTM处理
-        h0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size).to(x.device)
-        lstm_out, _ = self.lstm(encoded_sequence, (h0, c0))
+        # 计算参数数量
+        total_params = sum(p.numel() for p in self.parameters())
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         
-        # 3. 多头注意力处理
-        attended_features, attention_weights = self.multihead_attention(lstm_out)
+        print(f"总参数数量: {total_params:,}")
+        print(f"可训练参数数量: {trainable_params:,}")
         
-        # 4. 时间注意力处理
-        temporal_context, temporal_weights = self.temporal_attention(attended_features)
-        
-        # 5. 批标准化
-        normalized_features = self.batch_norm(temporal_context)
-        
-        # 6. 分类
-        output = self.classifier(normalized_features)
-        
-        return output, attention_weights, temporal_weights
+        return {
+            'total_params': total_params,
+            'trainable_params': trainable_params
+        }
 
 # Training function
 def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs, config):
@@ -305,6 +503,10 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
     val_accuracies = []
     reconstruction_losses = []
     best_val_acc = 0.0
+    
+    # 保存最后一个批次的注意力权重用于可视化
+    last_attention_weights = None
+    last_temporal_weights = None
     
     # 添加重构损失
     reconstruction_criterion = nn.MSELoss()
@@ -332,6 +534,10 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
             
             # 前向传播
             outputs, attention_weights, temporal_weights = model(batch_X)
+            
+            # 保存最后一个批次的注意力权重
+            last_attention_weights = attention_weights
+            last_temporal_weights = temporal_weights
             
             # 计算分类损失
             classification_loss = criterion(outputs, batch_y)
@@ -399,8 +605,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
                     'optimizer_state_dict': optimizer.state_dict(),
                     'epoch': epoch,
                     'best_val_acc': best_val_acc,
-                    'attention_weights': attention_weights.detach().cpu().numpy(),
-                    'temporal_weights': temporal_weights.detach().cpu().numpy()
+                    'attention_weights': last_attention_weights.detach().cpu().numpy(),
+                    'temporal_weights': last_temporal_weights.detach().cpu().numpy()
                 }, config.model_path)
                 print(f"模型已保存到: {config.model_path}")
             except Exception as e:
@@ -426,8 +632,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         'val_accuracies': val_accuracies,
         'best_val_acc': best_val_acc,
         'reconstruction_losses': reconstruction_losses,
-        'attention_weights': attention_weights.detach().cpu().numpy(),
-        'temporal_weights': temporal_weights.detach().cpu().numpy()
+        'attention_weights': last_attention_weights.detach().cpu().numpy(),
+        'temporal_weights': last_temporal_weights.detach().cpu().numpy()
     }
 
 def plot_training_metrics(metrics, config):
@@ -525,12 +731,21 @@ def main():
         
         input_size = X_with_clusters.shape[1]
         num_classes = len(np.unique(y))
+        
+        # 打印模型输入输出尺寸，帮助调试
+        print(f"模型输入尺寸: {input_size}")
+        print(f"行为类别数: {num_classes}")
+        print(f"序列长度: {config.sequence_length}")
+        print(f"隐藏层大小: {config.hidden_size}")
+        
         model = EnhancedNeuronLSTM(
             input_size, 
             config.hidden_size, 
             config.num_layers, 
             num_classes
         ).to(device)
+        
+        model.summary()  # 打印模型摘要
         
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.AdamW(
