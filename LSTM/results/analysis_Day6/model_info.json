@@ -1,9 +1,0 @@
-{
-    "model_type": "<class 'kmeans_lstm_analysis.EnhancedNeuronLSTM'>",
-    "input_size": 61,
-    "hidden_size": 256,
-    "num_layers": 3,
-    "num_classes": 6,
-    "device": "cuda",
-    "parameter_count": 5204196
-}
