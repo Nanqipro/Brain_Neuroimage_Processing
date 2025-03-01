@@ -1,0 +1,42 @@
+[2025-03-01 15:50:25] 
+=== 神经元数据分析开始 ===
+[2025-03-01 15:50:25] 数据文件: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\datasets\Day6_with_behavior_labels_filled.xlsx
+[2025-03-01 15:50:25] 模型文件: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\models\neuron_lstm_model_Day6.pth
+[2025-03-01 15:50:26] 加载模型和数据...
+[2025-03-01 15:50:27] 模型和数据加载完成
+[2025-03-01 15:50:27] 模型信息已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\model_info.json
+[2025-03-01 15:50:27] 
+分析行为-神经元相关性...
+[2025-03-01 15:50:28] 相关性分析完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\behavior_neuron_correlation_Day6.png
+[2025-03-01 15:50:28] 
+分析时间模式...
+[2025-03-01 15:50:31] 时间模式分析完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_patterns_Day6
+[2025-03-01 15:50:31] 
+分析时间相关性...
+[2025-03-01 15:50:32] 时间相关性分析完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_correlations_Day6
+[2025-03-01 15:50:32] 
+分析行为转换...
+[2025-03-01 15:50:32] 转换分析完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\behavior_transitions_Day6.png
+[2025-03-01 15:50:32] 
+识别关键神经元...
+[2025-03-01 15:50:33] 关键神经元识别完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\key_neurons_Day6.png
+[2025-03-01 15:50:33] 
+开始神经元网络拓扑分析...
+[2025-03-01 15:50:34] 网络构建完成: 60 个节点, 497 条边
+[2025-03-01 15:50:34] 
+分析网络拓扑特征...
+[2025-03-01 15:50:34] 网络分析完成
+[2025-03-01 15:50:34] 
+识别功能模块...
+[2025-03-01 15:50:34] 
+可视化网络拓扑分析结果...
+[2025-03-01 15:50:36] 
+创建交互式神经元网络可视化...
+[2025-03-01 15:50:36] 生成交互式神经元网络可视化完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\interactive\interactive_neuron_network.html
+[2025-03-01 15:50:36] 
+开始行为状态转换分析...
+[2025-03-01 15:50:38] 
+保存分析结果到: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\network_analysis_results.json
+[2025-03-01 15:50:38] 分析完成！所有结果已保存。
+[2025-03-01 15:50:38] 
+=== 神经元数据分析完成 ===
