@@ -133,9 +133,9 @@ class AnalysisConfig:
             # 拓扑分析可视化参数
             'topology': {
                 'use_background': True,           # 是否使用背景图
-                'node_size': 15,                  # 节点大小
+                'node_size': 10,                  # 节点大小（默认15，修改为10）
                 'node_text_position': 'middle center',  # 节点文本位置
-                'edge_width': 2,                  # 边的宽度
+                'edge_width': 1,                  # 边的宽度（默认2，修改为1）
                 'edge_color': 'black',            # 边的颜色
                 'background_opacity': 0.8,        # 背景图透明度
                 'frame_duration': 200,            # 帧持续时间（毫秒）

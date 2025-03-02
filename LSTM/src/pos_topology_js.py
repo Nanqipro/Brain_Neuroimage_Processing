@@ -39,6 +39,7 @@ import io
 import imageio
 import json
 from analysis_config import AnalysisConfig  # 导入配置类
+import sys
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -64,7 +65,8 @@ class NeuronTopologyAnalyzer:
                  frame_duration: Optional[int] = None,
                  color_scheme: Optional[str] = None,
                  max_groups: Optional[int] = None,
-                 edge_weight_threshold: Optional[float] = None):
+                 edge_weight_threshold: Optional[float] = None,
+                 network_file: Optional[str] = None):
         """
         Initialize the analyzer with configuration and optional override parameters.
         
@@ -80,6 +82,7 @@ class NeuronTopologyAnalyzer:
             color_scheme (Optional[str]): Color scheme for node groups ('tab20', 'Set1', 'Set2', etc.)
             max_groups (Optional[int]): Maximum number of groups for color cycling
             edge_weight_threshold (Optional[float]): Threshold for edge weight to create a connection
+            network_file (Optional[str]): Path to the network analysis JSON file
         """
         # 保存配置
         self.config = config
@@ -110,7 +113,7 @@ class NeuronTopologyAnalyzer:
         self.edge_weight_threshold = edge_weight_threshold if edge_weight_threshold is not None else 0.3
         
         # 加载网络分析结果和神经元效应大小数据
-        self.network_data = self._load_network_data(config.network_analysis_file)
+        self.network_data = self._load_network_data(network_file)
         self.effect_sizes = self._load_effect_sizes(config.neuron_effect_file)
         
         # 从网络数据中提取边信息
@@ -164,19 +167,34 @@ class NeuronTopologyAnalyzer:
             self._load_background_image()
     
     def _load_network_data(self, file_path: str) -> Dict:
-        """加载网络分析结果数据"""
-        try:
-            if not os.path.exists(file_path):
-                print(f"警告: 网络分析文件不存在: {file_path}，将使用默认连接方式")
-                return {}
+        """
+        加载网络分析结果数据
+        
+        参数:
+            file_path: 网络分析结果的JSON文件路径
             
-            with open(file_path, 'r') as f:
-                network_data = json.load(f)
-            print(f"成功加载网络分析数据: {file_path}")
-            return network_data
+        返回:
+            网络数据字典
+        """
+        try:
+            if file_path and os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                print(f"成功加载网络数据: {file_path}")
+                return data
+            else:
+                print(f"警告: 网络数据文件不存在: {file_path}")
+                # 返回一个空的网络数据结构
+                return {
+                    'nodes': [],
+                    'links': []
+                }
         except Exception as e:
-            print(f"警告: 加载网络分析数据失败: {e}，将使用默认连接方式")
-            return {}
+            print(f"加载网络数据出错: {str(e)}")
+            return {
+                'nodes': [],
+                'links': []
+            }
     
     def _load_effect_sizes(self, file_path: str) -> pd.DataFrame:
         """加载神经元效应大小数据"""
@@ -453,7 +471,7 @@ class NeuronTopologyAnalyzer:
         self.frames_data['edge_x'].append(edge_x)
         self.frames_data['edge_y'].append(edge_y)
         self.frames_data['edge_color'].append(edge_colors)
-        self.frames_data['titles'].append(f"神经元拓扑结构图 - 时间点：{timestamp}")
+        self.frames_data['titles'].append(f"Neuron Topology - Timestamp: {timestamp}")
         self.frames_data['behaviors'].append(behavior)  # 存储行为标签
         
     def process_all_frames(self) -> None:
@@ -789,7 +807,7 @@ class NeuronTopologyAnalyzer:
             edge_colors = self.frames_data['edge_color'][k] if 'edge_color' in self.frames_data and k < len(self.frames_data['edge_color']) else self.edge_color
             
             # 获取当前帧的节点大小列表
-            node_sizes = self.frames_data.get('node_size', [[self.node_size] * len(self.frames_data['node_x'][k])])[k]
+            node_sizes = self.frames_data.get('node_size', [[self.node_size * 20] * len(self.frames_data['node_x'][k])])[k]
             
             frames.append(go.Frame(
                 data=[
@@ -844,7 +862,7 @@ class NeuronTopologyAnalyzer:
             output_path (str): Path to save the GIF file
             fps (int): Frames per second, default is 10
         """
-        print("正在生成GIF动画...")
+        print("Generating GIF animation...")  # 改为英文
         
         # Create temporary directory for frame images
         temp_dir = "temp_frames"
@@ -861,7 +879,7 @@ class NeuronTopologyAnalyzer:
         
         # Generate each frame
         frame_files = []
-        for k in tqdm(range(len(self.frames_data['node_x'])), desc="生成GIF帧"):
+        for k in tqdm(range(len(self.frames_data['node_x'])), desc="Generating GIF frames"):  # 改为英文
             plt.clf()  # Clear current figure
             
             # Create main axes with fixed position
@@ -898,7 +916,7 @@ class NeuronTopologyAnalyzer:
             # 获取节点大小
             node_sizes = self.frames_data.get('node_size', [[self.node_size * 20] * len(self.frames_data['node_x'][k])])[k]
             # 转换大小为matplotlib格式（乘以比例因子）
-            node_sizes = [size * 20 for size in node_sizes]  # 调整大小以匹配HTML版本
+            node_sizes = [size * 15 for size in node_sizes]  # 将乘数由20调小到15使节点更小
             
             # Draw nodes with dynamic sizes
             ax_main.scatter(self.frames_data['node_x'][k], 
@@ -918,10 +936,33 @@ class NeuronTopologyAnalyzer:
                                fontsize=8)
             
             # Set title and behavior label
-            # Convert Chinese title to English
-            title = self.frames_data['titles'][k].replace("神经元拓扑结构图 - 时间:", "Neuron Topology - Time:")
+            # Convert any Chinese title to English
+            title = self.frames_data['titles'][k]
+            if "神经元拓扑结构图" in title:
+                title = "Neuron Topology - Time: " + title.split("：")[-1] if "：" in title else title.split(":")[-1]
             ax_main.set_title(title)
-            ax_main.text(0.02, 0.98, f"Current Behavior: {self.frames_data['behaviors'][k]}",
+            
+            # Convert behavior label to English
+            behavior = self.frames_data['behaviors'][k]
+            # 行为标签英文对照表
+            behavior_dict = {
+                "静止": "Resting",
+                "探索": "Exploring",
+                "修饰": "Grooming",
+                "抓挠": "Scratching",
+                "站立": "Standing",
+                "颤抖": "Trembling",
+                "CD1": "CD1",    # 特定行为标签保持原样
+                "Exp": "Exp",    # 这些标签看起来已经是英文/代码
+                "Gro": "Gro",
+                "Scra": "Scra",
+                "Sta": "Sta",
+                "Trem": "Trem",
+                # 添加其他可能的行为标签
+            }
+            english_behavior = behavior_dict.get(behavior, behavior)  # 如果没有对应的英文标签，保持原样
+            
+            ax_main.text(0.02, 0.98, f"Current Behavior: {english_behavior}",
                         transform=ax_main.transAxes,
                         fontsize=10,
                         verticalalignment='top')
@@ -953,7 +994,7 @@ class NeuronTopologyAnalyzer:
         os.rmdir(temp_dir)
         
         plt.close()  # Close figure
-        print(f"GIF动画已保存至: {output_path}")
+        print(f"GIF animation saved to: {output_path}")  # 改为英文
 
 def main():
     """Main function to run the topology analysis."""
@@ -994,11 +1035,34 @@ def main():
     # 背景图显示开关
     SHOW_BACKGROUND = False  # 设置为 True 显示背景图，False 不显示
     
+    # 线条和节点大小自定义设置
+    EDGE_WIDTH = 1      # 线条宽度，默认是2，现在改为1，使线条更细
+    NODE_SIZE = 10      # 节点大小，默认是15，现在改为10，使节点更小
+    
+    # 默认使用标准网络文件
+    network_file = config.network_analysis_file
+    
+    # 检查是否提供了命令行参数指定网络文件
+    if len(sys.argv) > 1:
+        method = sys.argv[1]
+        if method in ["threshold", "top_edges", "mst"]:
+            network_file = os.path.join(config.analysis_dir, f'neuron_network_main_{method}.json')
+            print(f"使用指定的网络文件: {network_file}")
+            
+            # 修改输出文件名以反映使用的方法
+            config.topology_html = os.path.join(config.topology_dir, f'pos_topology_{config.data_identifier}_{method}.html')
+            config.topology_gif = os.path.join(config.topology_dir, f'pos_topology_{config.data_identifier}_{method}.gif')
+        else:
+            print(f"未知的提取方法: {method}，使用默认网络文件")
+    
     # 创建分析器实例
     analyzer = NeuronTopologyAnalyzer(
         config=config,
         use_background=SHOW_BACKGROUND,  # 使用开关变量
-        edge_weight_threshold=config.visualization_params['topology']['edge_weight_threshold']
+        network_file=network_file,       # 使用选定的网络文件
+        edge_weight_threshold=config.visualization_params['topology']['edge_weight_threshold'],
+        edge_width=EDGE_WIDTH,           # 使用自定义线条宽度
+        node_size=NODE_SIZE              # 使用自定义节点大小
     )
     analyzer.process_all_frames()
     

@@ -605,6 +605,176 @@ class ResultAnalyzer:
         print(f"网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
         return G, correlation_matrix, available_neurons
 
+    def extract_main_connections(self, G, correlation_matrix, available_neurons, method='top_edges', **kwargs):
+        """
+        从完整网络中提取主要连接线路
+        
+        参数:
+            G: 原始网络图
+            correlation_matrix: 相关性矩阵
+            available_neurons: 可用神经元列表
+            method: 提取方法，可选 'threshold', 'top_edges', 'mst', 'backbone'
+            **kwargs: 其他参数
+                - threshold: 更高的相关性阈值（用于'threshold'方法）
+                - top_k: 每个节点保留的最强连接数（用于'top_edges'方法）
+                - alpha: 显著性水平（用于'backbone'方法）
+                
+        返回:
+            main_G: 提取出的主要连接网络
+        """
+        print(f"\n正在使用'{method}'方法提取主要连接线路...")
+        
+        # 复制原图以避免修改原始数据
+        main_G = nx.Graph()
+        
+        # 添加所有节点
+        for node in G.nodes():
+            main_G.add_node(node)
+        
+        if method == 'threshold':
+            # 使用更高的阈值过滤边
+            higher_threshold = kwargs.get('threshold', 0.6)  # 默认提高到0.6
+            print(f"使用更高的相关性阈值: {higher_threshold}")
+            
+            for u, v, data in G.edges(data=True):
+                if data['weight'] >= higher_threshold:
+                    main_G.add_edge(u, v, weight=data['weight'])
+                    
+        elif method == 'top_edges':
+            # 为每个节点只保留top_k个最强连接
+            top_k = kwargs.get('top_k', 5)  # 默认每个节点保留3个最强连接
+            print(f"为每个节点保留{top_k}个最强连接")
+            
+            for node in G.nodes():
+                edges = [(node, neighbor, G[node][neighbor]['weight']) 
+                        for neighbor in G.neighbors(node)]
+                
+                if edges:
+                    # 按权重降序排序
+                    edges.sort(key=lambda x: x[2], reverse=True)
+                    # 只保留前top_k个
+                    for u, v, weight in edges[:top_k]:
+                        if not main_G.has_edge(u, v):  # 避免重复添加
+                            main_G.add_edge(u, v, weight=weight)
+                            
+        elif method == 'mst':
+            # 使用最小生成树提取骨架网络
+            print("使用最小生成树算法提取网络骨架")
+            
+            # 创建边权重为距离（1-相关性）的图用于最小生成树
+            mst_graph = nx.Graph()
+            for node in G.nodes():
+                mst_graph.add_node(node)
+                
+            for u, v, data in G.edges(data=True):
+                # 将权重转换为距离（权重越大距离越小）
+                distance = 1.0 - data['weight']
+                mst_graph.add_edge(u, v, weight=distance)
+            
+            # 计算最小生成树
+            mst_edges = nx.minimum_spanning_edges(mst_graph, data=True)
+            
+            # 将原始权重添加回主图
+            for u, v, mst_data in mst_edges:
+                orig_weight = G[u][v]['weight'] if G.has_edge(u, v) else 0
+                main_G.add_edge(u, v, weight=orig_weight)
+                
+        elif method == 'backbone':
+            # 使用显著性过滤提取骨架网络
+            alpha = kwargs.get('alpha', 0.05)  # 默认显著性水平0.05
+            print(f"使用显著性骨架网络提取算法 (alpha={alpha})")
+            
+            try:
+                import networkx.algorithms.community as nxcom
+                
+                # 计算节点的度
+                degrees = dict(G.degree())
+                
+                # 对每条边进行显著性测试
+                for u, v, data in G.edges(data=True):
+                    weight = data['weight']
+                    k_u = degrees[u]
+                    k_v = degrees[v]
+                    
+                    # 计算边权重的显著性
+                    if k_u > 1 and k_v > 1:  # 避免度为1的节点导致的除零错误
+                        p_ij = weight / (k_u * k_v)
+                        if p_ij < alpha:  # 如果显著，则保留该边
+                            main_G.add_edge(u, v, weight=weight)
+            except ImportError:
+                print("警告: 无法导入社区检测算法，使用度中心性过滤作为替代")
+                # 使用度中心性作为替代
+                centrality = nx.degree_centrality(G)
+                centrality_threshold = np.percentile(list(centrality.values()), 70)  # 保留前30%的中心节点
+                
+                for u, v, data in G.edges(data=True):
+                    if centrality[u] >= centrality_threshold and centrality[v] >= centrality_threshold:
+                        main_G.add_edge(u, v, weight=data['weight'])
+        else:
+            raise ValueError(f"未知的提取方法: {method}")
+            
+        print(f"主要连接线路提取完成: {len(main_G.nodes())} 个节点, {len(main_G.edges())} 条边")
+        return main_G
+        
+    def export_network_to_json(self, G, output_path, include_attributes=True):
+        """
+        将网络导出为JSON格式文件
+        
+        参数:
+            G: NetworkX图对象
+            output_path: 输出JSON文件路径
+            include_attributes: 是否包含节点和边的属性
+        """
+        print(f"\n正在将网络导出为JSON格式...")
+        
+        # 准备节点数据
+        nodes_data = []
+        for node in G.nodes():
+            node_data = {
+                'id': str(node),
+                'label': str(node)
+            }
+            
+            # 添加节点属性
+            if include_attributes:
+                for attr, value in G.nodes[node].items():
+                    node_data[attr] = convert_to_serializable(value)
+                    
+            nodes_data.append(node_data)
+            
+        # 准备边数据
+        edges_data = []
+        for u, v, data in G.edges(data=True):
+            edge_data = {
+                'source': str(u),
+                'target': str(v)
+            }
+            
+            # 添加边权重和其他属性
+            if 'weight' in data:
+                edge_data['weight'] = float(data['weight'])
+                
+            if include_attributes:
+                for attr, value in data.items():
+                    if attr != 'weight':  # 已经添加过权重
+                        edge_data[attr] = convert_to_serializable(value)
+                        
+            edges_data.append(edge_data)
+            
+        # 创建网络数据结构
+        network_data = {
+            'nodes': nodes_data,
+            'links': edges_data
+        }
+        
+        # 导出为JSON文件
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(network_data, f, indent=2, ensure_ascii=False)
+            
+        print(f"网络已成功导出到: {output_path}")
+        
+        return output_path
+
     def analyze_network_topology(self, G):
         """
         分析神经元网络的拓扑特征
@@ -1460,6 +1630,55 @@ def main():
                 threshold=config.analysis_params['correlation_threshold']
             )
             
+            # 提取主要连接线路
+            main_methods = ['threshold', 'top_edges', 'mst']
+            for method in main_methods:
+                print(f"\n使用{method}方法提取主要连接线路...")
+                if method == 'threshold':
+                    main_G = analyzer.extract_main_connections(
+                        G, correlation_matrix, available_neurons,
+                        method=method, threshold=0.6
+                    )
+                elif method == 'top_edges':
+                    main_G = analyzer.extract_main_connections(
+                        G, correlation_matrix, available_neurons,
+                        method=method, top_k=3
+                    )
+                elif method == 'mst':
+                    main_G = analyzer.extract_main_connections(
+                        G, correlation_matrix, available_neurons,
+                        method=method
+                    )
+                
+                # 导出为JSON文件
+                output_file = os.path.join(config.analysis_dir, f'neuron_network_main_{method}.json')
+                analyzer.export_network_to_json(main_G, output_file)
+                print(f"{method}方法的主要连接线路已导出到: {output_file}")
+                
+                # 可视化主要连接线路
+                plt.figure(figsize=(12, 12))
+                pos = nx.spring_layout(main_G, k=1/np.sqrt(len(main_G.nodes())), iterations=50)
+                node_sizes = [300 for _ in main_G.nodes()]
+                edge_weights = [main_G[u][v]['weight'] * 5 for u, v in main_G.edges()]
+                
+                nx.draw_networkx(
+                    main_G, pos,
+                    with_labels=True,
+                    node_size=node_sizes,
+                    node_color='skyblue',
+                    font_size=10,
+                    width=edge_weights,
+                    edge_color='gray',
+                    alpha=0.8
+                )
+                
+                plt.title(f'主要神经元连接网络 (方法: {method})', fontsize=16)
+                plt.axis('off')
+                plt.tight_layout()
+                plt.savefig(os.path.join(config.analysis_dir, f'neuron_network_main_{method}.png'), 
+                           dpi=300, bbox_inches='tight')
+                plt.close()
+            
             # 分析网络拓扑特征
             topology_metrics = analyzer.analyze_network_topology(G)
             
@@ -1478,6 +1697,27 @@ def main():
                     print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
             except Exception as e:
                 print(f"生成交互式神经元网络可视化时出错: {str(e)}")
+            
+            # 尝试为主要连接也生成交互式可视化
+            try:
+                from visualization import VisualizationManager
+                visualizer = VisualizationManager(config)
+                for method in main_methods:
+                    main_G = analyzer.extract_main_connections(
+                        G, correlation_matrix, available_neurons,
+                        method=method, threshold=0.6 if method == 'threshold' else None,
+                        top_k=3 if method == 'top_edges' else None
+                    )
+                    interactive_path = visualizer.plot_interactive_neuron_network(
+                        main_G, 
+                        topology_metrics, 
+                        functional_modules, 
+                        filename=f'interactive_network_main_{method}.html'
+                    )
+                    if interactive_path:
+                        print(f"生成主要连接({method})交互式可视化完成。结果保存在: {interactive_path}")
+            except Exception as e:
+                print(f"生成主要连接交互式可视化时出错: {str(e)}")
             
             # 执行行为状态转换分析
             print("\n开始行为状态转换分析...")
