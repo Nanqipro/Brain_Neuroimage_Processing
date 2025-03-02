@@ -25,6 +25,15 @@ class AnalysisConfig:
         self.train_dir = os.path.join(self.output_dir, f'train_{self.data_identifier}')   # 训练结果目录
         self.log_file = os.path.join(self.analysis_dir, f'analysis_log_{self.data_identifier}.txt')  # 分析日志文件
         
+        # 拓扑分析相关路径配置
+        self.topology_dir = os.path.join(self.output_dir, f'topology_{self.data_identifier}')  # 拓扑分析结果目录
+        self.topology_html = os.path.join(self.topology_dir, f'pos_topology_{self.data_identifier}.html')  # HTML动画输出路径
+        self.topology_gif = os.path.join(self.topology_dir, f'pos_topology_{self.data_identifier}.gif')    # GIF动画输出路径
+        
+        # 拓扑分析所需数据文件路径
+        self.position_data_file = os.path.join(self.data_dir, f'{self.data_identifier}_Max_position.csv')  # 神经元位置数据
+        self.background_image = os.path.join(self.data_dir, f'{self.data_identifier}_Max.png')  # 背景图像
+        
         # 模型文件路径
         self.model_path = os.path.join(self.model_dir, f'neuron_lstm_model_{self.data_identifier}.pth')  # 训练好的模型文件路径
         
@@ -47,6 +56,10 @@ class AnalysisConfig:
         self.neuron_specificity_json = os.path.join(self.analysis_dir, f'neuron_specificity_{self.data_identifier}.json')  # 神经元特异性数据
         self.statistical_results_csv = os.path.join(self.analysis_dir, f'statistical_analysis_{self.data_identifier}.csv')  # 统计分析结果
         self.temporal_correlation_dir = os.path.join(self.analysis_dir, f'temporal_correlations_{self.data_identifier}')  # 时间相关性分析目录
+        
+        # 神经网络分析和效应大小数据文件
+        self.network_analysis_file = os.path.join(self.analysis_dir, f'network_analysis_results.json')  # 网络分析结果
+        self.neuron_effect_file = os.path.join(self.analysis_dir, f'neuron_effect_sizes.csv')  # 神经元效应大小
         
         # 模型超参数配置
         self.sequence_length = 10     # 序列长度：用于LSTM的输入序列长度
@@ -115,6 +128,21 @@ class AnalysisConfig:
                 'cmap': 'RdYlBu_r',
                 'interpolation': 'nearest',
                 'aspect': 'auto'
+            },
+            
+            # 拓扑分析可视化参数
+            'topology': {
+                'use_background': True,           # 是否使用背景图
+                'node_size': 15,                  # 节点大小
+                'node_text_position': 'middle center',  # 节点文本位置
+                'edge_width': 2,                  # 边的宽度
+                'edge_color': 'black',            # 边的颜色
+                'background_opacity': 0.8,        # 背景图透明度
+                'frame_duration': 200,            # 帧持续时间（毫秒）
+                'color_scheme': 'tab20',          # 颜色方案
+                'max_groups': 20,                 # 最大组数
+                'gif_fps': 5,                     # GIF帧率
+                'edge_weight_threshold': 0.3      # 边权重阈值，只显示权重大于此值的边
             }
         }
         
@@ -129,7 +157,8 @@ class AnalysisConfig:
             self.analysis_dir,         # 分析结果目录
             self.train_dir,            # 训练结果目录
             self.temporal_pattern_dir, # 时间模式分析目录
-            self.temporal_correlation_dir  # 时间相关性分析目录
+            self.temporal_correlation_dir,  # 时间相关性分析目录
+            self.topology_dir          # 拓扑分析目录
         ]
         
         created_dirs = []
