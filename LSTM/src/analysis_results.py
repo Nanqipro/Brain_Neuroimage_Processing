@@ -1672,7 +1672,7 @@ def main():
                     alpha=0.8
                 )
                 
-                plt.title(f'主要神经元连接网络 (方法: {method})', fontsize=16)
+                plt.title(f'Neuron Connection Network (Method: {method})', fontsize=16)
                 plt.axis('off')
                 plt.tight_layout()
                 plt.savefig(os.path.join(config.analysis_dir, f'neuron_network_main_{method}.png'), 
