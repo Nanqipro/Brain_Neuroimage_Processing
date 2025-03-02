@@ -15,14 +15,15 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'Day9_with_behavior_labels_filled.xlsx')  # 原始数据文件
-        self.data_identifier = 'Day9'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day6'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
         self.model_dir = os.path.join(self.base_dir, 'models')    # 模型保存目录
         self.analysis_dir = os.path.join(self.output_dir, f'analysis_{self.data_identifier}')  # 分析结果目录
         self.train_dir = os.path.join(self.output_dir, f'train_{self.data_identifier}')   # 训练结果目录
+        self.log_file = os.path.join(self.analysis_dir, f'analysis_log_{self.data_identifier}.txt')  # 分析日志文件
         
         # 模型文件路径
         self.model_path = os.path.join(self.model_dir, f'neuron_lstm_model_{self.data_identifier}.pth')  # 训练好的模型文件路径

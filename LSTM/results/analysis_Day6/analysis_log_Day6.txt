@@ -1,0 +1,164 @@
+分析开始时间: 2025-03-02 10:46:19
+数据标识符: Day6
+==================================================
+成功加载数据文件: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\datasets\Day6_with_behavior_labels_filled.xlsx
+数据形状: (2999, 62)
+加载模型和数据...
+Total neurons: 60
+Available neurons: 60
+
+Behavior label mapping:
+CD1: 0 (Count: 1)
+Exp: 1 (Count: 2457)
+Gro: 2 (Count: 377)
+Scra: 3 (Count: 15)
+Sta: 4 (Count: 36)
+Trem: 5 (Count: 113)
+
+数据集信息:
+神经元数量: 60
+样本数量: 2999
+行为类别数: 6
+
+行为标签统计:
+CD1: 1 个样本
+Exp: 2457 个样本
+Gro: 377 个样本
+Scra: 15 个样本
+Sta: 36 个样本
+Trem: 113 个样本
+尝试使用 weights_only=False 加载模型...
+
+分析行为-神经元相关性...
+相关性分析完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\behavior_neuron_correlation_Day6.png
+
+分析时间模式...
+
+分析时间模式...
+处理行为: CD1
+已保存时间模式图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_patterns_Day6\temporal_pattern_CD1.png
+处理行为: Exp
+已保存时间模式图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_patterns_Day6\temporal_pattern_Exp.png
+处理行为: Gro
+已保存时间模式图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_patterns_Day6\temporal_pattern_Gro.png
+处理行为: Scra
+已保存时间模式图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_patterns_Day6\temporal_pattern_Scra.png
+处理行为: Sta
+已保存时间模式图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_patterns_Day6\temporal_pattern_Sta.png
+处理行为: Trem
+已保存时间模式图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_patterns_Day6\temporal_pattern_Trem.png
+时间模式分析完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_patterns_Day6
+
+分析时间相关性...
+
+分析时间相关性...
+处理时间窗口大小: 10
+已保存时间相关性图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_correlations_Day6\temporal_correlation_10.png
+处理时间窗口大小: 20
+已保存时间相关性图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_correlations_Day6\temporal_correlation_20.png
+处理时间窗口大小: 50
+已保存时间相关性图表: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_correlations_Day6\temporal_correlation_50.png
+处理时间窗口大小: 100
+警告: 数据长度(60)小于等于窗口大小(100)，无法计算相关性
+跳过窗口大小 100 的可视化
+时间相关性分析完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\temporal_correlations_Day6
+
+分析行为转换...
+转换分析完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\behavior_transitions_Day6.png
+
+识别关键神经元...
+
+所有神经元的效应量数据已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\neuron_effect_sizes.csv
+
+每种行为的关键神经元:
+
+CD1:
+  神经元 58: 效应量 = 6.709
+  神经元 6: 效应量 = 4.066
+  神经元 9: 效应量 = 3.800
+  神经元 51: 效应量 = 3.789
+  神经元 12: 效应量 = 3.683
+
+Exp:
+  神经元 25: 效应量 = 1.006
+  神经元 2: 效应量 = 0.944
+  神经元 43: 效应量 = 0.857
+  神经元 8: 效应量 = 0.766
+  神经元 36: 效应量 = 0.757
+
+Gro:
+  神经元 21: 效应量 = 2.324
+  神经元 50: 效应量 = 1.352
+  神经元 45: 效应量 = 1.229
+  神经元 20: 效应量 = 1.166
+  神经元 57: 效应量 = 1.129
+
+Scra:
+  神经元 30: 效应量 = 4.706
+  神经元 24: 效应量 = 4.629
+  神经元 4: 效应量 = 3.206
+  神经元 5: 效应量 = 2.919
+  神经元 37: 效应量 = 2.089
+
+Sta:
+  神经元 29: 效应量 = 1.665
+  神经元 7: 效应量 = 1.610
+  神经元 9: 效应量 = 1.580
+  神经元 54: 效应量 = 1.574
+  神经元 18: 效应量 = 1.544
+
+Trem:
+  神经元 14: 效应量 = 3.402
+  神经元 16: 效应量 = 2.236
+  神经元 11: 效应量 = 2.183
+  神经元 60: 效应量 = 2.111
+  神经元 34: 效应量 = 1.777
+
+开始神经元网络拓扑分析...
+
+构建神经元功能连接网络...
+网络构建完成: 60 个节点, 498 条边
+
+分析网络拓扑特征...
+计算中心性指标...
+分析网络连通性...
+执行社区检测...
+网络分析完成
+
+识别功能模块...
+
+可视化网络拓扑分析结果...
+
+创建交互式神经元网络可视化...
+交互式神经元网络已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\interactive\interactive_neuron_network.html
+生成交互式神经元网络可视化完成。结果保存在: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\interactive\interactive_neuron_network.html
+
+开始行为状态转换分析...
+
+分析行为状态转换...
+对输入数据进行PCA降维，从 60 减少到 10 个特征
+选择最优HMM参数...
+  尝试: 状态数=2, 协方差类型=diag, 参数数量=44
+  结果: 状态数=2, 协方差类型=diag, 分数=-1115.34
+  跳过: 状态数=2, 协方差类型=tied, 参数数量(79)>=样本数(60)
+  跳过: 状态数=3, 协方差类型=diag, 参数数量(69)>=样本数(60)
+  跳过: 状态数=3, 协方差类型=tied, 参数数量(94)>=样本数(60)
+  跳过: 状态数=4, 协方差类型=diag, 参数数量(96)>=样本数(60)
+  跳过: 状态数=4, 协方差类型=tied, 参数数量(111)>=样本数(60)
+最优HMM参数: 状态数=2, 协方差类型=diag, 分数=-1115.34
+HMM模型参数数量: 44, 数据样本数: 60
+
+分析状态-行为映射关系...
+状态-行为映射概率:
+  状态1 主要对应行为: CD1(0.22), Exp(0.20), Gro(0.22), Sta(0.13), Trem(0.22)
+  状态2 主要对应行为: Scra(0.64), Sta(0.29)
+
+分析神经元活动与状态转换关系...
+
+预测状态转换点...
+
+保存分析结果到: D:\GitHub_local\Brain_Neuroimage_Processing\LSTM\results\analysis_Day6\network_analysis_results.json
+==================================================
+分析结束时间: 2025-03-02 10:46:31
+总耗时: 12.35 秒
+分析完成！所有结果已保存。
