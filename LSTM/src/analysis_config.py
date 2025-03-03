@@ -15,8 +15,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
-        self.data_identifier = 'Day6'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'Day3_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day3'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
