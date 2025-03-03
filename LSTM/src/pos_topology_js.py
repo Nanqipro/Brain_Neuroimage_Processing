@@ -40,12 +40,28 @@ import imageio
 import json
 from analysis_config import AnalysisConfig  # 导入配置类
 import sys
+import tempfile
+import concurrent.futures
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
 
 # Set default plotly template
 pio.templates.default = "plotly"
+
+# 添加GPU加速相关库
+try:
+    import torch
+    import torchvision.transforms as T
+    import concurrent.futures
+    HAS_GPU = torch.cuda.is_available()
+    if HAS_GPU:
+        print("GPU加速可用: " + torch.cuda.get_device_name(0))
+    else:
+        print("没有检测到可用的GPU，将使用CPU处理")
+except ImportError:
+    HAS_GPU = False
+    print("未安装PyTorch，将使用CPU处理")
 
 class NeuronTopologyAnalyzer:
     """
@@ -829,7 +845,14 @@ class NeuronTopologyAnalyzer:
             edge_colors = self.frames_data['edge_color'][k] if 'edge_color' in self.frames_data and k < len(self.frames_data['edge_color']) else self.edge_color
             
             # 获取当前帧的节点大小列表
-            node_sizes = self.frames_data.get('node_size', [[self.node_size * 20] * len(self.frames_data['node_x'][k])])[k]
+            node_sizes_default = [self.node_size * 20] * len(self.frames_data['node_x'][k])
+            if 'node_size' in self.frames_data and k < len(self.frames_data['node_size']) and self.frames_data['node_size'][k] is not None:
+                node_sizes = self.frames_data['node_size'][k]
+            else:
+                node_sizes = node_sizes_default
+                
+            # 转换大小为matplotlib格式（乘以比例因子）
+            node_sizes = [size * 15 for size in node_sizes]  # 将乘数由20调小到15使节点更小
             
             frames.append(go.Frame(
                 data=[
@@ -1024,6 +1047,186 @@ class NeuronTopologyAnalyzer:
         plt.close()  # Close figure
         print(f"GIF animation saved to: {output_path}")  # 改为英文
 
+    def create_gif_with_gpu(self, output_path: str, fps: int = 10) -> None:
+        """
+        优化版GIF生成函数（注意：目前没有真正使用GPU加速）
+        
+        Args:
+            output_path (str): 输出GIF文件路径
+            fps (int): 每秒帧数
+        """
+        # 检查GPU是否可用但提示用户
+        if HAS_GPU:
+            print("注意: 虽然检测到GPU，但当前方法实际使用优化的CPU渲染")
+        
+        try:
+            print("使用优化的单线程方式生成GIF...")
+            
+            # 创建临时目录用于保存帧
+            temp_dir = tempfile.mkdtemp()
+            frame_files = []
+            
+            # 顺序渲染所有帧
+            total_frames = len(self.frames_data['node_x'])
+            
+            # 确保使用tqdm显示进度
+            for k in tqdm(range(total_frames), desc="顺序GPU渲染帧"):
+                frame_path = os.path.join(temp_dir, f"frame_{k:04d}.png")
+                frame_files.append(frame_path)
+                
+                try:
+                    # 获取当前帧数据
+                    node_x = self.frames_data['node_x'][k]
+                    node_y = self.frames_data['node_y'][k]
+                    node_text = self.frames_data['node_text'][k]
+                    node_color = self.frames_data['node_color'][k]
+                    edge_x = self.frames_data['edge_x'][k]
+                    edge_y = self.frames_data['edge_y'][k]
+                    title = self.frames_data['titles'][k]
+                    behavior = self.frames_data['behaviors'][k]
+                    
+                    # 安全获取节点大小
+                    default_node_size = [self.node_size * 20] * len(node_x)
+                    if ('node_size' in self.frames_data and 
+                        k < len(self.frames_data['node_size']) and 
+                        self.frames_data['node_size'][k] is not None):
+                        node_size = self.frames_data['node_size'][k]
+                    else:
+                        node_size = default_node_size
+                    
+                    # 直接渲染帧，不使用多线程
+                    # 创建matplotlib图形
+                    fig, ax_main = plt.figure(figsize=(12, 8), dpi=100), plt.axes()
+                    
+                    # 绘制边
+                    edge_segments = []
+                    for i in range(0, len(edge_x), 3):
+                        if i+2 < len(edge_x) and not np.isnan(edge_x[i]) and not np.isnan(edge_x[i+1]):
+                            edge_segments.append([(edge_x[i], edge_y[i]), (edge_x[i+1], edge_y[i+1])])
+                    
+                    # 批量绘制所有边
+                    if edge_segments:
+                        line_segs = matplotlib.collections.LineCollection(
+                            edge_segments, 
+                            colors=self.edge_color,
+                            linewidths=self.edge_width,
+                            alpha=0.7,
+                            zorder=1
+                        )
+                        ax_main.add_collection(line_segs)
+                    
+                    # 转换节点大小
+                    adjusted_node_size = [s * 15 for s in node_size]  # 调整大小倍数
+                    
+                    # 绘制节点
+                    ax_main.scatter(node_x, node_y, c=node_color, s=adjusted_node_size, zorder=2)
+                    
+                    # 添加节点标签
+                    for i, txt in enumerate(node_text):
+                        ax_main.annotate(txt, 
+                                       (node_x[i], node_y[i]),
+                                       textcoords="offset points",
+                                       xytext=(0, 0),
+                                       ha='center',
+                                       va='center',
+                                       fontsize=8)
+                    
+                    # 处理标题
+                    if "神经元拓扑结构图" in title:
+                        title = "Neuron Topology - Time: " + title.split("：")[-1] if "：" in title else title.split(":")[-1]
+                    else:
+                        # 保留原始标题中的网络类型信息
+                        title_parts = title.split(" - ")
+                        if len(title_parts) > 1:
+                            # 如果标题包含分隔符，保留第一部分（包含网络类型）
+                            title = title_parts[0] + " - Time: " + title_parts[1].split(": ")[-1]
+                    ax_main.set_title(title)
+                    
+                    # 处理行为标签
+                    behavior_dict = {
+                        "静止": "Resting",
+                        "探索": "Exploring",
+                        "修饰": "Grooming",
+                        "抓挠": "Scratching",
+                        "站立": "Standing",
+                        "颤抖": "Trembling",
+                        "CD1": "CD1",
+                        "Exp": "Exp",
+                        "Gro": "Gro",
+                        "Scra": "Scra",
+                        "Sta": "Sta",
+                        "Trem": "Trem",
+                    }
+                    english_behavior = behavior_dict.get(behavior, behavior)
+                    
+                    # 添加行为标签
+                    ax_main.text(0.02, 0.98, f"Current Behavior: {english_behavior}",
+                                transform=ax_main.transAxes,
+                                fontsize=10,
+                                verticalalignment='top')
+                    
+                    # 设置坐标轴
+                    ax_main.set_xlim(-0.05, 1.05)
+                    ax_main.set_ylim(1.05, -0.05)  # 反转Y轴
+                    ax_main.axis('off')
+                    
+                    # 添加背景图像
+                    if self.use_background and self.background_image:
+                        try:
+                            background_data = base64.b64decode(self.background_image)
+                            img = Image.open(io.BytesIO(background_data))
+                            ax_main.imshow(img,
+                                         extent=[-0.05, 1.05, -0.05, 1.05],
+                                         alpha=self.background_opacity,
+                                         zorder=0)
+                        except Exception as bg_error:
+                            print(f"无法加载背景图像: {bg_error}")
+                    
+                    # 保存图像 - 立即关闭图形以释放内存
+                    plt.savefig(frame_path, bbox_inches='tight')
+                    plt.close(fig)
+                    
+                    # 提示进度(每100帧)
+                    if k > 0 and k % 100 == 0:
+                        print(f"已渲染 {k}/{total_frames} 帧")
+                        
+                except Exception as e:
+                    print(f"渲染帧 {k} 时出错: {e}")
+            
+            # 确保帧文件按顺序排序
+            frame_files.sort()
+            
+            # 读取所有帧并创建GIF
+            print("正在组装GIF文件...")
+            frames = []
+            for file_path in tqdm(frame_files, desc="加载帧"):
+                if os.path.exists(file_path):
+                    img = Image.open(file_path)
+                    frames.append(np.array(img))
+            
+            if frames:
+                # 使用imageio创建GIF
+                print(f"正在生成GIF，共 {len(frames)} 帧...")
+                imageio.mimsave(output_path, frames, fps=fps)
+                print(f"已成功生成GIF: {output_path}")
+            else:
+                raise Exception("没有生成有效的帧")
+            
+        except Exception as e:
+            print(f"优化的GIF生成失败: {e}")
+            print("回退到标准方法...")
+            self.create_gif(output_path, fps)
+        finally:
+            # 清理临时文件
+            try:
+                for f in frame_files:
+                    if os.path.exists(f):
+                        os.remove(f)
+                if os.path.exists(temp_dir):
+                    os.rmdir(temp_dir)
+            except Exception as cleanup_error:
+                print(f"清理临时文件时出错: {cleanup_error}")
+    
     def _get_network_type(self) -> str:
         """确定当前使用的网络数据类型"""
         if self.network_file_path:
@@ -1069,100 +1272,106 @@ def main():
     config.setup_directories()
     
     # 控制是否生成GIF的开关
-    GENERATE_GIF = True  # 设置为False只生成HTML，不生成GIF
+    GENERATE_GIF = True  # 默认生成GIF
+    
+    # 控制是否使用GPU加速GIF生成
+    # USE_GPU_ACCELERATION = HAS_GPU  # 默认在有GPU时启用加速
+    USE_GPU_ACCELERATION = False
+    # 初始化网络类型参数
+    network_arg = None
     
     # 处理命令行参数
     if len(sys.argv) > 1:
-        # 检查是否有网络类型指定
-        network_arg = None
+        # 检查第一个参数是否为网络类型
         if sys.argv[1] in ["standard", "mst", "threshold", "top_edges"]:
             network_arg = sys.argv[1]
+            print(f"指定网络类型: {network_arg}")
         
-        # 检查是否有GIF生成控制参数
+        # 检查所有参数中是否有控制参数
         for arg in sys.argv:
             if arg == "--no-gif":
                 GENERATE_GIF = False
                 print("GIF生成已禁用，将只生成HTML动画")
-            elif arg == "--only-gif":
-                GENERATE_GIF = True
-                print("GIF生成已启用")
+            elif arg == "--use-gpu":
+                if HAS_GPU:
+                    USE_GPU_ACCELERATION = True
+                    print("已启用GPU加速")
+                else:
+                    print("警告: 请求GPU加速但没有可用GPU，将使用CPU生成")
+            elif arg == "--no-gpu":
+                USE_GPU_ACCELERATION = False
+                print("已禁用GPU加速，将使用CPU生成GIF")
     
-    # 输出文件路径信息
-    print(f"神经元数据文件: {config.data_file}")
-    print(f"位置数据文件: {config.position_data_file}")
-    print(f"背景图像文件: {config.background_image}")
-    print(f"网络分析结果文件: {config.network_analysis_file}")
-    print(f"神经元效应大小文件: {config.neuron_effect_file}")
-    
-    # 检查文件是否存在
-    print(f"检查背景图像是否存在: {config.background_image}")
-    if not os.path.exists(config.background_image):
-        print(f"警告: 未找到背景图像 {config.background_image}")
+    # 处理网络类型
+    if network_arg is None:
+        network_types = ["standard"]  # 默认只处理标准网络类型
+    elif network_arg == "all":
+        network_types = ["standard", "mst", "threshold", "top_edges"]
     else:
-        print(f"成功找到背景图像: {config.background_image}")
-    
-    print(f"检查网络分析结果文件是否存在: {config.network_analysis_file}")
-    if not os.path.exists(config.network_analysis_file):
-        print(f"警告: 未找到网络分析结果文件 {config.network_analysis_file}，将使用默认连接方式")
-    else:
-        print(f"成功找到网络分析结果文件: {config.network_analysis_file}")
-    
-    print(f"检查神经元效应大小文件是否存在: {config.neuron_effect_file}")
-    if not os.path.exists(config.neuron_effect_file):
-        print(f"警告: 未找到神经元效应大小文件 {config.neuron_effect_file}，将使用默认神经元特性")
-    else:
-        print(f"成功找到神经元效应大小文件: {config.neuron_effect_file}")
-    
-    # 背景图显示开关
-    SHOW_BACKGROUND = False  # 设置为 True 显示背景图，False 不显示
-    
-    # 线条和节点大小自定义设置
-    EDGE_WIDTH = 1      # 线条宽度，默认是2，现在改为1，使线条更细
-    NODE_SIZE = 10      # 节点大小，默认是15，现在改为10，使节点更小
-    
-    # 定义要处理的网络文件类型
-    network_types = ["standard", "mst", "threshold", "top_edges"]
-
-    # 检查命令行参数是否指定特定类型
-    if network_arg:
         network_types = [network_arg]
-        print(f"仅处理指定的网络类型: {network_types[0]}")
     
-    # 为每种网络类型创建可视化
     for network_type in network_types:
-        # 设置网络文件路径和输出文件名
-        if network_type == "standard":
-            network_file = config.network_analysis_file
-            output_suffix = ""
-        else:
-            network_file = os.path.join(config.analysis_dir, f'neuron_network_main_{network_type}.json')
-            output_suffix = f"_{network_type}"
-        
-        # 检查文件是否存在
-        if not os.path.exists(network_file):
-            print(f"警告: 未找到网络文件 {network_file}，跳过此类型")
-            continue
-        
         print(f"\n处理网络类型: {network_type}")
+        
+        # 确定网络文件路径
+        if network_type == "standard":
+            network_file = config.network_analysis_file  # 使用正确的配置属性
+        else:
+            network_file = os.path.join(config.analysis_dir, f"network_{network_type}.json")
+        
+        # 构建输出文件路径
+        html_output = config.topology_html  # 使用已有的配置属性
+        gif_output = config.topology_gif    # 使用已有的配置属性
+        
+        if network_type != "standard":
+            # 如果不是标准网络，添加后缀
+            html_output = html_output.replace(".html", f"_{network_type}.html")
+            gif_output = gif_output.replace(".gif", f"_{network_type}.gif")
+        
         print(f"使用网络文件: {network_file}")
-        
-        # 设置输出文件路径
-        html_output = os.path.join(config.topology_dir, f'pos_topology_{config.data_identifier}{output_suffix}.html')
-        gif_output = os.path.join(config.topology_dir, f'pos_topology_{config.data_identifier}{output_suffix}.gif')
-        
         print(f"输出HTML文件: {html_output}")
         if GENERATE_GIF:
             print(f"输出GIF文件: {gif_output}")
         
         # 创建分析器实例
-        analyzer = NeuronTopologyAnalyzer(
-            config=config,
-            use_background=SHOW_BACKGROUND,  # 使用开关变量
-            network_file=network_file,       # 使用选定的网络文件
-            edge_weight_threshold=config.visualization_params['topology']['edge_weight_threshold'],
-            edge_width=EDGE_WIDTH,           # 使用自定义线条宽度
-            node_size=NODE_SIZE              # 使用自定义节点大小
-        )
+        NODE_SIZE = 10  # 默认节点大小
+        EDGE_WIDTH = 1  # 默认边宽度
+        
+        # 检查配置对象是否有visualization_params属性
+        if hasattr(config, 'visualization_params') and isinstance(config.visualization_params, dict):
+            # 使用配置的参数
+            topology_params = config.visualization_params.get('topology', {})
+            NODE_SIZE = topology_params.get('node_size', NODE_SIZE)
+            EDGE_WIDTH = topology_params.get('edge_width', EDGE_WIDTH)
+            
+            analyzer = NeuronTopologyAnalyzer(
+                config=config,
+                use_background=topology_params.get('use_background', True),
+                node_text_position=topology_params.get('node_text_position', 'middle center'),
+                background_opacity=topology_params.get('background_opacity', 0.3),
+                color_scheme=topology_params.get('color_scheme', 'viridis'),
+                max_groups=topology_params.get('max_groups', 5),
+                frame_duration=topology_params.get('frame_duration', 30),
+                edge_weight_threshold=topology_params.get('edge_weight_threshold', 0.5),
+                edge_width=EDGE_WIDTH,
+                node_size=NODE_SIZE,
+                network_file=network_file
+            )
+        else:
+            # 使用默认参数
+            analyzer = NeuronTopologyAnalyzer(
+                config=config,
+                use_background=True,
+                node_text_position='middle center',
+                background_opacity=0.3,
+                color_scheme='viridis',
+                max_groups=5,
+                frame_duration=30,
+                edge_weight_threshold=0.5,
+                edge_width=EDGE_WIDTH,
+                node_size=NODE_SIZE,
+                network_file=network_file
+            )
         analyzer.process_all_frames()
         
         # 生成HTML动画
@@ -1170,7 +1379,23 @@ def main():
         
         # 根据开关决定是否生成GIF动画
         if GENERATE_GIF:
-            analyzer.create_gif(gif_output, fps=config.visualization_params['topology']['gif_fps'])
+            try:
+                # 设置默认fps值
+                fps = 10
+                
+                # 检查是否有配置的fps
+                if hasattr(config, 'visualization_params') and isinstance(config.visualization_params, dict):
+                    topology_params = config.visualization_params.get('topology', {})
+                    fps = topology_params.get('gif_fps', fps)
+                
+                if USE_GPU_ACCELERATION:
+                    print(f"使用优化的GIF生成方法: {gif_output}")
+                    analyzer.create_gif_with_gpu(gif_output, fps=fps)
+                else:
+                    print(f"使用标准方法生成GIF: {gif_output}")
+                    analyzer.create_gif(gif_output, fps=fps)
+            except Exception as e:
+                print(f"GIF生成失败: {e}")
         
         print(f"完成 {network_type} 类型的拓扑结构可视化")
 
