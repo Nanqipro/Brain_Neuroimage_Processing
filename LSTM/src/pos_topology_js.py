@@ -84,87 +84,119 @@ class NeuronTopologyAnalyzer:
             edge_weight_threshold (Optional[float]): Threshold for edge weight to create a connection
             network_file (Optional[str]): Path to the network analysis JSON file
         """
-        # 保存配置
+        # 存储配置参数
         self.config = config
         
-        # 保存数据路径
-        self.neuron_data = pd.read_excel(config.data_file)
-        
-        # 验证behavior列是否存在
-        if 'behavior' not in self.neuron_data.columns:
-            raise ValueError("Behavior column not found in the Excel file!")
-        
-        self.positions_data = pd.read_csv(config.position_data_file)
-        self.background_image_path = config.background_image
-        
-        # 获取拓扑可视化参数（优先使用传入的参数，如果未传入则使用配置中的默认值）
-        topo_params = config.visualization_params['topology']
-        self.use_background = use_background if use_background is not None else topo_params['use_background']
-        self.node_size = node_size if node_size is not None else topo_params['node_size']
-        self.node_text_position = node_text_position if node_text_position is not None else topo_params['node_text_position']
-        self.edge_width = edge_width if edge_width is not None else topo_params['edge_width']
-        self.edge_color = edge_color if edge_color is not None else topo_params['edge_color']
-        self.background_opacity = background_opacity if background_opacity is not None else topo_params['background_opacity']
-        self.frame_duration = frame_duration if frame_duration is not None else topo_params['frame_duration']
-        self.color_scheme = color_scheme if color_scheme is not None else topo_params['color_scheme']
-        self.max_groups = max_groups if max_groups is not None else topo_params['max_groups']
-        
-        # 边权重阈值 - 只有权重大于此值的边才会被显示
-        self.edge_weight_threshold = edge_weight_threshold if edge_weight_threshold is not None else 0.3
-        
-        # 加载网络分析结果和神经元效应大小数据
-        self.network_data = self._load_network_data(network_file)
-        self.effect_sizes = self._load_effect_sizes(config.neuron_effect_file)
-        
-        # 从网络数据中提取边信息
-        self.edges = self._extract_edge_data()
-        
-        # Initialize neuron IDs and positions
-        self.neuron_ids = self._get_neuron_ids()
-        self.pos = self._get_positions()
-        
-        # Validate data
-        self._validate_data()
-        
-        # Calculate thresholds
-        self.threshold_dict = self._calculate_thresholds()
-        
-        # 初始化连接图
-        self.G = nx.Graph()
-        for neuron_id in self.neuron_ids:
-            self.G.add_node(neuron_id)
-        
-        # 添加边（使用网络分析中的边数据）
-        for edge in self.edges:
-            source, target, weight = edge
-            # 如果源和目标都在神经元ID列表中且权重大于阈值，则添加边
-            if source in self.neuron_ids and target in self.neuron_ids and weight > self.edge_weight_threshold:
-                self.G.add_edge(source, target, weight=weight)
-                
-        # Initialize group tracking
-        self.group_id_counter = itertools.count(1)
-        self.current_groups: Dict[int, List[str]] = {}  # group_id: neuron_list
-        self.neuron_to_group: Dict[str, int] = {}  # neuron_id: group_id
+        # 初始化数据存储
+        self.neuron_data = None
+        self.position_data = None
+        self.network_data = None
+        self.effect_sizes = None
+        self.edges = []
+        self.neuron_ids = []
+        self.positions = {}
+        self.frames = []
+        self.current_frame_states = {}
+        self.neuron_groups = {}
         self.group_colors = {}
-        
-        # Initialize color scheme
-        self.color_cycle = self._initialize_colors()
-        
-        # 神经元状态: 1表示活跃, 0表示不活跃
-        self.neuron_states = {nid: 0 for nid in self.neuron_ids}
-        
-        # Initialize frame storage
-        self.frames_data = {
-            'node_x': [], 'node_y': [], 'node_text': [],
-            'node_color': [], 'edge_x': [], 'edge_y': [],
-            'edge_color': [], 'titles': [], 'behaviors': []
-        }
-        
-        # Load background image if specified
-        self.background_image = None
+        self.background_image_path = None
         self.background_image_size = None
-        if self.use_background and self.background_image_path:
-            self._load_background_image()
+        
+        # 加载网络文件路径
+        self.network_file_path = network_file or config.network_analysis_file
+        
+        # 加载数据
+        try:
+            # 加载神经元数据
+            self.neuron_data = pd.read_excel(config.data_file)
+            print(f"成功加载神经元数据: {config.data_file}")
+            
+            # 加载位置数据
+            self.position_data = pd.read_csv(config.position_data_file)
+            print(f"成功加载位置数据: {config.position_data_file}")
+            
+            # 加载网络分析结果
+            self.network_data = self._load_network_data(self.network_file_path)
+            
+            # 加载神经元效应大小数据
+            self.effect_sizes = self._load_effect_sizes(config.neuron_effect_file)
+            
+            # 提取边数据
+            self.edges = self._extract_edge_data()
+            
+            # 验证behavior列是否存在
+            if 'behavior' not in self.neuron_data.columns:
+                raise ValueError("Behavior column not found in the Excel file!")
+            
+            self.background_image_path = config.background_image
+            
+            # 获取拓扑可视化参数（优先使用传入的参数，如果未传入则使用配置中的默认值）
+            topo_params = config.visualization_params['topology']
+            self.use_background = use_background if use_background is not None else topo_params['use_background']
+            self.node_size = node_size if node_size is not None else topo_params['node_size']
+            self.node_text_position = node_text_position if node_text_position is not None else topo_params['node_text_position']
+            self.edge_width = edge_width if edge_width is not None else topo_params['edge_width']
+            self.edge_color = edge_color if edge_color is not None else topo_params['edge_color']
+            self.background_opacity = background_opacity if background_opacity is not None else topo_params['background_opacity']
+            self.frame_duration = frame_duration if frame_duration is not None else topo_params['frame_duration']
+            self.color_scheme = color_scheme if color_scheme is not None else topo_params['color_scheme']
+            self.max_groups = max_groups if max_groups is not None else topo_params['max_groups']
+            
+            # 边权重阈值 - 只有权重大于此值的边才会被显示
+            self.edge_weight_threshold = edge_weight_threshold if edge_weight_threshold is not None else 0.3
+            
+            # Initialize neuron IDs and positions
+            self.neuron_ids = self._get_neuron_ids()
+            self.pos = self._get_positions()
+            
+            # Validate data
+            self._validate_data()
+            
+            # Calculate thresholds
+            self.threshold_dict = self._calculate_thresholds()
+            
+            # 初始化连接图
+            self.G = nx.Graph()
+            for neuron_id in self.neuron_ids:
+                self.G.add_node(neuron_id)
+            
+            # 添加边（使用网络分析中的边数据）
+            for edge in self.edges:
+                source, target, weight = edge
+                # 如果源和目标都在神经元ID列表中且权重大于阈值，则添加边
+                if source in self.neuron_ids and target in self.neuron_ids and weight > self.edge_weight_threshold:
+                    self.G.add_edge(source, target, weight=weight)
+                
+            # Initialize group tracking
+            self.group_id_counter = itertools.count(1)
+            self.current_groups: Dict[int, List[str]] = {}  # group_id: neuron_list
+            self.neuron_to_group: Dict[str, int] = {}  # neuron_id: group_id
+            self.group_colors = {}
+            
+            # Initialize color scheme
+            self.color_cycle = self._initialize_colors()
+            
+            # 神经元状态: 1表示活跃, 0表示不活跃
+            self.neuron_states = {nid: 0 for nid in self.neuron_ids}
+            
+            # Initialize frame storage
+            self.frames_data = {
+                'node_x': [], 'node_y': [], 'node_text': [],
+                'node_color': [], 'edge_x': [], 'edge_y': [],
+                'edge_color': [], 'titles': [], 'behaviors': []
+            }
+            
+            # Load background image if specified
+            self.background_image = None
+            self.background_image_size = None
+            if self.use_background and self.background_image_path:
+                self._load_background_image()
+            
+            # 确定网络数据类型
+            self.network_type = self._get_network_type()
+            print(f"检测到网络数据类型: {self.network_type}")
+        except Exception as e:
+            print(f"初始化失败: {str(e)}")
     
     def _load_network_data(self, file_path: str) -> Dict:
         """
@@ -214,14 +246,29 @@ class NeuronTopologyAnalyzer:
         """从网络分析数据中提取边信息"""
         edges = []
         try:
-            # 检查网络数据是否包含图的边信息
+            # 检查是否是标准的网络分析结果格式
             if self.network_data and 'topology_metrics' in self.network_data and 'graph' in self.network_data['topology_metrics'] and 'edges' in self.network_data['topology_metrics']['graph']:
                 edges_data = self.network_data['topology_metrics']['graph']['edges']
                 for edge in edges_data:
                     if len(edge) == 3:  # 确保边数据格式正确
                         source, target, weight = edge
                         edges.append((source, target, float(weight)))
-                print(f"从网络分析数据中提取了 {len(edges)} 条边")
+                print(f"从标准网络分析数据中提取了 {len(edges)} 条边")
+            
+            # 检查是否是特殊格式的网络数据 (mst, threshold, top_edges)
+            elif self.network_data and 'links' in self.network_data:
+                links_data = self.network_data['links']
+                for link in links_data:
+                    if 'source' in link and 'target' in link and 'weight' in link:
+                        source = link['source']
+                        target = link['target']
+                        weight = link['weight']
+                        edges.append((source, target, float(weight)))
+                print(f"从特殊格式网络数据中提取了 {len(edges)} 条边")
+            
+            else:
+                print("警告: 网络数据格式不兼容，无法提取边信息")
+        
         except Exception as e:
             print(f"警告: 提取边数据失败: {e}")
         
@@ -247,24 +294,42 @@ class NeuronTopologyAnalyzer:
             self.use_background = False
         
     def _get_neuron_ids(self) -> List[str]:
-        """Extract neuron IDs from the data columns."""
-        neuron_ids = [col for col in self.neuron_data.columns if 'n' in col.lower()]
+        """Extract neuron IDs from the network data or data columns."""
+        # 首先尝试从网络数据中获取神经元ID
+        neuron_ids = []
+        
+        # 检查标准格式网络数据
+        if self.network_data and 'topology_metrics' in self.network_data and 'graph' in self.network_data['topology_metrics'] and 'nodes' in self.network_data['topology_metrics']['graph']:
+            neuron_ids = self.network_data['topology_metrics']['graph']['nodes']
+            print(f"从标准网络数据中获取了 {len(neuron_ids)} 个神经元ID")
+        
+        # 检查特殊格式网络数据
+        elif self.network_data and 'nodes' in self.network_data:
+            neuron_ids = [node['id'] for node in self.network_data['nodes']]
+            print(f"从特殊格式网络数据中获取了 {len(neuron_ids)} 个神经元ID")
+        
+        # 如果网络数据中没有神经元ID，则从神经元数据中提取
         if not neuron_ids:
-            raise ValueError("在Excel文件中未找到神经元列!")
-        print(f"找到 {len(neuron_ids)} 个神经元列:", neuron_ids)
+            neuron_ids = [col for col in self.neuron_data.columns if 'n' in col.lower()]
+            print(f"从神经元数据中提取了 {len(neuron_ids)} 个神经元ID")
+        
+        if not neuron_ids:
+            raise ValueError("未能找到任何神经元ID!")
+            
+        print(f"最终使用 {len(neuron_ids)} 个神经元ID")
         return neuron_ids
         
     def _get_positions(self) -> Dict[str, Tuple[float, float]]:
         """Convert position data to dictionary format."""
         pos = {}
         for nid, (rx, ry) in zip(self.neuron_ids, 
-                                self.positions_data[['relative_x', 'relative_y']].values):
+                                self.position_data[['relative_x', 'relative_y']].values):
             pos[nid] = (rx, ry)
         return pos
         
     def _validate_data(self) -> None:
         """Validate that the number of positions matches the number of neurons."""
-        if len(self.positions_data) != len(self.neuron_ids):
+        if len(self.position_data) != len(self.neuron_ids):
             raise ValueError("标记点数量与神经元数量不一致，请检查数据。")
             
     def _calculate_thresholds(self) -> Dict[str, float]:
@@ -471,7 +536,7 @@ class NeuronTopologyAnalyzer:
         self.frames_data['edge_x'].append(edge_x)
         self.frames_data['edge_y'].append(edge_y)
         self.frames_data['edge_color'].append(edge_colors)
-        self.frames_data['titles'].append(f"Neuron Topology - Timestamp: {timestamp}")
+        self.frames_data['titles'].append(f"Neuron Topology ({self.network_type}) - Timestamp: {timestamp}")
         self.frames_data['behaviors'].append(behavior)  # 存储行为标签
         
     def process_all_frames(self) -> None:
@@ -529,275 +594,232 @@ class NeuronTopologyAnalyzer:
         )
         
     def _create_layout(self) -> go.Layout:
-        """
-        Create the layout for the animation.
-        包含了背景图、坐标轴、动画控制等设置。
-        """
-        # 设置基本布局配置
-        layout_config = {
-            'title': self.frames_data['titles'][0],
-            'showlegend': False,
-            'plot_bgcolor': 'rgba(0,0,0,0)',
-            'paper_bgcolor': 'rgba(0,0,0,0)',
-            'margin': dict(l=10, r=10, t=30, b=60),  # 进一步减小左右边距
-            'width': 1200,
-            'height': 800
-        }
-
-        # 如果有背景图，根据背景图设置画布大小和比例
-        if self.use_background and self.background_image and self.background_image_size:
-            # 获取图像尺寸
-            img_width, img_height = self.background_image_size
-            
-            # 设置画布大小（保持宽度1200，高度根据背景图比例调整）
-            layout_config['width'] = 1200
-            layout_config['height'] = int(1200 * img_height / img_width) + 60  # 为标题和时间轴留出空间
-            
-            # 计算坐标轴范围
-            layout_config['xaxis'] = dict(
-                showgrid=False,
-                zeroline=False,
-                showticklabels=False,
-                range=[-0.05, 1.05],
-                domain=[0.05, 0.95],  # 调整domain，让图形在画布中居中
-                scaleanchor='y',
-                scaleratio=1
-            )
-            
-            layout_config['yaxis'] = dict(
-                showgrid=False,
-                zeroline=False,
-                showticklabels=False,
-                range=[-0.05, 1.05],
-                domain=[0.05, 0.95],  # 调整domain，让图形在画布中居中
-                autorange='reversed'
-            )
-            
-            # 添加背景图
-            layout_config['images'] = [{
-                'source': f'data:image/png;base64,{self.background_image}',
-                'xref': 'paper',
-                'yref': 'paper',
-                'x': 0,
-                'y': 1,
-                'sizex': 1,
-                'sizey': 1,
-                'sizing': 'stretch',
-                'opacity': self.background_opacity,
-                'layer': 'below'
-            }]
-        else:
-            # 如果没有背景图，使用默认设置
-            layout_config.update({
-                'xaxis': dict(
-                    showgrid=False,
-                    zeroline=False,
-                    showticklabels=False,
-                    range=[-0.05, 1.05],
-                    domain=[0.05, 0.95],  # 调整domain，让图形在画布中居中
-                    scaleanchor='y',
-                    scaleratio=1
-                ),
-                'yaxis': dict(
-                    showgrid=False,
-                    zeroline=False,
-                    showticklabels=False,
-                    range=[-0.05, 1.05],
-                    domain=[0.05, 0.95],  # 调整domain，让图形在画布中居中
-                    autorange='reversed'
+        """创建图形布局"""
+        # 检查行为类型是否可用
+        behavior_available = 'Behavior' in self.neuron_data.columns
+        
+        # 计算节点的最大距离，用于确定图形的尺寸
+        max_x = max(pos[0] for pos in self.pos.values())
+        max_y = max(pos[1] for pos in self.pos.values())
+        
+        # 设置图形的宽高比，确保与原始图像保持一致
+        width_ratio = 1.0
+        height_ratio = 1.0
+        
+        if self.background_image_size:
+            bg_width, bg_height = self.background_image_size
+            width_ratio = bg_width / max(max_x, 1)
+            height_ratio = bg_height / max(max_y, 1)
+        
+        # 设置图形的宽度和高度
+        width = 1200
+        height = int(width * (max_y / max(max_x, 1)))
+        
+        # 调整高度以显示行为信息
+        if behavior_available:
+            height += 50
+        
+        # 创建自定义网格线
+        grid_lines = []
+        
+        # 添加网格线
+        grid_step = 100
+        for x in range(0, int(max_x) + grid_step, grid_step):
+            grid_lines.append(
+                go.layout.Shape(
+                    type="line",
+                    x0=x, y0=0,
+                    x1=x, y1=max_y,
+                    line=dict(
+                        color="rgba(200, 200, 200, 0.2)",
+                        width=1,
+                        dash="dash"
+                    )
                 )
-            })
-
-        # 修改动画控制配置
-        layout_config['updatemenus'] = [
-            # 播放/暂停按钮
-            {
-                "buttons": [
-                    {
-                        "label": "播放",
-                        "method": "animate",
-                        "args": [
-                            None,
-                            {
-                                "frame": {"duration": 100, "redraw": True},
-                                "fromcurrent": True,
-                                "mode": "immediate",
-                                "transition": {"duration": 0}
-                            }
-                        ]
-                    },
-                    {
-                        "label": "暂停",
-                        "method": "animate",
-                        "args": [
-                            [None],
-                            {
-                                "frame": {"duration": 0, "redraw": False},
-                                "mode": "immediate",
-                                "transition": {"duration": 0}
-                            }
-                        ]
-                    }
-                ],
-                "direction": "left",
-                "pad": {"r": 10},
-                "showactive": False,
-                "type": "buttons",
-                "x": 0.9,
-                "y": 1.1,
-                "xanchor": "right",
-                "yanchor": "top"
-            }
-        ]
-
-        # 修改滑块配置
-        layout_config['sliders'] = [
-            # 时间轴滑块
-            {
-                "active": 0,
-                "yanchor": "top",
-                "xanchor": "left",
-                "currentvalue": {
-                    "prefix": "时间点: ",
-                    "visible": True,
-                    "xanchor": "right"
-                },
-                "pad": {"b": 50, "t": 50},
-                "len": 1.0,
-                "x": 0,
-                "y": -0.1,
-                "steps": [
-                    {
-                        "args": [
-                            [f"frame_{k}"],
-                            {
-                                "frame": {"duration": 0, "redraw": True},
-                                "mode": "immediate",
-                                "transition": {"duration": 0}
-                            }
-                        ],
-                        "label": f"{k}" if k % 50 == 0 else "",
-                        "method": "animate"
-                    }
-                    for k in range(len(self.frames_data['node_x']))
-                ]
-            },
-            # 速度控制滑块
-            {
-                "active": 2,  # 默认选择正常速度
-                "yanchor": "top",
-                "xanchor": "left",
-                "currentvalue": {
-                    "prefix": "播放速度: ",
-                    "suffix": "x",
-                    "visible": True,
-                    "xanchor": "right"
-                },
-                "pad": {"b": 10, "t": 50},
-                "len": 0.3,  # 滑块长度
-                "x": 0.6,    # 位置
-                "y": 1.1,    # 位置
-                "steps": [
-                    {
-                        "args": [
-                            None,
-                            {
-                                "frame": {"duration": int(200/speed), "redraw": True},
-                                "fromcurrent": True,
-                                "mode": "immediate",
-                                "transition": {"duration": 0}
-                            }
-                        ],
-                        "label": str(speed),
-                        "method": "animate"
-                    }
-                    for speed in [0.25, 0.5, 1, 2, 4, 8]  # 速度选项
-                ]
-            }
-        ]
-
-        # 行为标签和时间轴配置（与Time_topology.py完全一致）
-        behavior_shapes = []
-        behavior_annotations = []
-        current_behavior = self.frames_data['behaviors'][0]
-        start_idx = 0
-        label_alternate = True  # 用于交替显示标签位置
-        
-        # 计算行为区间
-        for i in range(1, len(self.frames_data['behaviors'])):
-            if self.frames_data['behaviors'][i] != current_behavior:
-                # 添加竖线
-                behavior_shapes.append({
-                    'type': 'line',
-                    'x0': i/len(self.frames_data['behaviors']),
-                    'x1': i/len(self.frames_data['behaviors']),
-                    'y0': -0.1,
-                    'y1': -0.15 if label_alternate else -0.05,  # 根据交替标志调整竖线长度
-                    'xref': 'paper',
-                    'yref': 'paper',
-                    'line': {'color': 'black', 'width': 1}
-                })
-                
-                # 添加行为标签（交替显示在上下方）
-                behavior_annotations.append({
-                    'x': (start_idx + i)/(2*len(self.frames_data['behaviors'])),
-                    'y': -0.17 if label_alternate else -0.03,  # 交替位置
-                    'xref': 'paper',
-                    'yref': 'paper',
-                    'text': current_behavior,
-                    'showarrow': False,
-                    'font': {'size': 12},
-                    'yanchor': 'top' if label_alternate else 'bottom'  # 调整锚点
-                })
-                
-                current_behavior = self.frames_data['behaviors'][i]
-                start_idx = i
-                label_alternate = not label_alternate  # 切换交替标志
-        
-        # 添加最后一个区间的标签
-        behavior_annotations.append({
-            'x': (start_idx + len(self.frames_data['behaviors']))/(2*len(self.frames_data['behaviors'])),
-            'y': -0.17 if label_alternate else -0.03,
-            'xref': 'paper',
-            'yref': 'paper',
-            'text': current_behavior,
-            'showarrow': False,
-            'font': {'size': 12},
-            'yanchor': 'top' if label_alternate else 'bottom'
-        })
-        
-        # 添加底部的水平线（保持原有位置）
-        behavior_shapes.append({
-            'type': 'line',
-            'x0': 0,
-            'x1': 1,
-            'y0': -0.1,
-            'y1': -0.1,
-            'xref': 'paper',
-            'yref': 'paper',
-            'line': {'color': 'black', 'width': 1}
-        })
-
-        # 添加当前行为标签和行为区间标签
-        all_annotations = [
-            # 左上角的当前行为标签
-            dict(
-                x=0.02,
-                y=0.98,
-                xref='paper',
-                yref='paper',
-                text=f"Current Behavior: {self.frames_data['behaviors'][0]}",
-                showarrow=False,
-                font=dict(size=14),
-                xanchor='left',
-                yanchor='top'
             )
-        ]
-        all_annotations.extend(behavior_annotations)
-        layout_config['annotations'] = all_annotations
-        layout_config['shapes'] = behavior_shapes
         
-        return go.Layout(**layout_config)
+        for y in range(0, int(max_y) + grid_step, grid_step):
+            grid_lines.append(
+                go.layout.Shape(
+                    type="line",
+                    x0=0, y0=y,
+                    x1=max_x, y1=y,
+                    line=dict(
+                        color="rgba(200, 200, 200, 0.2)",
+                        width=1,
+                        dash="dash"
+                    )
+                )
+            )
+        
+        # 创建布局
+        layout = go.Layout(
+            title=dict(
+                text=f"神经元拓扑结构 - {self.network_type}",
+                font=dict(
+                    family="Arial",
+                    size=24,
+                    color="#333333"
+                ),
+                x=0.5,
+                xanchor="center"
+            ),
+            width=width,
+            height=height,
+            showlegend=True,
+            legend=dict(
+                x=1.05,
+                y=0.5,
+                xanchor="left",
+                yanchor="middle",
+                font=dict(
+                    family="Arial",
+                    size=12,
+                    color="#333333"
+                ),
+                bgcolor="rgba(255, 255, 255, 0.5)",
+                bordercolor="rgba(0, 0, 0, 0.2)",
+                borderwidth=1
+            ),
+            xaxis=dict(
+                range=[-50, max_x + 50],
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+                title=""
+            ),
+            yaxis=dict(
+                range=[-50, max_y + 50],
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+                title="",
+                scaleanchor="x",
+                scaleratio=1
+            ),
+            margin=dict(
+                l=20,
+                r=20,
+                t=50,
+                b=20
+            ),
+            plot_bgcolor="rgba(255, 255, 255, 0)",
+            paper_bgcolor="rgba(255, 255, 255, 1)",
+            hovermode="closest",
+            shapes=grid_lines,
+            updatemenus=[
+                dict(
+                    type="buttons",
+                    showactive=False,
+                    buttons=[
+                        dict(
+                            label="播放",
+                            method="animate",
+                            args=[
+                                None,
+                                dict(
+                                    frame=dict(duration=self.frame_duration, redraw=True),
+                                    fromcurrent=True,
+                                    mode="immediate"
+                                )
+                            ]
+                        ),
+                        dict(
+                            label="暂停",
+                            method="animate",
+                            args=[
+                                [None],
+                                dict(
+                                    frame=dict(duration=0, redraw=True),
+                                    mode="immediate"
+                                )
+                            ]
+                        )
+                    ],
+                    direction="left",
+                    pad=dict(r=10, t=10),
+                    x=0.1,
+                    y=0,
+                    xanchor="right",
+                    yanchor="top"
+                )
+            ],
+            sliders=[
+                dict(
+                    active=0,
+                    yanchor="top",
+                    xanchor="left",
+                    currentvalue=dict(
+                        font=dict(size=14),
+                        prefix="时间点: ",
+                        visible=True,
+                        xanchor="right"
+                    ),
+                    pad=dict(t=50, b=10),
+                    len=0.9,
+                    x=0.1,
+                    y=0,
+                    steps=[
+                        dict(
+                            method="animate",
+                            args=[
+                                [f"frame{i}"],
+                                dict(
+                                    mode="immediate",
+                                    frame=dict(duration=self.frame_duration, redraw=True),
+                                    transition=dict(duration=300)
+                                )
+                            ],
+                            label=str(i)
+                        ) for i in range(len(self.neuron_data))
+                    ]
+                )
+            ],
+            annotations=[
+                dict(
+                    text="神经元活动",
+                    showarrow=False,
+                    xref="paper",
+                    yref="paper",
+                    x=0.5,
+                    y=-0.05,
+                    font=dict(
+                        family="Arial",
+                        size=14,
+                        color="#333333"
+                    )
+                )
+            ]
+        )
+        
+        # 如果使用背景图像
+        if self.use_background and self.background_image_path and os.path.exists(self.background_image_path):
+            try:
+                img = Image.open(self.background_image_path)
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='PNG')
+                img_byte_arr = img_byte_arr.getvalue()
+                encoded_image = base64.b64encode(img_byte_arr).decode()
+                
+                # 设置背景图像
+                layout.images = [
+                    dict(
+                        source=f"data:image/png;base64,{encoded_image}",
+                        xref="x",
+                        yref="y",
+                        x=0,
+                        y=max_y,  # 反转y轴以匹配图像坐标系
+                        sizex=max_x,
+                        sizey=max_y,
+                        sizing="stretch",
+                        opacity=self.background_opacity,
+                        layer="below"
+                    )
+                ]
+            except Exception as e:
+                print(f"加载背景图像失败: {str(e)}")
+        
+        return layout
         
     def _create_animation_frames(self) -> List[go.Frame]:
         """Create frames for the animation with custom parameters."""
@@ -940,6 +962,12 @@ class NeuronTopologyAnalyzer:
             title = self.frames_data['titles'][k]
             if "神经元拓扑结构图" in title:
                 title = "Neuron Topology - Time: " + title.split("：")[-1] if "：" in title else title.split(":")[-1]
+            else:
+                # 保留原始标题中的网络类型信息
+                title_parts = title.split(" - ")
+                if len(title_parts) > 1:
+                    # 如果标题包含分隔符，保留第一部分（包含网络类型）
+                    title = title_parts[0] + " - Time: " + title_parts[1].split(": ")[-1]
             ax_main.set_title(title)
             
             # Convert behavior label to English
@@ -996,6 +1024,42 @@ class NeuronTopologyAnalyzer:
         plt.close()  # Close figure
         print(f"GIF animation saved to: {output_path}")  # 改为英文
 
+    def _get_network_type(self) -> str:
+        """确定当前使用的网络数据类型"""
+        if self.network_file_path:
+            # 从文件路径尝试确定类型
+            file_name = os.path.basename(self.network_file_path).lower()
+            
+            if "mst" in file_name:
+                return "最小生成树 (MST)"
+            elif "threshold" in file_name:
+                return "阈值过滤"
+            elif "top_edges" in file_name:
+                return "顶部边缘"
+            elif "network_analysis_results" in file_name:
+                return "标准拓扑分析"
+        
+        # 从数据结构尝试确定类型
+        if self.network_data:
+            if 'topology_metrics' in self.network_data:
+                return "标准拓扑分析"
+            elif 'nodes' in self.network_data and 'links' in self.network_data:
+                # 简单计算平均连接数来区分不同类型
+                if len(self.network_data.get('links', [])) > 0:
+                    nodes_count = len(self.network_data.get('nodes', []))
+                    links_count = len(self.network_data.get('links', []))
+                    avg_links = links_count / max(nodes_count, 1)
+                    
+                    if avg_links < 1.5:
+                        return "最小生成树 (MST)"
+                    elif avg_links < 2.5:
+                        return "阈值过滤"
+                    else:
+                        return "顶部边缘"
+        
+        # 默认类型
+        return "未知类型"
+
 def main():
     """Main function to run the topology analysis."""
     # 创建配置实例
@@ -1004,14 +1068,31 @@ def main():
     # 确保输出目录存在
     config.setup_directories()
     
+    # 控制是否生成GIF的开关
+    GENERATE_GIF = True  # 设置为False只生成HTML，不生成GIF
+    
+    # 处理命令行参数
+    if len(sys.argv) > 1:
+        # 检查是否有网络类型指定
+        network_arg = None
+        if sys.argv[1] in ["standard", "mst", "threshold", "top_edges"]:
+            network_arg = sys.argv[1]
+        
+        # 检查是否有GIF生成控制参数
+        for arg in sys.argv:
+            if arg == "--no-gif":
+                GENERATE_GIF = False
+                print("GIF生成已禁用，将只生成HTML动画")
+            elif arg == "--only-gif":
+                GENERATE_GIF = True
+                print("GIF生成已启用")
+    
     # 输出文件路径信息
     print(f"神经元数据文件: {config.data_file}")
     print(f"位置数据文件: {config.position_data_file}")
     print(f"背景图像文件: {config.background_image}")
     print(f"网络分析结果文件: {config.network_analysis_file}")
     print(f"神经元效应大小文件: {config.neuron_effect_file}")
-    print(f"输出HTML文件: {config.topology_html}")
-    print(f"输出GIF文件: {config.topology_gif}")
     
     # 检查文件是否存在
     print(f"检查背景图像是否存在: {config.background_image}")
@@ -1039,38 +1120,59 @@ def main():
     EDGE_WIDTH = 1      # 线条宽度，默认是2，现在改为1，使线条更细
     NODE_SIZE = 10      # 节点大小，默认是15，现在改为10，使节点更小
     
-    # 默认使用标准网络文件
-    network_file = config.network_analysis_file
+    # 定义要处理的网络文件类型
+    network_types = ["standard", "mst", "threshold", "top_edges"]
+
+    # 检查命令行参数是否指定特定类型
+    if network_arg:
+        network_types = [network_arg]
+        print(f"仅处理指定的网络类型: {network_types[0]}")
     
-    # 检查是否提供了命令行参数指定网络文件
-    if len(sys.argv) > 1:
-        method = sys.argv[1]
-        if method in ["threshold", "top_edges", "mst"]:
-            network_file = os.path.join(config.analysis_dir, f'neuron_network_main_{method}.json')
-            print(f"使用指定的网络文件: {network_file}")
-            
-            # 修改输出文件名以反映使用的方法
-            config.topology_html = os.path.join(config.topology_dir, f'pos_topology_{config.data_identifier}_{method}.html')
-            config.topology_gif = os.path.join(config.topology_dir, f'pos_topology_{config.data_identifier}_{method}.gif')
+    # 为每种网络类型创建可视化
+    for network_type in network_types:
+        # 设置网络文件路径和输出文件名
+        if network_type == "standard":
+            network_file = config.network_analysis_file
+            output_suffix = ""
         else:
-            print(f"未知的提取方法: {method}，使用默认网络文件")
-    
-    # 创建分析器实例
-    analyzer = NeuronTopologyAnalyzer(
-        config=config,
-        use_background=SHOW_BACKGROUND,  # 使用开关变量
-        network_file=network_file,       # 使用选定的网络文件
-        edge_weight_threshold=config.visualization_params['topology']['edge_weight_threshold'],
-        edge_width=EDGE_WIDTH,           # 使用自定义线条宽度
-        node_size=NODE_SIZE              # 使用自定义节点大小
-    )
-    analyzer.process_all_frames()
-    
-    # 生成HTML动画
-    analyzer.create_animation(config.topology_html)
-    
-    # 生成GIF动画
-    analyzer.create_gif(config.topology_gif, fps=config.visualization_params['topology']['gif_fps'])
+            network_file = os.path.join(config.analysis_dir, f'neuron_network_main_{network_type}.json')
+            output_suffix = f"_{network_type}"
+        
+        # 检查文件是否存在
+        if not os.path.exists(network_file):
+            print(f"警告: 未找到网络文件 {network_file}，跳过此类型")
+            continue
+        
+        print(f"\n处理网络类型: {network_type}")
+        print(f"使用网络文件: {network_file}")
+        
+        # 设置输出文件路径
+        html_output = os.path.join(config.topology_dir, f'pos_topology_{config.data_identifier}{output_suffix}.html')
+        gif_output = os.path.join(config.topology_dir, f'pos_topology_{config.data_identifier}{output_suffix}.gif')
+        
+        print(f"输出HTML文件: {html_output}")
+        if GENERATE_GIF:
+            print(f"输出GIF文件: {gif_output}")
+        
+        # 创建分析器实例
+        analyzer = NeuronTopologyAnalyzer(
+            config=config,
+            use_background=SHOW_BACKGROUND,  # 使用开关变量
+            network_file=network_file,       # 使用选定的网络文件
+            edge_weight_threshold=config.visualization_params['topology']['edge_weight_threshold'],
+            edge_width=EDGE_WIDTH,           # 使用自定义线条宽度
+            node_size=NODE_SIZE              # 使用自定义节点大小
+        )
+        analyzer.process_all_frames()
+        
+        # 生成HTML动画
+        analyzer.create_animation(html_output)
+        
+        # 根据开关决定是否生成GIF动画
+        if GENERATE_GIF:
+            analyzer.create_gif(gif_output, fps=config.visualization_params['topology']['gif_fps'])
+        
+        print(f"完成 {network_type} 类型的拓扑结构可视化")
 
 if __name__ == '__main__':
     main()
