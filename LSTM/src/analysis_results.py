@@ -3,6 +3,16 @@ import pandas as pd
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib as mpl
+
+# 字体配置：解决'Arial'字体警告问题
+mpl.rcParams['font.family'] = 'sans-serif'
+mpl.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Liberation Sans', 'FreeSans', 'Helvetica', 'sans-serif']
+# 避免使用Arial字体
+mpl.rcParams['mathtext.fontset'] = 'cm'
+# 设置中文显示支持（如有需要）
+mpl.rcParams['axes.unicode_minus'] = False
+
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import os
@@ -32,6 +42,10 @@ import torch.nn.functional as F
 
 # 添加安全的全局变量
 add_safe_globals(['_reconstruct'])
+
+# 添加到导入部分后
+import logging
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 
 class ResultAnalyzer:
     """
