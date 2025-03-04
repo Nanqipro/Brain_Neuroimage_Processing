@@ -598,38 +598,47 @@ class NeuronTopologyAnalyzer:
         # 检查行为类型是否可用
         behavior_available = 'Behavior' in self.neuron_data.columns
         
-        # 计算节点的最大距离，用于确定图形的尺寸
-        max_x = max(pos[0] for pos in self.pos.values())
-        max_y = max(pos[1] for pos in self.pos.values())
+        # 计算节点位置的范围
+        x_coords = [pos[0] for pos in self.pos.values()]
+        y_coords = [pos[1] for pos in self.pos.values()]
+        min_x, max_x = min(x_coords), max(x_coords)
+        min_y, max_y = min(y_coords), max(y_coords)
         
-        # 设置图形的宽高比，确保与原始图像保持一致
-        width_ratio = 1.0
-        height_ratio = 1.0
+        # 计算坐标范围和添加边距
+        x_range = max_x - min_x
+        y_range = max_y - min_y
+        padding = 0.2  # 增加20%的边距
         
-        if self.background_image_size:
-            bg_width, bg_height = self.background_image_size
-            width_ratio = bg_width / max(max_x, 1)
-            height_ratio = bg_height / max(max_y, 1)
+        x_min = min_x - (x_range * padding)
+        x_max = max_x + (x_range * padding)
+        y_min = min_y - (y_range * padding)
+        y_max = max_y + (y_range * padding)
         
-        # 设置图形的宽度和高度
+        # 设置图形的宽高比
         width = 1200
-        height = int(width * (max_y / max(max_x, 1)))
+        height = int(width * (y_range / x_range))
         
-        # 调整高度以显示行为信息
+        # 确保最小高度
+        height = max(height, 800)
+        
+        # 如果有行为信息，增加高度
         if behavior_available:
             height += 50
         
         # 创建自定义网格线
         grid_lines = []
         
-        # 添加网格线
-        grid_step = 100
-        for x in range(0, int(max_x) + grid_step, grid_step):
+        # 添加网格线，使用相对间距
+        grid_step_x = x_range / 10  # 将范围分成10份
+        grid_step_y = y_range / 10
+        
+        # X方向网格线
+        for x in np.arange(x_min, x_max + grid_step_x, grid_step_x):
             grid_lines.append(
                 go.layout.Shape(
                     type="line",
-                    x0=x, y0=0,
-                    x1=x, y1=max_y,
+                    x0=x, y0=y_min,
+                    x1=x, y1=y_max,
                     line=dict(
                         color="rgba(200, 200, 200, 0.2)",
                         width=1,
@@ -638,12 +647,13 @@ class NeuronTopologyAnalyzer:
                 )
             )
         
-        for y in range(0, int(max_y) + grid_step, grid_step):
+        # Y方向网格线
+        for y in np.arange(y_min, y_max + grid_step_y, grid_step_y):
             grid_lines.append(
                 go.layout.Shape(
                     type="line",
-                    x0=0, y0=y,
-                    x1=max_x, y1=y,
+                    x0=x_min, y0=y,
+                    x1=x_max, y1=y,
                     line=dict(
                         color="rgba(200, 200, 200, 0.2)",
                         width=1,
@@ -682,26 +692,28 @@ class NeuronTopologyAnalyzer:
                 borderwidth=1
             ),
             xaxis=dict(
-                range=[-50, max_x + 50],
+                range=[x_min, x_max],
                 showgrid=False,
                 zeroline=False,
-                showticklabels=False,
-                title=""
+                showticklabels=True,  # 显示坐标轴刻度
+                title="X Position",
+                tickformat=".2f"  # 保留两位小数
             ),
             yaxis=dict(
-                range=[-50, max_y + 50],
+                range=[y_min, y_max],
                 showgrid=False,
                 zeroline=False,
-                showticklabels=False,
-                title="",
+                showticklabels=True,  # 显示坐标轴刻度
+                title="Y Position",
+                tickformat=".2f",  # 保留两位小数
                 scaleanchor="x",
                 scaleratio=1
             ),
             margin=dict(
-                l=20,
-                r=20,
+                l=50,  # 增加左边距
+                r=50,  # 增加右边距
                 t=50,
-                b=20
+                b=50   # 增加底部边距
             ),
             plot_bgcolor="rgba(255, 255, 255, 0)",
             paper_bgcolor="rgba(255, 255, 255, 1)",
@@ -774,50 +786,25 @@ class NeuronTopologyAnalyzer:
                         ) for i in range(len(self.neuron_data))
                     ]
                 )
-            ],
-            annotations=[
-                dict(
-                    text="神经元活动",
-                    showarrow=False,
-                    xref="paper",
-                    yref="paper",
-                    x=0.5,
-                    y=-0.05,
-                    font=dict(
-                        family="Arial",
-                        size=14,
-                        color="#333333"
-                    )
-                )
             ]
         )
         
         # 如果使用背景图像
-        if self.use_background and self.background_image_path and os.path.exists(self.background_image_path):
-            try:
-                img = Image.open(self.background_image_path)
-                img_byte_arr = io.BytesIO()
-                img.save(img_byte_arr, format='PNG')
-                img_byte_arr = img_byte_arr.getvalue()
-                encoded_image = base64.b64encode(img_byte_arr).decode()
-                
-                # 设置背景图像
-                layout.images = [
-                    dict(
-                        source=f"data:image/png;base64,{encoded_image}",
-                        xref="x",
-                        yref="y",
-                        x=0,
-                        y=max_y,  # 反转y轴以匹配图像坐标系
-                        sizex=max_x,
-                        sizey=max_y,
-                        sizing="stretch",
-                        opacity=self.background_opacity,
-                        layer="below"
-                    )
-                ]
-            except Exception as e:
-                print(f"加载背景图像失败: {str(e)}")
+        if self.use_background and self.background_image:
+            layout.images = [
+                dict(
+                    source=f"data:image/png;base64,{self.background_image}",
+                    xref="x",
+                    yref="y",
+                    x=x_min,
+                    y=y_max,
+                    sizex=x_max - x_min,
+                    sizey=y_max - y_min,
+                    sizing="stretch",
+                    opacity=self.background_opacity,
+                    layer="below"
+                )
+            ]
         
         return layout
         
