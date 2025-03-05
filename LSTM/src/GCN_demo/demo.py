@@ -36,7 +36,7 @@ def generate_graph(node_nums, feature_dim, *args, **kwargs):
 # generate dataset
 data_list = []
 for i in range(graph_nums):
-    x, edge_index = generate_graph(node_nums, node_feature_dim, edge_prob=0,1)
+    x, edge_index = generate_graph(node_nums, node_feature_dim, edge_prob=0.1)
     y = torch.tensor(np.random.randint(0, num_classes, dtype=torch.long))
     data = Data(x=x, edge_index=edge_index)
     data_list.append(data)
