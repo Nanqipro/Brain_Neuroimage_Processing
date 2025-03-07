@@ -14,7 +14,7 @@ import os
 import datetime
 from analysis_config import AnalysisConfig
 import re
-import torch.optim as optim
+warnings.filterwarnings('ignore')
 
 # Set random seed
 def set_random_seed(seed):
@@ -163,7 +163,7 @@ class NeuronDataProcessor:
             count = sum(y == code)
             print(f"{label}: {code} (Count: {count})")
         
-        return X_scaled, y, behavior_data
+        return X_scaled, y
 
     def apply_kmeans(self, X):
         # 应用K-means聚类
@@ -677,109 +677,122 @@ def plot_training_metrics(metrics, config):
     plt.close()
 
 def main():
-    """主函数"""
-    print("\n====== 神经元数据分析 ======\n")
-    
-    # 配置项
-    use_gnn_integration = True  # 是否使用GNN集成分析
-    
-    # 导入必要的包
-    from analysis_config import AnalysisConfig
-
-    # 创建配置实例
-    config = AnalysisConfig()
-    
-    # 设置随机种子
-    set_random_seed(config.random_seed)
-    
-    # 数据处理
-    processor = NeuronDataProcessor(config)
-    X_scaled, y, behavior_labels = processor.preprocess_data()
-    print(f"预处理后数据形状: {X_scaled.shape}")
-    
-    # 序列长度
-    sequence_length = 10
-    
-    # LSTM分析
-    print("\n====== LSTM分析 ======\n")
-    # 创建LSTM数据集
-    dataset = NeuronDataset(X_scaled, y, sequence_length)
-    train_data, test_data = train_test_split(dataset, test_size=config.test_size, random_state=config.random_seed)
-    train_loader = DataLoader(train_data, batch_size=config.batch_size, shuffle=True)
-    test_loader = DataLoader(test_data, batch_size=config.batch_size)
-    
-    # 自动决定设备类型
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"使用设备: {device}")
-    
-    # 创建并训练模型
-    input_size = X_scaled.shape[1]
-    num_classes = len(np.unique(y))
-    model = EnhancedNeuronLSTM(
-        input_size=input_size,
-        hidden_size=config.hidden_size,
-        num_layers=config.num_layers,
-        num_classes=num_classes,
-        latent_dim=config.latent_dim,
-        num_heads=config.num_heads,
-        dropout=config.dropout
-    ).to(device)
-    
-    # 打印模型结构
-    model.summary()
-    
-    # 定义损失函数和优化器
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
-    
-    # 训练模型
-    metrics = train_model(
-        model, train_loader, test_loader, criterion, optimizer, device, 
-        config.num_epochs, config
-    )
-    
-    # 绘制训练指标
-    plot_training_metrics(metrics, config)
-    
-    # 保存模型
-    model_path = os.path.join(config.model_dir, 'enhanced_lstm_model.pth')
-    torch.save({
-        'model_state_dict': model.state_dict(),
-        'config': model.get_config(),
-        'metrics': metrics
-    }, model_path)
-    print(f"模型已保存至 {model_path}")
-    
-    # GNN集成分析
-    if use_gnn_integration:
-        print("\n====== GNN集成分析 ======\n")
-        try:
-            # 导入GNN-LSTM集成器
-            from gnn_lstm_integration import GNNLSTMIntegrator
-            
-            # 创建并运行集成分析
-            integrator = GNNLSTMIntegrator(config)
-            gnn_results = integrator.run_full_analysis(X_scaled, y)
-            
-            print("\n====== GNN分析完成 ======\n")
-            print(f"社区结构: 检测到 {gnn_results['community_metrics']['num_communities']} 个神经元社区")
-            print(f"模块度: {gnn_results['community_metrics']['modularity']:.4f}")
-            
-            # 如果训练了混合模型，显示性能
-            if gnn_results['hybrid_model'] is not None:
-                print("\nGNN-LSTM混合模型训练完成")
-                print(f"最终训练损失: {gnn_results['training_history']['train_loss'][-1]:.4f}")
-                print(f"最终验证损失: {gnn_results['training_history']['val_loss'][-1]:.4f}")
-                print(f"最终训练准确率: {gnn_results['training_history']['train_acc'][-1]:.4f}")
-                print(f"最终验证准确率: {gnn_results['training_history']['val_acc'][-1]:.4f}")
-            
-            print(f"\n分析结果已保存至 {config.gnn_output_dir}")
-            
-        except ImportError as e:
-            print(f"GNN集成分析失败: {e}")
-            print("请确保依赖库已正确安装，并且GNN模块路径配置正确")
-    
-    print("\n====== 分析完成 ======\n")
+    """
+    主函数：
+    1. 初始化配置
+    2. 数据预处理
+    3. 应用K-means聚类
+    4. 训练LSTM模型
+    5. 保存结果和可视化
+    """
+    config = None
+    try:
+        # 初始化配置
+        config = AnalysisConfig()
+        
+        # 验证和创建目录（validate_paths 现在会自动调用 setup_directories）
+        print("正在验证并创建目录结构...")
+        config.validate_paths()
+        
+        print("正在设置随机种子...")
+        set_random_seed(config.random_seed)
+        
+        print("正在进行数据预处理...")
+        processor = NeuronDataProcessor(config)
+        X_scaled, y = processor.preprocess_data()
+        
+        print("正在应用K-means聚类...")
+        kmeans, cluster_labels = processor.apply_kmeans(X_scaled)
+        
+        print("正在准备训练数据...")
+        X_with_clusters = np.column_stack((X_scaled, cluster_labels))
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_with_clusters, y, test_size=config.test_size, random_state=config.random_seed
+        )
+        
+        # 创建数据加载器
+        train_dataset = NeuronDataset(X_train, y_train, config.sequence_length)
+        val_dataset = NeuronDataset(X_test, y_test, config.sequence_length)
+        
+        train_loader = DataLoader(
+            train_dataset, 
+            batch_size=config.batch_size, 
+            shuffle=True
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            shuffle=False
+        )
+        
+        print("正在初始化模型...")
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"使用设备: {device}")
+        
+        input_size = X_with_clusters.shape[1]
+        num_classes = len(np.unique(y))
+        
+        # 打印模型输入输出尺寸，帮助调试
+        print(f"模型输入尺寸: {input_size}")
+        print(f"行为类别数: {num_classes}")
+        print(f"序列长度: {config.sequence_length}")
+        print(f"隐藏层大小: {config.hidden_size}")
+        
+        model = EnhancedNeuronLSTM(
+            input_size, 
+            config.hidden_size, 
+            config.num_layers, 
+            num_classes
+        ).to(device)
+        
+        model.summary()  # 打印模型摘要
+        
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=config.learning_rate,
+            weight_decay=config.analysis_params['weight_decay']
+        )
+        
+        print("\n开始训练模型...")
+        metrics = train_model(
+            model, 
+            train_loader,
+            val_loader, 
+            criterion, 
+            optimizer, 
+            device, 
+            config.num_epochs,
+            config
+        )
+        
+        print("\n正在保存训练指标...")
+        plot_training_metrics(metrics, config)
+        
+        print("\n训练完成！结果已保存：")
+        print(f"训练指标曲线: {config.accuracy_plot}")
+        print(f"训练日志: {config.metrics_log}")
+        print(f"最佳验证集准确率: {metrics['best_val_acc']:.2f}%")
+        print(f"所有训练相关文件已保存到: {config.train_dir}")
+        
+    except FileNotFoundError as e:
+        print(f"文件未找到: {str(e)}")
+    except PermissionError as e:
+        print(f"权限错误: {str(e)}")
+    except RuntimeError as e:
+        print(f"运行时错误: {str(e)}")
+    except Exception as e:
+        print(f"发生未预期的错误: {str(e)}")
+        if config:
+            # 保存错误日志
+            try:
+                with open(config.error_log, 'a') as f:
+                    f.write(f"\n{'-'*50}\n")
+                    f.write(f"时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"错误: {str(e)}\n")
+                print(f"错误日志已保存到: {config.error_log}")
+            except:
+                print("无法保存错误日志")
 
 if __name__ == "__main__":
     main() 

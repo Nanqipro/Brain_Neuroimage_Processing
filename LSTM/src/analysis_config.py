@@ -9,30 +9,17 @@ class AnalysisConfig:
     3. 分析参数配置
     4. 可视化参数配置
     """
-    def __init__(self, 
-                data_file='../data/neuron_data.xlsx',
-                base_output_dir='../results',
-                verbose=True,
-                random_seed=42):
-        """
-        初始化分析配置
-        
-        参数:
-            data_file: 数据文件路径
-            base_output_dir: 基础输出目录
-            verbose: 是否显示详细输出
-            random_seed: 随机种子
-        """
+    def __init__(self):
         # 基础目录配置
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根目录
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = data_file  # 原始数据文件
+        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
         self.data_identifier = 'Day6'  # 从数据文件名提取标识符
         
         # 输出目录配置
-        self.output_dir = base_output_dir  # 结果输出总目录
+        self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
         self.model_dir = os.path.join(self.base_dir, 'models')    # 模型保存目录
         self.analysis_dir = os.path.join(self.output_dir, f'analysis_{self.data_identifier}')  # 分析结果目录
         self.train_dir = os.path.join(self.output_dir, f'train_{self.data_identifier}')   # 训练结果目录
@@ -83,7 +70,7 @@ class AnalysisConfig:
         self.num_epochs = 100         # 训练轮数：模型训练的总轮数
         self.n_clusters = 5           # 聚类数量：K-means聚类的类别数
         self.test_size = 0.2          # 测试集比例：数据集中测试集的占比
-        self.random_seed = random_seed         # 随机种子：确保结果可重复性
+        self.random_seed = 42         # 随机种子：确保结果可重复性
         
         # 分析参数配置
         self.analysis_params = {
@@ -158,32 +145,6 @@ class AnalysisConfig:
                 'edge_weight_threshold': 0.3      # 边权重阈值，只显示权重大于此值的边
             }
         }
-        
-        # GNN相关配置
-        self.gnn_output_dir = os.path.join(self.output_dir, 'gnn_analysis')
-        
-        # GNN模型参数
-        self.gnn_feature_type = 'connection_profile'  # 节点特征类型: 'connection_profile', 'eigen', 'degree', 'identity'
-        self.gnn_message_type = 'node_edge_concat'  # 消息传递类型: 'edge_weighted', 'bin_concat', 'node_edge_concat', 'node_concat'
-        self.gnn_hidden_dim = 64  # GNN隐藏层维度
-        self.gnn_num_layers = 2  # GNN层数
-        self.gnn_pooling = 'mean'  # 池化方法: 'concat', 'mean', 'max', 'add'
-        self.gnn_dropout = 0.2  # Dropout比率
-        
-        # GNN-LSTM混合模型参数
-        self.window_size = 20  # 滑动窗口大小
-        self.step_size = 10  # 滑动步长
-        self.correlation_threshold = 0.3  # 相关性阈值
-        self.lstm_hidden_dim = 128  # LSTM隐藏层维度
-        
-        # 训练参数
-        self.weight_decay = 5e-4  # 权重衰减
-        
-        # 创建必要的目录
-        os.makedirs(self.gnn_output_dir, exist_ok=True)
-        
-        # 随机种子
-        self.random_seed = random_seed
         
     def setup_directories(self):
         """
