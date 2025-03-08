@@ -47,6 +47,81 @@ add_safe_globals(['_reconstruct'])
 import logging
 logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 
+# 导入GNN相关模块
+try:
+    import torch_geometric
+    from neuron_gnn import GNNAnalyzer, NeuronGCN, NeuronGAT, TemporalGNN, ModuleGNN
+    from neuron_gnn import train_gnn_model, plot_gnn_results, visualize_node_embeddings
+    HAS_GNN_SUPPORT = True
+    print("成功加载GNN支持模块，GNN分析功能已启用")
+except ImportError as e:
+    print(f"警告: 未找到GNN支持模块 ({str(e)})，将禁用GNN分析功能")
+    print("请确保已安装PyTorch Geometric及相关依赖项")
+    print("安装命令: pip install torch-geometric torch-scatter torch-sparse")
+    HAS_GNN_SUPPORT = False
+
+def check_gnn_dependencies():
+    """
+    检查GNN相关依赖项是否正确安装
+    
+    返回:
+        status: 依赖项检查状态
+        missing: 缺失的依赖项列表
+    """
+    dependencies = {
+        'torch': False,
+        'torch_geometric': False,
+        'torch_scatter': False,
+        'torch_sparse': False,
+    }
+    
+    missing = []
+    
+    # 检查PyTorch
+    try:
+        import torch
+        dependencies['torch'] = True
+        print(f"PyTorch版本: {torch.__version__}")
+    except ImportError:
+        missing.append('torch')
+    
+    # 检查PyTorch Geometric
+    try:
+        import torch_geometric
+        dependencies['torch_geometric'] = True
+        print(f"PyTorch Geometric版本: {torch_geometric.__version__}")
+    except ImportError:
+        missing.append('torch_geometric')
+    
+    # 检查torch_scatter
+    try:
+        import torch_scatter
+        dependencies['torch_scatter'] = True
+        print(f"Torch Scatter版本: {torch_scatter.__version__}")
+    except ImportError:
+        missing.append('torch_scatter')
+    
+    # 检查torch_sparse
+    try:
+        import torch_sparse
+        dependencies['torch_sparse'] = True
+        print(f"Torch Sparse版本: {torch_sparse.__version__}")
+    except ImportError:
+        missing.append('torch_sparse')
+    
+    # 检查是否能导入我们的GNN模块
+    try:
+        import neuron_gnn
+        print("成功导入neuron_gnn模块")
+    except ImportError as e:
+        print(f"无法导入neuron_gnn模块: {str(e)}")
+        print(f"当前Python路径: {sys.path}")
+        missing.append('neuron_gnn')
+    
+    status = all(dependencies.values())
+    
+    return status, missing
+
 class ResultAnalyzer:
     """
     结果分析器类：用于分析神经元活动数据和行为之间的关系
@@ -1547,6 +1622,188 @@ class ResultAnalyzer:
         
         return mapping_probs
 
+    def analyze_network_with_gnn(self, G, correlation_matrix, X_scaled, y, available_neurons):
+        """
+        使用图神经网络分析神经元网络
+        
+        参数:
+            G: NetworkX图对象
+            correlation_matrix: 相关性矩阵
+            X_scaled: 标准化后的神经元活动数据
+            y: 行为标签
+            available_neurons: 可用神经元列表
+            
+        返回:
+            gnn_results: 包含GNN分析结果的字典
+        """
+        if not HAS_GNN_SUPPORT:
+            print("警告: GNN支持模块未找到，跳过GNN分析")
+            return {}
+        
+        print("\n开始使用GNN进行神经元网络分析...")
+        
+        # 创建GNN分析器
+        gnn_analyzer = GNNAnalyzer(self.config)
+        
+        # 转换为GNN格式
+        data = gnn_analyzer.convert_network_to_gnn_format(G, X_scaled, y)
+        
+        # GNN分析结果字典
+        gnn_results = {}
+        
+        # 1. 行为预测GCN模型
+        print("\n训练行为预测GCN模型...")
+        try:
+            # 获取类别数
+            num_classes = len(np.unique(y))
+            
+            # 创建GCN模型
+            gcn_model = NeuronGCN(
+                in_channels=X_scaled.shape[1],
+                hidden_channels=128,
+                out_channels=num_classes,
+                dropout=0.2
+            )
+            
+            # 设置训练参数
+            epochs = self.config.analysis_params.get('gnn_epochs', 100)
+            lr = self.config.analysis_params.get('gnn_learning_rate', 0.01)
+            
+            # 训练模型
+            trained_model, losses = train_gnn_model(
+                model=gcn_model,
+                data=data,
+                epochs=epochs,
+                lr=lr,
+                device=gnn_analyzer.device
+            )
+            
+            # 绘制训练结果
+            loss_plot_path = os.path.join(gnn_analyzer.gnn_output_dir, 'gcn_training.png')
+            plot_gnn_results(losses, loss_plot_path)
+            
+            # 可视化节点嵌入
+            embedding_plot_path = os.path.join(gnn_analyzer.gnn_output_dir, 'gcn_embeddings.png')
+            visualize_node_embeddings(trained_model, data, embedding_plot_path)
+            
+            # 评估模型
+            trained_model.eval()
+            with torch.no_grad():
+                out = trained_model(data)
+                _, predicted = torch.max(out, 1)
+                correct = (predicted == data.y).sum().item()
+                accuracy = correct / len(data.y)
+            
+            print(f"GCN行为预测模型完成，准确率: {accuracy:.4f}")
+            
+            # 保存结果
+            gnn_results['gcn_behavior_prediction'] = {
+                'accuracy': accuracy,
+                'loss_plot_path': loss_plot_path,
+                'embedding_plot_path': embedding_plot_path
+            }
+            
+        except Exception as e:
+            print(f"GCN行为预测模型训练出错: {str(e)}")
+            gnn_results['gcn_behavior_prediction'] = {'error': str(e)}
+        
+        # 2. 神经元模块识别GAT模型
+        print("\n训练神经元模块识别GAT模型...")
+        try:
+            # 创建GAT模型
+            # 先使用社区检测算法获取社区作为标签
+            try:
+                communities = community_louvain.best_partition(G)
+                community_labels = np.array([communities[node] for node in G.nodes()])
+                num_communities = len(set(communities.values()))
+                
+                # 更新数据标签
+                data.y = torch.tensor(community_labels, dtype=torch.long)
+                
+                # 创建GAT模型
+                gat_model = NeuronGAT(
+                    in_channels=X_scaled.shape[1],
+                    hidden_channels=64,
+                    out_channels=num_communities,
+                    heads=4,
+                    dropout=0.2
+                )
+                
+                # 训练模型
+                trained_gat, gat_losses = train_gnn_model(
+                    model=gat_model,
+                    data=data,
+                    epochs=epochs,
+                    lr=lr,
+                    device=gnn_analyzer.device
+                )
+                
+                # 绘制训练结果
+                gat_loss_plot_path = os.path.join(gnn_analyzer.gnn_output_dir, 'gat_training.png')
+                plot_gnn_results(gat_losses, gat_loss_plot_path)
+                
+                # 评估模型
+                trained_gat.eval()
+                with torch.no_grad():
+                    out = trained_gat(data)
+                    _, predicted = torch.max(out, 1)
+                    gat_accuracy = (predicted == data.y).sum().item() / len(data.y)
+                
+                print(f"GAT模块识别模型完成，准确率: {gat_accuracy:.4f}")
+                
+                # 保存结果
+                gnn_results['gat_module_detection'] = {
+                    'accuracy': gat_accuracy,
+                    'loss_plot_path': gat_loss_plot_path,
+                    'num_communities': num_communities
+                }
+                
+            except Exception as e:
+                print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
+                gnn_results['gat_module_detection'] = {'error': str(e)}
+            
+        except Exception as e:
+            print(f"GAT模块识别模型训练出错: {str(e)}")
+            gnn_results['gat_module_detection'] = {'error': str(e)}
+        
+        # 3. 时间序列GNN分析
+        print("\n准备时间序列GNN数据...")
+        try:
+            # 设置时间窗口参数
+            window_size = self.config.analysis_params.get('temporal_window_size', 10)
+            stride = self.config.analysis_params.get('temporal_stride', 5)
+            
+            # 准备时间序列数据
+            temporal_data = gnn_analyzer.prepare_temporal_gnn_data(
+                G, X_scaled, window_size=window_size, stride=stride
+            )
+            
+            print(f"时间序列GNN数据准备完成，共 {len(temporal_data)} 个窗口")
+            
+            # 保存结果
+            gnn_results['temporal_gnn'] = {
+                'windows_count': len(temporal_data),
+                'window_size': window_size,
+                'stride': stride
+            }
+            
+        except Exception as e:
+            print(f"时间序列GNN数据准备出错: {str(e)}")
+            gnn_results['temporal_gnn'] = {'error': str(e)}
+        
+        # 保存GNN分析结果到JSON文件
+        gnn_results_file = os.path.join(gnn_analyzer.gnn_output_dir, 'gnn_analysis_results.json')
+        try:
+            # 将不可序列化的对象转换为字符串
+            serializable_results = convert_to_serializable(gnn_results)
+            with open(gnn_results_file, 'w') as f:
+                json.dump(serializable_results, f, indent=4)
+            print(f"\nGNN分析结果已保存到 {gnn_results_file}")
+        except Exception as e:
+            print(f"保存GNN分析结果时出错: {str(e)}")
+        
+        return gnn_results
+
 def convert_to_serializable(obj):
     """
     将对象转换为可JSON序列化的格式
@@ -1601,15 +1858,38 @@ def main():
         
         # 使用redirect_stdout重定向标准输出
         with contextlib.redirect_stdout(output_buffer):
+            # 检查GNN依赖项
+            print("\n检查GNN依赖项...")
+            gnn_ok, missing_deps = check_gnn_dependencies()
+            if gnn_ok:
+                print("GNN依赖项检查通过，将启用GNN分析功能")
+                if hasattr(config, 'use_gnn'):
+                    print(f"使用GNN: {'启用' if config.use_gnn else '禁用'}")
+                else:
+                    print("配置中未找到use_gnn属性，将默认启用GNN")
+                    config.use_gnn = True
+            else:
+                print(f"GNN依赖项检查失败，以下组件缺失: {', '.join(missing_deps)}")
+                print("将禁用GNN分析功能")
+                config.use_gnn = False
+                print("""
+如需启用GNN功能，请安装以下依赖项:
+pip install torch-geometric torch-scatter torch-sparse
+
+注意: torch-scatter和torch-sparse可能需要根据您的CUDA版本安装特定版本
+详情请参考: https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html
+""")
+                
             # 记录分析开始时间
             start_time = datetime.now()
             print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"数据标识符: {config.data_identifier}")
-            print(f"=" * 50)
+            print("=" * 50)
             
             # Initialize analyzer
             analyzer = ResultAnalyzer(config)
             
+            # 加载模型和数据
             print("加载模型和数据...")
             model, X_scaled, y = analyzer.load_model_and_data()
             
@@ -1808,6 +2088,30 @@ def main():
             
         print(f"分析日志已保存到: {config.log_file}")
             
+        # 在现有网络分析后添加GNN分析
+        if hasattr(config, 'use_gnn') and config.use_gnn:
+            print("\n使用GNN进行神经元网络分析...")
+            gnn_results = analyzer.analyze_network_with_gnn(
+                G, correlation_matrix, X_scaled, y, available_neurons
+            )
+            
+            # 将GNN结果添加到分析结果中
+            if gnn_results:
+                # 读取已保存的分析结果
+                try:
+                    with open(config.network_analysis_file, 'r') as f:
+                        results = json.load(f)
+                    
+                    # 添加GNN分析结果
+                    results['gnn_analysis'] = gnn_results
+                    
+                    # 更新网络分析结果文件
+                    with open(config.network_analysis_file, 'w') as f:
+                        json.dump(results, f, indent=4)
+                    print(f"更新的网络分析结果（包含GNN分析）已保存到 {config.network_analysis_file}")
+                except Exception as e:
+                    print(f"更新网络分析结果文件时出错: {str(e)}")
+        
     except Exception as e:
         error_message = f"分析过程中出现错误: {str(e)}"
         print(error_message)

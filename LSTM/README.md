@@ -1,50 +1,56 @@
-# Neural Network LSTM Analysis Platform
+# 神经网络LSTM与GNN分析平台
 
-## Project Overview
+## 项目概述
 
-This is an LSTM (Long Short-Term Memory) platform for neural network data analysis, focusing on neuron activity sequence analysis, clustering, and network topology visualization. The project leverages deep learning techniques to analyze neural activity patterns, aiming to reveal the dynamic changes in neural network functional connectivity and their association with behavior.
+本项目是一个神经元网络数据分析平台，结合LSTM（长短期记忆网络）和GNN（图神经网络）技术，专注于神经元活动序列分析、聚类和网络拓扑可视化。项目利用深度学习和图神经网络技术分析神经活动模式，旨在揭示神经网络功能连接的动态变化及其与行为的关联。
 
-## Key Features
+## 核心功能
 
-- LSTM-based time series analysis of neuronal activity
-- K-means and other clustering algorithms for neuronal functional grouping
-- Neural network topology structure analysis
-- Interactive and static network visualization
-- Correlation analysis between neuronal activity and behavior
-- Model training, testing, and validation framework
+- 基于LSTM的神经元活动时间序列分析
+- 基于GNN/GCN的神经元网络拓扑结构分析
+- 神经元功能连接的图模型构建与分析
+- K-means等聚类算法用于神经元功能分组
+- 神经网络拓扑结构分析
+- 交互式和静态网络可视化
+- 神经元活动与行为之间的相关性分析
+- 模型训练、测试和验证框架
 
-## Project Structure
+## 项目结构
 
 ```
 LSTM/
-├── src/                    # Source code directory
-│   ├── lib/                # Core library components
-│   │   ├── vis-9.1.2/      # Visualization library
-│   │   ├── tom-select/     # Selection component library
-│   │   └── bindings/       # Language bindings
-│   ├── analysis_results.py # Results analysis script
-│   ├── pos_topology_js.py  # Topology analysis script
-│   ├── analysis_config.py  # Analysis configuration
-│   ├── kmeans_lstm_analysis.py # LSTM clustering analysis
-│   ├── visualization.py    # Visualization tools
-│   ├── analysis_utils.py   # Analysis utility functions
-│   ├── enhanced_analysis.py # Enhanced analysis methods
-│   └── test_env.py         # Environment test script
-├── datasets/               # Datasets directory 
-├── models/                 # Trained model storage
-│   ├── neuron_lstm_model_Day3.pth # Day 3 neuron model
-│   ├── neuron_lstm_model_Day6.pth # Day 6 neuron model
-│   └── neuron_lstm_model_Day9.pth # Day 9 neuron model
-├── results/                # Analysis results output directory
-├── README_interactive_network.md # Interactive network usage guide
-└── requirements.txt        # Project dependencies
+├── src/                    # 源代码目录
+│   ├── lib/                # 核心库组件
+│   │   ├── vis-9.1.2/      # 可视化库
+│   │   ├── tom-select/     # 选择组件库
+│   │   └── bindings/       # 语言绑定
+│   ├── analysis_results.py # 结果分析脚本
+│   ├── pos_topology_js.py  # 拓扑分析脚本
+│   ├── analysis_config.py  # 分析配置
+│   ├── kmeans_lstm_analysis.py # LSTM聚类分析
+│   ├── neuron_gnn.py       # 神经元GNN分析模块
+│   ├── gnn_visualization.py # GNN可视化模块
+│   ├── visualization.py    # 可视化工具
+│   ├── analysis_utils.py   # 分析工具函数
+│   ├── enhanced_analysis.py # 增强分析方法
+│   └── test_env.py         # 环境测试脚本
+├── datasets/               # 数据集目录
+├── models/                 # 训练模型存储
+│   ├── neuron_lstm_model_Day3.pth # 第3天神经元模型
+│   ├── neuron_lstm_model_Day6.pth # 第6天神经元模型
+│   └── neuron_lstm_model_Day9.pth # 第9天神经元模型
+├── results/                # 分析结果输出目录
+│   └── gnn_results/        # GNN分析结果目录
+├── README_interactive_network.md # 交互式网络使用指南
+└── requirements.txt        # 项目依赖
 ```
 
-## Installation Requirements
+## 安装要求
 
-Running this project requires the following dependencies (Python 3.8+ recommended):
+运行此项目需要以下依赖项（推荐Python 3.8+）：
 
 ```
+# 核心依赖
 torch>=2.1.0
 torchvision>=0.16.0
 torchaudio>=2.1.0
@@ -53,123 +59,155 @@ pandas>=1.3.0
 scikit-learn>=1.0.0
 matplotlib>=3.4.0
 seaborn>=0.11.0
+networkx>=2.6.0
+
+# GNN相关依赖
+torch-geometric>=2.0.0
+torch-scatter>=2.0.9
+torch-sparse>=0.6.13
 ```
 
-Install dependencies with:
+安装依赖：
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage Guide
+## 使用指南
 
-### Environment Testing
+### 环境测试
 
-First, verify that your environment is correctly configured:
+首先，验证环境配置是否正确：
 
 ```bash
 python src/test_env.py
 ```
 
-### Data Analysis Workflow
+### 数据分析工作流程
 
-1. **Configure Analysis Parameters**
+1. **配置分析参数**
    
-   Edit the `src/analysis_config.py` file to set analysis parameters
+   编辑`src/analysis_config.py`文件设置分析参数，包括GNN相关参数
 
-2. **Run LSTM Analysis**
+2. **运行LSTM分析**
 
    ```bash
    python src/kmeans_lstm_analysis.py
    ```
 
-3. **Results Analysis and Visualization**
+3. **结果分析和可视化**
 
    ```bash
    python src/analysis_results.py
    ```
+   
+   此步骤现在也会执行GNN分析（如果启用）
 
-4. **Visualize Network Topology**
+4. **可视化网络拓扑**
 
    ```bash
    python src/pos_topology_js.py
    ```
 
-### Interactive Network Visualization
+### 交互式网络可视化
 
-For detailed instructions, refer to `README_interactive_network.md`
+详细说明请参阅`README_interactive_network.md`
 
-## Main Module Descriptions
+## 主要模块说明
 
-### LSTM Model
+### LSTM模型
 
-The project uses Long Short-Term Memory networks (LSTM) to encode and analyze neuronal activity time series. The model structure follows the project's standard architecture, including:
+项目使用长短期记忆网络（LSTM）编码和分析神经元活动时间序列。模型结构遵循项目的标准架构，包括：
 
-- Multi-layer LSTM encoder
-- Gradient clipping
-- Learning rate scheduler
-- Standardized input processing
+- 多层LSTM编码器
+- 梯度裁剪
+- 学习率调度器
+- 标准化输入处理
 
-### Clustering Analysis
+### GNN/GCN模型
 
-Uses K-means and other clustering algorithms to analyze neuronal functional organization:
+项目使用图神经网络分析神经元功能连接拓扑结构：
 
-- Automatic parameter selection
-- Cluster stability analysis
-- Cluster evolution tracking over time
+- **GCN（图卷积网络）**：用于神经元行为预测，捕捉神经元活动与行为之间的关系
+- **GAT（图注意力网络）**：用于识别神经元功能模块，自动发现具有相似功能的神经元群组
+- **时间GNN**：结合GNN和LSTM分析神经元活动随时间变化的特征
 
-### Topology Analysis
+### 聚类分析
 
-Analyzes functional connections between neurons:
+使用K-means和其他聚类算法分析神经元功能组织：
 
-- Correlation-based connection strength calculation
-- Community detection algorithms
-- Centrality and path length analysis
+- 自动参数选择
+- 聚类稳定性分析
+- 跟踪聚类随时间的演变
 
-### Visualization
+### 拓扑分析
 
-Provides various visualization tools:
+分析神经元之间的功能连接：
 
-- Static network graphs
-- Interactive network visualization
-- Activity pattern heatmaps
-- Clustering results visualization
+- 基于相关性的连接强度计算
+- 社区检测算法
+- 中心性和路径长度分析
+- GNN增强的模块识别
 
-## Results Interpretation
+### 可视化
 
-Analysis results are saved in the `results` directory, including:
+提供各种可视化工具：
 
-- Training and validation metrics
-- Clustering results
-- Network analysis results
-- Visualization charts
+- 静态网络图
+- 交互式网络可视化
+- 活动模式热图
+- 聚类结果可视化
+- GNN嵌入可视化
+- GAT注意力权重可视化
+- 时间序列GNN结果可视化
 
-## Troubleshooting
+## 结果解释
 
-Common issues and solutions:
+分析结果保存在`results`目录中，包括：
 
-1. **CUDA Errors**: Ensure proper GPU environment variables and compatible CUDA version installation
-2. **Memory Errors**: Reduce batch size or use data sampling
-3. **Visualization Issues**: Ensure all relevant visualization libraries are installed
+- 训练和验证指标
+- 聚类结果
+- 网络分析结果
+- GNN分析结果（保存在`results/gnn_results`目录）
+- 可视化图表
 
-## Contact and Contributions
+### GNN分析结果
 
-Questions and suggestions for improvements are welcome!
+GNN分析生成以下结果：
 
-## Citation
+- 神经元行为预测模型（GCN）
+- 神经元功能模块识别（GAT）
+- 时间序列GNN分析
+- 节点嵌入可视化
+- 交互式GNN网络可视化
 
-If you use this platform in your research, please cite:
+## 常见问题解决
+
+常见问题及解决方案：
+
+1. **CUDA错误**：确保正确设置GPU环境变量并安装兼容的CUDA版本
+2. **内存错误**：减小批量大小或使用数据采样
+3. **可视化问题**：确保安装所有相关的可视化库
+4. **PyTorch Geometric安装问题**：根据您的CUDA版本安装正确版本的torch-scatter和torch-sparse
+
+## 联系方式与贡献
+
+欢迎提出问题和改进建议！
+
+## 引用
+
+如果您在研究中使用此平台，请引用：
 
 ```
-@software{neural_network_lstm_platform,
+@software{neural_network_lstm_gnn_platform,
   author = {Your Research Team},
-  title = {Neural Network LSTM Analysis Platform},
+  title = {Neural Network LSTM and GNN Analysis Platform},
   year = {2023},
-  url = {https://github.com/yourusername/neural-network-lstm}
+  url = {https://github.com/yourusername/neural-network-lstm-gnn}
 }
 ```
 
-## License
+## 许可证
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+此项目根据MIT许可证授权 - 详情见LICENSE文件。
 

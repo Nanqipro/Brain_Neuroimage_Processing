@@ -15,8 +15,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'EMtrace.xlsx')  # 原始数据文件
-        self.data_identifier = 'EMtrace'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day6'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -99,6 +99,26 @@ class AnalysisConfig:
             'max_modules': 10,  # 最大功能模块数量
             'edge_weight_threshold': 0.5,  # 边权重阈值
             'community_resolution': 1.0,  # 社区检测的分辨率参数
+            
+            # GNN参数配置
+            'gnn_epochs': 100,  # GNN训练轮数
+            'gnn_learning_rate': 0.01,  # GNN学习率
+            'gnn_weight_decay': 5e-4,  # GNN权重衰减
+            'gnn_dropout': 0.2,  # GNN Dropout率
+            
+            # GNN相关目录
+            'gnn_results_dir': 'gnn_results',  # GNN结果子目录
+            
+            # 时间序列GNN参数
+            'temporal_window_size': 10,  # 时间窗口大小
+            'temporal_stride': 5,  # 时间窗口滑动步长
+            
+            # GAT模型参数
+            'gat_heads': 4,  # GAT注意力头数
+            'gat_hidden_channels': 64,  # GAT隐藏层维度
+            
+            # GCN模型参数
+            'gcn_hidden_channels': 128,  # GCN隐藏层维度
         }
         
         # 可视化参数配置
@@ -146,6 +166,9 @@ class AnalysisConfig:
             }
         }
         
+        # GNN 分析配置
+        self.use_gnn = True  # 是否使用GNN分析
+        
     def setup_directories(self):
         """
         创建必要的目录结构并验证权限
@@ -177,6 +200,15 @@ class AnalysisConfig:
                 os.remove(test_file_path)
             except Exception as e:
                 raise PermissionError(f"无法在目录中写入文件: {str(e)}")
+                
+            # 创建GNN结果目录
+            self.gnn_results_dir = os.path.join(self.analysis_dir, self.analysis_params['gnn_results_dir'])
+            try:
+                os.makedirs(self.gnn_results_dir, exist_ok=True)
+                print(f"创建GNN结果目录: {self.gnn_results_dir}")
+            except Exception as e:
+                self.gnn_results_dir = self.analysis_dir
+                print(f"创建GNN结果目录时出错: {str(e)}, 使用默认分析目录")
                 
         except Exception as e:
             # 如果创建过程中出错，尝试删除已创建的目录
