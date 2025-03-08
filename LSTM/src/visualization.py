@@ -433,7 +433,7 @@ class VisualizationManager:
             html_path: 保存的HTML文件路径
         """
         if output_path is None:
-            output_path = os.path.join(self.config.analysis_dir, 'interactive', 'interactive_neuron_network.html')
+            output_path = self.config.interactive_neuron_network
         
         try:
             from pyvis.network import Network

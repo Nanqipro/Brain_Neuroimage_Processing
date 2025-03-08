@@ -9,6 +9,7 @@
 - 基于LSTM的神经元活动时间序列分析
 - 基于GNN/GCN的神经元网络拓扑结构分析
 - 神经元功能连接的图模型构建与分析
+- 基于GNN嵌入的拓扑结构可视化（新增！）
 - K-means等聚类算法用于神经元功能分组
 - 神经网络拓扑结构分析
 - 交互式和静态网络可视化
@@ -30,6 +31,7 @@ LSTM/
 │   ├── kmeans_lstm_analysis.py # LSTM聚类分析
 │   ├── neuron_gnn.py       # 神经元GNN分析模块
 │   ├── gnn_visualization.py # GNN可视化模块
+│   ├── gnn_topology.py     # GNN拓扑结构分析与可视化
 │   ├── visualization.py    # 可视化工具
 │   ├── analysis_utils.py   # 分析工具函数
 │   ├── enhanced_analysis.py # 增强分析方法
@@ -41,6 +43,11 @@ LSTM/
 │   └── neuron_lstm_model_Day9.pth # 第9天神经元模型
 ├── results/                # 分析结果输出目录
 │   └── gnn_results/        # GNN分析结果目录
+│       ├── gcn_topology.png             # GCN拓扑静态可视化
+│       ├── gcn_interactive_topology.html # GCN拓扑交互式可视化
+│       ├── gat_topology.png             # GAT拓扑静态可视化
+│       ├── gat_interactive_topology.html # GAT拓扑交互式可视化
+│       └── gnn_analysis_results.json    # GNN分析结果JSON
 ├── README_interactive_network.md # 交互式网络使用指南
 └── requirements.txt        # 项目依赖
 ```
@@ -101,7 +108,7 @@ python src/test_env.py
    python src/analysis_results.py
    ```
    
-   此步骤现在也会执行GNN分析（如果启用）
+   此步骤现在也会执行GNN分析和基于GNN的拓扑可视化
 
 4. **可视化网络拓扑**
 
@@ -132,6 +139,16 @@ python src/test_env.py
 - **GAT（图注意力网络）**：用于识别神经元功能模块，自动发现具有相似功能的神经元群组
 - **时间GNN**：结合GNN和LSTM分析神经元活动随时间变化的特征
 
+### 基于GNN的拓扑结构分析（新增！）
+
+项目新增了基于GNN学习的神经元拓扑结构分析功能：
+
+- 使用GNN学习的嵌入表示重新构建神经元连接结构
+- 基于功能相似性而非仅仅相关性的连接创建
+- 揭示传统相关性分析难以发现的神经元功能模块
+- 提供静态拓扑图与交互式可视化
+- 从GCN（行为视角）和GAT（模块视角）两个不同角度进行拓扑构建
+
 ### 聚类分析
 
 使用K-means和其他聚类算法分析神经元功能组织：
@@ -160,6 +177,7 @@ python src/test_env.py
 - GNN嵌入可视化
 - GAT注意力权重可视化
 - 时间序列GNN结果可视化
+- 基于GNN的拓扑结构可视化（新增！）
 
 ## 结果解释
 
@@ -169,6 +187,7 @@ python src/test_env.py
 - 聚类结果
 - 网络分析结果
 - GNN分析结果（保存在`results/gnn_results`目录）
+- 基于GNN的拓扑结构图（保存在`results/gnn_results`目录）
 - 可视化图表
 
 ### GNN分析结果
@@ -177,6 +196,7 @@ GNN分析生成以下结果：
 
 - 神经元行为预测模型（GCN）
 - 神经元功能模块识别（GAT）
+- 基于GNN重新构建的拓扑结构（新增！）
 - 时间序列GNN分析
 - 节点嵌入可视化
 - 交互式GNN网络可视化

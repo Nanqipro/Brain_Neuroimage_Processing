@@ -30,6 +30,29 @@ class AnalysisConfig:
         self.topology_html = os.path.join(self.topology_dir, f'pos_topology_{self.data_identifier}.html')  # HTML动画输出路径
         self.topology_gif = os.path.join(self.topology_dir, f'pos_topology_{self.data_identifier}.gif')    # GIF动画输出路径
         
+        # GNN分析相关路径配置
+        self.gnn_results_dir = os.path.join(self.analysis_dir, 'gnn_results')  # GNN结果目录
+        self.interactive_dir = os.path.join(self.analysis_dir, 'interactive')  # 交互式可视化目录
+        
+        # GNN交互式可视化文件路径
+        self.gnn_interactive_template = os.path.join(self.gnn_results_dir, 'interactive_network_main_{}.html')  # GNN交互式可视化模板
+        self.gnn_analysis_results = os.path.join(self.gnn_results_dir, 'gnn_analysis_results.json')  # GNN分析结果文件
+        
+        # GCN相关路径
+        self.gcn_training_plot = os.path.join(self.gnn_results_dir, 'gcn_training.png')  # GCN训练曲线
+        self.gcn_topology_png = os.path.join(self.gnn_results_dir, 'gcn_topology.png')  # GCN拓扑静态可视化
+        self.gcn_interactive_topology = os.path.join(self.gnn_results_dir, 'gcn_interactive_topology.html')  # GCN拓扑交互式可视化
+        self.gcn_topology_data = os.path.join(self.gnn_results_dir, 'gcn_topology_data.json')  # GCN拓扑数据
+        
+        # GAT相关路径
+        self.gat_training_plot = os.path.join(self.gnn_results_dir, 'gat_training.png')  # GAT训练曲线
+        self.gat_topology_png = os.path.join(self.gnn_results_dir, 'gat_topology.png')  # GAT拓扑静态可视化
+        self.gat_interactive_topology = os.path.join(self.gnn_results_dir, 'gat_interactive_topology.html')  # GAT拓扑交互式可视化
+        self.gat_topology_data = os.path.join(self.gnn_results_dir, 'gat_topology_data.json')  # GAT拓扑数据
+        
+        # 基本交互式可视化路径
+        self.interactive_neuron_network = os.path.join(self.interactive_dir, 'interactive_neuron_network.html')  # 基本交互式神经元网络
+        
         # 拓扑分析所需数据文件路径
         self.position_data_file = os.path.join(self.data_dir, f'{self.data_identifier}_Max_position.csv')  # 神经元位置数据
         self.background_image = os.path.join(self.data_dir, f'{self.data_identifier}_Max.png')  # 背景图像
@@ -101,10 +124,11 @@ class AnalysisConfig:
             'community_resolution': 1.0,  # 社区检测的分辨率参数
             
             # GNN参数配置
-            'gnn_epochs': 100,  # GNN训练轮数
-            'gnn_learning_rate': 0.01,  # GNN学习率
-            'gnn_weight_decay': 5e-4,  # GNN权重衰减
-            'gnn_dropout': 0.2,  # GNN Dropout率
+            'gnn_epochs': 100,  # 恢复更多训练轮数
+            'gnn_learning_rate': 0.008,  # 提高初始学习率
+            'gnn_weight_decay': 1e-3,  # 减弱权重衰减强度
+            'gnn_dropout': 0.3,  # 减弱Dropout强度
+            'gnn_early_stop_patience': 20,  # 增加早停耐心值，允许更充分训练
             
             # GNN相关目录
             'gnn_results_dir': 'gnn_results',  # GNN结果子目录
@@ -115,10 +139,11 @@ class AnalysisConfig:
             
             # GAT模型参数
             'gat_heads': 4,  # GAT注意力头数
-            'gat_hidden_channels': 64,  # GAT隐藏层维度
+            'gat_hidden_channels': 56,  # 增加GAT隐藏层维度
+            'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
             
             # GCN模型参数
-            'gcn_hidden_channels': 128,  # GCN隐藏层维度
+            'gcn_hidden_channels': 64,  # 恢复GCN隐藏层维度
         }
         
         # 可视化参数配置
@@ -181,7 +206,9 @@ class AnalysisConfig:
             self.train_dir,            # 训练结果目录
             self.temporal_pattern_dir, # 时间模式分析目录
             self.temporal_correlation_dir,  # 时间相关性分析目录
-            self.topology_dir          # 拓扑分析目录
+            self.topology_dir,         # 拓扑分析目录
+            self.gnn_results_dir,      # GNN结果目录
+            self.interactive_dir       # 交互式可视化目录
         ]
         
         created_dirs = []

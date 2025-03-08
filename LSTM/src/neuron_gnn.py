@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from torch_geometric.utils import from_networkx, to_networkx
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
+import copy
 
 class GNNAnalyzer:
     """
@@ -29,7 +30,7 @@ class GNNAnalyzer:
         print(f"GNN分析器将使用设备: {self.device}")
         
         # 确保保存GNN结果的目录存在
-        self.gnn_output_dir = os.path.join(config.analysis_dir, 'gnn_results')
+        self.gnn_output_dir = config.gnn_results_dir
         os.makedirs(self.gnn_output_dir, exist_ok=True)
     
     def convert_network_to_gnn_format(self, G, X_scaled, y=None):
@@ -134,7 +135,7 @@ class GNNAnalyzer:
 class NeuronGCN(torch.nn.Module):
     """使用图卷积网络进行神经元行为分类"""
     
-    def __init__(self, in_channels, hidden_channels, out_channels, dropout=0.2):
+    def __init__(self, in_channels, hidden_channels, out_channels, dropout=0.3):
         """
         初始化神经元GCN模型
         
@@ -145,9 +146,14 @@ class NeuronGCN(torch.nn.Module):
             dropout: Dropout比率
         """
         super(NeuronGCN, self).__init__()
+        # 优化模型结构，保持两层但增加表达能力
         self.conv1 = GCNConv(in_channels, hidden_channels)
+        self.bn1 = torch.nn.BatchNorm1d(hidden_channels)
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
-        self.conv3 = GCNConv(hidden_channels, hidden_channels//2)
+        self.bn2 = torch.nn.BatchNorm1d(hidden_channels)
+        # 使用更强大的分类器
+        self.fc = torch.nn.Linear(hidden_channels, hidden_channels//2)
+        self.bn3 = torch.nn.BatchNorm1d(hidden_channels//2)
         self.classifier = torch.nn.Linear(hidden_channels//2, out_channels)
         self.dropout = dropout
         
@@ -165,27 +171,56 @@ class NeuronGCN(torch.nn.Module):
         
         # 第一层图卷积
         x = self.conv1(x, edge_index, edge_weight)
+        x = self.bn1(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
         
-        # 第二层图卷积
+        # 第二层图卷积 - 保持同样维度以保持表达能力
         x = self.conv2(x, edge_index, edge_weight)
+        x = self.bn2(x)
         x = F.relu(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
         
-        # 第三层图卷积
-        x = self.conv3(x, edge_index, edge_weight)
+        # 添加一个全连接层增强表达能力
+        x = self.fc(x)
+        x = self.bn3(x)
         x = F.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         
         # 分类层
         x = self.classifier(x)
         
         return x
+        
+    def get_embeddings(self, data):
+        """
+        获取节点嵌入向量
+        
+        参数:
+            data: PyTorch Geometric数据对象
+            
+        返回:
+            embeddings: 节点嵌入向量
+        """
+        x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr
+        
+        # 第一层图卷积
+        x = self.conv1(x, edge_index, edge_weight)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        # 第二层图卷积（最终嵌入）
+        embeddings = self.conv2(x, edge_index, edge_weight)
+        embeddings = self.bn2(embeddings)
+        embeddings = F.relu(embeddings)
+        
+        return embeddings
 
 class NeuronGAT(torch.nn.Module):
     """使用图注意力网络进行神经元功能模块识别"""
     
-    def __init__(self, in_channels, hidden_channels, out_channels, heads=4, dropout=0.2):
+    def __init__(self, in_channels, hidden_channels, out_channels, heads=4, dropout=0.3):
         """
         初始化神经元GAT模型
         
@@ -197,9 +232,13 @@ class NeuronGAT(torch.nn.Module):
             dropout: Dropout比率
         """
         super(NeuronGAT, self).__init__()
+        # 减小隐藏层维度，增加正则化
         self.conv1 = GATConv(in_channels, hidden_channels, heads=heads, dropout=dropout)
+        self.bn1 = torch.nn.BatchNorm1d(hidden_channels * heads)
         self.conv2 = GATConv(hidden_channels * heads, hidden_channels, heads=1, dropout=dropout)
+        self.bn2 = torch.nn.BatchNorm1d(hidden_channels)
         self.classifier = torch.nn.Linear(hidden_channels, out_channels)
+        self.dropout = dropout
         
     def forward(self, data):
         """
@@ -215,17 +254,46 @@ class NeuronGAT(torch.nn.Module):
         
         # 第一层图注意力卷积
         x = self.conv1(x, edge_index)
+        x = self.bn1(x)
         x = F.elu(x)
-        x = F.dropout(x, p=0.2, training=self.training)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         
         # 第二层图注意力卷积
         x = self.conv2(x, edge_index)
+        x = self.bn2(x)
         x = F.elu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         
         # 分类层
         x = self.classifier(x)
         
         return x
+        
+    def get_embeddings(self, data):
+        """
+        获取节点嵌入向量和注意力权重
+        
+        参数:
+            data: PyTorch Geometric数据对象
+            
+        返回:
+            embeddings: 节点嵌入向量
+            attention_weights: 注意力权重（如果可用）
+        """
+        x, edge_index = data.x, data.edge_index
+        
+        # 第一层图注意力卷积
+        x = self.conv1(x, edge_index)
+        x = self.bn1(x)
+        x = F.elu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        
+        # 第二层图注意力卷积（最终嵌入）
+        embeddings = self.conv2(x, edge_index)
+        embeddings = self.bn2(embeddings)
+        embeddings = F.elu(embeddings)
+        
+        return embeddings
 
 class TemporalGNN(nn.Module):
     """用于分析神经元时间序列活动的时间图神经网络"""
@@ -333,7 +401,7 @@ class ModuleGNN(MessagePassing):
         # aggr_out 包含聚合后的消息
         return aggr_out
 
-def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=5e-4, device='cpu'):
+def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu', patience=15):
     """
     训练GNN模型
     
@@ -344,6 +412,7 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=5e-4, device='cpu
         lr: 学习率
         weight_decay: 权重衰减
         device: 设备(cuda/cpu)
+        patience: 早停耐心值
     
     返回:
         model: 训练好的模型
@@ -355,14 +424,26 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=5e-4, device='cpu
     
     # 准备优化器
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    
+    # 学习率调度器 - 使用更温和的衰减
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.7, patience=5, verbose=True, min_lr=1e-5
+    )
+    
     criterion = torch.nn.CrossEntropyLoss()
     
-    # 创建训练/验证索引
+    # 创建训练/验证索引 - 使用更小的验证集
     indices = list(range(data.x.size(0)))
-    train_indices, val_indices = train_test_split(indices, test_size=0.2, random_state=42)
+    train_indices, val_indices = train_test_split(indices, test_size=0.18, random_state=42)
     
     # 记录损失
     losses = {'train': [], 'val': []}
+    
+    # 早停设置 - 使用更温和的早停策略
+    best_val_loss = float('inf')
+    best_model_state = None
+    patience_counter = 0
+    min_delta = 1e-5  # 降低最小改进阈值，更容易继续训练
     
     # 训练循环
     for epoch in range(epochs):
@@ -376,6 +457,10 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=5e-4, device='cpu
         # 计算损失
         train_loss = criterion(out[train_indices], data.y[train_indices])
         train_loss.backward()
+        
+        # 梯度裁剪 - 使用适中的裁剪
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.8)
+        
         optimizer.step()
         
         # 验证模式
@@ -383,6 +468,15 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=5e-4, device='cpu
         with torch.no_grad():
             out = model(data)
             val_loss = criterion(out[val_indices], data.y[val_indices])
+            
+            # 验证集准确率
+            pred = out[val_indices].argmax(dim=1)
+            correct = (pred == data.y[val_indices]).sum().item()
+            val_acc = correct / len(val_indices)
+        
+        # 学习率调度 - 确保不会过早衰减
+        if epoch >= 10:  # 前10个epoch保持初始学习率
+            scheduler.step(val_loss)
         
         # 记录损失
         losses['train'].append(train_loss.item())
@@ -390,7 +484,30 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=5e-4, device='cpu
         
         # 打印进度
         if (epoch + 1) % 10 == 0:
-            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {train_loss.item():.4f}, Val Loss: {val_loss.item():.4f}')
+            lr_current = optimizer.param_groups[0]['lr']
+            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {train_loss.item():.4f}, Val Loss: {val_loss.item():.4f}, Val Acc: {val_acc:.4f}, LR: {lr_current:.6f}')
+        
+        # 早停检查 - 考虑训练早期的不稳定性
+        if epoch >= 15:  # 前15个epoch不考虑早停
+            if val_loss < best_val_loss - min_delta:
+                best_val_loss = val_loss
+                best_model_state = copy.deepcopy(model.state_dict())
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print(f'Early stopping at epoch {epoch+1}, best val loss: {best_val_loss:.4f}')
+                    break
+        else:
+            # 仍然记录最佳模型
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_model_state = copy.deepcopy(model.state_dict())
+    
+    # 如果启用了早停且找到了最佳模型，则恢复最佳模型
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+        print(f"已恢复最佳模型 (验证损失: {best_val_loss:.4f})")
     
     return model, losses
 
@@ -413,7 +530,7 @@ def plot_gnn_results(losses, save_path):
     plt.savefig(save_path)
     plt.close()
 
-def visualize_node_embeddings(model, data, save_path):
+def visualize_node_embeddings(model, data, save_path, title='Node Embeddings'):
     """
     可视化节点嵌入
     
@@ -421,6 +538,7 @@ def visualize_node_embeddings(model, data, save_path):
         model: 训练好的GNN模型
         data: PyTorch Geometric数据对象
         save_path: 保存路径
+        title: 图表标题
     """
     # 评估模式
     model.eval()
@@ -443,7 +561,7 @@ def visualize_node_embeddings(model, data, save_path):
     plt.scatter(node_embeddings_2d[:, 0], node_embeddings_2d[:, 1], 
                c=data.y.cpu().numpy(), cmap='viridis', s=100, alpha=0.8)
     plt.colorbar(label='Class')
-    plt.title('t-SNE Visualization of Node Embeddings')
+    plt.title(title)
     plt.xlabel('t-SNE 1')
     plt.ylabel('t-SNE 2')
     plt.savefig(save_path)

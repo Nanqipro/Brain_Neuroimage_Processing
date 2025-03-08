@@ -29,8 +29,8 @@ class GNNVisualizer:
             config: 分析配置对象
         """
         self.config = config
-        # 确保GNN可视化输出目录存在
-        self.viz_dir = os.path.join(self.config.gnn_results_dir, 'visualizations')
+        # 设置可视化输出目录
+        self.viz_dir = config.gnn_results_dir
         os.makedirs(self.viz_dir, exist_ok=True)
     
     def visualize_gnn_embeddings(self, embeddings, labels, neuron_names=None, title='神经元GNN嵌入可视化'):

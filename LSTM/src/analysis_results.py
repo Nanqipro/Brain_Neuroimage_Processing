@@ -60,6 +60,20 @@ except ImportError as e:
     print("安装命令: pip install torch-geometric torch-scatter torch-sparse")
     HAS_GNN_SUPPORT = False
 
+# 导入GNN拓扑可视化模块
+try:
+    from gnn_topology import (
+        create_gnn_based_topology, 
+        visualize_gnn_topology, 
+        create_interactive_gnn_topology,
+        save_gnn_topology_data,
+        analyze_gnn_topology
+    )
+    HAS_GNN_TOPOLOGY = True
+except ImportError:
+    print("警告: 未找到GNN拓扑可视化模块，将禁用GNN拓扑功能")
+    HAS_GNN_TOPOLOGY = False
+
 def check_gnn_dependencies():
     """
     检查GNN相关依赖项是否正确安装
@@ -1624,29 +1638,33 @@ class ResultAnalyzer:
 
     def analyze_network_with_gnn(self, G, correlation_matrix, X_scaled, y, available_neurons):
         """
-        使用图神经网络分析神经元网络
+        使用GNN分析神经元网络
         
         参数:
             G: NetworkX图对象
             correlation_matrix: 相关性矩阵
-            X_scaled: 标准化后的神经元活动数据
+            X_scaled: 标准化的神经元活动数据
             y: 行为标签
             available_neurons: 可用神经元列表
             
         返回:
-            gnn_results: 包含GNN分析结果的字典
+            gnn_results: GNN分析结果字典
         """
-        if not HAS_GNN_SUPPORT:
-            print("警告: GNN支持模块未找到，跳过GNN分析")
-            return {}
-        
-        print("\n开始使用GNN进行神经元网络分析...")
+        print("\n使用GNN进行神经元网络分析...")
         
         # 创建GNN分析器
         gnn_analyzer = GNNAnalyzer(self.config)
         
+        # 特征归一化 - 确保特征在合适的范围内
+        from sklearn.preprocessing import StandardScaler
+        X_normalized = StandardScaler().fit_transform(X_scaled)
+        
         # 转换为GNN格式
-        data = gnn_analyzer.convert_network_to_gnn_format(G, X_scaled, y)
+        print("\n开始使用GNN进行神经元网络分析...")
+        print(f"GNN分析器将使用设备: {gnn_analyzer.device}")
+        print("将神经元网络转换为GNN数据格式...")
+        data = gnn_analyzer.convert_network_to_gnn_format(G, X_normalized, y)
+        print(f"GNN数据转换完成: {data}")
         
         # GNN分析结果字典
         gnn_results = {}
@@ -1659,15 +1677,17 @@ class ResultAnalyzer:
             
             # 创建GCN模型
             gcn_model = NeuronGCN(
-                in_channels=X_scaled.shape[1],
-                hidden_channels=128,
+                in_channels=X_normalized.shape[1],
+                hidden_channels=self.config.analysis_params.get('gcn_hidden_channels', 64),
                 out_channels=num_classes,
-                dropout=0.2
+                dropout=self.config.analysis_params.get('gnn_dropout', 0.3)
             )
             
             # 设置训练参数
             epochs = self.config.analysis_params.get('gnn_epochs', 100)
-            lr = self.config.analysis_params.get('gnn_learning_rate', 0.01)
+            lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
+            weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
+            patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
             
             # 训练模型
             trained_model, losses = train_gnn_model(
@@ -1675,16 +1695,23 @@ class ResultAnalyzer:
                 data=data,
                 epochs=epochs,
                 lr=lr,
+                weight_decay=weight_decay,
+                patience=patience,
                 device=gnn_analyzer.device
             )
             
-            # 绘制训练结果
-            loss_plot_path = os.path.join(gnn_analyzer.gnn_output_dir, 'gcn_training.png')
+            # 绘制训练曲线
+            loss_plot_path = self.config.gcn_training_plot
             plot_gnn_results(losses, loss_plot_path)
             
             # 可视化节点嵌入
-            embedding_plot_path = os.path.join(gnn_analyzer.gnn_output_dir, 'gcn_embeddings.png')
-            visualize_node_embeddings(trained_model, data, embedding_plot_path)
+            gnn_topo_path = self.config.gcn_topology_png
+            visualize_node_embeddings(
+                trained_model, 
+                data, 
+                save_path=gnn_topo_path,
+                title='GCN Node Embeddings'
+            )
             
             # 评估模型
             trained_model.eval()
@@ -1700,9 +1727,75 @@ class ResultAnalyzer:
             gnn_results['gcn_behavior_prediction'] = {
                 'accuracy': accuracy,
                 'loss_plot_path': loss_plot_path,
-                'embedding_plot_path': embedding_plot_path
+                'embedding_plot_path': gnn_topo_path
             }
             
+            # 基于GCN创建新的拓扑结构
+            if HAS_GNN_TOPOLOGY:
+                print("\n基于GCN模型创建神经元拓扑结构...")
+                
+                # 使用GNN模型创建拓扑结构
+                gnn_G, embeddings, similarities = create_gnn_based_topology(
+                    model=trained_model,
+                    data=data,
+                    G=G,
+                    node_names=available_neurons,
+                    threshold=0.6
+                )
+                
+                # 可视化GNN拓扑结构
+                gnn_topo_path = os.path.join(gnn_analyzer.gnn_output_dir, 'gcn_topology.png')
+                visualize_gnn_topology(
+                    G=gnn_G,
+                    embeddings=embeddings,
+                    similarities=similarities,
+                    node_names=available_neurons,
+                    output_path=gnn_topo_path,
+                    title="GCN-Based Neuron Topology (Behavior Prediction)"
+                )
+                
+                # 创建交互式可视化
+                interactive_path = self.config.gcn_interactive_topology
+                create_interactive_gnn_topology(
+                    G=gnn_G,
+                    embeddings=embeddings,
+                    similarities=similarities,
+                    node_names=available_neurons,
+                    output_path=interactive_path
+                )
+                
+                # 保存拓扑数据
+                data_path = self.config.gcn_topology_data
+                save_gnn_topology_data(
+                    G=gnn_G,
+                    embeddings=embeddings,
+                    similarities=similarities,
+                    node_names=available_neurons,
+                    output_path=data_path
+                )
+                
+                # 分析GNN拓扑结构
+                topo_metrics = analyze_gnn_topology(gnn_G, similarities)
+                
+                # 保存结果
+                gnn_results['gcn_topology'] = {
+                    'visualization_path': gnn_topo_path,
+                    'interactive_path': interactive_path,
+                    'data_path': data_path,
+                    'metrics': topo_metrics,
+                    'node_count': gnn_G.number_of_nodes(),
+                    'edge_count': gnn_G.number_of_edges()
+                }
+                
+                print(f"GCN拓扑结构创建完成: {gnn_G.number_of_nodes()} 个节点, {gnn_G.number_of_edges()} 条边")
+            
+            # 使用GCN嵌入可视化
+            gcn_embedding = trained_model.get_embeddings(data)
+            visualize_node_embeddings(
+                trained_model, data, 
+                self.config.gcn_topology_png
+            )
+        
         except Exception as e:
             print(f"GCN行为预测模型训练出错: {str(e)}")
             gnn_results['gcn_behavior_prediction'] = {'error': str(e)}
@@ -1722,11 +1815,11 @@ class ResultAnalyzer:
                 
                 # 创建GAT模型
                 gat_model = NeuronGAT(
-                    in_channels=X_scaled.shape[1],
-                    hidden_channels=64,
+                    in_channels=X_normalized.shape[1],
+                    hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 56),
                     out_channels=num_communities,
-                    heads=4,
-                    dropout=0.2
+                    heads=self.config.analysis_params.get('gat_heads', 4),
+                    dropout=self.config.analysis_params.get('gat_dropout', 0.3)
                 )
                 
                 # 训练模型
@@ -1735,11 +1828,13 @@ class ResultAnalyzer:
                     data=data,
                     epochs=epochs,
                     lr=lr,
+                    weight_decay=weight_decay,
+                    patience=patience,
                     device=gnn_analyzer.device
                 )
                 
-                # 绘制训练结果
-                gat_loss_plot_path = os.path.join(gnn_analyzer.gnn_output_dir, 'gat_training.png')
+                # 绘制GAT训练曲线
+                gat_loss_plot_path = self.config.gat_training_plot
                 plot_gnn_results(gat_losses, gat_loss_plot_path)
                 
                 # 评估模型
@@ -1758,6 +1853,76 @@ class ResultAnalyzer:
                     'num_communities': num_communities
                 }
                 
+                # 基于GAT创建新的拓扑结构
+                if HAS_GNN_TOPOLOGY:
+                    print("\n基于GAT模型创建神经元拓扑结构...")
+                    
+                    # 使用GNN模型创建拓扑结构
+                    gat_G, gat_embeddings, gat_similarities = create_gnn_based_topology(
+                        model=trained_gat,
+                        data=data,
+                        G=G,
+                        node_names=available_neurons,
+                        threshold=0.7  # 使用更高阈值突出模块结构
+                    )
+                    
+                    # 可视化GAT拓扑结构
+                    gat_topo_path = self.config.gat_topology_png
+                    visualize_gnn_topology(
+                        G=gat_G,
+                        embeddings=gat_embeddings,
+                        similarities=gat_similarities,
+                        node_names=available_neurons,
+                        output_path=gat_topo_path,
+                        title="GAT-Based Neuron Topology (Module Detection)"
+                    )
+                    
+                    # 创建交互式可视化
+                    gat_interactive_path = self.config.gat_interactive_topology
+                    create_interactive_gnn_topology(
+                        G=gat_G,
+                        embeddings=gat_embeddings,
+                        similarities=gat_similarities,
+                        node_names=available_neurons,
+                        output_path=gat_interactive_path
+                    )
+                    
+                    # 保存拓扑数据
+                    gat_data_path = self.config.gat_topology_data
+                    save_gnn_topology_data(
+                        G=gat_G,
+                        embeddings=gat_embeddings,
+                        similarities=gat_similarities,
+                        node_names=available_neurons,
+                        output_path=gat_data_path
+                    )
+                    
+                    # 分析GAT拓扑结构
+                    gat_topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
+                    
+                    # 保存结果
+                    gnn_results['gat_topology'] = {
+                        'node_count': gat_G.number_of_nodes(),
+                        'edge_count': gat_G.number_of_edges(),
+                        'visualization_path': gat_topo_path,
+                        'model_parameters': {
+                            'hidden_channels': self.config.analysis_params.get('gat_hidden_channels', 64),
+                            'heads': self.config.analysis_params.get('gat_heads', 4),
+                            'dropout': self.config.analysis_params.get('gat_dropout', 0.3)
+                        }
+                    }
+                    
+                    print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
+                
+                # 可视化GAT节点嵌入
+                gat_topo_path = self.config.gat_topology_png
+                visualize_node_embeddings(
+                    gat_model, 
+                    data, 
+                    save_path=gat_topo_path,
+                    title='GAT Node Embeddings'
+                )
+            
             except Exception as e:
                 print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
                 gnn_results['gat_module_detection'] = {'error': str(e)}
@@ -1792,7 +1957,7 @@ class ResultAnalyzer:
             gnn_results['temporal_gnn'] = {'error': str(e)}
         
         # 保存GNN分析结果到JSON文件
-        gnn_results_file = os.path.join(gnn_analyzer.gnn_output_dir, 'gnn_analysis_results.json')
+        gnn_results_file = self.config.gnn_analysis_results
         try:
             # 将不可序列化的对象转换为字符串
             serializable_results = convert_to_serializable(gnn_results)
@@ -2006,7 +2171,7 @@ pip install torch-geometric torch-scatter torch-sparse
                         main_G, 
                         topology_metrics, 
                         functional_modules, 
-                        filename=f'interactive_network_main_{method}.html'
+                        output_path=config.gnn_interactive_template.format(method)
                     )
                     if interactive_path:
                         print(f"生成主要连接({method})交互式可视化完成。结果保存在: {interactive_path}")
