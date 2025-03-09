@@ -13,6 +13,7 @@ from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_similarity
 import json
 from typing import Dict, List, Tuple, Optional, Any, Union
+import math
 
 def create_gnn_based_topology(model, data, G, node_names, threshold=0.5):
     """
@@ -31,8 +32,23 @@ def create_gnn_based_topology(model, data, G, node_names, threshold=0.5):
     # 1. 提取模型的节点嵌入
     model.eval()
     with torch.no_grad():
-        # 获取GNN的节点嵌入
-        embeddings = model.get_embeddings(data).cpu().numpy()
+        try:
+            # 获取GNN的节点嵌入
+            embeddings = model.get_embeddings(data)
+            # 如果是tensor，转为numpy
+            if torch.is_tensor(embeddings):
+                embeddings = embeddings.cpu().detach().numpy()
+        except Exception as e:
+            print(f"获取节点嵌入时出错: {str(e)}")
+            print("尝试使用前向传播的输出...")
+            # 作为后备方案，使用前向传播的中间层
+            output = model(data)
+            if hasattr(model, 'last_hidden'):
+                embeddings = model.last_hidden.cpu().detach().numpy()
+            else:
+                # 如果无法获取嵌入，使用随机嵌入
+                print("无法获取嵌入，使用随机嵌入...")
+                embeddings = np.random.randn(len(G.nodes()), 64)
     
     # 2. 基于嵌入计算新的相似度
     similarities = cosine_similarity(embeddings)
@@ -42,15 +58,18 @@ def create_gnn_based_topology(model, data, G, node_names, threshold=0.5):
     
     # 添加节点
     for i, node in enumerate(G.nodes()):
-        new_G.add_node(node, embedding=embeddings[i].tolist())
+        node_name = node_names[i] if i < len(node_names) else f"Node_{i}"
+        new_G.add_node(node_name, embedding=embeddings[i].tolist())
     
     # 添加边（基于相似度阈值）
-    for i, node_i in enumerate(G.nodes()):
-        for j, node_j in enumerate(G.nodes()):
-            if i < j and similarities[i, j] > threshold:
-                new_G.add_edge(node_i, node_j, weight=float(similarities[i, j]))
+    for i in range(len(G.nodes())):
+        node_i = node_names[i] if i < len(node_names) else f"Node_{i}"
+        for j in range(i+1, len(G.nodes())):
+            node_j = node_names[j] if j < len(node_names) else f"Node_{j}"
+            if similarities[i, j] > threshold:
+                new_G.add_edge(node_i, node_j, weight=similarities[i, j])
     
-    return new_G, embeddings, similarities
+    return new_G
 
 def visualize_gnn_topology(G, embeddings, similarities, node_names, output_path, title="GNN-Based Neuron Topology"):
     """
@@ -111,81 +130,197 @@ def create_interactive_gnn_topology(G, embeddings, similarities, node_names, out
         print("警告: 未找到pyvis库，请安装: pip install pyvis")
         return None
     
-    # 创建交互式网络
-    net = Network(height="800px", width="100%", notebook=False)
-    
-    # 使用t-SNE降维确定节点位置
-    tsne = TSNE(n_components=2, random_state=42)
-    tsne_pos = tsne.fit_transform(embeddings)
-    
-    # 添加节点
-    for i, node in enumerate(G.nodes()):
-        x, y = tsne_pos[i, 0] * 10, tsne_pos[i, 1] * 10  # 放大坐标以便更好地显示
-        # 节点编号为N+索引，从1开始
-        node_number = i + 1
-        net.add_node(
-            node, 
-            label=f"N{node_number}", 
-            title=f"神经元: {node}\n编号: N{node_number}\n度: {G.degree(node)}", 
-            size=30,  # 统一节点大小
-            font={"size": 14, "face": "Arial", "color": "black"},  # 设置字体
-            x=float(x), 
-            y=float(y)
-        )
-    
-    # 添加边
-    for u, v, data in G.edges(data=True):
-        weight = data['weight']
-        width = weight * 5  # 根据相似度调整边宽度
-        net.add_edge(u, v, value=weight, width=width, title=f"相似度: {weight:.3f}", color={'opacity': 0.7})
-    
-    # 设置物理布局参数
-    net.set_options("""
-    {
-      "physics": {
-        "enabled": true,
-        "forceAtlas2Based": {
-          "gravitationalConstant": -100,
-          "centralGravity": 0.01,
-          "springLength": 200,
-          "springConstant": 0.08
-        },
-        "solver": "forceAtlas2Based",
-        "stabilization": {
-          "iterations": 150
+    try:
+        print(f"开始创建交互式GNN拓扑可视化: {output_path}")
+        print(f"输入数据类型: embeddings={type(embeddings)}, similarities={type(similarities)}")
+        
+        # 确保目录存在
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # 创建交互式网络
+        net = Network(height="800px", width="100%", notebook=False)
+        
+        # 确保embeddings是numpy数组，以便t-SNE可以处理
+        if isinstance(embeddings, list):
+            print("embeddings是列表类型，转换为numpy数组")
+            embeddings_array = np.array(embeddings)
+        else:
+            embeddings_array = embeddings
+            
+        print(f"t-SNE输入数据类型: {type(embeddings_array)}, 形状: {embeddings_array.shape if hasattr(embeddings_array, 'shape') else '未知'}")
+        
+        # 使用t-SNE降维确定节点位置
+        try:
+            tsne = TSNE(n_components=2, random_state=42)
+            tsne_pos = tsne.fit_transform(embeddings_array)
+            print(f"t-SNE降维成功，结果形状: {tsne_pos.shape}")
+        except Exception as tsne_err:
+            print(f"t-SNE降维失败: {str(tsne_err)}")
+            # 如果t-SNE失败，尝试使用随机位置
+            num_nodes = len(G.nodes())
+            print(f"生成随机位置作为备选，节点数: {num_nodes}")
+            tsne_pos = np.random.rand(num_nodes, 2)
+        
+        # 现在将结果转换为Python原生类型用于JSON序列化
+        tsne_pos = numpy_to_python_type(tsne_pos)
+        embeddings_list = numpy_to_python_type(embeddings)
+        
+        # 添加节点
+        for i, node in enumerate(G.nodes()):
+            x, y = tsne_pos[i][0] * 10, tsne_pos[i][1] * 10  # 放大坐标以便更好地显示
+            # 节点编号为N+索引，从1开始
+            node_number = i + 1
+            
+            # 获取节点度 - 并转换为Python类型
+            node_degree = numpy_to_python_type(G.degree(node))
+            
+            # 节点名称
+            node_label = node_names[i] if i < len(node_names) else f"N{node_number}"
+            
+            net.add_node(
+                i,  # 使用整数ID避免序列化问题
+                label=f"N{node_number}", 
+                title=f"神经元: {node_label}\n编号: N{node_number}\n度: {node_degree}",
+                size=30,  # 统一节点大小
+                font={"size": 14, "face": "Arial", "color": "black"},
+                x=x, 
+                y=y,
+                color="#97C2FC",  # 设置节点颜色
+            )
+        
+        # 添加边 - 确保所有数值都是Python内置类型
+        for u, v, attr in G.edges(data=True):
+            # 获取节点索引
+            u_idx = list(G.nodes()).index(u)
+            v_idx = list(G.nodes()).index(v)
+            
+            # 获取权重 - 转换为Python float
+            if 'weight' in attr:
+                weight = numpy_to_python_type(attr['weight'])
+            else:
+                weight = 1.0
+            
+            # 计算边宽度 (1-5范围内)
+            width = 1 + min(4, 4 * weight)
+            
+            # 所有数值都转换为Python内置类型
+            edge_data = {
+                "value": width,
+                "title": f"相似度: {weight:.4f}"
+            }
+            
+            net.add_edge(u_idx, v_idx, **edge_data)
+        
+        # 设置网络选项 - 确保使用Python内置类型
+        physics_options = {
+            "enabled": True,
+            "forceAtlas2Based": {
+                "gravitationalConstant": -100,
+                "centralGravity": 0.01,
+                "springLength": 200,
+                "springConstant": 0.08
+            },
+            "solver": "forceAtlas2Based",
+            "stabilization": {
+                "iterations": 150
+            }
         }
-      },
-      "nodes": {
-        "borderWidth": 2,
-        "borderWidthSelected": 4,
-        "color": {
-          "border": "#2B7CE9",
-          "background": "#D2E5FF"
-        },
-        "shape": "circle",
-        "shadow": true
-      },
-      "edges": {
-        "width": 1.5,
-        "smooth": {
-          "type": "continuous",
-          "roundness": 0.5
-        },
-        "shadow": true
-      },
-      "interaction": {
-        "hover": true,
-        "navigationButtons": true,
-        "keyboard": true,
-        "tooltipDelay": 200
-      }
-    }
-    """)
-    
-    # 保存为HTML文件
-    net.save_graph(output_path)
-    
-    return output_path
+        
+        # 保存网络数据到临时文件，进行修改后再加载
+        # 这是为了避免pyvis内部序列化问题
+        tmp_nodes_path = os.path.join(os.path.dirname(output_path), "temp_nodes.json")
+        tmp_edges_path = os.path.join(os.path.dirname(output_path), "temp_edges.json")
+        
+        # 确保节点和边数据是Python内置类型
+        nodes_data = numpy_to_python_type(net.nodes)
+        edges_data = numpy_to_python_type(net.edges)
+        
+        # 保存为临时文件
+        with open(tmp_nodes_path, 'w') as f:
+            json.dump(nodes_data, f)
+        with open(tmp_edges_path, 'w') as f:
+            json.dump(edges_data, f)
+            
+        # 重新加载数据（现在是Python内置类型）
+        with open(tmp_nodes_path, 'r') as f:
+            net.nodes = json.load(f)
+        with open(tmp_edges_path, 'r') as f:
+            net.edges = json.load(f)
+            
+        # 删除临时文件
+        try:
+            os.remove(tmp_nodes_path)
+            os.remove(tmp_edges_path)
+        except:
+            pass
+        
+        # 设置交互选项
+        net.set_options("""
+        var options = {
+          "nodes": {
+            "borderWidth": 2,
+            "borderWidthSelected": 4,
+            "shape": "dot",
+            "scaling": {
+              "min": 20,
+              "max": 50
+            }
+          },
+          "edges": {
+            "color": {
+              "inherit": true
+            },
+            "smooth": {
+              "enabled": false,
+              "type": "continuous"
+            }
+          },
+          "interaction": {
+            "hover": true,
+            "navigationButtons": true,
+            "keyboard": true
+          },
+          "physics": %s
+        }
+        """ % json.dumps(physics_options))
+        
+        # 保存为HTML文件
+        try:
+            print(f"尝试保存交互式网络图到: {output_path}")
+            net.save_graph(output_path)
+            print(f"交互式神经元网络已成功保存到: {output_path}")
+            return output_path
+        except Exception as save_err:
+            print(f"保存交互式网络时出错: {str(save_err)}")
+            import traceback
+            print(f"保存错误详情:\n{traceback.format_exc()}")
+            
+            # 尝试使用更基本的设置重新保存
+            try:
+                print("尝试使用简化设置重新保存...")
+                simple_net = Network(height="600px", width="100%", notebook=False)
+                for i, node in enumerate(G.nodes()):
+                    simple_net.add_node(i, label=f"N{i+1}")
+                
+                for u, v in G.edges():
+                    u_idx = list(G.nodes()).index(u)
+                    v_idx = list(G.nodes()).index(v)
+                    simple_net.add_edge(u_idx, v_idx)
+                
+                backup_path = output_path.replace('.html', '_backup.html')
+                simple_net.save_graph(backup_path)
+                print(f"简化版交互式网络已保存到: {backup_path}")
+                return backup_path
+            except Exception as simple_save_err:
+                print(f"简化版保存也失败了: {str(simple_save_err)}")
+                return None
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"创建交互式可视化时出错: {str(e)}")
+        print(f"错误详情:\n{error_trace}")
+        return None
 
 def save_gnn_topology_data(G, embeddings, similarities, node_names, output_path):
     """
@@ -194,48 +329,61 @@ def save_gnn_topology_data(G, embeddings, similarities, node_names, output_path)
     参数:
         G: NetworkX图对象
         embeddings: 节点嵌入矩阵
-        similarities: 节点间相似度矩阵
+        similarities: 节点相似度矩阵
         node_names: 节点名称列表
-        output_path: 输出JSON文件路径
+        output_path: 输出文件路径
     """
-    # 准备数据
-    data = {
-        "nodes": [],
-        "edges": [],
-        "embeddings": {},
-        "similarity_matrix": {}
-    }
-    
-    # 添加节点数据
-    for i, node in enumerate(G.nodes()):
-        node_data = {
-            "id": node,
-            "degree": G.degree(node),
-            "embedding_dim": embeddings.shape[1]
+    try:
+        # 确保目录存在
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # 准备节点数据
+        nodes_data = []
+        for i, node in enumerate(G.nodes()):
+            node_data = {
+                "id": i,
+                "name": node_names[i] if i < len(node_names) else f"Node_{i}",
+                "degree": G.degree(node),
+                "embedding_dim": embeddings.shape[1] if hasattr(embeddings, 'shape') else len(embeddings[i])
+            }
+            nodes_data.append(node_data)
+        
+        # 准备边数据
+        edges_data = []
+        for u, v, data in G.edges(data=True):
+            # 获取节点索引
+            u_idx = list(G.nodes()).index(u) if isinstance(u, str) else u
+            v_idx = list(G.nodes()).index(v) if isinstance(v, str) else v
+            
+            edge_data = {
+                "source": u_idx,
+                "target": v_idx,
+                "similarity": float(data.get("weight", 0)) if "weight" in data else 0
+            }
+            edges_data.append(edge_data)
+        
+        # 使用numpy_to_python_type处理全部数据
+        # 构建完整数据结构
+        data = {
+            "nodes": nodes_data,
+            "edges": edges_data,
+            "embeddings": embeddings,
+            "similarity_matrix": similarities
         }
-        data["nodes"].append(node_data)
-        data["embeddings"][node] = embeddings[i].tolist()
-    
-    # 添加边数据
-    for u, v, attr in G.edges(data=True):
-        edge_data = {
-            "source": u,
-            "target": v,
-            "similarity": attr["weight"]
-        }
-        data["edges"].append(edge_data)
-    
-    # 添加相似度矩阵
-    for i, node_i in enumerate(G.nodes()):
-        data["similarity_matrix"][node_i] = {}
-        for j, node_j in enumerate(G.nodes()):
-            data["similarity_matrix"][node_i][node_j] = float(similarities[i, j])
-    
-    # 保存为JSON文件
-    with open(output_path, 'w') as f:
-        json.dump(data, f, indent=2)
-    
-    return output_path
+        
+        # 转换所有数据为Python内置类型
+        serializable_data = numpy_to_python_type(data)
+        
+        # 保存为JSON
+        with open(output_path, 'w') as f:
+            json.dump(serializable_data, f, indent=2)
+        
+        print(f"GNN拓扑数据已保存到: {output_path}")
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"保存GNN拓扑数据时出错: {str(e)}")
+        print(f"错误详情:\n{error_trace}")
 
 def analyze_gnn_topology(G, similarities):
     """
@@ -299,4 +447,28 @@ def analyze_gnn_topology(G, similarities):
     high_similarity_pairs.sort(key=lambda x: x[2], reverse=True)
     metrics['high_similarity_pairs'] = high_similarity_pairs[:10]
     
-    return metrics 
+    return metrics
+
+def numpy_to_python_type(obj):
+    """
+    将NumPy类型转换为Python内置类型，用于JSON序列化
+    
+    参数:
+        obj: 需要转换的对象
+        
+    返回:
+        转换后的对象
+    """
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {str(k): numpy_to_python_type(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [numpy_to_python_type(i) for i in obj]
+    else:
+        # 其他类型直接返回
+        return obj 

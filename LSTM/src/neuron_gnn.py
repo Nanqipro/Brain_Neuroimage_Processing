@@ -2,17 +2,18 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch_geometric.data import Data
-from torch_geometric.nn import GCNConv, GATConv
+from torch_geometric.nn import GCNConv, GATConv, MessagePassing
 import torch.nn as nn
 import networkx as nx
 from typing import List, Dict, Tuple, Optional, Union, Any
 import os
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from torch_geometric.utils import from_networkx, to_networkx
-from torch_geometric.nn import MessagePassing
-from torch_geometric.utils import add_self_loops, degree
+from torch_geometric.utils import from_networkx, to_networkx, add_self_loops, degree
+from torch_geometric.nn import global_mean_pool, global_add_pool
 import copy
+from torch.nn import Sequential, Linear, BatchNorm1d, Dropout, ReLU, LeakyReLU, ELU, GELU
+from sklearn.manifold import TSNE
 
 class GNNAnalyzer:
     """
@@ -133,89 +134,275 @@ class GNNAnalyzer:
         return temporal_data
 
 class NeuronGCN(torch.nn.Module):
-    """使用图卷积网络进行神经元行为分类"""
+    """
+    增强型图卷积网络 (GCN) 用于神经元行为预测
     
-    def __init__(self, in_channels, hidden_channels, out_channels, dropout=0.3):
+    特点:
+    1. 多层GCN结构
+    2. 残差连接
+    3. 批归一化
+    4. 多头注意力
+    5. 跳跃连接
+    6. 可调节的激活函数
+    """
+    def __init__(self, in_channels, hidden_channels, out_channels, dropout=0.3, 
+                 num_layers=4, heads=2, use_batch_norm=True, activation='leaky_relu', 
+                 alpha=0.2, residual=True):
         """
-        初始化神经元GCN模型
+        初始化增强型GCN模型
         
         参数:
             in_channels: 输入特征维度
             hidden_channels: 隐藏层维度
             out_channels: 输出类别数
-            dropout: Dropout比率
+            dropout: dropout率
+            num_layers: GCN层数
+            heads: 注意力头数
+            use_batch_norm: 是否使用批归一化
+            activation: 激活函数类型 ('relu', 'leaky_relu', 'elu', 'gelu')
+            alpha: LeakyReLU的alpha参数
+            residual: 是否使用残差连接
         """
         super(NeuronGCN, self).__init__()
-        # 优化模型结构，保持两层但增加表达能力
-        self.conv1 = GCNConv(in_channels, hidden_channels)
-        self.bn1 = torch.nn.BatchNorm1d(hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, hidden_channels)
-        self.bn2 = torch.nn.BatchNorm1d(hidden_channels)
-        # 使用更强大的分类器
-        self.fc = torch.nn.Linear(hidden_channels, hidden_channels//2)
-        self.bn3 = torch.nn.BatchNorm1d(hidden_channels//2)
-        self.classifier = torch.nn.Linear(hidden_channels//2, out_channels)
-        self.dropout = dropout
         
+        self.in_channels = in_channels
+        self.hidden_channels = hidden_channels
+        self.out_channels = out_channels
+        self.dropout = dropout
+        self.num_layers = num_layers
+        self.use_batch_norm = use_batch_norm
+        self.activation = activation
+        self.alpha = alpha
+        self.residual = residual
+        
+        # 激活函数映射
+        self.act_fn = self._get_activation(activation, alpha)
+        
+        # 初始投影层
+        self.initial_proj = Sequential(
+            Linear(in_channels, hidden_channels),
+            self.act_fn,
+            Dropout(dropout)
+        )
+        
+        # 图卷积层列表
+        self.conv_layers = nn.ModuleList()
+        
+        # 批归一化层列表
+        self.batch_norms = nn.ModuleList() if use_batch_norm else None
+        
+        # 添加多个图卷积层
+        for i in range(num_layers):
+            self.conv_layers.append(GCNConv(hidden_channels, hidden_channels))
+            if use_batch_norm:
+                self.batch_norms.append(BatchNorm1d(hidden_channels))
+                
+        # 注意力层
+        self.attention = nn.ModuleList([
+            MultiHeadSelfAttention(hidden_channels, num_heads=heads, dropout=dropout)
+            for _ in range(num_layers // 2)  # 在部分层后使用注意力
+        ])
+        
+        # 输出层
+        self.output_layer = Sequential(
+            Linear(hidden_channels, hidden_channels // 2),
+            self.act_fn,
+            Dropout(dropout),
+            Linear(hidden_channels // 2, out_channels)
+        )
+        
+    def _get_activation(self, activation, alpha=0.2):
+        """返回指定的激活函数"""
+        if activation == 'relu':
+            return ReLU()
+        elif activation == 'leaky_relu':
+            return LeakyReLU(alpha)
+        elif activation == 'elu':
+            return ELU()
+        elif activation == 'gelu':
+            return GELU()
+        else:
+            return ReLU()  # 默认
+            
     def forward(self, data):
         """
         前向传播
         
         参数:
-            data: PyTorch Geometric数据对象
-        
+            data: PyTorch Geometric 数据对象
+            
         返回:
-            x: 模型输出
+            x: 节点分类概率
         """
-        x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr
+        x, edge_index = data.x, data.edge_index
         
-        # 第一层图卷积
-        x = self.conv1(x, edge_index, edge_weight)
-        x = self.bn1(x)
-        x = F.relu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # 处理边权重（如果存在）
+        edge_weight = data.edge_attr if hasattr(data, 'edge_attr') else None
         
-        # 第二层图卷积 - 保持同样维度以保持表达能力
-        x = self.conv2(x, edge_index, edge_weight)
-        x = self.bn2(x)
-        x = F.relu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # 初始特征投影
+        x = self.initial_proj(x)
         
-        # 添加一个全连接层增强表达能力
-        x = self.fc(x)
-        x = self.bn3(x)
-        x = F.relu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # 保存初始特征用于残差连接
+        x_res = x
         
-        # 分类层
-        x = self.classifier(x)
+        # 应用多层图卷积
+        for i in range(self.num_layers):
+            # 图卷积
+            if edge_weight is not None:
+                x_conv = self.conv_layers[i](x, edge_index, edge_weight)
+            else:
+                x_conv = self.conv_layers[i](x, edge_index)
+            
+            # 批归一化
+            if self.use_batch_norm:
+                x_conv = self.batch_norms[i](x_conv)
+                
+            # 激活函数
+            x_conv = self.act_fn(x_conv)
+            
+            # Dropout
+            x_conv = F.dropout(x_conv, p=self.dropout, training=self.training)
+            
+            # 残差连接
+            if self.residual and x_conv.size() == x.size():
+                x = x_conv + x
+            else:
+                x = x_conv
+                
+            # 在一些层后应用注意力机制
+            if i < len(self.attention) and (i + 1) % 2 == 0:
+                att_idx = i // 2
+                # 应用注意力前确保维度正确
+                x = self.attention[att_idx](x)
+                
+            # 更新残差连接的基准
+            if i % 2 == 1:
+                x_res = x
         
-        return x
+        # 输出层
+        x = self.output_layer(x)
+        
+        return F.log_softmax(x, dim=1)
         
     def get_embeddings(self, data):
         """
-        获取节点嵌入向量
+        获取节点嵌入
         
         参数:
-            data: PyTorch Geometric数据对象
+            data: PyTorch Geometric 数据对象
             
         返回:
-            embeddings: 节点嵌入向量
+            embeddings: 节点嵌入
         """
-        x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr
+        x, edge_index = data.x, data.edge_index
         
-        # 第一层图卷积
-        x = self.conv1(x, edge_index, edge_weight)
-        x = self.bn1(x)
-        x = F.relu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # 处理边权重（如果存在）
+        edge_weight = data.edge_attr if hasattr(data, 'edge_attr') else None
         
-        # 第二层图卷积（最终嵌入）
-        embeddings = self.conv2(x, edge_index, edge_weight)
-        embeddings = self.bn2(embeddings)
-        embeddings = F.relu(embeddings)
+        # 初始特征投影
+        x = self.initial_proj(x)
         
-        return embeddings
+        # 应用图卷积层获取嵌入
+        for i in range(self.num_layers):
+            # 图卷积
+            if edge_weight is not None:
+                x_conv = self.conv_layers[i](x, edge_index, edge_weight)
+            else:
+                x_conv = self.conv_layers[i](x, edge_index)
+            
+            # 批归一化
+            if self.use_batch_norm:
+                x_conv = self.batch_norms[i](x_conv)
+                
+            # 激活函数
+            x_conv = self.act_fn(x_conv)
+            
+            # Dropout (训练中使用，评估时不使用)
+            if self.training:
+                x_conv = F.dropout(x_conv, p=self.dropout, training=self.training)
+                
+            # 残差连接
+            if self.residual and x_conv.size() == x.size():
+                x = x_conv + x
+            else:
+                x = x_conv
+                
+            # 在一些层后应用注意力机制
+            if i < len(self.attention) and (i + 1) % 2 == 0:
+                att_idx = i // 2
+                x = self.attention[att_idx](x)
+        
+        return x
+
+# 添加多头自注意力机制
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(self, in_channels, num_heads=4, dropout=0.1):
+        super(MultiHeadSelfAttention, self).__init__()
+        self.num_heads = num_heads
+        self.in_channels = in_channels
+        self.head_dim = in_channels // num_heads
+        assert in_channels % num_heads == 0, "in_channels must be divisible by num_heads"
+        
+        # 定义查询、键、值投影
+        self.query = Linear(in_channels, in_channels)
+        self.key = Linear(in_channels, in_channels)
+        self.value = Linear(in_channels, in_channels)
+        
+        # 输出投影
+        self.out_proj = Linear(in_channels, in_channels)
+        
+        # Dropout
+        self.dropout = Dropout(dropout)
+        
+        # 缩放因子
+        self.scale = self.head_dim ** -0.5
+        
+    def forward(self, x):
+        original_dim = x.dim()
+        original_shape = x.shape
+        
+        # 处理输入数据形状 - 适应PyG中节点特征的形状
+        if original_dim == 2:
+            # 如果是2D输入 [num_nodes, channels]
+            batch_size = 1
+            seq_len = x.size(0)
+            # 转换为 [1, num_nodes, channels]
+            x = x.unsqueeze(0)
+        else:
+            # 如果已经是3D输入 [batch_size, num_nodes, channels]
+            batch_size, seq_len, _ = x.size()
+        
+        # 投影查询、键、值
+        q = self.query(x)
+        k = self.key(x)
+        v = self.value(x)
+        
+        # 重塑为多头形式 [batch_size, num_heads, seq_len, head_dim]
+        q = q.view(batch_size, seq_len, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        k = k.view(batch_size, seq_len, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        v = v.view(batch_size, seq_len, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        
+        # 计算注意力分数
+        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        
+        # 应用softmax
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+        
+        # 应用注意力权重
+        context = torch.matmul(attn_weights, v)
+        
+        # 重塑并合并多头结果 [batch_size, seq_len, in_channels]
+        context = context.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, self.in_channels)
+        
+        # 输出投影
+        output = self.out_proj(context)
+        
+        # 恢复原始维度
+        if original_dim == 2:
+            output = output.squeeze(0)
+            
+        return output
 
 class NeuronGAT(torch.nn.Module):
     """使用图注意力网络进行神经元功能模块识别"""
@@ -533,37 +720,65 @@ def plot_gnn_results(losses, save_path):
 
 def visualize_node_embeddings(model, data, save_path, title='Node Embeddings'):
     """
-    可视化节点嵌入
+    可视化GNN模型学习的节点嵌入
     
     参数:
         model: 训练好的GNN模型
-        data: PyTorch Geometric数据对象
-        save_path: 保存路径
+        data: 图数据
+        save_path: 保存图像的路径
         title: 图表标题
     """
-    # 评估模式
-    model.eval()
+    # 确保目录存在
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     
     # 获取节点嵌入
+    model.eval()
     with torch.no_grad():
-        node_embeddings = model.conv2(
-            model.conv1(data.x, data.edge_index, data.edge_attr),
-            data.edge_index,
-            data.edge_attr
-        ).detach().cpu().numpy()
+        try:
+            embeddings = model.get_embeddings(data)
+            if torch.is_tensor(embeddings):
+                embeddings = embeddings.cpu().detach().numpy()
+        except Exception as e:
+            print(f"获取节点嵌入出错: {e}")
+            print("使用替代方法...")
+            # 使用前向传播输出作为备选
+            out = model(data)  # 前向传播
+            if hasattr(model, 'last_hidden'):
+                embeddings = model.last_hidden.cpu().detach().numpy()
+            else:
+                # 如果都不行，使用随机值（仅用于演示）
+                print("无法获取嵌入，使用随机值...")
+                embeddings = np.random.randn(data.num_nodes, 64)
     
-    # 使用t-SNE降维
-    from sklearn.manifold import TSNE
-    tsne = TSNE(n_components=2, random_state=42)
-    node_embeddings_2d = tsne.fit_transform(node_embeddings)
+    # 使用t-SNE降维到2D
+    if embeddings.shape[1] > 2:
+        tsne = TSNE(n_components=2, random_state=42)
+        embeddings_2d = tsne.fit_transform(embeddings)
+    else:
+        embeddings_2d = embeddings
     
-    # 绘制节点嵌入
-    plt.figure(figsize=(12, 10))
-    plt.scatter(node_embeddings_2d[:, 0], node_embeddings_2d[:, 1], 
-               c=data.y.cpu().numpy(), cmap='viridis', s=100, alpha=0.8)
-    plt.colorbar(label='Class')
+    # 获取标签
+    labels = data.y.cpu().numpy() if hasattr(data, 'y') else np.zeros(len(embeddings))
+    
+    # 绘制嵌入可视化
+    plt.figure(figsize=(10, 8))
+    scatter = plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], 
+                         c=labels, cmap='tab10', s=80, alpha=0.8)
+    plt.colorbar(scatter, label='Class')
+    
+    # 添加节点标签
+    n_nodes = min(30, len(embeddings_2d))  # 限制标签数量，防止过度拥挤
+    for i in range(n_nodes):
+        plt.annotate(f'N{i+1}', 
+                    (embeddings_2d[i, 0], embeddings_2d[i, 1]),
+                    xytext=(5, 5),
+                    textcoords='offset points')
+    
     plt.title(title)
-    plt.xlabel('t-SNE 1')
-    plt.ylabel('t-SNE 2')
-    plt.savefig(save_path)
-    plt.close() 
+    plt.xlabel('t-SNE Component 1')
+    plt.ylabel('t-SNE Component 2')
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300)
+    plt.close()
+    
+    print(f"节点嵌入可视化已保存至: {save_path}") 

@@ -128,7 +128,7 @@ class AnalysisConfig:
             'community_resolution': 1.0,  # 社区检测的分辨率参数
             
             # GNN参数配置
-            'gnn_epochs': 500,  # 恢复更多训练轮数
+            'gnn_epochs': 200,  # 恢复更多训练轮数
             'gnn_learning_rate': 0.008,  # 提高初始学习率
             'gnn_weight_decay': 1e-3,  # 减弱权重衰减强度
             'gnn_dropout': 0.3,  # 减弱Dropout强度
@@ -146,8 +146,14 @@ class AnalysisConfig:
             'gat_hidden_channels': 56,  # 增加GAT隐藏层维度
             'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
             
-            # GCN模型参数
-            'gcn_hidden_channels': 64,  # 恢复GCN隐藏层维度
+            # GCN增强模型参数
+            'gcn_hidden_channels': 128,  # 增加GCN隐藏层维度
+            'gcn_num_layers': 4,  # GCN层数
+            'gcn_heads': 4,  # GCN注意力头数
+            'gcn_use_batch_norm': True,  # 是否使用批归一化
+            'gcn_activation': 'leaky_relu',  # 激活函数类型
+            'gcn_alpha': 0.2,  # LeakyReLU的alpha参数
+            'gcn_residual': True,  # 是否使用残差连接
         }
         
         # 可视化参数配置
