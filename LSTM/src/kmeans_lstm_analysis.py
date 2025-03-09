@@ -14,6 +14,7 @@ import os
 import datetime
 from analysis_config import AnalysisConfig
 import re
+import copy
 warnings.filterwarnings('ignore')
 
 # Set random seed
@@ -491,10 +492,24 @@ class EnhancedNeuronLSTM(nn.Module):
         }
 
 # Training function
-def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs, config):
+def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs, config, early_stopping_enabled=True):
     """
-    增强版模型训练函数
-    添加了自编码器损失和注意力权重的可视化
+    训练增强型神经元LSTM模型
+    
+    参数:
+        model: 待训练的模型
+        train_loader: 训练数据加载器
+        val_loader: 验证数据加载器
+        criterion: 损失函数
+        optimizer: 优化器
+        device: 计算设备
+        num_epochs: 训练轮数
+        config: 配置对象
+        early_stopping_enabled: 是否启用早停机制，默认为True
+    
+    返回:
+        model: 训练后的模型
+        metrics_dict: 包含训练指标的字典
     """
     model.train()
     train_losses = []
@@ -502,6 +517,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
     val_losses = []
     val_accuracies = []
     reconstruction_losses = []
+    learning_rates = []
     best_val_acc = 0.0
     
     # 保存最后一个批次的注意力权重用于可视化
@@ -513,12 +529,21 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
     
     # 创建学习率调度器
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=5, verbose=True
+        optimizer, mode='min', factor=0.5, patience=5, verbose=True
     )
     
-    # 创建指标日志文件
+    # 确保训练指标日志目录存在
+    os.makedirs(os.path.dirname(config.metrics_log), exist_ok=True)
+    
+    # 创建或截断训练指标日志文件
     with open(config.metrics_log, 'w') as f:
         f.write('epoch,train_loss,train_acc,val_loss,val_acc,reconstruction_loss\n')
+    
+    # 早停相关参数
+    patience = config.analysis_params.get('early_stopping_patience', 20)
+    best_val_loss = float('inf')
+    counter = 0
+    best_model_state = None
     
     for epoch in range(num_epochs):
         model.train()
@@ -527,40 +552,53 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         correct = 0
         total = 0
         
+        # 训练循环
         for batch_X, batch_y in train_loader:
             batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             
+            # 清零梯度
             optimizer.zero_grad()
             
             # 前向传播
             outputs, attention_weights, temporal_weights = model(batch_X)
             
             # 保存最后一个批次的注意力权重
-            last_attention_weights = attention_weights
-            last_temporal_weights = temporal_weights
+            if attention_weights is not None:
+                last_attention_weights = attention_weights
+            if temporal_weights is not None:
+                last_temporal_weights = temporal_weights
             
             # 计算分类损失
-            classification_loss = criterion(outputs, batch_y)
+            loss = criterion(outputs, batch_y)
             
             # 计算重构损失
             _, decoded = model.autoencoder(batch_X.view(-1, batch_X.size(-1)))
             reconstruction_loss = reconstruction_criterion(decoded, batch_X.view(-1, batch_X.size(-1)))
             
             # 总损失
-            loss = classification_loss + 0.1 * reconstruction_loss
+            recon_weight = config.analysis_params.get('reconstruction_loss_weight', 0.1)
+            total_batch_loss = loss + recon_weight * reconstruction_loss
             
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), config.analysis_params['gradient_clip_norm'])
+            # 反向传播
+            total_batch_loss.backward()
+            
+            # 梯度裁剪
+            max_norm = config.analysis_params.get('gradient_clip_norm', 1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+            
+            # 更新参数
             optimizer.step()
             
-            total_loss += classification_loss.item()
-            total_recon_loss += reconstruction_loss.item()
-            _, predicted = torch.max(outputs.data, 1)
-            total += batch_y.size(0)
+            # 统计
+            total_loss += loss.item() * batch_X.size(0)
+            total_recon_loss += reconstruction_loss.item() * batch_X.size(0)
+            _, predicted = torch.max(outputs, 1)
             correct += (predicted == batch_y).sum().item()
+            total += batch_y.size(0)
         
-        avg_train_loss = total_loss / len(train_loader)
-        avg_recon_loss = total_recon_loss / len(train_loader)
+        # 计算平均损失和准确率
+        avg_train_loss = total_loss / total
+        avg_recon_loss = total_recon_loss / total
         train_accuracy = 100 * correct / total
         
         # 记录训练指标
@@ -571,70 +609,99 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         # 验证
         model.eval()
         val_loss = 0
-        correct = 0
-        total = 0
+        val_correct = 0
+        val_total = 0
         
         with torch.no_grad():
-            for batch_X, batch_y in val_loader:
-                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-                outputs, _, _ = model(batch_X)
-                loss = criterion(outputs, batch_y)
+            for val_X, val_y in val_loader:
+                val_X, val_y = val_X.to(device), val_y.to(device)
+                val_outputs, _, _ = model(val_X)
+                batch_loss = criterion(val_outputs, val_y)
+                val_loss += batch_loss.item() * val_X.size(0)
                 
-                val_loss += loss.item()
-                _, predicted = torch.max(outputs.data, 1)
-                total += batch_y.size(0)
-                correct += (predicted == batch_y).sum().item()
+                _, val_predicted = torch.max(val_outputs, 1)
+                val_correct += (val_predicted == val_y).sum().item()
+                val_total += val_y.size(0)
         
-        avg_val_loss = val_loss / len(val_loader)
-        val_accuracy = 100 * correct / total
+        # 计算验证损失和准确率
+        avg_val_loss = val_loss / val_total
+        val_accuracy = 100 * val_correct / val_total
         
         # 记录验证指标
         val_losses.append(avg_val_loss)
         val_accuracies.append(val_accuracy)
         
-        # 更新学习率
-        scheduler.step(val_accuracy)
+        # 记录学习率
+        current_lr = optimizer.param_groups[0]['lr']
+        learning_rates.append(current_lr)
         
-        # 保存最佳模型
-        if val_accuracy > best_val_acc:
-            best_val_acc = val_accuracy
-            try:
-                os.makedirs(os.path.dirname(config.model_path), exist_ok=True)
-                torch.save({
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'epoch': epoch,
-                    'best_val_acc': best_val_acc,
-                    'attention_weights': last_attention_weights.detach().cpu().numpy(),
-                    'temporal_weights': last_temporal_weights.detach().cpu().numpy()
-                }, config.model_path)
-                print(f"模型已保存到: {config.model_path}")
-            except Exception as e:
-                print(f"保存模型时出错: {str(e)}")
-                with open(config.error_log, 'a') as f:
-                    f.write(f"Epoch {epoch+1}: 保存模型失败 - {str(e)}\n")
+        # 打印训练信息
+        if (epoch+1) % 10 == 0:
+            print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Val Acc: {val_accuracy:.2f}%, LR: {current_lr:.6f}")
         
-        # 记录指标
+        # 记录指标到日志文件
         with open(config.metrics_log, 'a') as f:
             f.write(f'{epoch+1},{avg_train_loss:.4f},{train_accuracy:.2f},{avg_val_loss:.4f},{val_accuracy:.2f},{avg_recon_loss:.4f}\n')
         
-        # 打印训练信息
-        if (epoch + 1) % 5 == 0:
-            print(f'Epoch [{epoch+1}/{num_epochs}]:')
-            print(f'  Training Loss: {avg_train_loss:.4f}, Accuracy: {train_accuracy:.2f}%')
-            print(f'  Validation Loss: {avg_val_loss:.4f}, Accuracy: {val_accuracy:.2f}%')
-            print(f'  Reconstruction Loss: {avg_recon_loss:.4f}')
+        # 早停检查
+        if early_stopping_enabled:
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                best_model_state = copy.deepcopy(model.state_dict())
+                counter = 0
+            else:
+                counter += 1
+                if counter >= patience:
+                    print(f"Early stopping at epoch {epoch+1}, best val loss: {best_val_loss:.4f}")
+                    break
+        else:
+            # 如果禁用早停，仍然保存最佳模型
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                best_model_state = copy.deepcopy(model.state_dict())
+        
+        # 调整学习率
+        scheduler.step(avg_val_loss)
     
-    return {
+    # 如果禁用早停且完成所有epoch，打印最终结果
+    if not early_stopping_enabled:
+        print(f"Training completed for all {num_epochs} epochs, best val loss: {best_val_loss:.4f}")
+    
+    # 恢复最佳模型
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+        print(f"已恢复最佳模型 (验证损失: {best_val_loss:.4f})")
+    
+    # 保存最佳模型到文件
+    try:
+        os.makedirs(os.path.dirname(config.model_path), exist_ok=True)
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'best_val_loss': best_val_loss,
+            'attention_weights': last_attention_weights.detach().cpu().numpy() if last_attention_weights is not None else None,
+            'temporal_weights': last_temporal_weights.detach().cpu().numpy() if last_temporal_weights is not None else None
+        }, config.model_path)
+        print(f"模型已保存到: {config.model_path}")
+    except Exception as e:
+        print(f"保存模型时出错: {str(e)}")
+        with open(config.error_log, 'a') as f:
+            f.write(f"保存模型失败 - {str(e)}\n")
+    
+    # 返回训练结果
+    metrics_dict = {
         'train_losses': train_losses,
         'train_accuracies': train_accuracies,
         'val_losses': val_losses,
         'val_accuracies': val_accuracies,
-        'best_val_acc': best_val_acc,
+        'best_val_acc': max(val_accuracies) if val_accuracies else 0,
         'reconstruction_losses': reconstruction_losses,
-        'attention_weights': last_attention_weights.detach().cpu().numpy(),
-        'temporal_weights': last_temporal_weights.detach().cpu().numpy()
+        'learning_rates': learning_rates,
+        'attention_weights': last_attention_weights.detach().cpu().numpy() if last_attention_weights is not None else None,
+        'temporal_weights': last_temporal_weights.detach().cpu().numpy() if last_temporal_weights is not None else None
     }
+    
+    return model, metrics_dict
 
 def plot_training_metrics(metrics, config):
     """
@@ -755,18 +822,24 @@ def main():
         )
         
         print("\n开始训练模型...")
-        metrics = train_model(
-            model, 
-            train_loader,
-            val_loader, 
-            criterion, 
-            optimizer, 
-            device, 
-            config.num_epochs,
-            config
+        # 从配置中获取早停设置
+        early_stopping_enabled = config.analysis_params.get('early_stopping_enabled', True)
+        
+        # 训练模型
+        trained_model, metrics = train_model(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            criterion=criterion,
+            optimizer=optimizer,
+            device=device,
+            num_epochs=config.num_epochs,
+            config=config,
+            early_stopping_enabled=early_stopping_enabled
         )
         
-        print("\n正在保存训练指标...")
+        # 绘制训练指标
+        print("\n正在绘制训练指标...")
         plot_training_metrics(metrics, config)
         
         print("\n训练完成！结果已保存：")

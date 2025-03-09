@@ -108,6 +108,10 @@ class AnalysisConfig:
             'gradient_clip_norm': 1.0,  # 梯度裁剪的最大范数
             'weight_decay': 0.01,  # AdamW优化器的权重衰减系数
             
+            # 早停机制参数
+            'early_stopping_enabled': False,  # 是否启用早停机制
+            'early_stopping_patience': 20,   # 早停耐心值
+            
             # 新增的增强型LSTM模型参数
             'latent_dim': 32,  # 自编码器潜在空间维度
             'num_heads': 4,    # 多头注意力的头数
@@ -124,7 +128,7 @@ class AnalysisConfig:
             'community_resolution': 1.0,  # 社区检测的分辨率参数
             
             # GNN参数配置
-            'gnn_epochs': 100,  # 恢复更多训练轮数
+            'gnn_epochs': 500,  # 恢复更多训练轮数
             'gnn_learning_rate': 0.008,  # 提高初始学习率
             'gnn_weight_decay': 1e-3,  # 减弱权重衰减强度
             'gnn_dropout': 0.3,  # 减弱Dropout强度

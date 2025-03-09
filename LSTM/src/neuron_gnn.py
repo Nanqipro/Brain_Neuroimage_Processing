@@ -401,7 +401,7 @@ class ModuleGNN(MessagePassing):
         # aggr_out 包含聚合后的消息
         return aggr_out
 
-def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu', patience=15):
+def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu', patience=15, early_stopping_enabled=False):
     """
     训练GNN模型
     
@@ -413,6 +413,7 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         weight_decay: 权重衰减
         device: 设备(cuda/cpu)
         patience: 早停耐心值
+        early_stopping_enabled: 是否启用早停机制，默认为True
     
     返回:
         model: 训练好的模型
@@ -454,41 +455,37 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         # 前向传播
         out = model(data)
         
-        # 计算损失
+        # 计算训练损失 - 仅使用训练索引
         train_loss = criterion(out[train_indices], data.y[train_indices])
+        losses['train'].append(train_loss.item())
+        
+        # 反向传播和优化
         train_loss.backward()
-        
-        # 梯度裁剪 - 使用适中的裁剪
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.8)
-        
         optimizer.step()
         
-        # 验证模式
+        # 评估模式
         model.eval()
         with torch.no_grad():
+            # 前向传播
             out = model(data)
-            val_loss = criterion(out[val_indices], data.y[val_indices])
             
-            # 验证集准确率
-            pred = out[val_indices].argmax(dim=1)
-            correct = (pred == data.y[val_indices]).sum().item()
-            val_acc = correct / len(val_indices)
+            # 计算验证损失 - 仅使用验证索引
+            val_loss = criterion(out[val_indices], data.y[val_indices])
+            losses['val'].append(val_loss.item())
+            
+            # 计算准确率
+            _, predicted = torch.max(out[val_indices], 1)
+            val_acc = (predicted == data.y[val_indices]).sum().item() / len(val_indices)
         
-        # 学习率调度 - 确保不会过早衰减
-        if epoch >= 10:  # 前10个epoch保持初始学习率
-            scheduler.step(val_loss)
+        # 学习率调整
+        scheduler.step(val_loss)
         
-        # 记录损失
-        losses['train'].append(train_loss.item())
-        losses['val'].append(val_loss.item())
-        
-        # 打印进度
+        # 每10轮打印一次进度
         if (epoch + 1) % 10 == 0:
-            lr_current = optimizer.param_groups[0]['lr']
-            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {train_loss.item():.4f}, Val Loss: {val_loss.item():.4f}, Val Acc: {val_acc:.4f}, LR: {lr_current:.6f}')
+            print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss.item():.4f}, Val Loss: {val_loss.item():.4f}, Val Acc: {val_acc:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
         
-        # 早停检查 - 考虑训练早期的不稳定性
-        if epoch >= 15:  # 前15个epoch不考虑早停
+        # 早停检查
+        if early_stopping_enabled:
             if val_loss < best_val_loss - min_delta:
                 best_val_loss = val_loss
                 best_model_state = copy.deepcopy(model.state_dict())
@@ -496,15 +493,19 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
             else:
                 patience_counter += 1
                 if patience_counter >= patience:
-                    print(f'Early stopping at epoch {epoch+1}, best val loss: {best_val_loss:.4f}')
+                    print(f"Early stopping at epoch {epoch+1}, best val loss: {best_val_loss:.4f}")
                     break
         else:
-            # 仍然记录最佳模型
+            # 如果禁用早停，仍然保存最佳模型
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_model_state = copy.deepcopy(model.state_dict())
-    
-    # 如果启用了早停且找到了最佳模型，则恢复最佳模型
+                
+    # 如果禁用早停且完成所有训练，打印最终结果
+    if not early_stopping_enabled:
+        print(f"Training completed for all {epochs} epochs, best val loss: {best_val_loss:.4f}")
+            
+    # 加载最佳模型
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
         print(f"已恢复最佳模型 (验证损失: {best_val_loss:.4f})")

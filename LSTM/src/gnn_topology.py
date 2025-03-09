@@ -121,11 +121,14 @@ def create_interactive_gnn_topology(G, embeddings, similarities, node_names, out
     # 添加节点
     for i, node in enumerate(G.nodes()):
         x, y = tsne_pos[i, 0] * 10, tsne_pos[i, 1] * 10  # 放大坐标以便更好地显示
+        # 节点编号为N+索引，从1开始
+        node_number = i + 1
         net.add_node(
             node, 
-            label=node, 
-            title=f"神经元: {node}\n度: {G.degree(node)}", 
-            size=10 + 5 * G.degree(node),
+            label=f"N{node_number}", 
+            title=f"神经元: {node}\n编号: N{node_number}\n度: {G.degree(node)}", 
+            size=30,  # 统一节点大小
+            font={"size": 14, "face": "Arial", "color": "black"},  # 设置字体
             x=float(x), 
             y=float(y)
         )
@@ -152,9 +155,29 @@ def create_interactive_gnn_topology(G, embeddings, similarities, node_names, out
           "iterations": 150
         }
       },
+      "nodes": {
+        "borderWidth": 2,
+        "borderWidthSelected": 4,
+        "color": {
+          "border": "#2B7CE9",
+          "background": "#D2E5FF"
+        },
+        "shape": "circle",
+        "shadow": true
+      },
+      "edges": {
+        "width": 1.5,
+        "smooth": {
+          "type": "continuous",
+          "roundness": 0.5
+        },
+        "shadow": true
+      },
       "interaction": {
+        "hover": true,
         "navigationButtons": true,
-        "keyboard": true
+        "keyboard": true,
+        "tooltipDelay": 200
       }
     }
     """)

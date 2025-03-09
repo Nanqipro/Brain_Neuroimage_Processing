@@ -1688,6 +1688,7 @@ class ResultAnalyzer:
             lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
             weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
             patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
+            early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
             
             # 训练模型
             trained_model, losses = train_gnn_model(
@@ -1697,7 +1698,8 @@ class ResultAnalyzer:
                 lr=lr,
                 weight_decay=weight_decay,
                 patience=patience,
-                device=gnn_analyzer.device
+                device=gnn_analyzer.device,
+                early_stopping_enabled=early_stopping_enabled
             )
             
             # 绘制训练曲线
@@ -1822,6 +1824,13 @@ class ResultAnalyzer:
                     dropout=self.config.analysis_params.get('gat_dropout', 0.3)
                 )
                 
+                # 设置训练参数
+                epochs = self.config.analysis_params.get('gnn_epochs', 100)
+                lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
+                weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
+                patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
+                early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
+                
                 # 训练模型
                 trained_gat, gat_losses = train_gnn_model(
                     model=gat_model,
@@ -1830,7 +1839,8 @@ class ResultAnalyzer:
                     lr=lr,
                     weight_decay=weight_decay,
                     patience=patience,
-                    device=gnn_analyzer.device
+                    device=gnn_analyzer.device,
+                    early_stopping_enabled=early_stopping_enabled
                 )
                 
                 # 绘制GAT训练曲线
