@@ -297,48 +297,69 @@ class GNNVisualizer:
         可视化时间序列GNN结果
         
         参数:
-            temporal_data: 时间窗口数据列表
-            window_size: 窗口大小
+            temporal_data: 时间序列数据
+            window_size: 时间窗口大小
             title: 图表标题
         """
-        # 分析窗口之间的变化
-        if isinstance(temporal_data, list) and len(temporal_data) > 1:
-            # 计算每个窗口的汇总统计数据
-            window_stats = []
-            for window_idx, window_data in enumerate(temporal_data):
-                # 假设我们有一些测量窗口特征的方法
-                # 这里使用简单的汇总统计数据
-                if hasattr(window_data, 'x'):
-                    mean_activity = torch.mean(window_data.x).item()
-                    max_activity = torch.max(window_data.x).item()
-                    window_stats.append({
-                        'window_idx': window_idx,
-                        'mean_activity': mean_activity,
-                        'max_activity': max_activity
-                    })
-            
-            # 绘制统计数据
-            if window_stats:
-                # 创建DataFrame
-                import pandas as pd
-                stats_df = pd.DataFrame(window_stats)
-                
-                # 绘制统计数据
-                plt.figure(figsize=(12, 6))
-                plt.plot(stats_df['window_idx'], stats_df['mean_activity'], 
-                       label='平均活动', marker='o')
-                plt.plot(stats_df['window_idx'], stats_df['max_activity'], 
-                       label='最大活动', marker='x')
-                plt.xlabel('时间窗口索引')
-                plt.ylabel('活动值')
-                plt.title(f'时间窗口（大小={window_size}）的神经元活动变化')
-                plt.legend()
-                plt.grid(True, alpha=0.3)
-                
-                # 保存图像
-                viz_path = os.path.join(self.viz_dir, 'temporal_gnn_activity.png')
-                plt.savefig(viz_path, dpi=300)
-                plt.close()
-                return viz_path
+        # 实现时间序列GNN结果可视化
+        pass
         
-        return None 
+    def plot_training_metrics(self, epochs, train_metrics, val_metrics, metric_name='准确率', title=None, filename=None):
+        """
+        绘制训练过程中的指标变化曲线
+        
+        参数:
+            epochs: epoch列表或数量
+            train_metrics: 训练集指标列表
+            val_metrics: 验证集指标列表
+            metric_name: 指标名称（如'准确率'、'损失'等）
+            title: 图表标题
+            filename: 保存文件名
+        
+        返回:
+            保存的文件路径
+        """
+        plt.figure(figsize=(10, 6))
+        
+        # If epochs is a number, generate an array from 1 to epochs
+        if isinstance(epochs, int):
+            epochs = np.arange(1, epochs+1)
+            
+        # Plot training and validation metrics
+        if train_metrics is not None:
+            plt.plot(epochs, train_metrics, 'b-', label=f'Training {metric_name}')
+        
+        if val_metrics is not None:
+            plt.plot(epochs, val_metrics, 'r-', label=f'Validation {metric_name}')
+            
+        plt.title(title or f'Model Training {metric_name} Changes')
+        plt.xlabel('Epoch')
+        plt.ylabel(metric_name)
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.legend()
+        
+        # 添加数据点标记
+        marker_frequency = max(1, len(epochs) // 10)  # 每10%的数据点添加标记
+        for i in range(0, len(epochs), marker_frequency):
+            if val_metrics is not None:
+                plt.plot(epochs[i], val_metrics[i], 'ro')
+                if i % (marker_frequency * 2) == 0:  # 每20%添加标签
+                    plt.annotate(f'{val_metrics[i]:.2f}', 
+                                (epochs[i], val_metrics[i]),
+                                textcoords="offset points", 
+                                xytext=(0, 10), 
+                                ha='center')
+        
+        # 保存图表
+        if filename is None:
+            filename = os.path.join(self.viz_dir, f'{metric_name}_training_curve.png')
+        else:
+            if not filename.startswith('/'):
+                filename = os.path.join(self.viz_dir, filename)
+        
+        plt.tight_layout()
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"训练{metric_name}曲线已保存到: {filename}")
+        return filename 

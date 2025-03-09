@@ -1700,8 +1700,8 @@ class ResultAnalyzer:
             patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
             early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
             
-            # 训练模型
-            trained_model, losses = train_gnn_model(
+            # 训练模型   
+            trained_model, losses, accuracies = train_gnn_model(
                 model=gcn_model,
                 data=data,
                 epochs=epochs,
@@ -1715,6 +1715,20 @@ class ResultAnalyzer:
             # 绘制训练曲线
             loss_plot_path = self.config.gcn_training_plot
             plot_gnn_results(losses, loss_plot_path)
+            
+            # 绘制准确率曲线
+            # 创建GNN可视化器用于绘制准确率曲线
+            from gnn_visualization import GNNVisualizer
+            visualizer = GNNVisualizer(self.config)
+            acc_epochs = list(range(1, len(accuracies['train'])+1))
+            accuracy_plot_path = visualizer.plot_training_metrics(
+                acc_epochs, 
+                accuracies['train'], 
+                accuracies['val'], 
+                metric_name='准确率',
+                title='GCN模型训练准确率变化',
+                filename='gcn_accuracy_curve.png'
+            )
             
             # 可视化节点嵌入
             gnn_topo_path = self.config.gcn_topology_png
@@ -1763,6 +1777,19 @@ class ResultAnalyzer:
                 node_names=[f"N{i+1}" for i in range(len(available_neurons))],
                 output_path=self.config.gcn_interactive_topology
             )
+            
+            # 记录GCN分析结果
+            gnn_results = {
+                'gcn_behavior_prediction': {
+                    'accuracy': accuracy,
+                    'loss_plot_path': loss_plot_path,
+                    'topology_plot_path': gnn_topo_path,
+                    'accuracy_plot_path': accuracy_plot_path,
+                    'train_acc_history': accuracies['train'],
+                    'val_acc_history': accuracies['val'],
+                    'epochs': epochs
+                }
+            }
         except Exception as e:
             import traceback
             error_trace = traceback.format_exc()
@@ -1799,7 +1826,7 @@ class ResultAnalyzer:
                 early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
                 
                 # 训练模型
-                trained_gat, gat_losses = train_gnn_model(
+                trained_gat, gat_losses, gat_accuracies = train_gnn_model(
                     model=gat_model,
                     data=data,
                     epochs=epochs,
@@ -1814,6 +1841,17 @@ class ResultAnalyzer:
                 gat_loss_plot_path = self.config.gat_training_plot
                 plot_gnn_results(gat_losses, gat_loss_plot_path)
                 
+                # 绘制GAT准确率曲线
+                gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
+                gat_accuracy_plot_path = visualizer.plot_training_metrics(
+                    gat_acc_epochs, 
+                    gat_accuracies['train'], 
+                    gat_accuracies['val'], 
+                    metric_name='准确率',
+                    title='GAT模型训练准确率变化',
+                    filename='gat_accuracy_curve.png'
+                )
+                
                 # 评估模型
                 trained_gat.eval()
                 with torch.no_grad():
@@ -1827,7 +1865,10 @@ class ResultAnalyzer:
                 gnn_results['gat_module_detection'] = {
                     'accuracy': gat_accuracy,
                     'loss_plot_path': gat_loss_plot_path,
-                    'num_communities': num_communities
+                    'accuracy_plot_path': gat_accuracy_plot_path,
+                    'num_communities': num_communities,
+                    'train_acc_history': gat_accuracies['train'],
+                    'val_acc_history': gat_accuracies['val']
                 }
                 
                 # 基于GAT创建新的拓扑结构
@@ -1988,19 +2029,47 @@ def convert_to_serializable(obj):
         except:
             return f"不可序列化对象: {type(obj)}"
 
-def main():
+def set_all_random_seeds(seed=42):
     """
-    主函数：执行完整的分析流程
-    1. 加载配置
-    2. 初始化分析器
-    3. 加载模型和数据
-    4. 执行各种分析
-    5. 保存分析结果
-    """
-    # Initialize configuration
-    config = AnalysisConfig()
+    设置所有相关库的随机种子，确保结果可重现
     
+    参数:
+        seed: 随机种子值，默认为42
+    """
+    import random
+    import numpy as np
+    import torch
+    
+    # 设置Python内置random模块种子
+    random.seed(seed)
+    
+    # 设置NumPy种子
+    np.random.seed(seed)
+    
+    # 设置PyTorch种子
+    torch.manual_seed(seed)
+    
+    # 如果可用，设置CUDA种子
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # 如果使用多GPU
+        
+        # 为了完全的确定性，可以设置以下选项
+        # 但可能影响性能
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    
+    print(f"已设置所有随机种子为: {seed}")
+
+def main():
+    """主函数，运行神经元活动数据分析流程"""
     try:
+        # 首先设置所有随机种子确保结果可重现
+        set_all_random_seeds(42)
+        
+        # 加载配置
+        config = AnalysisConfig()
+        
         # Setup and validate directories
         config.setup_directories()
         config.validate_paths()
@@ -2027,11 +2096,9 @@ def main():
                 print("""
 如需启用GNN功能，请安装以下依赖项:
 pip install torch-geometric torch-scatter torch-sparse
-
-注意: torch-scatter和torch-sparse可能需要根据您的CUDA版本安装特定版本
 详情请参考: https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html
 """)
-                
+            
             # 记录分析开始时间
             start_time = datetime.now()
             print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -2227,6 +2294,32 @@ pip install torch-geometric torch-scatter torch-sparse
             print(f"分析结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"总耗时: {duration.total_seconds():.2f} 秒")
             print("分析完成！所有结果已保存。")
+            
+            # 在现有网络分析后添加GNN分析
+            if hasattr(config, 'use_gnn') and config.use_gnn:
+                print("\n使用GNN进行神经元网络分析...")
+                gnn_results = analyzer.analyze_network_with_gnn(
+                    G, correlation_matrix, X_scaled, y, available_neurons
+                )
+                
+                # 将GNN结果添加到分析结果中
+                if gnn_results:
+                    # 读取已保存的分析结果
+                    try:
+                        with open(config.network_analysis_file, 'r') as f:
+                            results = json.load(f)
+                        
+                        # 添加GNN分析结果
+                        results['gnn_analysis'] = gnn_results
+                        
+                        # 更新网络分析结果文件
+                        with open(config.network_analysis_file, 'w') as f:
+                            # 使用convert_to_serializable函数确保所有数据都可JSON序列化
+                            serializable_results = convert_to_serializable(results)
+                            json.dump(serializable_results, f, indent=4)
+                        print(f"更新的网络分析结果（包含GNN分析）已保存到 {config.network_analysis_file}")
+                    except Exception as e:
+                        print(f"更新网络分析结果文件时出错: {str(e)}")
         
         # 将捕获的输出保存到日志文件
         log_content = output_buffer.getvalue()
@@ -2240,32 +2333,6 @@ pip install torch-geometric torch-scatter torch-sparse
             
         print(f"分析日志已保存到: {config.log_file}")
             
-        # 在现有网络分析后添加GNN分析
-        if hasattr(config, 'use_gnn') and config.use_gnn:
-            print("\n使用GNN进行神经元网络分析...")
-            gnn_results = analyzer.analyze_network_with_gnn(
-                G, correlation_matrix, X_scaled, y, available_neurons
-            )
-            
-            # 将GNN结果添加到分析结果中
-            if gnn_results:
-                # 读取已保存的分析结果
-                try:
-                    with open(config.network_analysis_file, 'r') as f:
-                        results = json.load(f)
-                    
-                    # 添加GNN分析结果
-                    results['gnn_analysis'] = gnn_results
-                    
-                    # 更新网络分析结果文件
-                    with open(config.network_analysis_file, 'w') as f:
-                        # 使用convert_to_serializable函数确保所有数据都可JSON序列化
-                        serializable_results = convert_to_serializable(results)
-                        json.dump(serializable_results, f, indent=4)
-                    print(f"更新的网络分析结果（包含GNN分析）已保存到 {config.network_analysis_file}")
-                except Exception as e:
-                    print(f"更新网络分析结果文件时出错: {str(e)}")
-        
     except Exception as e:
         error_message = f"分析过程中出现错误: {str(e)}"
         print(error_message)

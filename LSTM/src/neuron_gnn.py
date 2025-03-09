@@ -451,6 +451,11 @@ class NeuronGAT(torch.nn.Module):
         x = F.elu(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
         
+        # 池化
+        # x = self.pooling(x, edge_index)
+
+        # 均值池化
+        x = self.mean_pooling(x, edge_index)
         # 分类层
         x = self.classifier(x)
         
@@ -605,6 +610,7 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
     返回:
         model: 训练好的模型
         losses: 损失历史
+        metrics: 其他指标历史（如准确率）
     """
     # 将数据移至设备
     data = data.to(device)
@@ -624,8 +630,9 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
     indices = list(range(data.x.size(0)))
     train_indices, val_indices = train_test_split(indices, test_size=0.18, random_state=42)
     
-    # 记录损失
+    # 记录损失和准确率
     losses = {'train': [], 'val': []}
+    accuracies = {'train': [], 'val': []}
     
     # 早停设置 - 使用更温和的早停策略
     best_val_loss = float('inf')
@@ -646,6 +653,11 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         train_loss = criterion(out[train_indices], data.y[train_indices])
         losses['train'].append(train_loss.item())
         
+        # 计算训练准确率
+        _, train_predicted = torch.max(out[train_indices], 1)
+        train_acc = (train_predicted == data.y[train_indices]).sum().item() / len(train_indices)
+        accuracies['train'].append(train_acc)
+        
         # 反向传播和优化
         train_loss.backward()
         optimizer.step()
@@ -660,9 +672,10 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
             val_loss = criterion(out[val_indices], data.y[val_indices])
             losses['val'].append(val_loss.item())
             
-            # 计算准确率
+            # 计算验证准确率
             _, predicted = torch.max(out[val_indices], 1)
             val_acc = (predicted == data.y[val_indices]).sum().item() / len(val_indices)
+            accuracies['val'].append(val_acc)
         
         # 学习率调整
         scheduler.step(val_loss)
@@ -697,7 +710,7 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         model.load_state_dict(best_model_state)
         print(f"已恢复最佳模型 (验证损失: {best_val_loss:.4f})")
     
-    return model, losses
+    return model, losses, accuracies
 
 def plot_gnn_results(losses, save_path):
     """
