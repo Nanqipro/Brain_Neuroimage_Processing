@@ -740,7 +740,7 @@ class ResultAnalyzer:
         
         if method == 'threshold':
             # 使用更高的阈值过滤边
-            higher_threshold = kwargs.get('threshold', 0.6)  # 默认提高到0.6
+            higher_threshold = kwargs.get('threshold', 0.2)  # 默认提高到0.2
             print(f"使用更高的相关性阈值: {higher_threshold}")
             
             for u, v, data in G.edges(data=True):
