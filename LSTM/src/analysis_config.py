@@ -15,8 +15,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
-        self.data_identifier = 'Day6'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'Day9_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day9'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -144,7 +144,7 @@ class AnalysisConfig:
             # GAT模型参数
             'gat_heads': 4,  # GAT注意力头数
             'gat_hidden_channels': 128,  # 增加GAT隐藏层维度
-            'gat_dropout': 0.1,  # 减弱GAT特定的Dropout率
+            'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
             'gat_residual': True,  # 启用残差连接
             'gat_num_layers': 3,  # GAT层数
             'gat_alpha': 0.2,  # LeakyReLU的alpha参数

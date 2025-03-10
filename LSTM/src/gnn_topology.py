@@ -165,6 +165,35 @@ def create_interactive_gnn_topology(G, embeddings, similarities, node_names, out
         tsne_pos = numpy_to_python_type(tsne_pos)
         embeddings_list = numpy_to_python_type(embeddings)
         
+        # 检测社区结构，为不同社区分配不同颜色
+        try:
+            import community as community_louvain
+            partition = community_louvain.best_partition(G)
+            # 将社区ID转换为Python原生类型
+            partition = {str(k): int(v) for k, v in partition.items()}
+            
+            # 为每个社区分配一个颜色
+            community_colors = [
+                "#FF6347", "#4682B4", "#32CD32", "#FFD700", "#9370DB", 
+                "#20B2AA", "#FF69B4", "#8A2BE2", "#00CED1", "#FF8C00",
+                "#1E90FF", "#FF1493", "#00FA9A", "#DC143C", "#BA55D3"
+            ]
+            
+            # 如果社区数量超过颜色列表长度，则循环使用
+            num_communities = max(partition.values()) + 1
+            if num_communities > len(community_colors):
+                community_colors = community_colors * (num_communities // len(community_colors) + 1)
+                
+            print(f"检测到{num_communities}个社区")
+        except ImportError:
+            print("警告: 未找到python-louvain库，无法检测社区结构")
+            partition = {node: 0 for node in G.nodes()}
+            community_colors = ["#97C2FC"]  # 默认颜色
+        except Exception as comm_err:
+            print(f"社区检测失败: {str(comm_err)}")
+            partition = {node: 0 for node in G.nodes()}
+            community_colors = ["#97C2FC"]  # 默认颜色
+        
         # 添加节点
         for i, node in enumerate(G.nodes()):
             x, y = tsne_pos[i][0] * 10, tsne_pos[i][1] * 10  # 放大坐标以便更好地显示
@@ -177,18 +206,22 @@ def create_interactive_gnn_topology(G, embeddings, similarities, node_names, out
             # 节点名称
             node_label = node_names[i] if i < len(node_names) else f"N{node_number}"
             
+            # 获取节点所属社区并分配颜色
+            community_id = partition.get(str(node), 0)
+            node_color = community_colors[community_id % len(community_colors)]
+            
             net.add_node(
                 i,  # 使用整数ID避免序列化问题
                 label=f"N{node_number}", 
-                title=f"Neuron: {node_label}\nID: N{node_number}\nDegree: {node_degree}",
-                size=30,  # 统一节点大小
-                font={"size": 14, "face": "Arial", "color": "black"},
+                title=f"Neuron: {node_label}\nID: N{node_number}\nDegree: {node_degree}\n社区: {community_id+1}",
+                size=15,  # 固定节点大小
+                font={"size": 12, "face": "Arial", "color": "black"},
                 x=x, 
                 y=y,
-                color="#97C2FC",  # 设置节点颜色
+                color=node_color,  # 根据社区分配颜色
             )
         
-        # 添加边 - 确保所有数值都是Python内置类型
+        # 添加边 - 确保所有数值都是Python内置类型，并设置为非常细
         for u, v, attr in G.edges(data=True):
             # 获取节点索引
             u_idx = list(G.nodes()).index(u)
@@ -200,13 +233,15 @@ def create_interactive_gnn_topology(G, embeddings, similarities, node_names, out
             else:
                 weight = 1.0
             
-            # 计算边宽度 (1-5范围内)
-            width = 1 + min(4, 4 * weight)
+            # 边宽度设置为非常细 (0.5-1.5范围内)
+            width = 0.5 + min(1.0, weight)
             
             # 所有数值都转换为Python内置类型
             edge_data = {
                 "value": width,
-                "title": f"Similarity: {weight:.4f}"
+                "title": f"Similarity: {weight:.4f}",
+                "width": width,  # 确保边非常细
+                "color": {"opacity": 1}  # 不透明
             }
             
             net.add_edge(u_idx, v_idx, **edge_data)
@@ -471,4 +506,182 @@ def numpy_to_python_type(obj):
         return [numpy_to_python_type(i) for i in obj]
     else:
         # 其他类型直接返回
-        return obj 
+        return obj
+
+def visualize_gcn_topology(topology_data_path):
+    """
+    根据GCN拓扑数据文件生成静态拓扑结构图
+    
+    参数:
+        topology_data_path: GCN拓扑数据JSON文件路径
+    """
+    print("\n开始生成GCN静态拓扑结构图...")
+    
+    try:
+        # 读取拓扑数据
+        with open(topology_data_path, 'r') as f:
+            data = json.load(f)
+        
+        # 创建NetworkX图对象
+        G = nx.Graph()
+        
+        # 添加节点
+        for node in data['nodes']:
+            G.add_node(node['id'])
+        
+        # 添加边
+        for edge in data['edges']:
+            G.add_edge(edge['source'], edge['target'], weight=edge['similarity'])
+        
+        # 检测社区结构
+        import community as community_louvain
+        communities = community_louvain.best_partition(G)
+        
+        # 为不同社区分配不同颜色
+        community_colors = [
+            "#FF6347", "#4682B4", "#32CD32", "#FFD700", "#9370DB", 
+            "#20B2AA", "#FF69B4", "#8A2BE2", "#00CED1", "#FF8C00",
+            "#1E90FF", "#FF1493", "#00FA9A", "#DC143C", "#BA55D3"
+        ]
+        
+        # 获取社区数量
+        num_communities = len(set(communities.values()))
+        if num_communities > len(community_colors):
+            community_colors = community_colors * (num_communities // len(community_colors) + 1)
+        
+        # 创建节点颜色映射
+        node_colors = [community_colors[communities[node]] for node in G.nodes()]
+        
+        # 设置绘图参数
+        plt.figure(figsize=(15, 15))
+        
+        # 使用spring布局，增加k值和迭代次数使节点更分散
+        pos = nx.spring_layout(G, 
+                             k=2.0,           # 增加节点间理想距离
+                             iterations=100,   # 增加迭代次数
+                             seed=42)         # 设置随机种子保证结果可重现
+        
+        # 绘制边（使用权重确定边的宽度，降低alpha值使边更透明）
+        edge_weights = [G[u][v]['weight'] * 1.5 for u, v in G.edges()]  # 稍微减小边的宽度系数
+        nx.draw_networkx_edges(G, pos, width=edge_weights, alpha=0.2, edge_color='gray')  # 降低边的不透明度
+        
+        # 绘制节点（稍微增大节点大小）
+        node_sizes = [400 for _ in G.nodes()]  # 增加节点大小
+        nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.9)  # 增加节点不透明度
+        
+        # 添加节点标签（调整字体大小）
+        labels = {node: f'N{node+1}' for node in G.nodes()}
+        nx.draw_networkx_labels(G, pos, labels, font_size=9, font_weight='bold')  # 稍微增加字体大小
+        
+        plt.title('GCN-Based Neuron Network Topology', fontsize=16)
+        plt.axis('off')
+        
+        # 添加社区图例
+        legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
+                                    markerfacecolor=community_colors[i],
+                                    markersize=10, label=f'Community {i+1}')
+                         for i in range(num_communities)]
+        plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5))
+        
+        # 保存图像
+        output_path = os.path.join(os.path.dirname(topology_data_path), 'gcn_topology_static.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"GCN静态拓扑结构图已保存至: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        print(f"生成GCN静态拓扑结构图时出错: {str(e)}")
+        import traceback
+        print(f"错误详情:\n{traceback.format_exc()}")
+        return None 
+    
+def visualize_gat_topology(topology_data_path):
+    """
+    根据GAT拓扑数据文件生成静态拓扑结构图
+    
+    参数:
+        topology_data_path: GAT拓扑数据JSON文件路径
+    """
+    print("\n开始生成GAT静态拓扑结构图...")
+    
+    try:
+        # 读取拓扑数据
+        with open(topology_data_path, 'r') as f:
+            data = json.load(f)
+        
+        # 创建NetworkX图对象
+        G = nx.Graph()
+        
+        # 添加节点
+        for node in data['nodes']:
+            G.add_node(node['id'])
+        
+        # 添加边
+        for edge in data['edges']:
+            G.add_edge(edge['source'], edge['target'], weight=edge['similarity'])
+        
+        # 检测社区结构
+        import community as community_louvain
+        communities = community_louvain.best_partition(G)
+        
+        # 为不同社区分配不同颜色
+        community_colors = [
+            "#FF6347", "#4682B4", "#32CD32", "#FFD700", "#9370DB", 
+            "#20B2AA", "#FF69B4", "#8A2BE2", "#00CED1", "#FF8C00",
+            "#1E90FF", "#FF1493", "#00FA9A", "#DC143C", "#BA55D3"
+        ]
+        
+        # 获取社区数量
+        num_communities = len(set(communities.values()))
+        if num_communities > len(community_colors):
+            community_colors = community_colors * (num_communities // len(community_colors) + 1)
+        
+        # 创建节点颜色映射
+        node_colors = [community_colors[communities[node]] for node in G.nodes()]
+        
+        # 设置绘图参数
+        plt.figure(figsize=(15, 15))
+        
+        # 使用spring布局，增加k值和迭代次数使节点更分散
+        pos = nx.spring_layout(G, 
+                             k=2.0,           # 增加节点间理想距离
+                             iterations=100,   # 增加迭代次数
+                             seed=42)         # 设置随机种子保证结果可重现
+        
+        # 绘制边（使用权重确定边的宽度，降低alpha值使边更透明）
+        edge_weights = [G[u][v]['weight'] * 1.5 for u, v in G.edges()]  # 稍微减小边的宽度系数
+        nx.draw_networkx_edges(G, pos, width=edge_weights, alpha=0.2, edge_color='gray')  # 降低边的不透明度
+        
+        # 绘制节点（稍微增大节点大小）
+        node_sizes = [400 for _ in G.nodes()]  # 增加节点大小
+        nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.9)  # 增加节点不透明度
+        
+        # 添加节点标签（调整字体大小）
+        labels = {node: f'N{node+1}' for node in G.nodes()}
+        nx.draw_networkx_labels(G, pos, labels, font_size=9, font_weight='bold')  # 稍微增加字体大小
+        
+        plt.title('GAT-Based Neuron Network Topology', fontsize=16)
+        plt.axis('off')
+        
+        # 添加社区图例
+        legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
+                                    markerfacecolor=community_colors[i],
+                                    markersize=10, label=f'Community {i+1}')
+                         for i in range(num_communities)]
+        plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5))
+        
+        # 保存图像
+        output_path = os.path.join(os.path.dirname(topology_data_path), 'gat_topology_static.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"GAT静态拓扑结构图已保存至: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        print(f"生成GAT静态拓扑结构图时出错: {str(e)}")
+        import traceback
+        print(f"错误详情:\n{traceback.format_exc()}")
+        return None 

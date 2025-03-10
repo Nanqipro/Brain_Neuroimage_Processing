@@ -40,6 +40,7 @@ from analysis_config import AnalysisConfig
 
 import torch.nn.functional as F
 
+
 # 添加安全的全局变量
 add_safe_globals(['_reconstruct'])
 
@@ -54,7 +55,7 @@ try:
     from neuron_gnn import train_gnn_model, plot_gnn_results, visualize_node_embeddings
     from gnn_topology import (create_gnn_based_topology, visualize_gnn_topology,
                              create_interactive_gnn_topology, save_gnn_topology_data, 
-                             analyze_gnn_topology)
+                             analyze_gnn_topology, visualize_gcn_topology, visualize_gat_topology)
     from gnn_visualization import GNNVisualizer
     # 设置GNN支持标志为True，表示成功导入了所有GNN相关模块
     # 此标志将在后续代码中用于条件性地启用GNN分析功能
@@ -745,7 +746,7 @@ class ResultAnalyzer:
         
         if method == 'threshold':
             # 使用更高的阈值过滤边
-            higher_threshold = kwargs.get('threshold', 0.4)  # 默认提高到0.4
+            higher_threshold = kwargs.get('threshold', 0.35)  # 默认提高到0.4
             print(f"使用更高的相关性阈值: {higher_threshold}")
             
             for u, v, data in G.edges(data=True):
@@ -754,7 +755,7 @@ class ResultAnalyzer:
                     
         elif method == 'top_edges':
             # 为每个节点只保留top_k个最强连接
-            top_k = kwargs.get('top_k', 10)  # 默认每个节点保留3个最强连接
+            top_k = kwargs.get('top_k', 8)  # 默认每个节点保留3个最强连接
             print(f"为每个节点保留{top_k}个最强连接")
             
             for node in G.nodes():
@@ -1774,6 +1775,9 @@ class ResultAnalyzer:
                 self.config.gcn_topology_data
             )
             
+            # 生成静态拓扑结构图
+            visualize_gcn_topology(self.config.gcn_topology_data)
+            
             # 创建交互式可视化
             create_interactive_gnn_topology(
                 G=G_gnn,
@@ -1889,7 +1893,7 @@ class ResultAnalyzer:
                         data=data,
                         G=G.copy(),
                         node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                        threshold=0.7  # 使用更高阈值突出模块结构
+                        threshold=0.6 # 使用更高阈值突出模块结构
                     )
                     
                     # 获取节点嵌入和相似度矩阵
@@ -1899,16 +1903,16 @@ class ResultAnalyzer:
                     
                     print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
                     
-                    # 可视化GAT拓扑结构
-                    gat_topo_path = self.config.gat_topology_png
-                    visualize_gnn_topology(
-                        G=gat_G,
-                        embeddings=gat_embeddings,
-                        similarities=gat_similarities,
-                        node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                        output_path=gat_topo_path,
-                        title="GAT-Based Module Detection Topology"
-                    )
+                    # # 可视化GAT拓扑结构
+                    # gat_topo_path = self.config.gat_topology_png
+                    # visualize_gnn_topology(
+                    #     G=gat_G,
+                    #     embeddings=gat_embeddings,
+                    #     similarities=gat_similarities,
+                    #     node_names=[f"N{i+1}" for i in range(len(available_neurons))],
+                    #     output_path=gat_topo_path,
+                    #     title="GAT-Based Module Detection Topology"
+                    # )
                     
                     # 创建交互式可视化
                     create_interactive_gnn_topology(
@@ -1928,12 +1932,15 @@ class ResultAnalyzer:
                         output_path=self.config.gat_topology_data
                     )
                     
+                    # 使用visualize_gat_topology生成GAT静态拓扑图
+                    gat_static_topo_path = visualize_gat_topology(self.config.gat_topology_data)
+                    
                     # 分析GNN拓扑结构
                     topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
                     
                     # 保存结果
                     gnn_results['gat_topology'] = {
-                        'visualization_path': gat_topo_path,
+                        'visualization_path': gat_static_topo_path,  # 使用静态拓扑图路径替代原来的可视化路径
                         'interactive_path': self.config.gat_interactive_topology,
                         'data_path': self.config.gat_topology_data,
                         'metrics': topo_metrics,
@@ -2158,12 +2165,12 @@ pip install torch-geometric torch-scatter torch-sparse
                 if method == 'threshold':
                     main_G = analyzer.extract_main_connections(
                         G, correlation_matrix, available_neurons,
-                        method=method, threshold=0.6
+                        method=method, threshold=0.35
                     )
                 elif method == 'top_edges':
                     main_G = analyzer.extract_main_connections(
                         G, correlation_matrix, available_neurons,
-                        method=method, top_k=3
+                        method=method, top_k=8
                     )
                 elif method == 'mst':
                     main_G = analyzer.extract_main_connections(
