@@ -180,7 +180,7 @@ def create_interactive_gnn_topology(G, embeddings, similarities, node_names, out
             net.add_node(
                 i,  # 使用整数ID避免序列化问题
                 label=f"N{node_number}", 
-                title=f"神经元: {node_label}\n编号: N{node_number}\n度: {node_degree}",
+                title=f"Neuron: {node_label}\nID: N{node_number}\nDegree: {node_degree}",
                 size=30,  # 统一节点大小
                 font={"size": 14, "face": "Arial", "color": "black"},
                 x=x, 
@@ -206,7 +206,7 @@ def create_interactive_gnn_topology(G, embeddings, similarities, node_names, out
             # 所有数值都转换为Python内置类型
             edge_data = {
                 "value": width,
-                "title": f"相似度: {weight:.4f}"
+                "title": f"Similarity: {weight:.4f}"
             }
             
             net.add_edge(u_idx, v_idx, **edge_data)

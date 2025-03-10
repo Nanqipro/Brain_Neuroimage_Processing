@@ -124,7 +124,7 @@ class AnalysisConfig:
             'correlation_threshold': 0.2,  # 构建功能连接网络的相关性阈值
             'min_module_size': 3,  # 功能模块的最小神经元数量
             'max_modules': 10,  # 最大功能模块数量
-            'edge_weight_threshold': 0.3,  # 边权重阈值
+            'edge_weight_threshold': 0.4,  # 边权重阈值
             'community_resolution': 1.0,  # 社区检测的分辨率参数
             
             # GNN参数配置

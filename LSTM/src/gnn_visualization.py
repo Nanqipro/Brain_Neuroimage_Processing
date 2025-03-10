@@ -33,7 +33,7 @@ class GNNVisualizer:
         self.viz_dir = config.gnn_results_dir
         os.makedirs(self.viz_dir, exist_ok=True)
     
-    def visualize_gnn_embeddings(self, embeddings, labels, neuron_names=None, title='神经元GNN嵌入可视化'):
+    def visualize_gnn_embeddings(self, embeddings, labels, neuron_names=None, title='Neuron GNN Embeddings Visualization'):
         """
         可视化GNN嵌入
         
@@ -58,10 +58,10 @@ class GNNVisualizer:
                 plt.annotate(name, (embeddings_2d[i, 0], embeddings_2d[i, 1]), 
                            fontsize=8, alpha=0.7)
         
-        plt.colorbar(scatter, label='类别')
+        plt.colorbar(scatter, label='Category')
         plt.title(title)
-        plt.xlabel('t-SNE维度1')
-        plt.ylabel('t-SNE维度2')
+        plt.xlabel('t-SNE Dimension 1')
+        plt.ylabel('t-SNE Dimension 2')
         plt.tight_layout()
         
         # 保存图像
@@ -70,7 +70,7 @@ class GNNVisualizer:
         plt.close()
         return viz_path
     
-    def visualize_attention_weights(self, attention_weights, neuron_names, title='神经元GAT注意力权重'):
+    def visualize_attention_weights(self, attention_weights, neuron_names, title='Neuron GAT Attention Weights'):
         """
         可视化GAT注意力权重
         
@@ -91,7 +91,7 @@ class GNNVisualizer:
         plt.close()
         return viz_path
     
-    def visualize_gnn_communities(self, G, communities, pos=None, title='GNN社区检测结果'):
+    def visualize_gnn_communities(self, G, communities, pos=None, title='GNN Community Detection Results'):
         """
         可视化GNN检测的社区
         
@@ -131,7 +131,7 @@ class GNNVisualizer:
     
     def visualize_gnn_behavior_prediction(self, embeddings, true_labels, predicted_labels, 
                                         neuron_names=None, behavior_names=None,
-                                        title='行为预测GNN结果'):
+                                        title='Behavior Prediction GNN Results'):
         """
         可视化GNN行为预测结果
         
@@ -153,12 +153,12 @@ class GNNVisualizer:
         # 绘制真实标签
         scatter1 = ax1.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], 
                              c=true_labels, cmap='tab10', s=100, alpha=0.8)
-        ax1.set_title('真实行为标签')
+        ax1.set_title('True Behavior Labels')
         
         # 绘制预测标签
         scatter2 = ax2.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], 
                              c=predicted_labels, cmap='tab10', s=100, alpha=0.8)
-        ax2.set_title('GNN预测行为标签')
+        ax2.set_title('GNN Predicted Behavior Labels')
         
         # 添加神经元标签（如果提供）
         if neuron_names is not None:
@@ -180,8 +180,8 @@ class GNNVisualizer:
             ax2.legend(handles=legend_elements, loc='upper right')
         else:
             # 使用普通颜色条
-            plt.colorbar(scatter1, ax=ax1, label='行为类别')
-            plt.colorbar(scatter2, ax=ax2, label='行为类别')
+            plt.colorbar(scatter1, ax=ax1, label='Behavior Category')
+            plt.colorbar(scatter2, ax=ax2, label='Behavior Category')
         
         fig.suptitle(title, fontsize=16)
         plt.tight_layout()
@@ -193,7 +193,7 @@ class GNNVisualizer:
         return viz_path
     
     def create_interactive_gnn_visualization(self, G, embeddings, labels, neuron_names=None,
-                                          title='交互式神经元GNN可视化'):
+                                          title='Interactive GNN Visualization'):
         """
         创建交互式GNN可视化
         
@@ -244,7 +244,7 @@ class GNNVisualizer:
                 size=10,
                 colorbar=dict(
                     thickness=15,
-                    title='节点类别',
+                    title='Node Category',
                     xanchor='left',
                     titleside='right'
                 ),
@@ -265,7 +265,7 @@ class GNNVisualizer:
             else:
                 node_label = str(node)
             
-            node_info.append(f'神经元: {node_label}<br>类别: {labels[i]}')
+            node_info.append(f'Neuron: {node_label}<br>Category: {labels[i]}')
             node_colors.append(labels[i])
         
         node_trace.marker.color = node_colors
@@ -292,7 +292,7 @@ class GNNVisualizer:
         
         return html_path
     
-    def visualize_time_series_gnn(self, temporal_data, window_size, title='时间序列GNN结果'):
+    def visualize_time_series_gnn(self, temporal_data, window_size, title='Time Series GNN Results'):
         """
         可视化时间序列GNN结果
         
@@ -304,7 +304,7 @@ class GNNVisualizer:
         # 实现时间序列GNN结果可视化
         pass
         
-    def plot_training_metrics(self, epochs, train_metrics, val_metrics, metric_name='准确率', title=None, filename=None):
+    def plot_training_metrics(self, epochs, train_metrics, val_metrics, metric_name='Accuracy', title=None, filename=None):
         """
         绘制训练过程中的指标变化曲线
         

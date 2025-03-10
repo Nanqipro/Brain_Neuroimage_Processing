@@ -56,6 +56,8 @@ try:
                              create_interactive_gnn_topology, save_gnn_topology_data, 
                              analyze_gnn_topology)
     from gnn_visualization import GNNVisualizer
+    # 设置GNN支持标志为True，表示成功导入了所有GNN相关模块
+    # 此标志将在后续代码中用于条件性地启用GNN分析功能
     HAS_GNN_SUPPORT = True
     print("成功加载GNN支持模块，GNN分析功能已启用")
 except ImportError as e:
@@ -73,6 +75,8 @@ try:
         save_gnn_topology_data,
         analyze_gnn_topology
     )
+    # 设置GNN拓扑支持标志为True，表示成功导入了所有GNN拓扑相关模块
+    # 此标志将在后续代码中用于条件性地启用GNN拓扑分析功能
     HAS_GNN_TOPOLOGY = True
 except ImportError:
     print("警告: 未找到GNN拓扑可视化模块，将禁用GNN拓扑功能")
@@ -659,7 +663,7 @@ class ResultAnalyzer:
         plt.close()
         return behavior_importance
 
-    def build_neuron_network(self, X_scaled, threshold=0.3):
+    def build_neuron_network(self, X_scaled, threshold=0.35):
         """
         构建神经元功能连接网络
         参数:
@@ -669,6 +673,7 @@ class ResultAnalyzer:
             G: NetworkX图对象
             correlation_matrix: 相关性矩阵
             available_neurons: 可用神经元列表
+            threshold: 相关性阈值  此处设置为0.35
         """
         print("\n构建神经元功能连接网络...")
         
@@ -740,7 +745,7 @@ class ResultAnalyzer:
         
         if method == 'threshold':
             # 使用更高的阈值过滤边
-            higher_threshold = kwargs.get('threshold', 0.2)  # 默认提高到0.2
+            higher_threshold = kwargs.get('threshold', 0.4)  # 默认提高到0.4
             print(f"使用更高的相关性阈值: {higher_threshold}")
             
             for u, v, data in G.edges(data=True):
@@ -749,7 +754,7 @@ class ResultAnalyzer:
                     
         elif method == 'top_edges':
             # 为每个节点只保留top_k个最强连接
-            top_k = kwargs.get('top_k', 5)  # 默认每个节点保留3个最强连接
+            top_k = kwargs.get('top_k', 10)  # 默认每个节点保留3个最强连接
             print(f"为每个节点保留{top_k}个最强连接")
             
             for node in G.nodes():
@@ -1132,7 +1137,7 @@ class ResultAnalyzer:
             pca = PCA(n_components=n_components_pca)
             X_reduced = pca.fit_transform(X_balanced)
             
-            n_states = 2  # 固定使用2个状态
+            n_states = 3  # 固定使用3个状态
             print(f"使用最小状态数: {n_states}")
             
             model = hmm.GaussianHMM(
@@ -1694,7 +1699,7 @@ class ResultAnalyzer:
             )
             
             # 设置训练参数
-            epochs = self.config.analysis_params.get('gnn_epochs', 100)
+            epochs = self.config.analysis_params.get('gnn_epochs', 200)
             lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
             weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
             patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
@@ -1725,8 +1730,8 @@ class ResultAnalyzer:
                 acc_epochs, 
                 accuracies['train'], 
                 accuracies['val'], 
-                metric_name='准确率',
-                title='GCN模型训练准确率变化',
+                metric_name='Accuracy',
+                title='GCN Model Training Accuracy Change',
                 filename='gcn_accuracy_curve.png'
             )
             
@@ -1819,7 +1824,7 @@ class ResultAnalyzer:
                 )
                 
                 # 设置训练参数
-                epochs = self.config.analysis_params.get('gnn_epochs', 100)
+                epochs = self.config.analysis_params.get('gnn_epochs', 200)
                 lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
                 weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
                 patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)

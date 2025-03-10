@@ -455,7 +455,19 @@ class NeuronGAT(torch.nn.Module):
         # x = self.pooling(x, edge_index)
 
         # 均值池化
-        x = self.mean_pooling(x, edge_index)
+        # x = self.mean_pooling(x, edge_index)
+        
+        # 基于自注意力机制的池化
+        # x = self.self_attention_pooling(x, edge_index)
+        
+        # SAGPool (Self-Attention Graph Pooling)：基于自注意力机制的池化
+        x = self.sag_pooling(x, edge_index)
+        
+        # DiffPool：可微分的图池化层，学习将节点聚类到更高层次的结构
+        # x = self.diff_pooling(x, edge_index)
+        
+        # TopKPool：保留最重要的k个节点，特别适合找出关键神经元
+        # x = self.topk_pooling(x, edge_index)
         # 分类层
         x = self.classifier(x)
         
