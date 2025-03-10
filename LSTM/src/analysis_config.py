@@ -143,8 +143,9 @@ class AnalysisConfig:
             
             # GAT模型参数
             'gat_heads': 4,  # GAT注意力头数
-            'gat_hidden_channels': 56,  # 增加GAT隐藏层维度
+            'gat_hidden_channels': 128,  # 增加GAT隐藏层维度
             'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
+            # 'gat_residual': True,  # 添加残差连接参数
             
             # GCN增强模型参数
             'gcn_hidden_channels': 128,  # 增加GCN隐藏层维度

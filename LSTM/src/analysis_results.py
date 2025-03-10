@@ -1852,8 +1852,8 @@ class ResultAnalyzer:
                     gat_acc_epochs, 
                     gat_accuracies['train'], 
                     gat_accuracies['val'], 
-                    metric_name='准确率',
-                    title='GAT模型训练准确率变化',
+                    metric_name='Accuracy',
+                    title='GAT Model Training Accuracy Change',
                     filename='gat_accuracy_curve.png'
                 )
                 
