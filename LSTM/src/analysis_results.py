@@ -1817,10 +1817,13 @@ class ResultAnalyzer:
                 # 创建GAT模型
                 gat_model = NeuronGAT(
                     in_channels=X_normalized.shape[1],
-                    hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 56),
+                    hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 128),
                     out_channels=num_communities,
                     heads=self.config.analysis_params.get('gat_heads', 4),
-                    dropout=self.config.analysis_params.get('gat_dropout', 0.3)
+                    dropout=self.config.analysis_params.get('gat_dropout', 0.3),
+                    residual=self.config.analysis_params.get('gat_residual', True),
+                    num_layers=self.config.analysis_params.get('gat_num_layers', 3),
+                    alpha=self.config.analysis_params.get('gat_alpha', 0.2)
                 )
                 
                 # 设置训练参数

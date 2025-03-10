@@ -144,8 +144,11 @@ class AnalysisConfig:
             # GAT模型参数
             'gat_heads': 4,  # GAT注意力头数
             'gat_hidden_channels': 128,  # 增加GAT隐藏层维度
-            'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
-            # 'gat_residual': True,  # 添加残差连接参数
+            'gat_dropout': 0.1,  # 减弱GAT特定的Dropout率
+            'gat_residual': True,  # 启用残差连接
+            'gat_num_layers': 3,  # GAT层数
+            'gat_alpha': 0.2,  # LeakyReLU的alpha参数
+            'gat_jk_mode': 'max',  # 跳跃连接模式：max, lstm, cat
             
             # GCN增强模型参数
             'gcn_hidden_channels': 128,  # 增加GCN隐藏层维度

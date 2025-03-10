@@ -1,19 +1,20 @@
-import numpy as np
 import torch
 import torch.nn.functional as F
-from torch_geometric.data import Data
-from torch_geometric.nn import GCNConv, GATConv, MessagePassing
 import torch.nn as nn
-import networkx as nx
-from typing import List, Dict, Tuple, Optional, Union, Any
-import os
+import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from torch_geometric.utils import from_networkx, to_networkx, add_self_loops, degree
-from torch_geometric.nn import global_mean_pool, global_add_pool
 import copy
+from sklearn.model_selection import train_test_split
+from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool, global_max_pool
+from torch_geometric.nn import JumpingKnowledge, GlobalAttention
+from torch_geometric.nn import MessagePassing
+from torch_geometric.utils import from_networkx, to_networkx, add_self_loops, degree
+import os
+import networkx as nx
 from torch.nn import Sequential, Linear, BatchNorm1d, Dropout, ReLU, LeakyReLU, ELU, GELU
 from sklearn.manifold import TSNE
+from torch_geometric.data import Data
+from typing import List, Dict, Tuple, Optional, Union, Any
 
 class GNNAnalyzer:
     """
@@ -407,7 +408,8 @@ class MultiHeadSelfAttention(nn.Module):
 class NeuronGAT(torch.nn.Module):
     """使用图注意力网络进行神经元功能模块识别"""
     
-    def __init__(self, in_channels, hidden_channels, out_channels, heads=4, dropout=0.3):
+    def __init__(self, in_channels, hidden_channels, out_channels, heads=4, dropout=0.3, 
+                 residual=True, num_layers=3, edge_dim=None, alpha=0.2):
         """
         初始化神经元GAT模型
         
@@ -417,15 +419,86 @@ class NeuronGAT(torch.nn.Module):
             out_channels: 输出类别数
             heads: 注意力头数量
             dropout: Dropout比率
+            residual: 是否使用残差连接
+            num_layers: GAT层数
+            edge_dim: 边特征维度，默认为None
+            alpha: LeakyReLU的alpha参数
         """
         super(NeuronGAT, self).__init__()
-        # 减小隐藏层维度，增加正则化
-        self.conv1 = GATConv(in_channels, hidden_channels, heads=heads, dropout=dropout)
-        self.bn1 = torch.nn.BatchNorm1d(hidden_channels * heads)
-        self.conv2 = GATConv(hidden_channels * heads, hidden_channels, heads=1, dropout=dropout)
-        self.bn2 = torch.nn.BatchNorm1d(hidden_channels)
-        self.classifier = torch.nn.Linear(hidden_channels, out_channels)
-        self.dropout = dropout
+        self.num_layers = num_layers
+        self.residual = residual
+        self.dropout_rate = dropout
+        
+        # 初始层
+        self.convs = nn.ModuleList()
+        self.batch_norms = nn.ModuleList()
+        
+        # 第一层
+        self.convs.append(GATConv(in_channels, hidden_channels, heads=heads, 
+                           dropout=dropout, edge_dim=edge_dim, add_self_loops=True))
+        self.batch_norms.append(torch.nn.BatchNorm1d(hidden_channels * heads))
+        
+        # 中间层
+        for i in range(num_layers - 2):
+            self.convs.append(
+                GATConv(hidden_channels * heads, hidden_channels, heads=heads, 
+                       dropout=dropout, edge_dim=edge_dim, add_self_loops=True)
+            )
+            self.batch_norms.append(torch.nn.BatchNorm1d(hidden_channels * heads))
+        
+        # 最后一个GAT层
+        if num_layers > 1:
+            self.convs.append(
+                GATConv(hidden_channels * heads, hidden_channels, heads=1, 
+                       dropout=dropout, edge_dim=edge_dim, add_self_loops=True)
+            )
+            self.batch_norms.append(torch.nn.BatchNorm1d(hidden_channels))
+        
+        # JK连接层 - 跳跃连接以聚合多层特征
+        self.jk = JumpingKnowledge(mode='max')
+        
+        # 全局注意力池化层
+        self.glob_attn = GlobalAttention(
+            nn.Sequential(
+                nn.Linear(hidden_channels, hidden_channels), 
+                nn.LeakyReLU(alpha), 
+                nn.Linear(hidden_channels, 1)
+            )
+        )
+        
+        # 分类层加入多层感知机结构
+        self.mlp = nn.Sequential(
+            nn.Linear(hidden_channels, hidden_channels),
+            nn.LeakyReLU(alpha),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_channels, hidden_channels // 2),
+            nn.LeakyReLU(alpha),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_channels // 2, out_channels)
+        )
+        
+        # 残差连接的投影层
+        if residual:
+            self.res_projs = nn.ModuleList()
+            in_dim = in_channels
+            for i in range(num_layers):
+                out_dim = hidden_channels if i == num_layers - 1 else hidden_channels * heads
+                self.res_projs.append(nn.Linear(in_dim, out_dim, bias=False))
+                in_dim = hidden_channels * heads
+        
+        # 层间维度调整投影层
+        self.dim_projections = nn.ModuleList()
+        # 只有当有多个层且最后一层头数为1时才需要进行维度调整
+        if num_layers > 1 and (heads > 1 or edge_dim is not None):
+            for i in range(num_layers - 1):
+                # 第i层输出维度
+                in_dim = hidden_channels * heads
+                # 最后一层输出维度
+                out_dim = hidden_channels
+                self.dim_projections.append(nn.Linear(in_dim, out_dim, bias=False))
+        
+        # 额外的增强网络
+        self.attention_enhancement = MultiHeadSelfAttention(hidden_channels, num_heads=2, dropout=dropout)
         
     def forward(self, data):
         """
@@ -438,64 +511,139 @@ class NeuronGAT(torch.nn.Module):
             x: 模型输出
         """
         x, edge_index = data.x, data.edge_index
+        edge_weight = data.edge_weight if hasattr(data, 'edge_weight') else None
         
-        # 第一层图注意力卷积
-        x = self.conv1(x, edge_index)
-        x = self.bn1(x)
-        x = F.elu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # 存储每层的输出用于跳跃连接
+        layer_outputs = []
         
-        # 第二层图注意力卷积
-        x = self.conv2(x, edge_index)
-        x = self.bn2(x)
-        x = F.elu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # 通过所有GAT层
+        for i in range(self.num_layers):
+            # 残差连接
+            res = self.res_projs[i](x) if self.residual else None
+            
+            # 应用GAT卷积
+            if edge_weight is not None:
+                x = self.convs[i](x, edge_index, edge_weight)
+            else:
+                x = self.convs[i](x, edge_index)
+            
+            # 批量归一化
+            x = self.batch_norms[i](x)
+            
+            # 添加残差连接
+            if self.residual and res is not None and x.size() == res.size():
+                x = x + res
+            
+            # 非线性激活
+            x = F.leaky_relu(x, negative_slope=0.2)
+            
+            # Dropout
+            x = F.dropout(x, p=self.dropout_rate, training=self.training)
+            
+            # 存储层输出
+            layer_outputs.append(x)
         
-        # 池化
-        # x = self.pooling(x, edge_index)
-
-        # 均值池化
-        # x = self.mean_pooling(x, edge_index)
+        # 应用跳跃连接前确保所有层输出维度一致
+        if len(layer_outputs) > 1:
+            # 检查是否需要维度调整
+            first_shape = layer_outputs[0].shape
+            last_shape = layer_outputs[-1].shape
+            
+            if first_shape[-1] != last_shape[-1] and len(self.dim_projections) > 0:
+                # 需要维度调整
+                normalized_outputs = []
+                for i, layer_output in enumerate(layer_outputs):
+                    if i < len(layer_outputs) - 1:  # 对除最后一层外的所有层应用投影
+                        # 使用预先创建的投影层
+                        normalized_outputs.append(self.dim_projections[i](layer_output))
+                    else:
+                        normalized_outputs.append(layer_output)
+                
+                # 应用跳跃连接
+                x = self.jk(normalized_outputs)
+            else:
+                # 维度已经一致，直接应用跳跃连接
+                x = self.jk(layer_outputs)
         
-        # 基于自注意力机制的池化
-        # x = self.self_attention_pooling(x, edge_index)
+        # 应用自注意力增强
+        x = self.attention_enhancement(x)
         
-        # SAGPool (Self-Attention Graph Pooling)：基于自注意力机制的池化
-        # x = self.sag_pooling(x, edge_index)
+        # 应用全局注意力池化（如果需要）
+        batch = data.batch if hasattr(data, 'batch') else None
+        if batch is not None:
+            x = self.glob_attn(x, batch)
         
-        # DiffPool：可微分的图池化层，学习将节点聚类到更高层次的结构
-        # x = self.diff_pooling(x, edge_index)
-        
-        # TopKPool：保留最重要的k个节点，特别适合找出关键神经元
-        # x = self.topk_pooling(x, edge_index)
-        # 分类层
-        x = self.classifier(x)
+        # 使用MLP分类器
+        x = self.mlp(x)
         
         return x
         
     def get_embeddings(self, data):
         """
-        获取节点嵌入向量和注意力权重
+        获取节点嵌入向量
         
         参数:
             data: PyTorch Geometric数据对象
             
         返回:
             embeddings: 节点嵌入向量
-            attention_weights: 注意力权重（如果可用）
         """
         x, edge_index = data.x, data.edge_index
+        edge_weight = data.edge_weight if hasattr(data, 'edge_weight') else None
         
-        # 第一层图注意力卷积
-        x = self.conv1(x, edge_index)
-        x = self.bn1(x)
-        x = F.elu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # 存储每层的输出用于跳跃连接
+        layer_outputs = []
         
-        # 第二层图注意力卷积（最终嵌入）
-        embeddings = self.conv2(x, edge_index)
-        embeddings = self.bn2(embeddings)
-        embeddings = F.elu(embeddings)
+        # 通过所有GAT层
+        for i in range(self.num_layers):
+            # 残差连接
+            res = self.res_projs[i](x) if self.residual else None
+            
+            # 应用GAT卷积
+            if edge_weight is not None:
+                x = self.convs[i](x, edge_index, edge_weight)
+            else:
+                x = self.convs[i](x, edge_index)
+            
+            # 批量归一化
+            x = self.batch_norms[i](x)
+            
+            # 添加残差连接
+            if self.residual and res is not None and x.size() == res.size():
+                x = x + res
+            
+            # 非线性激活
+            x = F.leaky_relu(x, negative_slope=0.2)
+            
+            # 存储层输出
+            layer_outputs.append(x)
+        
+        # 应用跳跃连接前确保所有层输出维度一致
+        if len(layer_outputs) > 1:
+            # 检查是否需要维度调整
+            first_shape = layer_outputs[0].shape
+            last_shape = layer_outputs[-1].shape
+            
+            if first_shape[-1] != last_shape[-1] and len(self.dim_projections) > 0:
+                # 需要维度调整
+                normalized_outputs = []
+                for i, layer_output in enumerate(layer_outputs):
+                    if i < len(layer_outputs) - 1:  # 对除最后一层外的所有层应用投影
+                        # 使用预先创建的投影层
+                        normalized_outputs.append(self.dim_projections[i](layer_output))
+                    else:
+                        normalized_outputs.append(layer_output)
+                
+                # 应用跳跃连接
+                embeddings = self.jk(normalized_outputs)
+            else:
+                # 维度已经一致，直接应用跳跃连接
+                embeddings = self.jk(layer_outputs)
+        else:
+            embeddings = layer_outputs[0]
+        
+        # 应用自注意力增强
+        embeddings = self.attention_enhancement(embeddings)
         
         return embeddings
 
@@ -605,6 +753,60 @@ class ModuleGNN(MessagePassing):
         # aggr_out 包含聚合后的消息
         return aggr_out
 
+class LabelSmoothingCrossEntropy(nn.Module):
+    """
+    标签平滑交叉熵损失函数
+    
+    参数:
+        smoothing: 平滑系数，通常在0.1到0.2之间
+    """
+    def __init__(self, smoothing=0.1):
+        super(LabelSmoothingCrossEntropy, self).__init__()
+        self.smoothing = smoothing
+        self.confidence = 1.0 - smoothing
+        
+    def forward(self, x, target):
+        logprobs = F.log_softmax(x, dim=-1)
+        nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
+        nll_loss = nll_loss.squeeze(1)
+        smooth_loss = -logprobs.mean(dim=-1)
+        loss = self.confidence * nll_loss + self.smoothing * smooth_loss
+        return loss.mean()
+
+def custom_gnn_loss(outputs, data, lambda_reg=0.001):
+    """
+    自定义GNN损失函数，结合了多种损失成分
+    
+    参数:
+        outputs: 模型输出
+        data: PyTorch Geometric数据对象
+        lambda_reg: 正则化系数
+    
+    返回:
+        loss: 计算得到的损失值
+    """
+    # 如果存在标签，使用交叉熵
+    if hasattr(data, 'y') and data.y is not None:
+        ce_loss = F.cross_entropy(outputs, data.y)
+        loss = ce_loss
+    else:
+        # 如果没有标签，可以使用自监督损失如重构损失
+        loss = F.mse_loss(outputs, data.x)
+    
+    # L2正则化已经通过weight_decay实现，这里不再重复添加
+    
+    # 添加拓扑一致性损失，相连节点应该有相似的嵌入
+    if hasattr(data, 'edge_index'):
+        src, dst = data.edge_index
+        src_emb = outputs[src]
+        dst_emb = outputs[dst]
+        topo_loss = F.mse_loss(src_emb, dst_emb)
+        
+        # 加权组合各种损失
+        loss = loss + 0.1 * topo_loss
+    
+    return loss
+
 def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu', patience=15, early_stopping_enabled=False):
     """
     训练GNN模型
@@ -617,7 +819,7 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         weight_decay: 权重衰减
         device: 设备(cuda/cpu)
         patience: 早停耐心值
-        early_stopping_enabled: 是否启用早停机制，默认为True
+        early_stopping_enabled: 是否启用早停机制，默认为False
     
     返回:
         model: 训练好的模型
@@ -628,99 +830,146 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
     data = data.to(device)
     model = model.to(device)
     
-    # 准备优化器
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    # 准备优化器 - 使用带动量的SGD或AdamW
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, betas=(0.9, 0.999))
     
-    # 学习率调度器 - 使用更温和的衰减
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.7, patience=5, verbose=True, min_lr=1e-5
+    # 使用余弦退火学习率调度器，更适合避免局部最小值
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=20, T_mult=2, eta_min=1e-6
     )
     
-    criterion = torch.nn.CrossEntropyLoss()
+    # 使用标签平滑交叉熵损失，提高泛化能力
+    criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
     
-    # 创建训练/验证索引 - 使用更小的验证集
+    # 创建训练/验证索引 - 使用分层采样确保类别平衡
     indices = list(range(data.x.size(0)))
-    train_indices, val_indices = train_test_split(indices, test_size=0.18, random_state=42)
+    if hasattr(data, 'y'):
+        stratify = data.y.cpu().numpy() if data.y is not None else None
+        train_indices, val_indices = train_test_split(
+            indices, test_size=0.2, random_state=42, stratify=stratify
+        )
+    else:
+        train_indices, val_indices = train_test_split(indices, test_size=0.2, random_state=42)
     
     # 记录损失和准确率
     losses = {'train': [], 'val': []}
     accuracies = {'train': [], 'val': []}
     
-    # 早停设置 - 使用更温和的早停策略
+    # 早停设置
     best_val_loss = float('inf')
     best_model_state = None
-    patience_counter = 0
-    min_delta = 1e-5  # 降低最小改进阈值，更容易继续训练
+    no_improve_count = 0
     
-    # 训练循环
-    for epoch in range(epochs):
+    for epoch in range(1, epochs + 1):
         # 训练模式
         model.train()
-        optimizer.zero_grad()
+        train_loss = 0.0
+        train_correct = 0
+        train_total = 0
         
-        # 前向传播
+        # 创建训练掩码
+        train_mask = torch.zeros(data.x.size(0), dtype=torch.bool, device=device)
+        train_mask[train_indices] = True
+        
+        # 前向传播和优化
+        optimizer.zero_grad()
         out = model(data)
         
-        # 计算训练损失 - 仅使用训练索引
-        train_loss = criterion(out[train_indices], data.y[train_indices])
-        losses['train'].append(train_loss.item())
+        if hasattr(data, 'y') and data.y is not None:
+            # 分类任务
+            loss = criterion(out[train_mask], data.y[train_mask])
+            loss.backward()
+            
+            # 梯度裁剪，避免梯度爆炸
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+            
+            train_loss += loss.item()
+            
+            # 计算训练准确率
+            _, predicted = torch.max(out[train_mask], 1)
+            train_total += data.y[train_mask].size(0)
+            train_correct += (predicted == data.y[train_mask]).sum().item()
+        else:
+            # 如果不是分类任务，自定义损失函数
+            loss = custom_gnn_loss(out[train_mask], data)
+            loss.backward()
+            
+            # 梯度裁剪
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+            train_loss += loss.item()
         
-        # 计算训练准确率
-        _, train_predicted = torch.max(out[train_indices], 1)
-        train_acc = (train_predicted == data.y[train_indices]).sum().item() / len(train_indices)
-        accuracies['train'].append(train_acc)
-        
-        # 反向传播和优化
-        train_loss.backward()
-        optimizer.step()
-        
-        # 评估模式
+        # 验证模式
         model.eval()
+        val_loss = 0.0
+        val_correct = 0
+        val_total = 0
+        
+        # 创建验证掩码
+        val_mask = torch.zeros(data.x.size(0), dtype=torch.bool, device=device)
+        val_mask[val_indices] = True
+        
         with torch.no_grad():
-            # 前向传播
             out = model(data)
             
-            # 计算验证损失 - 仅使用验证索引
-            val_loss = criterion(out[val_indices], data.y[val_indices])
-            losses['val'].append(val_loss.item())
-            
-            # 计算验证准确率
-            _, predicted = torch.max(out[val_indices], 1)
-            val_acc = (predicted == data.y[val_indices]).sum().item() / len(val_indices)
-            accuracies['val'].append(val_acc)
+            if hasattr(data, 'y') and data.y is not None:
+                # 分类任务验证
+                val_loss_value = criterion(out[val_mask], data.y[val_mask]).item()
+                val_loss += val_loss_value
+                
+                # 计算验证准确率
+                _, predicted = torch.max(out[val_mask], 1)
+                val_total += data.y[val_mask].size(0)
+                val_correct += (predicted == data.y[val_mask]).sum().item()
+            else:
+                # 非分类任务验证
+                val_loss_value = custom_gnn_loss(out[val_mask], data).item()
+                val_loss += val_loss_value
         
-        # 学习率调整
-        scheduler.step(val_loss)
+        # 计算平均损失和准确率
+        train_loss /= len(train_indices)
+        val_loss /= len(val_indices)
         
-        # 每10轮打印一次进度
-        if (epoch + 1) % 10 == 0:
-            print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss.item():.4f}, Val Loss: {val_loss.item():.4f}, Val Acc: {val_acc:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
+        train_acc = train_correct / train_total if train_total > 0 else 0
+        val_acc = val_correct / val_total if val_total > 0 else 0
+        
+        # 记录损失和准确率
+        losses['train'].append(train_loss)
+        losses['val'].append(val_loss)
+        accuracies['train'].append(train_acc)
+        accuracies['val'].append(val_acc)
+        
+        # 更新学习率
+        current_lr = optimizer.param_groups[0]['lr']
+        scheduler.step()
+        
+        # 打印训练信息
+        if epoch % 10 == 0 or epoch == 1:
+            print(f"Epoch {epoch}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, LR: {current_lr:.6f}")
         
         # 早停检查
         if early_stopping_enabled:
-            if val_loss < best_val_loss - min_delta:
-                best_val_loss = val_loss
-                best_model_state = copy.deepcopy(model.state_dict())
-                patience_counter = 0
-            else:
-                patience_counter += 1
-                if patience_counter >= patience:
-                    print(f"Early stopping at epoch {epoch+1}, best val loss: {best_val_loss:.4f}")
-                    break
-        else:
-            # 如果禁用早停，仍然保存最佳模型
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_model_state = copy.deepcopy(model.state_dict())
+                no_improve_count = 0
+            else:
+                no_improve_count += 1
                 
-    # 如果禁用早停且完成所有训练，打印最终结果
-    if not early_stopping_enabled:
-        print(f"Training completed for all {epochs} epochs, best val loss: {best_val_loss:.4f}")
-            
-    # 加载最佳模型
-    if best_model_state is not None:
-        model.load_state_dict(best_model_state)
-        print(f"已恢复最佳模型 (验证损失: {best_val_loss:.4f})")
+            if no_improve_count >= patience:
+                print(f"早停激活于第 {epoch} 轮，最佳验证损失: {best_val_loss:.4f}")
+                if best_model_state is not None:
+                    model.load_state_dict(best_model_state)
+                break
+    
+    # 如果已经完成所有轮次，检查是否应该恢复最佳模型
+    if early_stopping_enabled and best_model_state is not None and epoch == epochs:
+        if val_loss > best_val_loss:
+            model.load_state_dict(best_model_state)
+            print(f"训练完成所有 {epochs} 轮次，已恢复最佳模型 (验证损失: {best_val_loss:.4f})")
     
     return model, losses, accuracies
 
