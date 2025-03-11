@@ -611,15 +611,6 @@ def visualize_gat_topology(topology_data_path):
         with open(topology_data_path, 'r') as f:
             data = json.load(f)
         
-        # 数据验证
-        if 'nodes' not in data or 'edges' not in data:
-            print(f"警告: 拓扑数据格式不正确，缺少nodes或edges字段")
-            # 创建默认数据结构
-            if 'nodes' not in data:
-                data['nodes'] = [{'id': i} for i in range(10)]  # 创建10个默认节点
-            if 'edges' not in data:
-                data['edges'] = []  # 创建空边列表
-        
         # 创建NetworkX图对象
         G = nx.Graph()
         
@@ -627,50 +618,13 @@ def visualize_gat_topology(topology_data_path):
         for node in data['nodes']:
             G.add_node(node['id'])
         
-        # 如果没有节点，添加一些默认节点
-        if len(G.nodes()) == 0:
-            print("警告: 没有节点数据，添加默认节点")
-            for i in range(5):
-                G.add_node(i)
-        
         # 添加边
-        edge_count = 0
         for edge in data['edges']:
-            # 验证边的源和目标节点是否存在
-            if 'source' in edge and 'target' in edge:
-                source = edge['source']
-                target = edge['target']
-                
-                # 确保源节点和目标节点在图中
-                if source not in G.nodes():
-                    print(f"警告: 边的源节点 {source} 不存在，跳过")
-                    continue
-                if target not in G.nodes():
-                    print(f"警告: 边的目标节点 {target} 不存在，跳过")
-                    continue
-                
-                # 添加边及其权重
-                weight = edge.get('similarity', 0.5)  # 如果没有相似度，使用默认值0.5
-                G.add_edge(source, target, weight=weight)
-                edge_count += 1
-        
-        print(f"成功加载拓扑数据: {len(G.nodes())}个节点, {edge_count}条边")
-        
-        # 如果没有边，添加一些默认边以便可视化
-        if edge_count == 0:
-            print("警告: 没有边数据，添加默认边")
-            nodes = list(G.nodes())
-            for i in range(len(nodes)-1):
-                G.add_edge(nodes[i], nodes[i+1], weight=0.5)
+            G.add_edge(edge['source'], edge['target'], weight=edge['similarity'])
         
         # 检测社区结构
-        try:
-            import community as community_louvain
-            communities = community_louvain.best_partition(G)
-        except Exception as e:
-            print(f"社区检测失败: {str(e)}，使用节点ID作为社区")
-            # 使用节点ID模3作为默认社区
-            communities = {node: node % 3 for node in G.nodes()}
+        import community as community_louvain
+        communities = community_louvain.best_partition(G)
         
         # 为不同社区分配不同颜色
         community_colors = [
@@ -685,65 +639,38 @@ def visualize_gat_topology(topology_data_path):
             community_colors = community_colors * (num_communities // len(community_colors) + 1)
         
         # 创建节点颜色映射
-        node_colors = []
-        for node in G.nodes():
-            if node in communities:
-                community_id = communities[node]
-                if 0 <= community_id < len(community_colors):
-                    node_colors.append(community_colors[community_id])
-                else:
-                    # 如果社区ID超出颜色列表范围，使用默认颜色
-                    node_colors.append("#CCCCCC")
-            else:
-                # 如果节点没有社区，使用灰色
-                node_colors.append("#CCCCCC")
+        node_colors = [community_colors[communities[node]] for node in G.nodes()]
         
         # 设置绘图参数
         plt.figure(figsize=(15, 15))
         
         # 使用spring布局，增加k值和迭代次数使节点更分散
-        try:
-            pos = nx.spring_layout(G, 
-                                k=2.0,           # 增加节点间理想距离
-                                iterations=100,   # 增加迭代次数
-                                seed=42)         # 设置随机种子保证结果可重现
-        except Exception as layout_error:
-            print(f"Spring布局失败: {str(layout_error)}，使用随机布局")
-            pos = nx.random_layout(G)
+        pos = nx.spring_layout(G, 
+                             k=2.0,           # 增加节点间理想距离
+                             iterations=100,   # 增加迭代次数
+                             seed=42)         # 设置随机种子保证结果可重现
         
         # 绘制边（使用权重确定边的宽度，降低alpha值使边更透明）
-        try:
-            edge_weights = [G[u][v].get('weight', 0.5) * 1.5 for u, v in G.edges()]  # 获取边权重，默认0.5
-            nx.draw_networkx_edges(G, pos, width=edge_weights, alpha=0.2, edge_color='gray')  # 降低边的不透明度
-        except Exception as edge_error:
-            print(f"绘制边失败: {str(edge_error)}，使用默认边样式")
-            nx.draw_networkx_edges(G, pos, alpha=0.2, edge_color='gray')
+        edge_weights = [G[u][v]['weight'] * 1.5 for u, v in G.edges()]  # 稍微减小边的宽度系数
+        nx.draw_networkx_edges(G, pos, width=edge_weights, alpha=0.2, edge_color='gray')  # 降低边的不透明度
         
         # 绘制节点（稍微增大节点大小）
         node_sizes = [400 for _ in G.nodes()]  # 增加节点大小
         nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.9)  # 增加节点不透明度
         
         # 添加节点标签（调整字体大小）
-        try:
-            labels = {node: f'N{node+1}' for node in G.nodes()}
-            nx.draw_networkx_labels(G, pos, labels, font_size=9, font_weight='bold')  # 稍微增加字体大小
-        except Exception as label_error:
-            print(f"绘制标签失败: {str(label_error)}，使用节点ID作为标签")
-            labels = {node: str(node) for node in G.nodes()}
-            nx.draw_networkx_labels(G, pos, labels, font_size=9, font_weight='bold')
+        labels = {node: f'N{node+1}' for node in G.nodes()}
+        nx.draw_networkx_labels(G, pos, labels, font_size=9, font_weight='bold')  # 稍微增加字体大小
         
         plt.title('GAT-Based Neuron Network Topology', fontsize=16)
         plt.axis('off')
         
         # 添加社区图例
-        try:
-            legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
-                                        markerfacecolor=community_colors[i % len(community_colors)],
-                                        markersize=10, label=f'Community {i+1}')
-                             for i in range(num_communities)]
-            plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5))
-        except Exception as legend_error:
-            print(f"创建图例失败: {str(legend_error)}")
+        legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
+                                    markerfacecolor=community_colors[i],
+                                    markersize=10, label=f'Community {i+1}')
+                         for i in range(num_communities)]
+        plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5))
         
         # 保存图像
         output_path = os.path.join(os.path.dirname(topology_data_path), 'gat_topology_static.png')
@@ -757,17 +684,4 @@ def visualize_gat_topology(topology_data_path):
         print(f"生成GAT静态拓扑结构图时出错: {str(e)}")
         import traceback
         print(f"错误详情:\n{traceback.format_exc()}")
-        
-        # 创建一个简单的错误图像
-        plt.figure(figsize=(10, 6))
-        plt.text(0.5, 0.5, f"拓扑图生成失败\n错误: {str(e)}", 
-                horizontalalignment='center', verticalalignment='center',
-                fontsize=14, color='red')
-        plt.axis('off')
-        
-        # 保存错误图像
-        output_path = os.path.join(os.path.dirname(topology_data_path), 'gat_topology_error.png')
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        return output_path 
+        return None 

@@ -15,6 +15,7 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
+<<<<<<< HEAD
         self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
         self.data_identifier = 'Day6'  # 从数据文件名提取标识符
         
@@ -42,6 +43,10 @@ class AnalysisConfig:
             'temporal_window_size': 10,  # 时间序列GNN窗口大小
             'temporal_stride': 5,  # 时间序列GNN步长
         }
+=======
+        self.data_file = os.path.join(self.data_dir, 'Day9_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day9'  # 从数据文件名提取标识符
+>>>>>>> parent of 01e6d8f (20250311)
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -49,14 +54,6 @@ class AnalysisConfig:
         self.analysis_dir = os.path.join(self.output_dir, f'analysis_{self.data_identifier}')  # 分析结果目录
         self.train_dir = os.path.join(self.output_dir, f'train_{self.data_identifier}')   # 训练结果目录
         self.log_file = os.path.join(self.analysis_dir, f'analysis_log_{self.data_identifier}.txt')  # 分析日志文件
-        
-        # 数据兼容性配置
-        self.auto_adapt_data = True  # 是否自动适应不同数据集
-        self.min_neurons_required = 5  # 最少需要的神经元数量
-        self.max_neurons_allowed = 500  # 最大允许的神经元数量
-        self.min_samples_required = 10  # 最少需要的样本数量
-        self.default_correlation_threshold = 0.35  # 默认相关性阈值
-        self.adaptive_correlation_threshold = True  # 是否根据数据特性自适应调整阈值
         
         # 拓扑分析相关路径配置
         self.topology_dir = os.path.join(self.output_dir, f'topology_{self.data_identifier}')  # 拓扑分析结果目录
@@ -135,6 +132,71 @@ class AnalysisConfig:
         self.latent_dim = 32          # 潜在维度：自编码器的潜在特征维度
         self.num_heads = 4            # 注意力头数：多头注意力机制的头数量
         self.dropout = 0.2            # Dropout率：防止过拟合的神经元随机失活比例
+        
+        # 分析参数配置
+        self.analysis_params = {
+            'min_samples_per_behavior': 10,  # 每种行为的最小样本数要求
+            'correlation_windows': [10, 20, 50, 100],  # 时间相关性分析的窗口大小列表
+            'behavior_merge_threshold': 0.8,  # 行为合并的相似度阈值
+            'neuron_significance_threshold': 1.0,  # 神经元显著性的阈值
+            'temporal_window_size': 50,  # 时间窗口分析的大小
+            'top_neurons_count': 5,  # 每个行为选择的关键神经元数量
+            'p_value_threshold': 0.05,  # 统计检验的显著性水平
+            'effect_size_threshold': 0.5,  # 效应量的显著性阈值
+            'gradient_clip_norm': 1.0,  # 梯度裁剪的最大范数
+            'weight_decay': 0.01,  # AdamW优化器的权重衰减系数
+            
+            # 早停机制参数
+            'early_stopping_enabled': False,  # 是否启用早停机制
+            'early_stopping_patience': 20,   # 早停耐心值
+            
+            # 新增的增强型LSTM模型参数
+            'latent_dim': 32,  # 自编码器潜在空间维度
+            'num_heads': 4,    # 多头注意力的头数
+            'dropout': 0.2,    # Dropout率
+            'reconstruction_loss_weight': 0.1,  # 重构损失的权重
+            'attention_dropout': 0.1,  # 注意力机制的dropout率
+            'autoencoder_hidden_dim': 128,  # 自编码器隐藏层维度
+            
+            # 新增的网络拓扑分析参数
+            'correlation_threshold': 0.2,  # 构建功能连接网络的相关性阈值
+            'min_module_size': 3,  # 功能模块的最小神经元数量
+            'max_modules': 10,  # 最大功能模块数量
+            'edge_weight_threshold': 0.4,  # 边权重阈值
+            'community_resolution': 1.0,  # 社区检测的分辨率参数
+            
+            # GNN参数配置
+            'gnn_epochs': 200,  # 恢复更多训练轮数
+            'gnn_learning_rate': 0.008,  # 提高初始学习率
+            'gnn_weight_decay': 1e-3,  # 减弱权重衰减强度
+            'gnn_dropout': 0.3,  # 减弱Dropout强度
+            'gnn_early_stop_patience': 20,  # 增加早停耐心值，允许更充分训练
+            
+            # GNN相关目录
+            'gnn_results_dir': 'gnn_results',  # GNN结果子目录
+            
+            # 时间序列GNN参数
+            'temporal_window_size': 10,  # 时间窗口大小
+            'temporal_stride': 5,  # 时间窗口滑动步长
+            
+            # GAT模型参数
+            'gat_heads': 4,  # GAT注意力头数
+            'gat_hidden_channels': 128,  # 增加GAT隐藏层维度
+            'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
+            'gat_residual': True,  # 启用残差连接
+            'gat_num_layers': 3,  # GAT层数
+            'gat_alpha': 0.2,  # LeakyReLU的alpha参数
+            'gat_jk_mode': 'max',  # 跳跃连接模式：max, lstm, cat
+            
+            # GCN增强模型参数
+            'gcn_hidden_channels': 128,  # 增加GCN隐藏层维度
+            'gcn_num_layers': 4,  # GCN层数
+            'gcn_heads': 4,  # GCN注意力头数
+            'gcn_use_batch_norm': True,  # 是否使用批归一化
+            'gcn_activation': 'leaky_relu',  # 激活函数类型
+            'gcn_alpha': 0.2,  # LeakyReLU的alpha参数
+            'gcn_residual': True,  # 是否使用残差连接
+        }
         
         # 可视化参数配置
         self.visualization_params = {
@@ -282,97 +344,4 @@ class AnalysisConfig:
         返回：
             对应窗口大小的时间相关性图文件路径
         """
-        return os.path.join(self.temporal_correlation_dir, f'temporal_correlation_{window_size}.png')
-
-    def update_for_data_file(self, data_file):
-        """
-        根据新的数据文件更新配置
-        
-        参数:
-            data_file: 数据文件路径
-        """
-        # 更新数据文件路径
-        self.data_file = data_file
-        
-        # 从文件名中提取标识符
-        file_name = os.path.basename(data_file)
-        file_base = os.path.splitext(file_name)[0]
-        
-        # 提取Day部分作为标识符
-        import re
-        day_match = re.search(r'Day(\d+)', file_base)
-        if day_match:
-            self.data_identifier = f"Day{day_match.group(1)}"
-        else:
-            # 如果没有找到Day标识，使用文件名前8个字符
-            self.data_identifier = file_base[:8]
-        
-        # 更新相关目录和文件路径
-        self.analysis_dir = os.path.join(self.output_dir, f'analysis_{self.data_identifier}')
-        self.train_dir = os.path.join(self.output_dir, f'train_{self.data_identifier}')
-        self.log_file = os.path.join(self.analysis_dir, f'analysis_log_{self.data_identifier}.txt')
-        self.topology_dir = os.path.join(self.output_dir, f'topology_{self.data_identifier}')
-        self.topology_html = os.path.join(self.topology_dir, f'pos_topology_{self.data_identifier}.html')
-        self.topology_gif = os.path.join(self.topology_dir, f'pos_topology_{self.data_identifier}.gif')
-        
-        # 重新创建目录
-        self.setup_directories()
-        
-        # 更新GNN相关路径
-        self.setup_gnn_paths()
-        
-        print(f"配置已更新为数据集: {self.data_identifier}")
-        print(f"数据文件: {self.data_file}")
-        print(f"分析结果目录: {self.analysis_dir}")
-        
-        return self.data_identifier
-    
-    def auto_tune_parameters(self, num_neurons, num_samples):
-        """
-        根据数据特性自动调整参数
-        
-        参数:
-            num_neurons: 神经元数量
-            num_samples: 样本数量
-        """
-        if not self.auto_adapt_data:
-            return
-        
-        print(f"\n自动调整参数以适应数据集特性...")
-        print(f"神经元数量: {num_neurons}, 样本数量: {num_samples}")
-        
-        # 调整网络构建阈值
-        if self.adaptive_correlation_threshold:
-            if num_neurons < 20:
-                # 小型网络使用较低阈值以保留更多连接
-                self.analysis_params['correlation_threshold'] = 0.25
-            elif num_neurons > 100:
-                # 大型网络使用较高阈值以减少边数
-                self.analysis_params['correlation_threshold'] = 0.45
-            else:
-                # 中型网络使用默认阈值
-                self.analysis_params['correlation_threshold'] = self.default_correlation_threshold
-                
-            print(f"已调整相关性阈值为: {self.analysis_params['correlation_threshold']}")
-        
-        # 调整GNN参数
-        # 对于大型网络，减少GNN隐藏层维度和注意力头数
-        if num_neurons > 100:
-            self.analysis_params['gat_hidden_channels'] = min(64, self.analysis_params.get('gat_hidden_channels', 128))
-            self.analysis_params['gat_heads'] = min(2, self.analysis_params.get('gat_heads', 4))
-            print(f"已调整GAT隐藏层维度为: {self.analysis_params['gat_hidden_channels']}")
-            print(f"已调整GAT注意力头数为: {self.analysis_params['gat_heads']}")
-        
-        # 对于小样本，增加GAT的dropout以防止过拟合
-        if num_samples < 50:
-            self.analysis_params['gat_dropout'] = max(0.5, self.analysis_params.get('gat_dropout', 0.3))
-            print(f"已调整GAT dropout为: {self.analysis_params['gat_dropout']}")
-        
-        # 调整训练参数
-        if num_samples < 30:
-            # 小样本减少训练轮数防止过拟合
-            self.analysis_params['gnn_epochs'] = min(100, self.analysis_params.get('gnn_epochs', 200))
-            # 启用早停
-            self.analysis_params['early_stopping_enabled'] = True
-            print(f"已调整训练轮数为: {self.analysis_params['gnn_epochs']}")
-            print("已启用早停机制") 
+        return os.path.join(self.temporal_correlation_dir, f'temporal_correlation_{window_size}.png') 

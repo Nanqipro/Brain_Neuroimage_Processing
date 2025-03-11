@@ -37,140 +37,54 @@ class GNNAnalyzer:
     
     def convert_network_to_gnn_format(self, G, X_scaled, y=None):
         """
-        将NetworkX图转换为PyTorch Geometric数据格式
+        将NetworkX神经元网络转换为PyTorch Geometric格式
         
         参数:
             G: NetworkX图对象
-            X_scaled: 神经元活动数据，形状为(时间点数, 神经元数)
-            y: 可选的标签数据
-            
+            X_scaled: 标准化后的神经元活动数据
+            y: 可选的行为标签
+        
         返回:
-            data: PyTorch Geometric数据对象
+            data: PyTorch Geometric Data对象
         """
-        print("\n将神经元网络转换为GNN格式...")
+        print("将神经元网络转换为GNN数据格式...")
         
-        # 检查输入数据维度
-        print(f"输入数据形状: X_scaled={X_scaled.shape}, 图节点数={len(G.nodes())}")
+        # 创建节点ID映射（神经元名称到索引）
+        node_map = {node: i for i, node in enumerate(G.nodes())}
         
-        # 处理数据维度不匹配的情况
-        if X_scaled.shape[1] != len(G.nodes()):
-            print(f"警告: 特征维度({X_scaled.shape[1]})与图节点数({len(G.nodes())})不匹配")
-            
-            # 情况1: 特征维度大于节点数 - 截断特征
-            if X_scaled.shape[1] > len(G.nodes()):
-                print(f"特征维度大于节点数，截断特征至前{len(G.nodes())}个")
-                X_scaled = X_scaled[:, :len(G.nodes())]
-            
-            # 情况2: 特征维度小于节点数 - 填充零向量
-            else:
-                print(f"特征维度小于节点数，填充零向量")
-                padding = np.zeros((X_scaled.shape[0], len(G.nodes()) - X_scaled.shape[1]))
-                X_scaled = np.hstack((X_scaled, padding))
+        # 准备边索引和权重
+        edge_index = []
+        edge_weight = []
         
-        # 将NetworkX图转换为PyTorch Geometric数据
-        try:
-            # 获取节点索引映射
-            node_idx = {node: i for i, node in enumerate(G.nodes())}
-            
-            # 创建边索引和边属性
-            edge_index = []
-            edge_attr = []
-            
-            for u, v, data in G.edges(data=True):
-                # 添加双向边
-                edge_index.append([node_idx[u], node_idx[v]])
-                edge_index.append([node_idx[v], node_idx[u]])  # 添加反向边
-                
-                # 添加边属性
-                weight = data.get('weight', 0.5)
-                edge_attr.append([weight])
-                edge_attr.append([weight])  # 反向边相同权重
-            
-            # 如果没有边，创建自环
-            if len(edge_index) == 0:
-                print("警告: 图中没有边，为每个节点添加自环")
-                for i in range(len(G.nodes())):
-                    edge_index.append([i, i])
-                    edge_attr.append([1.0])  # 自环权重为1
-            
-            # 转换为张量
-            if len(edge_index) > 0:
-                edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
-                edge_attr = torch.tensor(edge_attr, dtype=torch.float)
-            else:
-                # 创建空边索引和属性
-                edge_index = torch.zeros((2, 0), dtype=torch.long)
-                edge_attr = torch.zeros((0, 1), dtype=torch.float)
-            
-            # 添加节点特征
-            node_features = torch.tensor(X_scaled.T, dtype=torch.float)
-            
-            # 创建数据对象
-            data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr)
-            
-            # 验证边索引和边属性的大小是否匹配
-            if edge_index.shape[1] != edge_attr.shape[0]:
-                print(f"警告: 边索引({edge_index.shape[1]})和边属性({edge_attr.shape[0]})大小不匹配！")
-                print("修正边属性大小使其与边索引匹配...")
-                # 如果不匹配，将边属性扩展到与边索引相同的大小
-                new_edge_attr = torch.ones((edge_index.shape[1], 1), dtype=torch.float)
-                if edge_attr.shape[0] > 0:
-                    # 复制现有属性直到填满
-                    for i in range(edge_index.shape[1]):
-                        new_edge_attr[i] = edge_attr[i % edge_attr.shape[0]]
-                data.edge_attr = new_edge_attr
-                print(f"边属性已调整，大小现在为: {data.edge_attr.shape}")
-            
-        except Exception as e:
-            print(f"创建GNN数据出错: {str(e)}，尝试备用方法")
-            
-            # 备用方法: 使用from_networkx但处理边属性
-            try:
-                data = from_networkx(G)
-                
-                # 添加节点特征
-                node_features = torch.tensor(X_scaled.T, dtype=torch.float)
-                data.x = node_features
-                
-                # 确保边属性与边索引匹配
-                if hasattr(data, 'edge_index'):
-                    data.weight = torch.ones(data.edge_index.shape[1], dtype=torch.float)
-                    data.edge_attr = data.weight.view(-1, 1)
-            except Exception as e2:
-                print(f"备用方法也失败: {str(e2)}，创建默认数据对象")
-                
-                # 创建默认数据对象
-                num_nodes = len(G.nodes())
-                node_features = torch.tensor(X_scaled.T, dtype=torch.float)
-                
-                # 创建自环边
-                edge_index = torch.zeros((2, num_nodes), dtype=torch.long)
-                for i in range(num_nodes):
-                    edge_index[0, i] = i
-                    edge_index[1, i] = i
-                    
-                edge_attr = torch.ones((num_nodes, 1), dtype=torch.float)
-                
-                data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr)
+        # 提取边的信息
+        for u, v, attr in G.edges(data=True):
+            edge_index.append([node_map[u], node_map[v]])
+            edge_index.append([node_map[v], node_map[u]])  # 添加双向边
+            # 使用相关性作为边权重
+            edge_weight.append(attr['weight'])
+            edge_weight.append(attr['weight'])
         
-        # 添加标签（如果提供）
+        # 转换为PyTorch张量
+        edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        edge_weight = torch.tensor(edge_weight, dtype=torch.float)
+        
+        # 节点特征矩阵 - 使用神经元活动序列
+        # 确保神经元顺序与图中节点顺序一致
+        n_neurons = len(G.nodes())
+        if X_scaled.shape[1] == n_neurons:
+            # 如果特征维度与节点数匹配，假设它们按顺序对应
+            x = torch.tensor(X_scaled, dtype=torch.float)
+        else:
+            # 否则使用节点度作为特征（作为备选方案）
+            print(f"警告：特征维度 ({X_scaled.shape[1]}) 与节点数 ({n_neurons}) 不匹配，使用节点度作为特征")
+            node_degrees = np.array([d for _, d in G.degree()])
+            x = torch.tensor(node_degrees.reshape(-1, 1), dtype=torch.float)
+        
+        # 创建PyTorch Geometric数据对象
+        data = Data(x=x, edge_index=edge_index, edge_attr=edge_weight)
+        
+        # 如果提供了标签，添加到数据对象
         if y is not None:
-            # 确保y的长度与数据点数量匹配
-            if len(y) != X_scaled.shape[0]:
-                print(f"警告: 标签长度({len(y)})与数据点数({X_scaled.shape[0]})不匹配")
-                
-                # 如果标签太多，截断
-                if len(y) > X_scaled.shape[0]:
-                    print(f"标签太多，截断至前{X_scaled.shape[0]}个")
-                    y = y[:X_scaled.shape[0]]
-                
-                # 如果标签太少，填充最后一个标签
-                else:
-                    print(f"标签太少，填充至{X_scaled.shape[0]}个")
-                    last_label = y[-1]
-                    padding = np.array([last_label] * (X_scaled.shape[0] - len(y)))
-                    y = np.concatenate([y, padding])
-            
             data.y = torch.tensor(y, dtype=torch.long)
         
         print(f"GNN数据转换完成: {data}")
@@ -903,186 +817,159 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         epochs: 训练轮数
         lr: 学习率
         weight_decay: 权重衰减
-        device: 训练设备
+        device: 设备(cuda/cpu)
         patience: 早停耐心值
-        early_stopping_enabled: 是否启用早停
-        
+        early_stopping_enabled: 是否启用早停机制，默认为False
+    
     返回:
-        model: 训练后的模型
-        losses: 损失记录
-        accuracies: 准确率记录
+        model: 训练好的模型
+        losses: 损失历史
+        metrics: 其他指标历史（如准确率）
     """
-    # 数据维度检查和修复
-    print(f"GNN数据对象: {data}")
-    
-    # 特殊情况处理：检查节点特征维度是否与样本数不匹配
-    node_features_transpose = False
-    if hasattr(data, 'y') and data.y is not None:
-        if len(data.y) != data.x.size(0):
-            print(f"警告: 标签数量({len(data.y)})与节点数量({data.x.size(0)})不匹配")
-            if len(data.y) == data.x.size(1):
-                print("节点特征形状为[节点数, 样本数]，将特征矩阵转置")
-                # 转置特征矩阵使维度匹配
-                data.x = data.x.t()
-                node_features_transpose = True
-            else:
-                print("无法自动修复维度不匹配问题，请检查数据格式")
-                print(f"特征形状: {data.x.shape}, 标签形状: {data.y.shape}")
-    
-    # 移动模型到指定设备
-    model = model.to(device)
+    # 将数据移至设备
     data = data.to(device)
+    model = model.to(device)
     
-    # 优化器设置
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+    # 准备优化器 - 使用带动量的SGD或AdamW
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, betas=(0.9, 0.999))
     
-    # 使用标签平滑交叉熵损失
+    # 使用余弦退火学习率调度器，更适合避免局部最小值
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=20, T_mult=2, eta_min=1e-6
+    )
+    
+    # 使用标签平滑交叉熵损失，提高泛化能力
     criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
     
-    # 记录训练过程
+    # 创建训练/验证索引 - 使用分层采样确保类别平衡
+    indices = list(range(data.x.size(0)))
+    if hasattr(data, 'y'):
+        stratify = data.y.cpu().numpy() if data.y is not None else None
+        train_indices, val_indices = train_test_split(
+            indices, test_size=0.2, random_state=42, stratify=stratify
+        )
+    else:
+        train_indices, val_indices = train_test_split(indices, test_size=0.2, random_state=42)
+    
+    # 记录损失和准确率
     losses = {'train': [], 'val': []}
     accuracies = {'train': [], 'val': []}
     
-    # 划分训练集和验证集
-    try:
-        # 如果特征矩阵已转置（[样本数, 节点数]），则按样本划分
-        if node_features_transpose:
-            num_samples = data.x.size(0)
-            indices = list(range(num_samples))
-            
-            # 如果数据包含标签且在GPU上，需要将其移至CPU进行stratify
-            y_cpu = None
-            if data.y is not None:
-                y_cpu = data.y.cpu().numpy() if data.y.is_cuda else data.y.numpy()
-            
-            train_indices, val_indices = train_test_split(
-                indices, test_size=0.2, random_state=42, stratify=y_cpu
-            )
-            
-            # 创建训练集和验证集的掩码
-            train_mask = torch.zeros(num_samples, dtype=torch.bool, device=device)
-            val_mask = torch.zeros(num_samples, dtype=torch.bool, device=device)
-            
-            train_mask[train_indices] = True
-            val_mask[val_indices] = True
-            
-        # 常规情况，按节点划分
-        else:
-            num_nodes = data.x.size(0)
-            indices = list(range(num_nodes))
-            
-            # 如果数据包含标签且在GPU上，需要将其移至CPU进行stratify
-            y_cpu = None
-            if data.y is not None:
-                y_cpu = data.y.cpu().numpy() if data.y.is_cuda else data.y.numpy()
-            
-            train_indices, val_indices = train_test_split(
-                indices, test_size=0.2, random_state=42, stratify=y_cpu
-            )
-            
-            # 创建训练集和验证集的掩码
-            train_mask = torch.zeros(num_nodes, dtype=torch.bool, device=device)
-            val_mask = torch.zeros(num_nodes, dtype=torch.bool, device=device)
-            
-            train_mask[train_indices] = True
-            val_mask[val_indices] = True
-    except Exception as e:
-        print(f"训练集验证集划分失败，使用默认划分: {str(e)}")
-        # 简单的百分比拆分
-        num_samples = data.x.size(0)
-        train_size = int(0.8 * num_samples)
-        
-        train_mask = torch.zeros(num_samples, dtype=torch.bool)
-        val_mask = torch.zeros(num_samples, dtype=torch.bool)
-        
-        train_mask[:train_size] = True
-        val_mask[train_size:] = True
-    
-    # 将掩码移动到设备
-    train_mask = train_mask.to(device)
-    val_mask = val_mask.to(device)
-    
-    # 添加掩码到数据对象
-    data.train_mask = train_mask
-    data.val_mask = val_mask
-    
-    # 初始化最佳验证损失和早停计数器
+    # 早停设置
     best_val_loss = float('inf')
-    early_stopping_counter = 0
+    best_model_state = None
+    no_improve_count = 0
     
-    # 保存最佳模型
-    best_model = None
-    
-    # 训练循环
     for epoch in range(1, epochs + 1):
-        # 训练阶段
+        # 训练模式
         model.train()
+        train_loss = 0.0
+        train_correct = 0
+        train_total = 0
+        
+        # 创建训练掩码
+        train_mask = torch.zeros(data.x.size(0), dtype=torch.bool, device=device)
+        train_mask[train_indices] = True
+        
+        # 前向传播和优化
         optimizer.zero_grad()
         out = model(data)
         
-        # 获取训练集预测和标签
-        if node_features_transpose:
-            # 如果特征被转置，目标是预测样本标签
+        if hasattr(data, 'y') and data.y is not None:
+            # 分类任务
             loss = criterion(out[train_mask], data.y[train_mask])
+            loss.backward()
+            
+            # 梯度裁剪，避免梯度爆炸
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+            
+            train_loss += loss.item()
+            
+            # 计算训练准确率
+            _, predicted = torch.max(out[train_mask], 1)
+            train_total += data.y[train_mask].size(0)
+            train_correct += (predicted == data.y[train_mask]).sum().item()
         else:
-            # 常规情况，目标是预测节点标签
-            loss = criterion(out[train_mask], data.y[train_mask])
+            # 如果不是分类任务，自定义损失函数
+            loss = custom_gnn_loss(out[train_mask], data)
+            loss.backward()
+            
+            # 梯度裁剪
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+            train_loss += loss.item()
         
-        loss.backward()
-        optimizer.step()
-        
-        # 评估阶段
+        # 验证模式
         model.eval()
+        val_loss = 0.0
+        val_correct = 0
+        val_total = 0
+        
+        # 创建验证掩码
+        val_mask = torch.zeros(data.x.size(0), dtype=torch.bool, device=device)
+        val_mask[val_indices] = True
+        
         with torch.no_grad():
             out = model(data)
             
-            # 计算验证损失
-            val_loss = criterion(out[val_mask], data.y[val_mask])
-            
-            # 计算训练和验证准确率
-            _, train_pred = out[train_mask].max(dim=1)
-            train_correct = train_pred.eq(data.y[train_mask]).sum().item()
-            train_acc = train_correct / train_mask.sum().item()
-            
-            _, val_pred = out[val_mask].max(dim=1)
-            val_correct = val_pred.eq(data.y[val_mask]).sum().item()
-            val_acc = val_correct / val_mask.sum().item()
+            if hasattr(data, 'y') and data.y is not None:
+                # 分类任务验证
+                val_loss_value = criterion(out[val_mask], data.y[val_mask]).item()
+                val_loss += val_loss_value
+                
+                # 计算验证准确率
+                _, predicted = torch.max(out[val_mask], 1)
+                val_total += data.y[val_mask].size(0)
+                val_correct += (predicted == data.y[val_mask]).sum().item()
+            else:
+                # 非分类任务验证
+                val_loss_value = custom_gnn_loss(out[val_mask], data).item()
+                val_loss += val_loss_value
         
-        # 更新学习率
-        current_lr = scheduler.get_last_lr()[0]
-        scheduler.step()
+        # 计算平均损失和准确率
+        train_loss /= len(train_indices)
+        val_loss /= len(val_indices)
+        
+        train_acc = train_correct / train_total if train_total > 0 else 0
+        val_acc = val_correct / val_total if val_total > 0 else 0
         
         # 记录损失和准确率
-        losses['train'].append(loss.item())
-        losses['val'].append(val_loss.item())
+        losses['train'].append(train_loss)
+        losses['val'].append(val_loss)
         accuracies['train'].append(train_acc)
         accuracies['val'].append(val_acc)
         
-        # 每10个epochs打印一次进度
-        if epoch % 10 == 0 or epoch == 1 or epoch == epochs:
-            print(f"Epoch {epoch}/{epochs}, "
-                  f"Train Loss: {loss.item():.4f}, "
-                  f"Val Loss: {val_loss.item():.4f}, "
-                  f"Val Acc: {val_acc:.4f}, "
-                  f"LR: {current_lr:.6f}")
+        # 更新学习率
+        current_lr = optimizer.param_groups[0]['lr']
+        scheduler.step()
+        
+        # 打印训练信息
+        if epoch % 10 == 0 or epoch == 1:
+            print(f"Epoch {epoch}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, LR: {current_lr:.6f}")
         
         # 早停检查
         if early_stopping_enabled:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                early_stopping_counter = 0
-                # 保存最佳模型
-                best_model = copy.deepcopy(model)
+                best_model_state = copy.deepcopy(model.state_dict())
+                no_improve_count = 0
             else:
-                early_stopping_counter += 1
-                if early_stopping_counter >= patience:
-                    print(f"早停激活: {patience}个epoch没有提升")
-                    break
+                no_improve_count += 1
+                
+            if no_improve_count >= patience:
+                print(f"早停激活于第 {epoch} 轮，最佳验证损失: {best_val_loss:.4f}")
+                if best_model_state is not None:
+                    model.load_state_dict(best_model_state)
+                break
     
-    # 如果启用了早停并且找到了最佳模型，返回最佳模型
-    if early_stopping_enabled and best_model is not None:
-        return best_model, losses, accuracies
+    # 如果已经完成所有轮次，检查是否应该恢复最佳模型
+    if early_stopping_enabled and best_model_state is not None and epoch == epochs:
+        if val_loss > best_val_loss:
+            model.load_state_dict(best_model_state)
+            print(f"训练完成所有 {epochs} 轮次，已恢复最佳模型 (验证损失: {best_val_loss:.4f})")
     
     return model, losses, accuracies
 
