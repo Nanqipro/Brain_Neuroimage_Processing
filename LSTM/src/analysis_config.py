@@ -15,38 +15,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-<<<<<<< HEAD
         self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
         self.data_identifier = 'Day6'  # 从数据文件名提取标识符
-        
-        # 分析参数配置
-        self.analysis_params = {
-            'correlation_threshold': 0.35,  # 相关性阈值
-            'min_samples_per_behavior': 10,  # 每种行为的最小样本数
-            'temporal_window_sizes': [10, 20, 50, 100],  # 时间窗口大小列表
-            'hmm_max_states': 5,  # HMM最大状态数
-            'pca_components': 10,  # PCA降维组件数
-            'key_neurons_per_behavior': 5,  # 每种行为的关键神经元数量
-            
-            # GNN相关参数
-            'gat_hidden_channels': 128,  # GAT隐藏层维度
-            'gat_heads': 4,  # GAT注意力头数
-            'gat_dropout': 0.3,  # GAT dropout率
-            'gat_residual': True,  # 是否使用残差连接
-            'gat_num_layers': 3,  # GAT层数
-            'gat_alpha': 0.2,  # LeakyReLU斜率
-            'gnn_epochs': 200,  # 训练轮数
-            'gnn_learning_rate': 0.008,  # 学习率
-            'gnn_weight_decay': 1e-3,  # 权重衰减
-            'gnn_early_stop_patience': 20,  # 早停耐心值
-            'early_stopping_enabled': False,  # 是否启用早停
-            'temporal_window_size': 10,  # 时间序列GNN窗口大小
-            'temporal_stride': 5,  # 时间序列GNN步长
-        }
-=======
-        self.data_file = os.path.join(self.data_dir, 'Day9_with_behavior_labels_filled.xlsx')  # 原始数据文件
-        self.data_identifier = 'Day9'  # 从数据文件名提取标识符
->>>>>>> parent of 01e6d8f (20250311)
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -98,18 +68,17 @@ class AnalysisConfig:
         self.error_log = os.path.join(self.train_dir, f'error_log_{self.data_identifier}.txt')  # 错误日志文件
         
         # 分析结果文件路径配置
-        self.temporal_pattern_dir = os.path.join(self.analysis_dir, f'temporal_patterns_{self.data_identifier}')  # 时间模式分析目录
         self.correlation_plot = os.path.join(self.analysis_dir, f'behavior_neuron_correlation_{self.data_identifier}.png')  # 行为-神经元相关性图
         self.transition_plot = os.path.join(self.analysis_dir, f'behavior_transitions_{self.data_identifier}.png')  # 行为转换概率图
         self.key_neurons_plot = os.path.join(self.analysis_dir, f'key_neurons_{self.data_identifier}.png')  # 关键神经元分析图
+        self.temporal_pattern_dir = os.path.join(self.analysis_dir, f'temporal_patterns_{self.data_identifier}')  # 时间模式分析目录
         self.network_plot = os.path.join(self.analysis_dir, f'behavior_neuron_network_{self.data_identifier}.png')  # 行为-神经元网络图
         
         # 结果数据文件路径配置
-        self.temporal_correlation_dir = os.path.join(self.analysis_dir, f'temporal_correlations_{self.data_identifier}')  # 时间相关性分析目录
         self.behavior_importance_csv = os.path.join(self.analysis_dir, f'behavior_importance_{self.data_identifier}.csv')  # 行为重要性数据
         self.neuron_specificity_json = os.path.join(self.analysis_dir, f'neuron_specificity_{self.data_identifier}.json')  # 神经元特异性数据
         self.statistical_results_csv = os.path.join(self.analysis_dir, f'statistical_analysis_{self.data_identifier}.csv')  # 统计分析结果
-
+        self.temporal_correlation_dir = os.path.join(self.analysis_dir, f'temporal_correlations_{self.data_identifier}')  # 时间相关性分析目录
         
         # 神经网络分析和效应大小数据文件
         self.network_analysis_file = os.path.join(self.analysis_dir, f'network_analysis_results.json')  # 网络分析结果
@@ -125,13 +94,6 @@ class AnalysisConfig:
         self.n_clusters = 5           # 聚类数量：K-means聚类的类别数
         self.test_size = 0.2          # 测试集比例：数据集中测试集的占比
         self.random_seed = 42         # 随机种子：确保结果可重复性
-        self.weight_decay = 1e-4      # 权重衰减：优化器的权重衰减参数
-        self.early_stopping = False    # 早停：是否启用早停机制
-        
-        # 神经网络高级参数 - 新添加
-        self.latent_dim = 32          # 潜在维度：自编码器的潜在特征维度
-        self.num_heads = 4            # 注意力头数：多头注意力机制的头数量
-        self.dropout = 0.2            # Dropout率：防止过拟合的神经元随机失活比例
         
         # 分析参数配置
         self.analysis_params = {

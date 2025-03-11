@@ -275,43 +275,9 @@ class ResultAnalyzer:
                 X_scaled, y, self.behavior_labels, min_samples
             )
         
-<<<<<<< HEAD
-        # 为了兼容旧版代码，仍然加载模型，但不返回它
-        try:
-            # 初始化模型（但我们不需要它进行分析）
-        input_size = X_scaled.shape[1] + 1  # +1 for cluster label
-        num_classes = len(np.unique(y))
-        
-        model = EnhancedNeuronLSTM(
-            input_size=input_size,
-            hidden_size=self.config.hidden_size,
-            num_layers=self.config.num_layers,
-            num_classes=num_classes,
-            latent_dim=self.config.analysis_params.get('latent_dim', 32),
-            num_heads=self.config.analysis_params.get('num_heads', 4),
-            dropout=self.config.analysis_params.get('dropout', 0.2)
-        ).to(self.device)
-        
-            # 尝试加载模型权重（仅用于保持完整性）
-        try:
-            checkpoint = torch.load(self.config.model_path, weights_only=True)
-            model.load_state_dict(checkpoint['model_state_dict'])
-                print("成功加载模型权重")
-        except Exception as e1:
-            try:
-                print("尝试使用 weights_only=False 加载模型...")
-                checkpoint = torch.load(self.config.model_path, weights_only=False)
-                model.load_state_dict(checkpoint['model_state_dict'])
-                    print("成功加载模型权重")
-            except Exception as e2:
-                    print(f"注意: 无法加载模型，但这不影响分析过程: {str(e1)}")
-        except Exception as e:
-            print(f"注意: 模型加载过程出错，但这不影响分析过程: {str(e)}")
-=======
         # 加载训练好的模型
         input_size = X_scaled.shape[1] + 1  # +1 for cluster label
         num_classes = len(np.unique(y))
->>>>>>> parent of 01e6d8f (20250311)
         
         model = EnhancedNeuronLSTM(
             input_size=input_size,
@@ -783,45 +749,9 @@ class ResultAnalyzer:
             higher_threshold = kwargs.get('threshold', 0.35)  # 默认提高到0.4
             print(f"使用更高的相关性阈值: {higher_threshold}")
             
-<<<<<<< HEAD
-            # 创建新图
-        main_G = nx.Graph()
-            main_G.add_nodes_from(G.nodes())
-            
-            # 添加超过阈值的边
-            for u, v, data in G.edges(data=True):
-                if abs(data['weight']) >= threshold:
-                    main_G.add_edge(u, v, **data)
-            
-            info = {
-                'method': 'threshold', 
-                'threshold': threshold,
-                'original_edges': G.number_of_edges(),
-                'filtered_edges': main_G.number_of_edges(),
-                'retention_rate': main_G.number_of_edges() / G.number_of_edges() if G.number_of_edges() > 0 else 0
-            }
-            
-            print(f"主要连接线路提取完成: {len(main_G.nodes())} 个节点, {len(main_G.edges())} 条边")
-                    
-        elif method == 'top_edges':
-            # 为每个神经元保留k个最强连接
-            k = kwargs.get('k', 5)
-            print(f"为每个节点保留{k}个最强连接")
-            
-            # 创建新图
-            main_G = nx.Graph()
-            main_G.add_nodes_from(G.nodes())
-            
-            # 为每个节点找出top-k边
-            for node in G.nodes():
-                edges = list(G.edges(node, data=True))
-                if not edges:
-                    continue
-=======
             for u, v, data in G.edges(data=True):
                 if data['weight'] >= higher_threshold:
                     main_G.add_edge(u, v, weight=data['weight'])
->>>>>>> parent of 01e6d8f (20250311)
                     
         elif method == 'top_edges':
             # 为每个节点只保留top_k个最强连接
@@ -838,36 +768,16 @@ class ResultAnalyzer:
                     # 只保留前top_k个
                     for u, v, weight in edges[:top_k]:
                         if not main_G.has_edge(u, v):  # 避免重复添加
-<<<<<<< HEAD
-                            main_G.add_edge(u, v, **data)
-            
-            info = {
-                'method': 'top_edges', 
-                'k': k,
-                'original_edges': G.number_of_edges(),
-                'filtered_edges': main_G.number_of_edges(),
-                'retention_rate': main_G.number_of_edges() / G.number_of_edges() if G.number_of_edges() > 0 else 0
-            }
-            
-            print(f"主要连接线路提取完成: {len(main_G.nodes())} 个节点, {len(main_G.edges())} 条边")
-=======
                             main_G.add_edge(u, v, weight=weight)
->>>>>>> parent of 01e6d8f (20250311)
                             
         elif method == 'mst':
             # 使用最小生成树提取骨架网络
             print("使用最小生成树算法提取网络骨架")
             
-<<<<<<< HEAD
-            # 创建正权图（因为MST算法是找最小权重）
-            positive_G = nx.Graph()
-            positive_G.add_nodes_from(G.nodes())
-=======
             # 创建边权重为距离（1-相关性）的图用于最小生成树
             mst_graph = nx.Graph()
             for node in G.nodes():
                 mst_graph.add_node(node)
->>>>>>> parent of 01e6d8f (20250311)
                 
             for u, v, data in G.edges(data=True):
                 # 将权重转换为距离（权重越大距离越小）
@@ -882,26 +792,6 @@ class ResultAnalyzer:
                 orig_weight = G[u][v]['weight'] if G.has_edge(u, v) else 0
                 main_G.add_edge(u, v, weight=orig_weight)
                 
-<<<<<<< HEAD
-            info = {
-                'method': 'mst',
-                'original_edges': G.number_of_edges(),
-                'filtered_edges': main_G.number_of_edges(),
-                'retention_rate': main_G.number_of_edges() / G.number_of_edges() if G.number_of_edges() > 0 else 0
-            }
-            
-            print(f"主要连接线路提取完成: {len(main_G.nodes())} 个节点, {len(main_G.edges())} 条边")
-            
-        else:
-            raise ValueError(f"未知的提取方法: {method}")
-            
-        # 导出为JSON文件
-        output_file = os.path.join(self.config.analysis_dir, f'neuron_network_main_{method}.json')
-        self.export_network_to_json(main_G, output_file)
-        print(f"{method}方法的主要连接线路已导出到: {output_file}")
-        
-        return main_G, info
-=======
         elif method == 'backbone':
             # 使用显著性过滤提取骨架网络
             alpha = kwargs.get('alpha', 0.05)  # 默认显著性水平0.05
@@ -938,7 +828,6 @@ class ResultAnalyzer:
             
         print(f"主要连接线路提取完成: {len(main_G.nodes())} 个节点, {len(main_G.edges())} 条边")
         return main_G
->>>>>>> parent of 01e6d8f (20250311)
         
     def export_network_to_json(self, G, output_path, include_attributes=True):
         """
@@ -1200,39 +1089,10 @@ class ResultAnalyzer:
                    dpi=300, bbox_inches='tight')
         plt.close()
         
-<<<<<<< HEAD
-        # 3. 社区结构可视化
-        plt.figure(figsize=(10, 8))
-        if 'communities' in metrics:
-            community_sizes = {}
-            for node, community_id in metrics['communities'].items():
-                if community_id not in community_sizes:
-                    community_sizes[community_id] = 0
-                community_sizes[community_id] += 1
-            
-            communities = sorted(community_sizes.items(), key=lambda x: x[1], reverse=True)
-            sizes = [size for _, size in communities]
-            labels = [f"Community {comm_id+1}" for comm_id, _ in communities]
-            
-            plt.bar(labels, sizes)
-            plt.title('Community Size Distribution', fontsize=14)
-            plt.xlabel('Community', fontsize=12)
-            plt.ylabel('Number of Neurons', fontsize=12)
-            plt.xticks(rotation=45)
-        plt.tight_layout()
-            plt.savefig(os.path.join(self.config.analysis_dir, 'community_distribution.png'),
-                   dpi=300, bbox_inches='tight')
-        plt.close()
-
-    def create_interactive_visualization(self, G, correlation_matrix, available_neurons):
-        """
-        创建交互式神经元网络可视化
-=======
         # 3. 模块分析结果可视化
         plt.figure(figsize=(10, 6))
         module_sizes = [m['size'] for m in modules.values()]
         module_densities = [m['internal_density'] for m in modules.values()]
->>>>>>> parent of 01e6d8f (20250311)
         
         plt.bar(range(len(modules)), module_densities)
         plt.title('Module Internal Density')
@@ -1951,89 +1811,7 @@ class ResultAnalyzer:
             # 创建GAT模型
             # 先使用社区检测算法获取社区作为标签
             try:
-<<<<<<< HEAD
-                # 添加数据验证和兼容性检查
-                print(f"GNN数据转换完成: {data}")
-                print(f"X_normalized形状: {X_normalized.shape}")
-                print(f"可用神经元数量: {len(available_neurons)}")
-                
-                # 检查数据维度是否匹配
-                if data.x.shape[0] != len(G.nodes()):
-                    print(f"警告: 数据维度不匹配 - 数据点数量({data.x.shape[0]})与图节点数量({len(G.nodes())})不一致")
-                    print("正在调整数据以适应社区检测...")
-                    
-                    # 方法1: 如果数据点多于节点，取平均值
-                    if data.x.shape[0] > len(G.nodes()):
-                        print("数据点多于节点，计算每个神经元的平均活动")
-                        # 重新组织数据，按神经元聚合
-                        X_reshaped = X_normalized.reshape(-1, len(available_neurons))
-                        X_avg = np.mean(X_reshaped, axis=0)
-                        # 更新相关性矩阵
-                        correlation_matrix = np.corrcoef(X_avg)
-                    
-                    # 方法2: 如果节点多于数据点，使用可用的数据点
-                    else:
-                        print("节点多于数据点，使用可用数据点进行社区检测")
-                        # 保持原有相关性矩阵
-                
-                # 确保相关性矩阵是方阵且维度与节点数量匹配
-                if correlation_matrix.shape[0] != len(G.nodes()) or correlation_matrix.shape[1] != len(G.nodes()):
-                    print(f"警告: 相关性矩阵维度({correlation_matrix.shape})与图节点数量({len(G.nodes())})不匹配")
-                    print("重新计算相关性矩阵...")
-                    
-                    # 重新计算相关性矩阵
-                    if len(available_neurons) == len(G.nodes()):
-                        # 提取神经元活动数据
-                        neuron_activities = []
-                        for i, neuron in enumerate(available_neurons):
-                            if i < X_normalized.shape[1]:
-                                neuron_activities.append(X_normalized[:, i])
-                            else:
-                                # 如果神经元索引超出范围，使用零向量
-                                neuron_activities.append(np.zeros(X_normalized.shape[0]))
-                        
-                        # 计算新的相关性矩阵
-                        correlation_matrix = np.corrcoef(np.array(neuron_activities))
-                
-                # 确保相关性矩阵是有效的
-                if np.isnan(correlation_matrix).any():
-                    print("警告: 相关性矩阵包含NaN值，将其替换为0")
-                    correlation_matrix = np.nan_to_num(correlation_matrix)
-                
-                # 使用更健壮的社区检测方法
-                try:
-                    import community as community_louvain
                 communities = community_louvain.best_partition(G)
-                except Exception as louvain_error:
-                    print(f"Louvain社区检测失败: {str(louvain_error)}，尝试使用备选方法...")
-                    
-                    # 备选方法1: 使用连通分量作为社区
-                    connected_components = list(nx.connected_components(G))
-                    communities = {}
-                    for i, component in enumerate(connected_components):
-                        for node in component:
-                            communities[node] = i
-                    
-                    # 如果连通分量太少，使用度中心性聚类
-                    if len(connected_components) <= 1:
-                        print("图是完全连通的，使用度中心性进行社区划分...")
-                        degree_dict = dict(G.degree())
-                        sorted_nodes = sorted(degree_dict.items(), key=lambda x: x[1], reverse=True)
-                        
-                        # 将节点分为高度、中度和低度三组
-                        n_nodes = len(sorted_nodes)
-                        communities = {}
-                        for i, (node, _) in enumerate(sorted_nodes):
-                            if i < n_nodes // 3:
-                                communities[node] = 0  # 高度中心性
-                            elif i < 2 * (n_nodes // 3):
-                                communities[node] = 1  # 中度中心性
-                            else:
-                                communities[node] = 2  # 低度中心性
-                
-=======
-                communities = community_louvain.best_partition(G)
->>>>>>> parent of 01e6d8f (20250311)
                 community_labels = np.array([communities[node] for node in G.nodes()])
                 num_communities = len(set(communities.values()))
                 
@@ -2299,81 +2077,18 @@ def set_all_random_seeds(seed=42):
     print(f"已设置所有随机种子为: {seed}")
 
 def main():
-<<<<<<< HEAD
-    """
-    主函数：执行神经元网络行为分析流程
-    """
-    import argparse
-    import sys
-    import os
-    
-    # 解析命令行参数
-    parser = argparse.ArgumentParser(description='神经元网络行为分析工具')
-    parser.add_argument('--data', type=str, help='数据文件路径')
-    parser.add_argument('--no-auto-adapt', action='store_true', help='禁用自动参数调整')
-    parser.add_argument('--correlation-threshold', type=float, help='神经元网络相关性阈值')
-    parser.add_argument('--skip-gnn', action='store_true', help='跳过GNN分析')
-    args = parser.parse_args()
-    
-    # 创建配置对象
-        config = AnalysisConfig()
-        
-    # 如果指定了数据文件，更新配置
-    if args.data:
-        if not os.path.exists(args.data):
-            print(f"错误: 指定的数据文件不存在: {args.data}")
-            sys.exit(1)
-        config.update_for_data_file(args.data)
-    
-    # 禁用自动适应功能
-    if args.no_auto_adapt:
-        config.auto_adapt_data = False
-        print("已禁用自动参数调整功能")
-    
-    # 如果指定了相关性阈值，更新配置
-    if args.correlation_threshold is not None:
-        if not hasattr(config, 'analysis_params'):
-            config.analysis_params = {}
-        config.analysis_params['correlation_threshold'] = args.correlation_threshold
-        print(f"已设置相关性阈值为: {args.correlation_threshold}")
-    
-    # 创建分析器对象
-    analyzer = ResultAnalyzer(config)
-    
-    # 设置日志文件
-    log_file = open(config.log_file, 'w')
-    original_stdout = sys.stdout
-    
-=======
     """主函数，运行神经元活动数据分析流程"""
->>>>>>> parent of 01e6d8f (20250311)
     try:
         # 首先设置所有随机种子确保结果可重现
         set_all_random_seeds(42)
         
-<<<<<<< HEAD
-            # 检查GNN依赖项
-        status, missing = check_gnn_dependencies()
-        print(f"\n检查GNN依赖项...")
-        if status:
-                print("GNN依赖项检查通过，将启用GNN分析功能")
-            USE_GNN = not args.skip_gnn
-                else:
-            print(f"GNN依赖项检查失败，将禁用GNN分析功能")
-            print(f"缺失的依赖项: {', '.join(missing)}")
-            USE_GNN = False
-=======
         # 加载配置
         config = AnalysisConfig()
->>>>>>> parent of 01e6d8f (20250311)
         
         # Setup and validate directories
         config.setup_directories()
         config.validate_paths()
         
-<<<<<<< HEAD
-        print(f"使用GNN: {'启用' if USE_GNN else '禁用'}")
-=======
         # 创建StringIO对象以捕获所有输出
         output_buffer = io.StringIO()
         
@@ -2398,18 +2113,11 @@ def main():
 pip install torch-geometric torch-scatter torch-sparse
 详情请参考: https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html
 """)
->>>>>>> parent of 01e6d8f (20250311)
             
             # 记录分析开始时间
             start_time = datetime.now()
             print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"数据标识符: {config.data_identifier}")
-<<<<<<< HEAD
-        print("="*50)
-            
-            # 加载模型和数据
-        X, y, behavior_labels = analyzer.load_model_and_data()
-=======
             print("=" * 50)
             
             # Initialize analyzer
@@ -2630,123 +2338,10 @@ pip install torch-geometric torch-scatter torch-sparse
         
         # 将捕获的输出保存到日志文件
         log_content = output_buffer.getvalue()
->>>>>>> parent of 01e6d8f (20250311)
         
         # 同时打印到控制台
         print(log_content)
         
-<<<<<<< HEAD
-        # 行为神经元相关性分析
-        analyzer.analyze_behavior_neuron_correlation(X, y)
-        
-        # 时间模式分析
-        analyzer.analyze_temporal_patterns(X, y)
-        
-        # 时间相关性分析
-        analyzer.analyze_temporal_correlations(X, y)
-        
-        # 行为转换分析
-        analyzer.analyze_behavior_transitions(y)
-        
-        # 识别关键神经元
-        analyzer.identify_key_neurons(X, y)
-            
-            print("\n开始神经元网络拓扑分析...")
-        
-        # 构建神经元网络
-        print("\n构建神经元功能连接网络...")
-        correlation_threshold = config.analysis_params.get('correlation_threshold', 0.35)
-        G, correlation_matrix, available_neurons = analyzer.build_neuron_network(X, threshold=correlation_threshold)
-        print(f"网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
-        
-        # 提取主要连接
-        main_connections = {}
-        
-        # 使用threshold方法
-        print("\n使用threshold方法提取主要连接线路...")
-        G_threshold, threshold_output = analyzer.extract_main_connections(G, correlation_matrix, available_neurons, method='threshold', threshold=correlation_threshold)
-        main_connections['threshold'] = threshold_output
-        
-        # 使用top_edges方法
-        print("\n使用top_edges方法提取主要连接线路...")
-        G_top_edges, top_edges_output = analyzer.extract_main_connections(G, correlation_matrix, available_neurons, method='top_edges', k=8)
-        main_connections['top_edges'] = top_edges_output
-        
-        # 使用mst方法
-        print("\n使用mst方法提取主要连接线路...")
-        G_mst, mst_output = analyzer.extract_main_connections(G, correlation_matrix, available_neurons, method='mst')
-        main_connections['mst'] = mst_output
-        
-        # 网络拓扑分析
-        network_metrics = analyzer.analyze_network_topology(G)
-        
-        # 功能模块识别
-        print("\n识别功能模块...")
-        modules = analyzer.identify_functional_modules(G, correlation_matrix, available_neurons)
-        
-        # 可视化网络拓扑
-        print("\n可视化网络拓扑分析结果...")
-        analyzer.visualize_network_topology(G, network_metrics, modules)
-        
-        # 创建交互式可视化
-        print("\n创建交互式神经元网络可视化...")
-        analyzer.create_interactive_visualization(G, correlation_matrix, available_neurons)
-        
-        # 为主要连接创建交互式可视化
-        for method in ['threshold', 'top_edges', 'mst']:
-            analyzer.create_method_visualization(G, correlation_matrix, available_neurons, method)
-        
-        # 开始行为状态转换分析
-            print("\n开始行为状态转换分析...")
-            
-        # 行为状态转换分析
-        print("\n分析行为状态转换...")
-        hmm_results = analyzer.analyze_behavior_state_transitions(X, y)
-        
-        # 整合结果
-        network_analysis_results = {
-            'network_metrics': network_metrics,
-            'modules': modules,
-            'main_connections': main_connections,
-            'hmm_results': hmm_results
-        }
-        
-        # GNN分析（如果启用）
-        if USE_GNN:
-            print("\n使用GNN进行神经元网络分析...")
-            gnn_results = analyzer.analyze_network_with_gnn(G, correlation_matrix, X, y, available_neurons)
-            network_analysis_results['gnn_analysis'] = gnn_results
-        
-        # 保存分析结果
-        results_file = os.path.join(config.analysis_dir, 'network_analysis_results.json')
-        with open(results_file, 'w') as f:
-            json.dump(convert_to_serializable(network_analysis_results), f, indent=2)
-        print(f"保存分析结果到: {results_file}")
-            
-            # 记录分析结束时间
-            end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-        print("="*50)
-            print(f"分析结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"总耗时: {duration:.2f} 秒")
-        print(f"分析完成！所有结果已保存。")
-        
-                    except Exception as e:
-        import traceback
-        print(f"分析过程中出现错误: {str(e)}")
-        print(traceback.format_exc())
-    finally:
-        # 恢复标准输出
-        sys.stdout = original_stdout
-        log_file.close()
-        print(f"分析日志已保存到: {config.log_file}")
-            
-# 输出重定向类
-class StdoutTee:
-    def __init__(self, stdout, file):
-        self.stdout = stdout
-        self.file = file
-=======
         # 保存日志到文件
         with open(config.log_file, 'w', encoding='utf-8') as log_file:
             log_file.write(log_content)
@@ -2756,7 +2351,6 @@ class StdoutTee:
     except Exception as e:
         error_message = f"分析过程中出现错误: {str(e)}"
         print(error_message)
->>>>>>> parent of 01e6d8f (20250311)
         
         # 尝试将错误也写入日志文件
         try:
@@ -2772,4 +2366,3 @@ class StdoutTee:
 
 if __name__ == "__main__":
     main() 
-
