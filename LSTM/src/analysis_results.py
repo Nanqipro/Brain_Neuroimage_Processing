@@ -279,31 +279,31 @@ class ResultAnalyzer:
         # 为了兼容旧版代码，仍然加载模型，但不返回它
         try:
             # 初始化模型（但我们不需要它进行分析）
-            input_size = X_scaled.shape[1] + 1  # +1 for cluster label
-            num_classes = len(np.unique(y))
-            
-            model = EnhancedNeuronLSTM(
-                input_size=input_size,
-                hidden_size=self.config.hidden_size,
-                num_layers=self.config.num_layers,
-                num_classes=num_classes,
-                latent_dim=self.config.analysis_params.get('latent_dim', 32),
-                num_heads=self.config.analysis_params.get('num_heads', 4),
-                dropout=self.config.analysis_params.get('dropout', 0.2)
-            ).to(self.device)
-            
+        input_size = X_scaled.shape[1] + 1  # +1 for cluster label
+        num_classes = len(np.unique(y))
+        
+        model = EnhancedNeuronLSTM(
+            input_size=input_size,
+            hidden_size=self.config.hidden_size,
+            num_layers=self.config.num_layers,
+            num_classes=num_classes,
+            latent_dim=self.config.analysis_params.get('latent_dim', 32),
+            num_heads=self.config.analysis_params.get('num_heads', 4),
+            dropout=self.config.analysis_params.get('dropout', 0.2)
+        ).to(self.device)
+        
             # 尝试加载模型权重（仅用于保持完整性）
-            try:
-                checkpoint = torch.load(self.config.model_path, weights_only=True)
-                model.load_state_dict(checkpoint['model_state_dict'])
+        try:
+            checkpoint = torch.load(self.config.model_path, weights_only=True)
+            model.load_state_dict(checkpoint['model_state_dict'])
                 print("成功加载模型权重")
-            except Exception as e1:
-                try:
-                    print("尝试使用 weights_only=False 加载模型...")
-                    checkpoint = torch.load(self.config.model_path, weights_only=False)
-                    model.load_state_dict(checkpoint['model_state_dict'])
+        except Exception as e1:
+            try:
+                print("尝试使用 weights_only=False 加载模型...")
+                checkpoint = torch.load(self.config.model_path, weights_only=False)
+                model.load_state_dict(checkpoint['model_state_dict'])
                     print("成功加载模型权重")
-                except Exception as e2:
+            except Exception as e2:
                     print(f"注意: 无法加载模型，但这不影响分析过程: {str(e1)}")
         except Exception as e:
             print(f"注意: 模型加载过程出错，但这不影响分析过程: {str(e)}")
@@ -761,7 +761,7 @@ class ResultAnalyzer:
             print(f"使用更高的相关性阈值: {threshold}")
             
             # 创建新图
-            main_G = nx.Graph()
+        main_G = nx.Graph()
             main_G.add_nodes_from(G.nodes())
             
             # 添加超过阈值的边
@@ -778,7 +778,7 @@ class ResultAnalyzer:
             }
             
             print(f"主要连接线路提取完成: {len(main_G.nodes())} 个节点, {len(main_G.edges())} 条边")
-            
+                    
         elif method == 'top_edges':
             # 为每个神经元保留k个最强连接
             k = kwargs.get('k', 5)
@@ -812,7 +812,7 @@ class ResultAnalyzer:
             }
             
             print(f"主要连接线路提取完成: {len(main_G.nodes())} 个节点, {len(main_G.edges())} 条边")
-            
+                            
         elif method == 'mst':
             # 使用最小生成树算法提取网络骨架
             print("使用最小生成树算法提取网络骨架")
@@ -820,7 +820,7 @@ class ResultAnalyzer:
             # 创建正权图（因为MST算法是找最小权重）
             positive_G = nx.Graph()
             positive_G.add_nodes_from(G.nodes())
-            
+                
             for u, v, data in G.edges(data=True):
                 # 将权重转换为正数，且越强的相关性对应越小的权重
                 # 1 - abs(corr) 将强相关变为小权重
@@ -837,7 +837,7 @@ class ResultAnalyzer:
                 # 恢复原始权重
                 orig_weight = G[u][v]['weight']
                 main_G.add_edge(u, v, weight=orig_weight)
-            
+                
             info = {
                 'method': 'mst',
                 'original_edges': G.number_of_edges(),
@@ -849,14 +849,14 @@ class ResultAnalyzer:
             
         else:
             raise ValueError(f"未知的提取方法: {method}")
-        
+            
         # 导出为JSON文件
         output_file = os.path.join(self.config.analysis_dir, f'neuron_network_main_{method}.json')
         self.export_network_to_json(main_G, output_file)
         print(f"{method}方法的主要连接线路已导出到: {output_file}")
         
         return main_G, info
-
+        
     def export_network_to_json(self, G, output_path, include_attributes=True):
         """
         将网络导出为JSON格式文件
@@ -1131,10 +1131,10 @@ class ResultAnalyzer:
             plt.xlabel('Community', fontsize=12)
             plt.ylabel('Number of Neurons', fontsize=12)
             plt.xticks(rotation=45)
-            plt.tight_layout()
+        plt.tight_layout()
             plt.savefig(os.path.join(self.config.analysis_dir, 'community_distribution.png'),
-                       dpi=300, bbox_inches='tight')
-            plt.close()
+                   dpi=300, bbox_inches='tight')
+        plt.close()
 
     def create_interactive_visualization(self, G, correlation_matrix, available_neurons):
         """
@@ -2250,7 +2250,7 @@ class ResultAnalyzer:
                 # 使用更健壮的社区检测方法
                 try:
                     import community as community_louvain
-                    communities = community_louvain.best_partition(G)
+                communities = community_louvain.best_partition(G)
                 except Exception as louvain_error:
                     print(f"Louvain社区检测失败: {str(louvain_error)}，尝试使用备选方法...")
                     
@@ -2650,8 +2650,8 @@ def main():
     args = parser.parse_args()
     
     # 创建配置对象
-    config = AnalysisConfig()
-    
+        config = AnalysisConfig()
+        
     # 如果指定了数据文件，更新配置
     if args.data:
         if not os.path.exists(args.data):
@@ -2682,13 +2682,13 @@ def main():
         # 重定向标准输出到日志文件
         sys.stdout = StdoutTee(sys.stdout, log_file)
         
-        # 检查GNN依赖项
+            # 检查GNN依赖项
         status, missing = check_gnn_dependencies()
         print(f"\n检查GNN依赖项...")
         if status:
-            print("GNN依赖项检查通过，将启用GNN分析功能")
+                print("GNN依赖项检查通过，将启用GNN分析功能")
             USE_GNN = not args.skip_gnn
-        else:
+                else:
             print(f"GNN依赖项检查失败，将禁用GNN分析功能")
             print(f"缺失的依赖项: {', '.join(missing)}")
             USE_GNN = False
@@ -2697,14 +2697,14 @@ def main():
             print("用户指定跳过GNN分析")
         
         print(f"使用GNN: {'启用' if USE_GNN else '禁用'}")
-        
-        # 记录分析开始时间
-        start_time = datetime.now()
-        print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"数据标识符: {config.data_identifier}")
+            
+            # 记录分析开始时间
+            start_time = datetime.now()
+            print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"数据标识符: {config.data_identifier}")
         print("="*50)
-        
-        # 加载模型和数据
+            
+            # 加载模型和数据
         X, y, behavior_labels = analyzer.load_model_and_data()
         
         # 自动调整参数（如果启用）
@@ -2727,8 +2727,8 @@ def main():
         
         # 识别关键神经元
         analyzer.identify_key_neurons(X, y)
-        
-        print("\n开始神经元网络拓扑分析...")
+            
+            print("\n开始神经元网络拓扑分析...")
         
         # 构建神经元网络
         print("\n构建神经元功能连接网络...")
@@ -2774,8 +2774,8 @@ def main():
             analyzer.create_method_visualization(G, correlation_matrix, available_neurons, method)
         
         # 开始行为状态转换分析
-        print("\n开始行为状态转换分析...")
-        
+            print("\n开始行为状态转换分析...")
+            
         # 行为状态转换分析
         print("\n分析行为状态转换...")
         hmm_results = analyzer.analyze_behavior_state_transitions(X, y)
@@ -2799,16 +2799,16 @@ def main():
         with open(results_file, 'w') as f:
             json.dump(convert_to_serializable(network_analysis_results), f, indent=2)
         print(f"保存分析结果到: {results_file}")
-        
-        # 记录分析结束时间
-        end_time = datetime.now()
+            
+            # 记录分析结束时间
+            end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         print("="*50)
-        print(f"分析结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"分析结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"总耗时: {duration:.2f} 秒")
         print(f"分析完成！所有结果已保存。")
         
-    except Exception as e:
+                    except Exception as e:
         import traceback
         print(f"分析过程中出现错误: {str(e)}")
         print(traceback.format_exc())
@@ -2817,7 +2817,7 @@ def main():
         sys.stdout = original_stdout
         log_file.close()
         print(f"分析日志已保存到: {config.log_file}")
-
+            
 # 输出重定向类
 class StdoutTee:
     def __init__(self, stdout, file):

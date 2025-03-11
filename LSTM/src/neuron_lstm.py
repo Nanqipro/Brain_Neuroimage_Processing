@@ -436,7 +436,7 @@ class EnhancedNeuronLSTM(nn.Module):
             'trainable_params': trainable_params
         }
 
-def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs, config, early_stopping_enabled=True):
+def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs, config, early_stopping_enabled=False):
     """
     训练增强型神经元LSTM模型
     
@@ -449,7 +449,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         device (torch.device): 计算设备
         num_epochs (int): 训练轮数
         config (object): 配置对象
-        early_stopping_enabled (bool): 是否启用早停机制，默认为True
+        early_stopping_enabled (bool): 是否启用早停机制，默认为False
     
     返回:
         tuple: (model, metrics_dict) 训练后的模型和指标字典
