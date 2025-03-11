@@ -51,11 +51,14 @@ logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 # 导入GNN相关模块
 try:
     import torch_geometric
-    from neuron_gnn import GNNAnalyzer, NeuronGCN, NeuronGAT, TemporalGNN, ModuleGNN
+    # 导入GCN和基础GNN模块
+    from neuron_gnn import GNNAnalyzer, NeuronGCN, TemporalGNN, ModuleGNN
     from neuron_gnn import train_gnn_model, plot_gnn_results, visualize_node_embeddings
+    # 从独立的GAT模块导入
+    from neuron_gat import NeuronGAT, visualize_gat_topology, visualize_gat_attention_weights
     from gnn_topology import (create_gnn_based_topology, visualize_gnn_topology,
                              create_interactive_gnn_topology, save_gnn_topology_data, 
-                             analyze_gnn_topology, visualize_gcn_topology, visualize_gat_topology)
+                             analyze_gnn_topology, visualize_gcn_topology)
     from gnn_visualization import GNNVisualizer
     # 设置GNN支持标志为True，表示成功导入了所有GNN相关模块
     # 此标志将在后续代码中用于条件性地启用GNN分析功能
@@ -1808,159 +1811,170 @@ class ResultAnalyzer:
         # 2. 神经元模块识别GAT模型
         print("\n训练神经元模块识别GAT模型...")
         try:
-            # 创建GAT模型
-            # 先使用社区检测算法获取社区作为标签
-            try:
-                communities = community_louvain.best_partition(G)
-                community_labels = np.array([communities[node] for node in G.nodes()])
-                num_communities = len(set(communities.values()))
-                
-                # 更新数据标签
-                data.y = torch.tensor(community_labels, dtype=torch.long)
-                
-                # 创建GAT模型
-                gat_model = NeuronGAT(
-                    in_channels=X_normalized.shape[1],
-                    hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 128),
-                    out_channels=num_communities,
-                    heads=self.config.analysis_params.get('gat_heads', 4),
-                    dropout=self.config.analysis_params.get('gat_dropout', 0.3),
-                    residual=self.config.analysis_params.get('gat_residual', True),
-                    num_layers=self.config.analysis_params.get('gat_num_layers', 3),
-                    alpha=self.config.analysis_params.get('gat_alpha', 0.2)
-                )
-                
-                # 设置训练参数
-                epochs = self.config.analysis_params.get('gnn_epochs', 200)
-                lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
-                weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
-                patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
-                early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
-                
-                # 训练模型
-                trained_gat, gat_losses, gat_accuracies = train_gnn_model(
-                    model=gat_model,
-                    data=data,
-                    epochs=epochs,
-                    lr=lr,
-                    weight_decay=weight_decay,
-                    patience=patience,
-                    device=gnn_analyzer.device,
-                    early_stopping_enabled=early_stopping_enabled
-                )
-                
-                # 绘制GAT训练曲线
-                gat_loss_plot_path = self.config.gat_training_plot
-                plot_gnn_results(gat_losses, gat_loss_plot_path)
-                
-                # 绘制GAT准确率曲线
-                gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
-                gat_accuracy_plot_path = visualizer.plot_training_metrics(
-                    gat_acc_epochs, 
-                    gat_accuracies['train'], 
-                    gat_accuracies['val'], 
-                    metric_name='Accuracy',
-                    title='GAT Model Training Accuracy Change',
-                    filename='gat_accuracy_curve.png'
-                )
-                
-                # 评估模型
-                trained_gat.eval()
-                with torch.no_grad():
-                    out = trained_gat(data)
-                    _, predicted = torch.max(out, 1)
-                    gat_accuracy = (predicted == data.y).sum().item() / len(data.y)
-                
-                print(f"GAT模块识别模型完成，准确率: {gat_accuracy:.4f}")
-                
-                # 保存结果
+            # 首先检查配置是否启用GAT分析
+            if not hasattr(self.config, 'use_gat') or not self.config.use_gat:
+                print("GAT模型分析已在配置中禁用。")
                 gnn_results['gat_module_detection'] = {
-                    'accuracy': gat_accuracy,
-                    'loss_plot_path': gat_loss_plot_path,
-                    'accuracy_plot_path': gat_accuracy_plot_path,
-                    'num_communities': num_communities,
-                    'train_acc_history': gat_accuracies['train'],
-                    'val_acc_history': gat_accuracies['val']
+                    'status': 'disabled',
+                    'message': 'GAT模型分析已在配置中禁用'
                 }
-                
-                # 基于GAT创建新的拓扑结构
+            else:
+                # 创建GAT模型
+                # 先使用社区检测算法获取社区作为标签
                 try:
-                    print("\n基于GAT模型创建神经元拓扑结构...")
+                    communities = community_louvain.best_partition(G)
+                    community_labels = np.array([communities[node] for node in G.nodes()])
+                    num_communities = len(set(communities.values()))
                     
-                    # 使用GNN模型创建拓扑结构
-                    gat_G = create_gnn_based_topology(
-                        model=trained_gat,
+                    # 更新数据标签
+                    data.y = torch.tensor(community_labels, dtype=torch.long)
+                    
+                    # 使用配置参数创建GAT模型
+                    gat_model = NeuronGAT(
+                        in_channels=X_normalized.shape[1],
+                        hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 128),
+                        out_channels=num_communities,
+                        heads=self.config.analysis_params.get('gat_heads', 4),
+                        dropout=self.config.analysis_params.get('gat_dropout', 0.3),
+                        residual=self.config.analysis_params.get('gat_residual', True),
+                        num_layers=self.config.analysis_params.get('gat_num_layers', 3),
+                        alpha=self.config.analysis_params.get('gat_alpha', 0.2)
+                    )
+                    
+                    # 设置训练参数 - 使用GAT特定参数
+                    epochs = self.config.analysis_params.get('gat_epochs', 300)
+                    lr = self.config.analysis_params.get('gat_learning_rate', 0.005)
+                    weight_decay = self.config.analysis_params.get('gat_weight_decay', 5e-4)
+                    patience = self.config.analysis_params.get('gat_patience', 20)
+                    early_stopping_enabled = True
+                    
+                    # 训练模型
+                    trained_gat, gat_losses, gat_accuracies = train_gnn_model(
+                        model=gat_model,
                         data=data,
-                        G=G.copy(),
-                        node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                        threshold=0.6 # 使用更高阈值突出模块结构
+                        epochs=epochs,
+                        lr=lr,
+                        weight_decay=weight_decay,
+                        patience=patience,
+                        device=gnn_analyzer.device,
+                        early_stopping_enabled=early_stopping_enabled
                     )
                     
-                    # 获取节点嵌入和相似度矩阵
+                    # 绘制GAT训练曲线
+                    gat_loss_plot_path = self.config.gat_training_plot
+                    plot_gnn_results(gat_losses, gat_loss_plot_path)
+                    
+                    # 绘制GAT准确率曲线
+                    gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
+                    gat_accuracy_plot_path = visualizer.plot_training_metrics(
+                        gat_acc_epochs, 
+                        gat_accuracies['train'], 
+                        gat_accuracies['val'], 
+                        metric_name='Accuracy',
+                        title='GAT Model Training Accuracy Change',
+                        filename='gat_accuracy_curve.png'
+                    )
+                    
+                    # 评估模型
+                    trained_gat.eval()
                     with torch.no_grad():
-                        gat_embeddings = trained_gat.get_embeddings(data).detach().cpu().numpy()
-                    gat_similarities = nx.adjacency_matrix(gat_G).todense()
+                        out = trained_gat(data)
+                        _, predicted = torch.max(out, 1)
+                        gat_accuracy = (predicted == data.y).sum().item() / len(data.y)
                     
-                    print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
-                    
-                    # # 可视化GAT拓扑结构
-                    # gat_topo_path = self.config.gat_topology_png
-                    # visualize_gnn_topology(
-                    #     G=gat_G,
-                    #     embeddings=gat_embeddings,
-                    #     similarities=gat_similarities,
-                    #     node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                    #     output_path=gat_topo_path,
-                    #     title="GAT-Based Module Detection Topology"
-                    # )
-                    
-                    # 创建交互式可视化
-                    create_interactive_gnn_topology(
-                        G=gat_G,
-                        embeddings=gat_embeddings,
-                        similarities=gat_similarities.astype(float) if hasattr(gat_similarities, 'astype') else gat_similarities,
-                        node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                        output_path=self.config.gat_interactive_topology
-                    )
-                    
-                    # 保存拓扑数据
-                    save_gnn_topology_data(
-                        G=gat_G,
-                        embeddings=gat_embeddings,
-                        similarities=gat_similarities,
-                        node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                        output_path=self.config.gat_topology_data
-                    )
-                    
-                    # 使用visualize_gat_topology生成GAT静态拓扑图
-                    gat_static_topo_path = visualize_gat_topology(self.config.gat_topology_data)
-                    
-                    # 分析GNN拓扑结构
-                    topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
+                    print(f"GAT模块识别模型完成，准确率: {gat_accuracy:.4f}")
                     
                     # 保存结果
-                    gnn_results['gat_topology'] = {
-                        'visualization_path': gat_static_topo_path,  # 使用静态拓扑图路径替代原来的可视化路径
-                        'interactive_path': self.config.gat_interactive_topology,
-                        'data_path': self.config.gat_topology_data,
-                        'metrics': topo_metrics,
-                        'node_count': gat_G.number_of_nodes(),
-                        'edge_count': gat_G.number_of_edges()
+                    gnn_results['gat_module_detection'] = {
+                        'accuracy': gat_accuracy,
+                        'loss_plot_path': gat_loss_plot_path,
+                        'accuracy_plot_path': gat_accuracy_plot_path,
+                        'num_communities': num_communities,
+                        'train_acc_history': gat_accuracies['train'],
+                        'val_acc_history': gat_accuracies['val']
                     }
+                    
+                    # 基于GAT创建新的拓扑结构
+                    try:
+                        print("\n基于GAT模型创建神经元拓扑结构...")
+                        
+                        # 使用GNN模型创建拓扑结构
+                        gat_G = create_gnn_based_topology(
+                            model=trained_gat,
+                            data=data,
+                            G=G.copy(),
+                            node_names=[f"N{i+1}" for i in range(len(available_neurons))],
+                            threshold=0.6 # 使用更高阈值突出模块结构
+                        )
+                        
+                        # 获取节点嵌入和相似度矩阵
+                        with torch.no_grad():
+                            gat_embeddings = trained_gat.get_embeddings(data).detach().cpu().numpy()
+                        gat_similarities = nx.adjacency_matrix(gat_G).todense()
+                        
+                        print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
+                        
+                        # 创建交互式GNN拓扑可视化
+                        print(f"开始创建交互式GNN拓扑可视化: {self.config.gat_interactive_topology}")
+                        try:
+                            create_interactive_gnn_topology(
+                                G=gat_G,
+                                embeddings=gat_embeddings,
+                                similarities=gat_similarities.astype(float) if hasattr(gat_similarities, 'astype') else gat_similarities,
+                                node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
+                                output_path=self.config.gat_interactive_topology
+                            )
+                            print(f"交互式神经元网络已成功保存到: {self.config.gat_interactive_topology}")
+                        except Exception as e:
+                            print(f"创建交互式GAT拓扑结构时出错: {str(e)}")
+                        
+                        # 保存GAT拓扑数据
+                        save_gnn_topology_data(
+                            G=gat_G,
+                            embeddings=gat_embeddings,
+                            similarities=gat_similarities,
+                            node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
+                            output_path=self.config.gat_topology_data
+                        )
+                        print(f"GNN拓扑数据已保存到: {self.config.gat_topology_data}")
+                        
+                        # 使用visualize_gat_topology生成GAT静态拓扑图
+                        print("\n开始生成GAT静态拓扑结构图...")
+                        gat_static_topo_path = visualize_gat_topology(self.config.gat_topology_data)
+                        
+                        # 分析GAT拓扑结构
+                        topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
+                        
+                        # 保存GAT拓扑分析结果
+                        gnn_results['gat_topology'] = {
+                            'visualization_path': gat_static_topo_path,  # 使用静态拓扑图路径
+                            'interactive_path': self.config.gat_interactive_topology,
+                            'data_path': self.config.gat_topology_data,
+                            'topology_metrics': topo_metrics,
+                            'node_count': gat_G.number_of_nodes(),
+                            'edge_count': gat_G.number_of_edges()
+                        }
+                        
+                    except Exception as e:
+                        print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
+                        import traceback
+                        print(f"错误详情:\n{traceback.format_exc()}")
+                        gnn_results['gat_topology'] = {
+                            'error': str(e)
+                        }
                 except Exception as e:
+                    print(f"GAT训练过程中出错: {str(e)}")
                     import traceback
-                    error_trace = traceback.format_exc()
-                    print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
-                    print(f"详细错误信息:\n{error_trace}")
-                    gnn_results['gat_topology'] = {'error': str(e)}
-            
-            except Exception as e:
-                print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
-                gnn_results['gat_module_detection'] = {'error': str(e)}
-            
+                    print(f"错误详情:\n{traceback.format_exc()}")
+                    gnn_results['gat_module_detection'] = {
+                        'error': str(e)
+                    }
         except Exception as e:
-            print(f"GAT模块识别模型训练出错: {str(e)}")
-            gnn_results['gat_module_detection'] = {'error': str(e)}
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"GAT模型训练整体过程出错: {str(e)}")
+            print(f"错误详情:\n{error_trace}")
+            gnn_results['gat_error'] = str(e)
         
         # 3. 时间序列GNN分析
         print("\n准备时间序列GNN数据...")

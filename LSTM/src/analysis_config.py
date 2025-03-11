@@ -208,6 +208,15 @@ class AnalysisConfig:
         # GNN 分析配置
         self.use_gnn = True  # 是否使用GNN分析
         
+        # GAT模型控制开关（新增）
+        self.use_gat = False  # 是否使用GAT模型
+        
+        # 设置目录
+        self.setup_directories()
+        
+        # 验证路径
+        self.validate_paths()
+        
     def setup_directories(self):
         """
         创建必要的目录结构并验证权限
@@ -221,7 +230,7 @@ class AnalysisConfig:
             self.temporal_pattern_dir, # 时间模式分析目录
             self.temporal_correlation_dir,  # 时间相关性分析目录
             self.topology_dir,         # 拓扑分析目录
-            self.gnn_results_dir,      # GNN结果目录
+            self.gnn_results_dir,      # GNN结果目录 - 已在__init__中设置，不需要再次设置
             self.interactive_dir       # 交互式可视化目录
         ]
         
@@ -242,15 +251,6 @@ class AnalysisConfig:
             except Exception as e:
                 raise PermissionError(f"无法在目录中写入文件: {str(e)}")
                 
-            # 创建GNN结果目录
-            self.gnn_results_dir = os.path.join(self.analysis_dir, self.analysis_params['gnn_results_dir'])
-            try:
-                os.makedirs(self.gnn_results_dir, exist_ok=True)
-                print(f"创建GNN结果目录: {self.gnn_results_dir}")
-            except Exception as e:
-                self.gnn_results_dir = self.analysis_dir
-                print(f"创建GNN结果目录时出错: {str(e)}, 使用默认分析目录")
-                
         except Exception as e:
             # 如果创建过程中出错，尝试删除已创建的目录
             for dir_path in created_dirs:
@@ -267,9 +267,6 @@ class AnalysisConfig:
         检查数据文件和模型文件是否存在
         如果缺少必要文件，抛出FileNotFoundError异常
         """
-        # 首先确保目录结构存在
-        self.setup_directories()
-        
         # 检查数据文件
         if not os.path.exists(self.data_file):
             raise FileNotFoundError(f"数据文件未找到: {self.data_file}")
