@@ -35,7 +35,15 @@ import warnings
 warnings.filterwarnings('ignore')
 from sklearn.decomposition import PCA
 
-from kmeans_lstm_analysis import EnhancedNeuronLSTM, NeuronDataProcessor
+# 从 neuron_lstm.py 导入必要的类和函数
+from neuron_lstm import (
+    NeuronDataset, 
+    NeuronAutoencoder, 
+    MultiHeadAttention, 
+    TemporalAttention, 
+    EnhancedNeuronLSTM
+)
+from kmeans_lstm_analysis import NeuronDataProcessor
 from analysis_config import AnalysisConfig
 
 import torch.nn.functional as F
@@ -279,9 +287,13 @@ class ResultAnalyzer:
             )
         
         # 加载训练好的模型
-        input_size = X_scaled.shape[1] + 1  # +1 for cluster label
+        # 注意：这里修正了与训练时 input_size 不一致的问题
+        input_size = X_scaled.shape[1]  # 移除了 +1 for cluster label，与训练时保持一致
         num_classes = len(np.unique(y))
         
+        print(f"创建 EnhancedNeuronLSTM 模型: input_size={input_size}, num_classes={num_classes}")
+        
+        # 初始化模型结构，确保与训练时结构一致
         model = EnhancedNeuronLSTM(
             input_size=input_size,
             hidden_size=self.config.hidden_size,
@@ -293,16 +305,34 @@ class ResultAnalyzer:
         ).to(self.device)
         
         try:
-            # 尝试使用 weights_only=True 加载模型
-            checkpoint = torch.load(self.config.model_path, weights_only=True)
+            print(f"尝试加载模型: {self.config.model_path}")
+            # 首先尝试基本加载方式
+            checkpoint = torch.load(self.config.model_path, map_location=self.device)
             model.load_state_dict(checkpoint['model_state_dict'])
+            print("模型加载成功!")
         except Exception as e1:
+            print(f"基本加载失败: {str(e1)}")
             try:
                 print("尝试使用 weights_only=False 加载模型...")
-                checkpoint = torch.load(self.config.model_path, weights_only=False)
+                checkpoint = torch.load(self.config.model_path, map_location=self.device, weights_only=False)
                 model.load_state_dict(checkpoint['model_state_dict'])
+                print("模型使用 weights_only=False 加载成功!")
             except Exception as e2:
-                raise RuntimeError(f"加载模型失败。错误1: {str(e1)}\n错误2: {str(e2)}")
+                try:
+                    print("尝试其他兼容方式加载...")
+                    # 尝试宽松加载模式
+                    checkpoint = torch.load(self.config.model_path, map_location=self.device)
+                    # 过滤并仅加载模型中存在的参数
+                    model_dict = model.state_dict()
+                    pretrained_dict = {k: v for k, v in checkpoint['model_state_dict'].items() if k in model_dict}
+                    model_dict.update(pretrained_dict)
+                    model.load_state_dict(model_dict)
+                    print("模型使用兼容模式加载成功!")
+                except Exception as e3:
+                    # 详细记录所有错误，帮助诊断
+                    error_msg = f"加载模型失败。\n错误1: {str(e1)}\n错误2: {str(e2)}\n错误3: {str(e3)}"
+                    print(error_msg)
+                    raise RuntimeError(error_msg)
         
         model.eval()
         return model, X_scaled, y

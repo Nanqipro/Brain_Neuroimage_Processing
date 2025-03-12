@@ -3,11 +3,15 @@ import os
 class AnalysisConfig:
     """
     分析配置类：管理神经元行为分析项目的所有配置参数
-    包括：
-    1. 文件路径配置
-    2. 模型参数配置
-    3. 分析参数配置
-    4. 可视化参数配置
+    
+    该类负责集中管理项目中的所有配置信息，包括：
+    1. 文件路径配置 - 数据文件、输出目录、模型保存位置等
+    2. 模型参数配置 - LSTM、GNN等模型的超参数设置
+    3. 分析参数配置 - 聚类、拓扑分析、时间序列分析等参数
+    4. 可视化参数配置 - 图表尺寸、颜色方案、节点样式等
+    5. 目录结构管理 - 自动创建和验证必要的目录结构
+    
+    该类确保所有组件使用一致的配置，并提供集中的参数调整接口。
     """
     def __init__(self):
         # 基础目录配置
@@ -68,17 +72,17 @@ class AnalysisConfig:
         self.error_log = os.path.join(self.train_dir, f'error_log_{self.data_identifier}.txt')  # 错误日志文件
         
         # 分析结果文件路径配置
+        self.temporal_pattern_dir = os.path.join(self.analysis_dir, f'temporal_patterns_{self.data_identifier}')  # 时间模式分析目录
         self.correlation_plot = os.path.join(self.analysis_dir, f'behavior_neuron_correlation_{self.data_identifier}.png')  # 行为-神经元相关性图
         self.transition_plot = os.path.join(self.analysis_dir, f'behavior_transitions_{self.data_identifier}.png')  # 行为转换概率图
         self.key_neurons_plot = os.path.join(self.analysis_dir, f'key_neurons_{self.data_identifier}.png')  # 关键神经元分析图
-        self.temporal_pattern_dir = os.path.join(self.analysis_dir, f'temporal_patterns_{self.data_identifier}')  # 时间模式分析目录
         self.network_plot = os.path.join(self.analysis_dir, f'behavior_neuron_network_{self.data_identifier}.png')  # 行为-神经元网络图
         
         # 结果数据文件路径配置
+        self.temporal_correlation_dir = os.path.join(self.analysis_dir, f'temporal_correlations_{self.data_identifier}')  # 时间相关性分析目录
         self.behavior_importance_csv = os.path.join(self.analysis_dir, f'behavior_importance_{self.data_identifier}.csv')  # 行为重要性数据
         self.neuron_specificity_json = os.path.join(self.analysis_dir, f'neuron_specificity_{self.data_identifier}.json')  # 神经元特异性数据
         self.statistical_results_csv = os.path.join(self.analysis_dir, f'statistical_analysis_{self.data_identifier}.csv')  # 统计分析结果
-        self.temporal_correlation_dir = os.path.join(self.analysis_dir, f'temporal_correlations_{self.data_identifier}')  # 时间相关性分析目录
         
         # 神经网络分析和效应大小数据文件
         self.network_analysis_file = os.path.join(self.analysis_dir, f'network_analysis_results.json')  # 网络分析结果
@@ -94,6 +98,14 @@ class AnalysisConfig:
         self.n_clusters = 5           # 聚类数量：K-means聚类的类别数
         self.test_size = 0.2          # 测试集比例：数据集中测试集的占比
         self.random_seed = 42         # 随机种子：确保结果可重复性
+        
+        self.weight_decay = 1e-4      # 权重衰减：优化器的权重衰减参数
+        self.early_stopping = False    # 早停：是否启用早停机制
+         
+        # 神经网络高级参数 - 新添加
+        self.latent_dim = 32          # 潜在维度：自编码器的潜在特征维度
+        self.num_heads = 4            # 注意力头数：多头注意力机制的头数量
+        self.dropout = 0.2            # Dropout率：防止过拟合的神经元随机失活比例
         
         # 分析参数配置
         self.analysis_params = {
@@ -208,8 +220,8 @@ class AnalysisConfig:
         # GNN 分析配置
         self.use_gnn = True  # 是否使用GNN分析
         
-        # GAT模型控制开关（新增）
-        self.use_gat = False  # 是否使用GAT模型
+        # GAT模型控制开关
+        self.use_gat = True  # 是否使用GAT模型
         
         # 设置目录
         self.setup_directories()
