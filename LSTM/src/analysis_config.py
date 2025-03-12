@@ -221,7 +221,7 @@ class AnalysisConfig:
         self.use_gnn = True  # 是否使用GNN分析
         
         # GAT模型控制开关
-        self.use_gat = True  # 是否使用GAT模型
+        self.use_gat = False  # 是否使用GAT模型
         
         # 设置目录
         self.setup_directories()
