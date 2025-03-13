@@ -59,6 +59,8 @@ logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 # 导入GNN相关模块
 try:
     import torch_geometric
+    # 导入PyTorch Geometric的Data类
+    from torch_geometric.data import Data
     # 导入GCN和基础GNN模块
     from neuron_gnn import GNNAnalyzer, NeuronGCN, TemporalGNN, ModuleGNN
     from neuron_gnn import train_gnn_model, plot_gnn_results, visualize_node_embeddings
@@ -698,7 +700,7 @@ class ResultAnalyzer:
         plt.close()
         return behavior_importance
 
-    def build_neuron_network(self, X_scaled, threshold=0.35):
+    def build_neuron_network(self, X_scaled, threshold=0.4):
         """
         构建神经元功能连接网络
         参数:
@@ -780,7 +782,7 @@ class ResultAnalyzer:
         
         if method == 'threshold':
             # 使用更高的阈值过滤边
-            higher_threshold = kwargs.get('threshold', 0.35)  # 默认提高到0.4
+            higher_threshold = kwargs.get('threshold', 0.42)  # 默认提高到0.4
             print(f"使用更高的相关性阈值: {higher_threshold}")
             
             for u, v, data in G.edges(data=True):
@@ -1857,12 +1859,47 @@ class ResultAnalyzer:
                     community_labels = np.array([communities[node] for node in G.nodes()])
                     num_communities = len(set(communities.values()))
                     
-                    # 更新数据标签
-                    data.y = torch.tensor(community_labels, dtype=torch.long)
+                    # 创建新的数据对象，确保节点特征和标签维度匹配
+                    # 修复维度不匹配问题：
+                    # 1. 如果有样本数据，则使用样本特征而不是使用之前为GCN准备的data
+                    node_features = []
+                    for node in G.nodes():
+                        # 提取该节点的度作为特征
+                        node_degree = G.degree(node)
+                        # 创建简单的特征向量
+                        node_features.append([float(node_degree)])
+                    
+                    # 创建基于节点的数据对象(而非基于样本)
+                    node_features = torch.tensor(node_features, dtype=torch.float)
+                    
+                    # 修复边索引创建 - 使用正确的节点索引
+                    edge_index = []
+                    edge_weights = []
+                    node_idx_map = {node: idx for idx, node in enumerate(G.nodes())}
+                    
+                    for u, v, attr in G.edges(data=True):
+                        edge_index.append((node_idx_map[u], node_idx_map[v]))
+                        edge_index.append((node_idx_map[v], node_idx_map[u]))  # 添加双向边
+                        # 使用相关性作为边权重
+                        edge_weights.append(attr['weight'])
+                        edge_weights.append(attr['weight'])
+                    
+                    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+                    edge_weight = torch.tensor(edge_weights, dtype=torch.float)
+                    
+                    # 创建新的数据对象
+                    gat_data = Data(
+                        x=node_features,
+                        edge_index=edge_index,
+                        edge_attr=edge_weight,
+                        y=torch.tensor(community_labels, dtype=torch.long)
+                    )
+                    
+                    print(f"为GAT创建的数据: {gat_data}")
                     
                     # 使用配置参数创建GAT模型
                     gat_model = NeuronGAT(
-                        in_channels=X_normalized.shape[1],
+                        in_channels=node_features.size(1),  # 使用节点特征维度
                         hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 128),
                         out_channels=num_communities,
                         heads=self.config.analysis_params.get('gat_heads', 4),
@@ -1879,10 +1916,10 @@ class ResultAnalyzer:
                     patience = self.config.analysis_params.get('gat_patience', 20)
                     early_stopping_enabled = True
                     
-                    # 训练模型
+                    # 训练模型 - 使用新创建的gat_data
                     trained_gat, gat_losses, gat_accuracies = train_gnn_model(
                         model=gat_model,
-                        data=data,
+                        data=gat_data,
                         epochs=epochs,
                         lr=lr,
                         weight_decay=weight_decay,
@@ -1909,9 +1946,9 @@ class ResultAnalyzer:
                     # 评估模型
                     trained_gat.eval()
                     with torch.no_grad():
-                        out = trained_gat(data)
+                        out = trained_gat(gat_data)
                         _, predicted = torch.max(out, 1)
-                        gat_accuracy = (predicted == data.y).sum().item() / len(data.y)
+                        gat_accuracy = (predicted == gat_data.y).sum().item() / len(gat_data.y)
                     
                     print(f"GAT模块识别模型完成，准确率: {gat_accuracy:.4f}")
                     
@@ -1932,15 +1969,15 @@ class ResultAnalyzer:
                         # 使用GNN模型创建拓扑结构
                         gat_G = create_gnn_based_topology(
                             model=trained_gat,
-                            data=data,
+                            data=gat_data,
                             G=G.copy(),
                             node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                            threshold=0.6 # 使用更高阈值突出模块结构
+                            threshold=0.5 # 使用更高阈值突出模块结构
                         )
                         
                         # 获取节点嵌入和相似度矩阵
                         with torch.no_grad():
-                            gat_embeddings = trained_gat.get_embeddings(data).detach().cpu().numpy()
+                            gat_embeddings = trained_gat.get_embeddings(gat_data).detach().cpu().numpy()
                         gat_similarities = nx.adjacency_matrix(gat_G).todense()
                         
                         print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
@@ -2210,7 +2247,7 @@ pip install torch-geometric torch-scatter torch-sparse
                 if method == 'threshold':
                     main_G = analyzer.extract_main_connections(
                         G, correlation_matrix, available_neurons,
-                        method=method, threshold=0.35
+                        method=method, threshold=0.2
                     )
                 elif method == 'top_edges':
                     main_G = analyzer.extract_main_connections(
@@ -2278,7 +2315,7 @@ pip install torch-geometric torch-scatter torch-sparse
                 for method in main_methods:
                     main_G = analyzer.extract_main_connections(
                         G, correlation_matrix, available_neurons,
-                        method=method, threshold=0.6 if method == 'threshold' else None,
+                        method=method, threshold=0.4 if method == 'threshold' else None,
                         top_k=3 if method == 'top_edges' else None
                     )
                     interactive_path = visualizer.plot_interactive_neuron_network(

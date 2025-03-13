@@ -15,7 +15,7 @@ import json
 from typing import Dict, List, Tuple, Optional, Any, Union
 import math
 
-def create_gnn_based_topology(model, data, G, node_names, threshold=0.5):
+def create_gnn_based_topology(model, data, G, node_names, threshold=0.6):
     """
     基于GNN模型学习到的节点表示创建新的拓扑结构图
     

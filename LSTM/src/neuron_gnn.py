@@ -826,6 +826,10 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         losses: 损失历史
         metrics: 其他指标历史（如准确率）
     """
+    # 调试信息：检查输入数据的形状
+    print(f"数据检查 - x形状: {data.x.size()}, y形状: {data.y.size() if hasattr(data, 'y') and data.y is not None else 'None'}")
+    print(f"边索引形状: {data.edge_index.size()}, 边属性形状: {data.edge_attr.size() if hasattr(data, 'edge_attr') else 'None'}")
+    
     # 将数据移至设备
     data = data.to(device)
     model = model.to(device)
@@ -845,6 +849,18 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
     indices = list(range(data.x.size(0)))
     if hasattr(data, 'y'):
         stratify = data.y.cpu().numpy() if data.y is not None else None
+        
+        # 添加维度一致性检查
+        if stratify is not None and len(indices) != len(stratify):
+            print(f"警告: 特征数量 ({len(indices)}) 与标签数量 ({len(stratify)}) 不匹配!")
+            print(f"数据特征形状: {data.x.size()}, 标签形状: {data.y.size()}")
+            
+            # 尝试解决方法: 裁剪到相同长度
+            min_length = min(len(indices), len(stratify))
+            indices = indices[:min_length]
+            stratify = stratify[:min_length]
+            print(f"已调整为共同长度: {min_length}")
+        
         train_indices, val_indices = train_test_split(
             indices, test_size=0.2, random_state=42, stratify=stratify
         )

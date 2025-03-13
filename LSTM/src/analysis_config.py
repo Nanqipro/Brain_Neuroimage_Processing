@@ -116,7 +116,7 @@ class AnalysisConfig:
             'temporal_window_size': 50,  # 时间窗口分析的大小
             'top_neurons_count': 5,  # 每个行为选择的关键神经元数量
             'p_value_threshold': 0.05,  # 统计检验的显著性水平
-            'effect_size_threshold': 0.5,  # 效应量的显著性阈值
+            'effect_size_threshold': 0.8,  # 效应量的显著性阈值
             'gradient_clip_norm': 1.0,  # 梯度裁剪的最大范数
             'weight_decay': 0.01,  # AdamW优化器的权重衰减系数
             
@@ -214,7 +214,7 @@ class AnalysisConfig:
                 'color_scheme': 'tab20',          # 颜色方案
                 'max_groups': 20,                 # 最大组数
                 'gif_fps': 5,                     # GIF帧率
-                'edge_weight_threshold': 0.3      # 边权重阈值，只显示权重大于此值的边
+                'edge_weight_threshold': 0.4      # 边权重阈值，只显示权重大于此值的边
             }
         }
         
