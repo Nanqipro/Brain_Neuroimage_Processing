@@ -110,6 +110,15 @@ def check_gnn_dependencies():
     }
     
     missing = []
+
+    # 检查是否能导入我们的GNN模块
+    try:
+        import neuron_gnn
+        print("成功导入neuron_gnn模块")
+    except ImportError as e:
+        print(f"无法导入neuron_gnn模块: {str(e)}")
+        print(f"当前Python路径: {sys.path}")
+        missing.append('neuron_gnn')
     
     # 检查PyTorch
     try:
@@ -143,14 +152,6 @@ def check_gnn_dependencies():
     except ImportError:
         missing.append('torch_sparse')
     
-    # 检查是否能导入我们的GNN模块
-    try:
-        import neuron_gnn
-        print("成功导入neuron_gnn模块")
-    except ImportError as e:
-        print(f"无法导入neuron_gnn模块: {str(e)}")
-        print(f"当前Python路径: {sys.path}")
-        missing.append('neuron_gnn')
     
     status = all(dependencies.values())
     
@@ -346,13 +347,13 @@ class ResultAnalyzer:
         返回：
             behavior_activity_df: 行为-神经元活动相关性数据框
         """
-        # Calculate mean activity for each behavior
+        # 计算每种行为的平均神经元活动
         behavior_means = {}
         for behavior_idx in range(len(self.behavior_labels)):
             behavior_mask = (y == behavior_idx)
             behavior_means[self.behavior_labels[behavior_idx]] = np.mean(X_scaled[behavior_mask], axis=0)
         
-        # Create correlation heatmap
+        # 创建相关性热图
         behavior_activity_df = pd.DataFrame(behavior_means).T
         behavior_activity_df.columns = [f'Neuron {i+1}' for i in range(behavior_activity_df.shape[1])]
         

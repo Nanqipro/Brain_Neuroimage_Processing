@@ -19,8 +19,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'Day6_with_behavior_labels_filled.xlsx')  # 原始数据文件
-        self.data_identifier = 'Day6'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'Day9_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day9'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -110,7 +110,7 @@ class AnalysisConfig:
         # 分析参数配置
         self.analysis_params = {
             'min_samples_per_behavior': 10,  # 每种行为的最小样本数要求
-            'correlation_windows': [10, 20, 50, 100],  # 时间相关性分析的窗口大小列表
+            'correlation_windows': [10, 20, 50],  # 时间相关性分析的窗口大小列表
             'behavior_merge_threshold': 0.8,  # 行为合并的相似度阈值
             'neuron_significance_threshold': 1.0,  # 神经元显著性的阈值
             'temporal_window_size': 50,  # 时间窗口分析的大小
@@ -140,7 +140,7 @@ class AnalysisConfig:
             'community_resolution': 1.0,  # 社区检测的分辨率参数
             
             # GNN参数配置
-            'gnn_epochs': 200,  # 恢复更多训练轮数
+            'gnn_epochs': 300,  # 恢复更多训练轮数
             'gnn_learning_rate': 0.008,  # 提高初始学习率
             'gnn_weight_decay': 1e-3,  # 减弱权重衰减强度
             'gnn_dropout': 0.3,  # 减弱Dropout强度
@@ -153,15 +153,6 @@ class AnalysisConfig:
             'temporal_window_size': 10,  # 时间窗口大小
             'temporal_stride': 5,  # 时间窗口滑动步长
             
-            # GAT模型参数
-            'gat_heads': 4,  # GAT注意力头数
-            'gat_hidden_channels': 128,  # 增加GAT隐藏层维度
-            'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
-            'gat_residual': True,  # 启用残差连接
-            'gat_num_layers': 3,  # GAT层数
-            'gat_alpha': 0.2,  # LeakyReLU的alpha参数
-            'gat_jk_mode': 'max',  # 跳跃连接模式：max, lstm, cat
-            
             # GCN增强模型参数
             'gcn_hidden_channels': 128,  # 增加GCN隐藏层维度
             'gcn_num_layers': 4,  # GCN层数
@@ -170,6 +161,16 @@ class AnalysisConfig:
             'gcn_activation': 'leaky_relu',  # 激活函数类型
             'gcn_alpha': 0.2,  # LeakyReLU的alpha参数
             'gcn_residual': True,  # 是否使用残差连接
+            
+            # GAT模型参数
+            'gat_heads': 4,  # GAT注意力头数
+            'gat_hidden_channels': 128,  # 增加GAT隐藏层维度
+            'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
+            'gat_residual': True,  # 启用残差连接
+            'gat_num_layers': 3,  # GAT层数
+            'gat_alpha': 0.2,  # LeakyReLU的alpha参数
+            'gat_jk_mode': 'max',  # 跳跃连接模式：max, lstm, cat
+                      
         }
         
         # 可视化参数配置
@@ -221,7 +222,7 @@ class AnalysisConfig:
         self.use_gnn = True  # 是否使用GNN分析
         
         # GAT模型控制开关
-        self.use_gat = False  # 是否使用GAT模型
+        self.use_gat = True  # 是否使用GAT模型
         
         # 设置目录
         self.setup_directories()
