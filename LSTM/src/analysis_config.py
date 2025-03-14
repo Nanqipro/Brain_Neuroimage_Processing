@@ -19,8 +19,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'EMtrace.xlsx')  # 原始数据文件
-        self.data_identifier = 'EMtrace'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'Day3_with_behavior_labels_filled.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day3'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -47,6 +47,7 @@ class AnalysisConfig:
         self.gcn_topology_png = os.path.join(self.gnn_results_dir, 'gcn_topology.png')  # GCN拓扑静态可视化
         self.gcn_interactive_topology = os.path.join(self.gnn_results_dir, 'gcn_interactive_topology.html')  # GCN拓扑交互式可视化
         self.gcn_topology_data = os.path.join(self.gnn_results_dir, 'gcn_topology_data.json')  # GCN拓扑数据
+        self.gcn_real_pos_topology_png = os.path.join(self.gnn_results_dir, 'gcn_topology_real_positions.png')  # 基于真实位置的GCN拓扑静态可视化
         
         # GAT相关路径
         self.gat_training_plot = os.path.join(self.gnn_results_dir, 'gat_training.png')  # GAT训练曲线

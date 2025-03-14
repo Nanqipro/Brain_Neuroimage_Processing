@@ -68,7 +68,8 @@ try:
     from neuron_gat import NeuronGAT, visualize_gat_topology, visualize_gat_attention_weights
     from gnn_topology import (create_gnn_based_topology, visualize_gnn_topology,
                              create_interactive_gnn_topology, save_gnn_topology_data, 
-                             analyze_gnn_topology, visualize_gcn_topology)
+                             analyze_gnn_topology, visualize_gcn_topology,
+                             visualize_gcn_topology_with_real_positions)
     from gnn_visualization import GNNVisualizer
     # 设置GNN支持标志为True，表示成功导入了所有GNN相关模块
     # 此标志将在后续代码中用于条件性地启用GNN分析功能
@@ -80,21 +81,8 @@ except ImportError as e:
     print("安装命令: pip install torch-geometric torch-scatter torch-sparse")
     HAS_GNN_SUPPORT = False
 
-# 导入GNN拓扑可视化模块
-try:
-    from gnn_topology import (
-        create_gnn_based_topology, 
-        visualize_gnn_topology, 
-        create_interactive_gnn_topology,
-        save_gnn_topology_data,
-        analyze_gnn_topology
-    )
-    # 设置GNN拓扑支持标志为True，表示成功导入了所有GNN拓扑相关模块
-    # 此标志将在后续代码中用于条件性地启用GNN拓扑分析功能
-    HAS_GNN_TOPOLOGY = True
-except ImportError:
-    print("警告: 未找到GNN拓扑可视化模块，将禁用GNN拓扑功能")
-    HAS_GNN_TOPOLOGY = False
+# 导入GNN拓扑可视化模块（删除重复的导入）
+HAS_GNN_TOPOLOGY = HAS_GNN_SUPPORT  # 使用相同的标志，因为已经导入了所有需要的模块
 
 def check_gnn_dependencies():
     """
@@ -1814,6 +1802,13 @@ class ResultAnalyzer:
             # 生成静态拓扑结构图
             visualize_gcn_topology(self.config.gcn_topology_data)
             
+            # 使用真实位置坐标生成拓扑结构图
+            real_pos_topo_path = visualize_gcn_topology_with_real_positions(
+                self.config.gcn_topology_data,
+                self.config.position_data_file
+            )
+            print(f"基于真实位置的GCN拓扑结构图已保存至: {real_pos_topo_path}")
+            
             # 创建交互式可视化
             create_interactive_gnn_topology(
                 G=G_gnn,
@@ -1829,6 +1824,7 @@ class ResultAnalyzer:
                     'accuracy': accuracy,
                     'loss_plot_path': loss_plot_path,
                     'topology_plot_path': gnn_topo_path,
+                    'real_positions_topology_path': real_pos_topo_path,  # 添加真实位置拓扑图路径
                     'accuracy_plot_path': accuracy_plot_path,
                     'train_acc_history': accuracies['train'],
                     'val_acc_history': accuracies['val'],

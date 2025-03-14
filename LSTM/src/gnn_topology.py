@@ -685,3 +685,109 @@ def visualize_gat_topology(topology_data_path):
         import traceback
         print(f"错误详情:\n{traceback.format_exc()}")
         return None 
+
+def visualize_gcn_topology_with_real_positions(topology_data_path, position_data_path):
+    """
+    根据GCN拓扑数据文件和真实神经元位置坐标生成静态拓扑结构图
+    
+    参数:
+        topology_data_path: GCN拓扑数据JSON文件路径
+        position_data_path: 神经元位置坐标CSV文件路径
+    
+    返回:
+        output_path: 生成的图像文件路径
+    """
+    print("\n开始基于真实位置生成GCN静态拓扑结构图...")
+    
+    try:
+        # 读取拓扑数据
+        with open(topology_data_path, 'r') as f:
+            topo_data = json.load(f)
+        
+        # 读取位置数据
+        import pandas as pd
+        position_df = pd.read_csv(position_data_path)
+        
+        # 创建NetworkX图对象
+        G = nx.Graph()
+        
+        # 添加节点
+        for node in topo_data['nodes']:
+            G.add_node(node['id'])
+        
+        # 添加边
+        for edge in topo_data['edges']:
+            G.add_edge(edge['source'], edge['target'], weight=edge['similarity'])
+        
+        # 检测社区结构
+        import community as community_louvain
+        communities = community_louvain.best_partition(G)
+        
+        # 为不同社区分配不同颜色
+        community_colors = [
+            "#FF6347", "#4682B4", "#32CD32", "#FFD700", "#9370DB", 
+            "#20B2AA", "#FF69B4", "#8A2BE2", "#00CED1", "#FF8C00",
+            "#1E90FF", "#FF1493", "#00FA9A", "#DC143C", "#BA55D3"
+        ]
+        
+        # 获取社区数量
+        num_communities = len(set(communities.values()))
+        if num_communities > len(community_colors):
+            community_colors = community_colors * (num_communities // len(community_colors) + 1)
+        
+        # 创建节点颜色映射
+        node_colors = [community_colors[communities[node]] for node in G.nodes()]
+        
+        # 创建位置字典
+        pos = {}
+        for i, node in enumerate(G.nodes()):
+            # 在位置数据中查找对应节点（节点ID+1因为position_df中的编号从1开始）
+            node_num = node + 1
+            if node_num <= len(position_df):
+                # 使用相对坐标作为节点位置
+                x_pos = position_df.iloc[node_num-1]['relative_x']
+                y_pos = position_df.iloc[node_num-1]['relative_y']
+                pos[node] = (x_pos, y_pos)
+            else:
+                # 如果找不到对应位置，使用随机位置
+                print(f"警告：无法找到节点{node}的位置数据，使用随机位置")
+                pos[node] = (np.random.random(), np.random.random())
+        
+        # 设置绘图参数
+        plt.figure(figsize=(15, 15))
+        
+        # 绘制边（使用权重确定边的宽度，降低alpha值使边更透明）
+        edge_weights = [G[u][v]['weight'] * 1.5 for u, v in G.edges()]
+        nx.draw_networkx_edges(G, pos, width=edge_weights, alpha=0.2, edge_color='gray')
+        
+        # 绘制节点（节点大小调整）
+        node_sizes = [400 for _ in G.nodes()]
+        nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.9)
+        
+        # 添加节点标签
+        labels = {node: f'N{node+1}' for node in G.nodes()}
+        nx.draw_networkx_labels(G, pos, labels, font_size=9, font_weight='bold')
+        
+        plt.title('GCN-Based Neuron Network Topology (Real Positions)', fontsize=16)
+        plt.axis('off')
+        
+        # 添加社区图例
+        legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
+                                    markerfacecolor=community_colors[i],
+                                    markersize=10, label=f'Community {i+1}')
+                         for i in range(num_communities)]
+        plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5))
+        
+        # 保存图像
+        output_path = os.path.join(os.path.dirname(topology_data_path), 'gcn_topology_real_positions.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"基于真实位置的GCN拓扑结构图已保存至: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        print(f"生成基于真实位置的GCN拓扑结构图时出错: {str(e)}")
+        import traceback
+        print(f"错误详情:\n{traceback.format_exc()}")
+        return None 
