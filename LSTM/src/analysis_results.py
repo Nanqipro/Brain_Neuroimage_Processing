@@ -34,10 +34,6 @@ from scipy.signal import find_peaks
 import warnings
 warnings.filterwarnings('ignore')
 from sklearn.decomposition import PCA
-import copy
-from sklearn.model_selection import train_test_split
-import torch.nn as nn
-import torch.nn.functional as F
 
 # 从 neuron_lstm.py 导入必要的类和函数
 from neuron_lstm import (
@@ -45,11 +41,13 @@ from neuron_lstm import (
     NeuronAutoencoder, 
     MultiHeadAttention, 
     TemporalAttention, 
-    EnhancedNeuronLSTM,
-    set_random_seed
+    EnhancedNeuronLSTM
 )
 from kmeans_lstm_analysis import NeuronDataProcessor
 from analysis_config import AnalysisConfig
+
+import torch.nn.functional as F
+
 
 # 添加安全的全局变量
 add_safe_globals(['_reconstruct'])
@@ -86,60 +84,6 @@ except ImportError as e:
 # 导入GNN拓扑可视化模块（删除重复的导入）
 HAS_GNN_TOPOLOGY = HAS_GNN_SUPPORT  # 使用相同的标志，因为已经导入了所有需要的模块
 
-class LabelSmoothingCrossEntropy(nn.Module):
-    """
-    标签平滑交叉熵损失函数
-    
-    参数:
-        smoothing: 平滑系数，通常在0.1到0.2之间
-    """
-    def __init__(self, smoothing=0.1):
-        super(LabelSmoothingCrossEntropy, self).__init__()
-        self.smoothing = smoothing
-        self.confidence = 1.0 - smoothing
-        
-    def forward(self, x, target):
-        logprobs = F.log_softmax(x, dim=-1)
-        nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
-        nll_loss = nll_loss.squeeze(1)
-        smooth_loss = -logprobs.mean(dim=-1)
-        loss = self.confidence * nll_loss + self.smoothing * smooth_loss
-        return loss.mean()
-
-def custom_gnn_loss(outputs, data, lambda_reg=0.001):
-    """
-    自定义GNN损失函数，结合了多种损失成分
-    
-    参数:
-        outputs: 模型输出
-        data: PyTorch Geometric数据对象
-        lambda_reg: 正则化系数
-    
-    返回:
-        loss: 计算得到的损失值
-    """
-    # 如果存在标签，使用交叉熵
-    if hasattr(data, 'y') and data.y is not None:
-        ce_loss = F.cross_entropy(outputs, data.y)
-        loss = ce_loss
-    else:
-        # 如果没有标签，可以使用自监督损失如重构损失
-        loss = F.mse_loss(outputs, data.x)
-    
-    # L2正则化已经通过weight_decay实现，这里不再重复添加
-    
-    # 添加拓扑一致性损失，相连节点应该有相似的嵌入
-    if hasattr(data, 'edge_index'):
-        src, dst = data.edge_index
-        src_emb = outputs[src]
-        dst_emb = outputs[dst]
-        topo_loss = F.mse_loss(src_emb, dst_emb)
-        
-        # 加权组合各种损失
-        loss = loss + 0.1 * topo_loss
-    
-    return loss
-    
 def check_gnn_dependencies():
     """
     检查GNN相关依赖项是否正确安装
@@ -1904,218 +1848,189 @@ class ResultAnalyzer:
                     'message': 'GAT模型分析已在配置中禁用'
                 }
             else:
-                # 获取GAT参数
-                gat_hidden_channels = self.config.analysis_params.get('gat_hidden_channels', 196)
-                gat_num_layers = self.config.analysis_params.get('gat_num_layers', 4)
-                gat_heads = self.config.analysis_params.get('gat_heads', 8)
-                gat_dropout = self.config.analysis_params.get('gat_dropout', 0.2)
-                gat_jk_mode = self.config.analysis_params.get('gat_jk_mode', 'cat')
-                gat_use_gatv2 = self.config.analysis_params.get('gat_use_gatv2', True)
-                gat_use_layer_norm = self.config.analysis_params.get('gat_use_layer_norm', True)
-                gat_use_se = self.config.analysis_params.get('gat_use_se', True)
-                gat_se_reduction = self.config.analysis_params.get('gat_se_reduction', 8)
-                gat_use_auxiliary_tasks = self.config.analysis_params.get('gat_use_auxiliary_tasks', True)
-                gat_alpha = self.config.analysis_params.get('gat_alpha', 0.2)
-                
-                # 使用社区检测算法获取社区作为标签
-                community_resolution = self.config.analysis_params.get('community_resolution', 1.0)
-                communities = community_detection(G.copy(), resolution=community_resolution)
-                num_communities = len(communities)
-                
-                # 为每个神经元分配社区标签
-                community_labels = np.zeros(len(available_neurons), dtype=np.int64)
-                for community_idx, community in enumerate(communities):
-                    for neuron_idx in community:
-                        # 转换神经元索引为整数（如果是字符串的话）
-                        if isinstance(neuron_idx, str) and neuron_idx.isdigit():
-                            neuron_idx = int(neuron_idx)
-                        # 确保索引有效且在范围内
-                        if isinstance(neuron_idx, int) and 0 <= neuron_idx < len(community_labels):
-                            community_labels[neuron_idx] = community_idx
-                
-                # 创建用于GAT的数据
-                from torch_geometric.data import Data
-                gat_data = Data(x=torch.tensor(X_normalized, dtype=torch.float),
-                                edge_index=data.edge_index.clone(),
-                                y=torch.tensor(community_labels, dtype=torch.long))
-                
-                if hasattr(data, 'edge_attr'):
-                    gat_data.edge_attr = data.edge_attr.clone()
-                
-                print(f"创建GAT模型进行模块识别，社区数量: {num_communities}")
-                
-                # 创建增强版GAT模型
-                from neuron_gat import NeuronGAT
-                
-                # 检查边特征
-                edge_dim = None
-                if hasattr(data, 'edge_attr') and data.edge_attr is not None:
-                    # 安全地获取边特征维度
-                    if data.edge_attr.dim() > 1:
-                        edge_dim = data.edge_attr.size(1)  # 如果是多维的，获取第二个维度
-                    else:
-                        edge_dim = 1  # 如果是一维的，设为1
-                
-                # 确保特征数量与标签数量匹配
-                # 创建与X_normalized具有相同样本数的标签数据
-                adjusted_community_labels = np.zeros(X_normalized.shape[0], dtype=np.int64)
-                # 只填充有效的标签
-                valid_indices = min(len(community_labels), X_normalized.shape[0])
-                adjusted_community_labels[:valid_indices] = community_labels[:valid_indices]
-                
-                # 创建新的GAT数据对象，确保特征和标签数量匹配
-                gat_data = Data(
-                    x=torch.tensor(X_normalized, dtype=torch.float),
-                    edge_index=data.edge_index.clone(),
-                    y=torch.tensor(adjusted_community_labels, dtype=torch.long)
-                )
-                
-                # 如果有边特征，添加到数据中
-                if hasattr(data, 'edge_attr') and data.edge_attr is not None:
-                    gat_data.edge_attr = data.edge_attr.clone()
-                
-                # 禁用可能引起维度问题的功能
-                gat_use_se = False
-                gat_use_layer_norm = False
-                
-                # 确保hidden_channels是8的倍数以适应多头注意力
-                gat_hidden_channels = 192  # 修改为8的倍数，与实际输入维度匹配
-                
-                gat_model = NeuronGAT(
-                    in_channels=X_normalized.shape[1],
-                    hidden_channels=gat_hidden_channels,
-                    out_channels=num_communities,
-                    heads=gat_heads,
-                    dropout=gat_dropout,
-                    num_layers=gat_num_layers,
-                    edge_dim=edge_dim,
-                    alpha=gat_alpha,
-                    use_gatv2=gat_use_gatv2,
-                    jk_mode=gat_jk_mode,
-                    use_layer_norm=gat_use_layer_norm,  # 禁用层归一化
-                    use_se=gat_use_se,  # 禁用SE层
-                    se_reduction=gat_se_reduction,
-                    use_auxiliary_tasks=gat_use_auxiliary_tasks
-                )
-                
-                # 设置训练参数
-                epochs = self.config.analysis_params.get('gnn_epochs', 300)
-                lr = self.config.analysis_params.get('gat_learning_rate', 0.001)
-                weight_decay = self.config.analysis_params.get('gat_weight_decay', 3e-4)
-                patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
-                early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
-                
-                # 训练模型 - 使用新创建的gat_data
-                trained_gat, gat_losses, gat_accuracies = train_gnn_model(
-                    gat_model, gat_data, 
-                    epochs=epochs, 
-                    lr=lr,
-                    weight_decay=weight_decay,
-                    device=self.device,
-                    patience=patience,
-                    early_stopping_enabled=early_stopping_enabled
-                )
-                
-                # 绘制GAT训练曲线
-                gat_loss_plot_path = self.config.gat_training_plot
-                plot_gnn_results(gat_losses, gat_loss_plot_path)
-                
-                # 绘制GAT准确率曲线
-                gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
-                gat_accuracy_plot_path = visualizer.plot_training_metrics(
-                    gat_acc_epochs, 
-                    gat_accuracies['train'], 
-                    gat_accuracies['val'], 
-                    metric_name='Accuracy',
-                    title='GAT Model Training Accuracy Change',
-                    filename='gat_accuracy_curve.png'
-                )
-                
-                # 评估模型
-                trained_gat.eval()
-                with torch.no_grad():
-                    out = trained_gat(gat_data)
-                    _, predicted = torch.max(out, 1)
-                    gat_accuracy = (predicted == gat_data.y).sum().item() / len(gat_data.y)
-                
-                print(f"GAT模块识别模型完成，准确率: {gat_accuracy:.4f}")
-                
-                # 保存结果
-                gnn_results['gat_module_detection'] = {
-                    'accuracy': gat_accuracy,
-                    'loss_plot_path': gat_loss_plot_path,
-                    'accuracy_plot_path': gat_accuracy_plot_path,
-                    'num_communities': num_communities,
-                    'train_acc_history': gat_accuracies['train'],
-                    'val_acc_history': gat_accuracies['val']
-                }
-                
-                # 基于GAT创建新的拓扑结构
+                # 创建GAT模型
+                # 先使用社区检测算法获取社区作为标签
                 try:
-                    print("\n基于GAT模型创建神经元拓扑结构...")
+                    communities = community_louvain.best_partition(G)
+                    community_labels = np.array([communities[node] for node in G.nodes()])
+                    num_communities = len(set(communities.values()))
                     
-                    # 使用GNN模型创建拓扑结构
-                    gat_G = create_gnn_based_topology(
-                        model=trained_gat,
+                    # 创建新的数据对象，确保节点特征和标签维度匹配
+                    # 修复维度不匹配问题：
+                    # 1. 如果有样本数据，则使用样本特征而不是使用之前为GCN准备的data
+                    node_features = []
+                    for node in G.nodes():
+                        # 提取该节点的度作为特征
+                        node_degree = G.degree(node)
+                        # 创建简单的特征向量
+                        node_features.append([float(node_degree)])
+                    
+                    # 创建基于节点的数据对象(而非基于样本)
+                    node_features = torch.tensor(node_features, dtype=torch.float)
+                    
+                    # 修复边索引创建 - 使用正确的节点索引
+                    edge_index = []
+                    edge_weights = []
+                    node_idx_map = {node: idx for idx, node in enumerate(G.nodes())}
+                    
+                    for u, v, attr in G.edges(data=True):
+                        edge_index.append((node_idx_map[u], node_idx_map[v]))
+                        edge_index.append((node_idx_map[v], node_idx_map[u]))  # 添加双向边
+                        # 使用相关性作为边权重
+                        edge_weights.append(attr['weight'])
+                        edge_weights.append(attr['weight'])
+                    
+                    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+                    edge_weight = torch.tensor(edge_weights, dtype=torch.float)
+                    
+                    # 创建新的数据对象
+                    gat_data = Data(
+                        x=node_features,
+                        edge_index=edge_index,
+                        edge_attr=edge_weight,
+                        y=torch.tensor(community_labels, dtype=torch.long)
+                    )
+                    
+                    print(f"为GAT创建的数据: {gat_data}")
+                    
+                    # 使用配置参数创建GAT模型
+                    gat_model = NeuronGAT(
+                        in_channels=node_features.size(1),  # 使用节点特征维度
+                        hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 128),
+                        out_channels=num_communities,
+                        heads=self.config.analysis_params.get('gat_heads', 4),
+                        dropout=self.config.analysis_params.get('gat_dropout', 0.3),
+                        residual=self.config.analysis_params.get('gat_residual', True),
+                        num_layers=self.config.analysis_params.get('gat_num_layers', 3),
+                        alpha=self.config.analysis_params.get('gat_alpha', 0.2)
+                    )
+                    
+                    # 设置训练参数 - 使用GAT特定参数
+                    epochs = self.config.analysis_params.get('gat_epochs', 300)
+                    lr = self.config.analysis_params.get('gat_learning_rate', 0.005)
+                    weight_decay = self.config.analysis_params.get('gat_weight_decay', 5e-4)
+                    patience = self.config.analysis_params.get('gat_patience', 20)
+                    early_stopping_enabled = self.config.analysis_params.get('gat_early_stopping_enabled', False)
+                    
+                    # 训练模型 - 使用新创建的gat_data
+                    trained_gat, gat_losses, gat_accuracies = train_gnn_model(
+                        model=gat_model,
                         data=gat_data,
-                        G=G.copy(),
-                        node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                        threshold=0.5 # 使用更高阈值突出模块结构
+                        epochs=epochs,
+                        lr=lr,
+                        weight_decay=weight_decay,
+                        patience=patience,
+                        device=gnn_analyzer.device,
+                        early_stopping_enabled=early_stopping_enabled
                     )
                     
-                    # 获取节点嵌入和相似度矩阵
+                    # 绘制GAT训练曲线
+                    gat_loss_plot_path = self.config.gat_training_plot
+                    plot_gnn_results(gat_losses, gat_loss_plot_path)
+                    
+                    # 绘制GAT准确率曲线
+                    gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
+                    gat_accuracy_plot_path = visualizer.plot_training_metrics(
+                        gat_acc_epochs, 
+                        gat_accuracies['train'], 
+                        gat_accuracies['val'], 
+                        metric_name='Accuracy',
+                        title='GAT Model Training Accuracy Change',
+                        filename='gat_accuracy_curve.png'
+                    )
+                    
+                    # 评估模型
+                    trained_gat.eval()
                     with torch.no_grad():
-                        gat_embeddings = trained_gat.get_embeddings(gat_data).detach().cpu().numpy()
-                    gat_similarities = nx.adjacency_matrix(gat_G).todense()
+                        out = trained_gat(gat_data)
+                        _, predicted = torch.max(out, 1)
+                        gat_accuracy = (predicted == gat_data.y).sum().item() / len(gat_data.y)
                     
-                    print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
+                    print(f"GAT模块识别模型完成，准确率: {gat_accuracy:.4f}")
                     
-                    # 创建交互式GNN拓扑可视化
-                    print(f"开始创建交互式GNN拓扑可视化: {self.config.gat_interactive_topology}")
-                    try:
-                        create_interactive_gnn_topology(
-                            G=gat_G,
-                            embeddings=gat_embeddings,
-                            similarities=gat_similarities.astype(float) if hasattr(gat_similarities, 'astype') else gat_similarities,
-                            node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
-                            output_path=self.config.gat_interactive_topology
-                        )
-                        print(f"交互式神经元网络已成功保存到: {self.config.gat_interactive_topology}")
-                    except Exception as e:
-                        print(f"创建交互式GAT拓扑结构时出错: {str(e)}")
-                    
-                    # 保存GAT拓扑数据
-                    save_gnn_topology_data(
-                        G=gat_G,
-                        embeddings=gat_embeddings,
-                        similarities=gat_similarities,
-                        node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
-                        output_path=self.config.gat_topology_data
-                    )
-                    print(f"GNN拓扑数据已保存到: {self.config.gat_topology_data}")
-                    
-                    # 使用visualize_gat_topology生成GAT静态拓扑图
-                    print("\n开始生成GAT静态拓扑结构图...")
-                    gat_static_topo_path = visualize_gat_topology(self.config.gat_topology_data)
-                    
-                    # 分析GAT拓扑结构
-                    topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
-                    
-                    # 保存GAT拓扑分析结果
-                    gnn_results['gat_topology'] = {
-                        'visualization_path': gat_static_topo_path,  # 使用静态拓扑图路径
-                        'interactive_path': self.config.gat_interactive_topology,
-                        'data_path': self.config.gat_topology_data,
-                        'topology_metrics': topo_metrics,
-                        'node_count': gat_G.number_of_nodes(),
-                        'edge_count': gat_G.number_of_edges()
+                    # 保存结果
+                    gnn_results['gat_module_detection'] = {
+                        'accuracy': gat_accuracy,
+                        'loss_plot_path': gat_loss_plot_path,
+                        'accuracy_plot_path': gat_accuracy_plot_path,
+                        'num_communities': num_communities,
+                        'train_acc_history': gat_accuracies['train'],
+                        'val_acc_history': gat_accuracies['val']
                     }
                     
+                    # 基于GAT创建新的拓扑结构
+                    try:
+                        print("\n基于GAT模型创建神经元拓扑结构...")
+                        
+                        # 使用GNN模型创建拓扑结构
+                        gat_G = create_gnn_based_topology(
+                            model=trained_gat,
+                            data=gat_data,
+                            G=G.copy(),
+                            node_names=[f"N{i+1}" for i in range(len(available_neurons))],
+                            threshold=0.5 # 使用更高阈值突出模块结构
+                        )
+                        
+                        # 获取节点嵌入和相似度矩阵
+                        with torch.no_grad():
+                            gat_embeddings = trained_gat.get_embeddings(gat_data).detach().cpu().numpy()
+                        gat_similarities = nx.adjacency_matrix(gat_G).todense()
+                        
+                        print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
+                        
+                        # 创建交互式GNN拓扑可视化
+                        print(f"开始创建交互式GNN拓扑可视化: {self.config.gat_interactive_topology}")
+                        try:
+                            create_interactive_gnn_topology(
+                                G=gat_G,
+                                embeddings=gat_embeddings,
+                                similarities=gat_similarities.astype(float) if hasattr(gat_similarities, 'astype') else gat_similarities,
+                                node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
+                                output_path=self.config.gat_interactive_topology
+                            )
+                            print(f"交互式神经元网络已成功保存到: {self.config.gat_interactive_topology}")
+                        except Exception as e:
+                            print(f"创建交互式GAT拓扑结构时出错: {str(e)}")
+                        
+                        # 保存GAT拓扑数据
+                        save_gnn_topology_data(
+                            G=gat_G,
+                            embeddings=gat_embeddings,
+                            similarities=gat_similarities,
+                            node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
+                            output_path=self.config.gat_topology_data
+                        )
+                        print(f"GNN拓扑数据已保存到: {self.config.gat_topology_data}")
+                        
+                        # 使用visualize_gat_topology生成GAT静态拓扑图
+                        print("\n开始生成GAT静态拓扑结构图...")
+                        gat_static_topo_path = visualize_gat_topology(self.config.gat_topology_data)
+                        
+                        # 分析GAT拓扑结构
+                        topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
+                        
+                        # 保存GAT拓扑分析结果
+                        gnn_results['gat_topology'] = {
+                            'visualization_path': gat_static_topo_path,  # 使用静态拓扑图路径
+                            'interactive_path': self.config.gat_interactive_topology,
+                            'data_path': self.config.gat_topology_data,
+                            'topology_metrics': topo_metrics,
+                            'node_count': gat_G.number_of_nodes(),
+                            'edge_count': gat_G.number_of_edges()
+                        }
+                        
+                    except Exception as e:
+                        print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
+                        import traceback
+                        print(f"错误详情:\n{traceback.format_exc()}")
+                        gnn_results['gat_topology'] = {
+                            'error': str(e)
+                        }
                 except Exception as e:
-                    print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
+                    print(f"GAT训练过程中出错: {str(e)}")
                     import traceback
                     print(f"错误详情:\n{traceback.format_exc()}")
-                    gnn_results['gat_topology'] = {
+                    gnn_results['gat_module_detection'] = {
                         'error': str(e)
                     }
         except Exception as e:
@@ -2238,254 +2153,6 @@ def set_all_random_seeds(seed=42):
         torch.backends.cudnn.benchmark = False
     
     print(f"已设置所有随机种子为: {seed}")
-
-def community_detection(G, resolution=1.0):
-    """
-    使用Louvain算法进行社区检测
-    
-    参数:
-        G: NetworkX图对象
-        resolution: 社区分辨率参数，较大的值会产生更多较小的社区
-        
-    返回:
-        communities: 社区列表，每个社区包含节点列表
-    """
-    print(f"使用Louvain算法进行社区检测，分辨率参数: {resolution}...")
-    
-    # 使用python-louvain库进行社区检测
-    partition = community_louvain.best_partition(G, resolution=resolution)
-    
-    # 将结果重组为社区列表
-    community_dict = {}
-    for node, community_id in partition.items():
-        if community_id not in community_dict:
-            community_dict[community_id] = []
-        
-        # 转换节点ID为整数（如果可能）
-        if isinstance(node, str) and node.isdigit():
-            node = int(node)
-        
-        community_dict[community_id].append(node)
-    
-    # 将字典转换为列表
-    communities = list(community_dict.values())
-    
-    print(f"检测到 {len(communities)} 个社区")
-    community_sizes = [len(community) for community in communities]
-    print(f"社区大小分布: 最小={min(community_sizes)}, 最大={max(community_sizes)}, 平均={np.mean(community_sizes):.1f}")
-    
-    return communities
-
-def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu', patience=15, early_stopping_enabled=False):
-    """
-    训练GNN模型
-    
-    参数:
-        model: GNN模型
-        data: PyTorch Geometric数据对象
-        epochs: 训练轮数
-        lr: 学习率
-        weight_decay: 权重衰减
-        device: 设备(cuda/cpu)
-        patience: 早停耐心值
-        early_stopping_enabled: 是否启用早停机制，默认为False
-    
-    返回:
-        model: 训练好的模型
-        losses: 损失历史
-        metrics: 其他指标历史（如准确率）
-    """
-    # 调试信息：检查输入数据的形状
-    print(f"数据检查 - x形状: {data.x.size()}, y形状: {data.y.size() if hasattr(data, 'y') and data.y is not None else 'None'}")
-    print(f"边索引形状: {data.edge_index.size()}, 边属性形状: {data.edge_attr.size() if hasattr(data, 'edge_attr') else 'None'}")
-    
-    # 将数据移至设备
-    data = data.to(device)
-    model = model.to(device)
-    
-    # 检测模型是否支持辅助任务
-    use_auxiliary_tasks = hasattr(model, 'use_auxiliary_tasks') and model.use_auxiliary_tasks
-    
-    # 准备优化器 - 使用带动量的SGD或AdamW
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay, betas=(0.9, 0.999))
-    
-    # 使用余弦退火学习率调度器，更适合避免局部最小值
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, T_0=20, T_mult=2, eta_min=1e-6
-    )
-    
-    # 使用标签平滑交叉熵损失，提高泛化能力
-    criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
-    
-    # 创建训练/验证索引 - 使用分层采样确保类别平衡
-    indices = list(range(data.x.size(0)))
-    if hasattr(data, 'y'):
-        stratify = data.y.cpu().numpy() if data.y is not None else None
-        
-        # 添加维度一致性检查
-        if stratify is not None and len(indices) != len(stratify):
-            print(f"警告: 特征数量 ({len(indices)}) 与标签数量 ({len(stratify)}) 不匹配!")
-            print(f"数据特征形状: {data.x.size()}, 标签形状: {data.y.size()}")
-            
-            # 尝试解决方法: 裁剪到相同长度
-            min_length = min(len(indices), len(stratify))
-            indices = indices[:min_length]
-            stratify = stratify[:min_length]
-            print(f"已调整为共同长度: {min_length}")
-        
-        train_indices, val_indices = train_test_split(
-            indices, test_size=0.2, random_state=42, stratify=stratify
-        )
-    else:
-        train_indices, val_indices = train_test_split(indices, test_size=0.2, random_state=42)
-    
-    # 记录损失和准确率
-    losses = {'train': [], 'val': []}
-    accuracies = {'train': [], 'val': []}
-    
-    # 早停设置
-    best_val_loss = float('inf')
-    best_model_state = None
-    no_improve_count = 0
-    
-    for epoch in range(1, epochs + 1):
-        # 训练模式
-        model.train()
-        train_loss = 0.0
-        train_correct = 0
-        train_total = 0
-        
-        # 创建训练掩码
-        train_mask = torch.zeros(data.x.size(0), dtype=torch.bool, device=device)
-        train_mask[train_indices] = True
-        
-        # 前向传播和优化
-        optimizer.zero_grad()
-        
-        # 处理模型输出（支持辅助任务的情况）
-        if use_auxiliary_tasks:
-            out, aux_outputs = model(data)
-            
-            # 主任务损失
-            if hasattr(data, 'y') and data.y is not None:
-                main_loss = criterion(out[train_mask], data.y[train_mask])
-            else:
-                main_loss = custom_gnn_loss(out[train_mask], data)
-            
-            # 辅助任务损失
-            aux_loss = sum(aux_outputs.values())
-            
-            # 总损失 - 主任务占90%，辅助任务占10%
-            loss = 0.9 * main_loss + 0.1 * aux_loss
-        else:
-            out = model(data)
-            
-            if hasattr(data, 'y') and data.y is not None:
-                loss = criterion(out[train_mask], data.y[train_mask])
-            else:
-                loss = custom_gnn_loss(out[train_mask], data)
-        
-        # 反向传播
-        loss.backward()
-        
-        # 梯度裁剪，避免梯度爆炸
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        
-        optimizer.step()
-        
-        train_loss += loss.item()
-        
-        # 计算训练准确率
-        if hasattr(data, 'y') and data.y is not None:
-            _, predicted = torch.max(out[train_mask], 1)
-            train_total += data.y[train_mask].size(0)
-            train_correct += (predicted == data.y[train_mask]).sum().item()
-        
-        # 验证模式
-        model.eval()
-        val_loss = 0.0
-        val_correct = 0
-        val_total = 0
-        
-        # 创建验证掩码
-        val_mask = torch.zeros(data.x.size(0), dtype=torch.bool, device=device)
-        val_mask[val_indices] = True
-        
-        with torch.no_grad():
-            # 处理模型输出（支持辅助任务的情况）
-            if use_auxiliary_tasks:
-                out, aux_outputs = model(data)
-                
-                # 主任务损失
-                if hasattr(data, 'y') and data.y is not None:
-                    main_loss = criterion(out[val_mask], data.y[val_mask])
-                else:
-                    main_loss = custom_gnn_loss(out[val_mask], data)
-                
-                # 辅助任务损失
-                aux_loss = sum(aux_outputs.values())
-                
-                # 总损失 - 主任务占90%，辅助任务占10%
-                val_loss_value = (0.9 * main_loss + 0.1 * aux_loss).item()
-            else:
-                out = model(data)
-                
-                if hasattr(data, 'y') and data.y is not None:
-                    val_loss_value = criterion(out[val_mask], data.y[val_mask]).item()
-                else:
-                    val_loss_value = custom_gnn_loss(out[val_mask], data).item()
-            
-            val_loss += val_loss_value
-            
-            # 计算验证准确率
-            if hasattr(data, 'y') and data.y is not None:
-                _, predicted = torch.max(out[val_mask], 1)
-                val_total += data.y[val_mask].size(0)
-                val_correct += (predicted == data.y[val_mask]).sum().item()
-        
-        # 计算平均损失和准确率
-        train_loss /= len(train_indices)
-        val_loss /= len(val_indices)
-        
-        train_acc = train_correct / train_total if train_total > 0 else 0
-        val_acc = val_correct / val_total if val_total > 0 else 0
-        
-        # 记录损失和准确率
-        losses['train'].append(train_loss)
-        losses['val'].append(val_loss)
-        accuracies['train'].append(train_acc)
-        accuracies['val'].append(val_acc)
-        
-        # 更新学习率
-        current_lr = optimizer.param_groups[0]['lr']
-        scheduler.step()
-        
-        # 打印训练信息
-        if epoch % 10 == 0 or epoch == 1 or epoch == epochs:
-            print(f"Epoch {epoch}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, LR: {current_lr:.6f}")
-        
-        # 早停检查
-        if early_stopping_enabled:
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_model_state = copy.deepcopy(model.state_dict())
-                no_improve_count = 0
-            else:
-                no_improve_count += 1
-                
-            if no_improve_count >= patience:
-                print(f"早停激活于第 {epoch} 轮，最佳验证损失: {best_val_loss:.4f}")
-                if best_model_state is not None:
-                    model.load_state_dict(best_model_state)
-                break
-    
-    # 如果已经完成所有轮次，检查是否应该恢复最佳模型
-    if early_stopping_enabled and best_model_state is not None and epoch == epochs:
-        if val_loss > best_val_loss:
-            model.load_state_dict(best_model_state)
-            print(f"训练完成所有 {epochs} 轮次，已恢复最佳模型 (验证损失: {best_val_loss:.4f})")
-    
-    return model, losses, accuracies
 
 def main():
     """主函数，运行神经元活动数据分析流程"""

@@ -20,55 +20,19 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Linear, Dropout, LayerNorm, BatchNorm1d
-from torch_geometric.nn import GATConv, JumpingKnowledge, GlobalAttention, GATv2Conv
-from torch_geometric.utils import to_networkx, remove_self_loops, add_self_loops
+from torch.nn import Linear, Dropout
+from torch_geometric.nn import GATConv, JumpingKnowledge, GlobalAttention
+from torch_geometric.utils import to_networkx
 from sklearn.manifold import TSNE
-
-
-class SELayer(nn.Module):
-    """
-    Squeeze-and-Excitation注意力模块
-    
-    用于动态调整特征通道重要性
-    """
-    def __init__(self, channel, reduction=4):
-        super(SELayer, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(channel, channel // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(channel // reduction, channel, bias=False),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        # 输入x形状: [num_nodes, channels]
-        b, c = x.size()
-        # 重塑以适应池化层
-        x_reshaped = x.unsqueeze(0).transpose(1, 2)  # [1, channels, num_nodes]
-        
-        # 安全处理: 确保维度正确
-        try:
-            y = self.avg_pool(x_reshaped).view(c)  # [channels]
-            y = self.fc(y).view(1, c, 1)  # [1, channels, 1]
-            # 重塑回原始形状并应用注意力
-            y = y.expand_as(x_reshaped)  # [1, channels, num_nodes]
-            x_se = x_reshaped * y  # 应用通道注意力
-            return x_se.transpose(1, 2).squeeze(0)  # [num_nodes, channels]
-        except RuntimeError as e:
-            # 如果遇到维度不匹配问题，打印警告并返回原始输入
-            print(f"SELayer维度错误: {e}，跳过SE层并返回原始输入")
-            return x  # 如有错误，直接返回原始输入
 
 
 class MultiHeadSelfAttention(nn.Module):
     """
-    增强型多头自注意力机制
+    多头自注意力机制
     
-    用于增强节点特征表示的自注意力模块，包含残差连接和层归一化
+    用于增强节点特征表示的自注意力模块
     """
-    def __init__(self, in_channels, num_heads=8, dropout=0.1, use_layer_norm=True):
+    def __init__(self, in_channels, num_heads=4, dropout=0.1):
         """
         初始化多头自注意力层
         
@@ -76,14 +40,12 @@ class MultiHeadSelfAttention(nn.Module):
             in_channels: 输入特征维度
             num_heads: 注意力头数量
             dropout: Dropout比率
-            use_layer_norm: 是否使用层归一化
         """
         super(MultiHeadSelfAttention, self).__init__()
         self.num_heads = num_heads
         self.in_channels = in_channels
         self.head_dim = in_channels // num_heads
         assert in_channels % num_heads == 0, "in_channels must be divisible by num_heads"
-        self.use_layer_norm = use_layer_norm
         
         # 定义查询、键、值投影
         self.query = Linear(in_channels, in_channels)
@@ -95,19 +57,6 @@ class MultiHeadSelfAttention(nn.Module):
         
         # Dropout
         self.dropout = Dropout(dropout)
-        
-        # 层归一化
-        if use_layer_norm:
-            self.layer_norm1 = LayerNorm(in_channels)
-            self.layer_norm2 = LayerNorm(in_channels)
-        
-        # 前馈网络
-        self.ffn = nn.Sequential(
-            Linear(in_channels, in_channels * 2),
-            nn.GELU(),
-            Dropout(dropout),
-            Linear(in_channels * 2, in_channels)
-        )
         
         # 缩放因子
         self.scale = self.head_dim ** -0.5
@@ -123,6 +72,7 @@ class MultiHeadSelfAttention(nn.Module):
             output: 注意力增强的特征
         """
         original_dim = x.dim()
+        original_shape = x.shape
         
         # 处理输入数据形状 - 适应PyG中节点特征的形状
         if original_dim == 2:
@@ -134,11 +84,6 @@ class MultiHeadSelfAttention(nn.Module):
         else:
             # 如果已经是3D输入 [batch_size, num_nodes, channels]
             batch_size, seq_len, _ = x.size()
-        
-        # 第一个残差块: 多头自注意力
-        if self.use_layer_norm:
-            residual = x
-            x = self.layer_norm1(x)
         
         # 投影查询、键、值
         q = self.query(x)
@@ -164,129 +109,26 @@ class MultiHeadSelfAttention(nn.Module):
         context = context.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, self.in_channels)
         
         # 输出投影
-        x = self.out_proj(context)
-        
-        # 应用残差连接
-        if self.use_layer_norm:
-            x = x + residual
-        
-        # 第二个残差块: 前馈网络
-        if self.use_layer_norm:
-            residual = x
-            x = self.layer_norm2(x)
-        
-        # 应用前馈网络
-        x_ffn = self.ffn(x)
-        
-        # 应用残差连接
-        if self.use_layer_norm:
-            x = x_ffn + residual
-        else:
-            x = x_ffn + x
+        output = self.out_proj(context)
         
         # 恢复原始维度
         if original_dim == 2:
-            x = x.squeeze(0)
+            output = output.squeeze(0)
             
-        return x
-
-
-class GNNBlock(nn.Module):
-    """增强型GAT块，包含注意力、归一化和残差连接"""
-    
-    def __init__(self, in_channels, out_channels, heads=8, dropout=0.1, 
-                 edge_dim=None, use_gatv2=True, use_layer_norm=True,
-                 use_se=True, reduction=8, alpha=0.2):
-        super(GNNBlock, self).__init__()
-        
-        # 选择GAT版本
-        if use_gatv2:
-            self.gat = GATv2Conv(
-                in_channels, out_channels // heads, heads=heads,
-                dropout=dropout, edge_dim=edge_dim, add_self_loops=True
-            )
-        else:
-            self.gat = GATConv(
-                in_channels, out_channels // heads, heads=heads,
-                dropout=dropout, edge_dim=edge_dim, add_self_loops=True
-            )
-        
-        # 层归一化
-        self.use_layer_norm = use_layer_norm
-        if use_layer_norm:
-            self.layer_norm = LayerNorm(out_channels)
-        
-        # Squeeze-and-Excitation模块
-        self.use_se = use_se
-        if use_se:
-            self.se = SELayer(out_channels, reduction=reduction)
-        
-        # 激活函数
-        self.act = nn.LeakyReLU(alpha)
-        self.dropout = nn.Dropout(dropout)
-        
-    def forward(self, x, edge_index, edge_weight=None, residual=None):
-        # 应用GAT
-        if edge_weight is not None:
-            out = self.gat(x, edge_index, edge_weight)
-        else:
-            out = self.gat(x, edge_index)
-        
-        # 应用Squeeze-and-Excitation
-        if self.use_se:
-            try:
-                out = self.se(out)
-            except RuntimeError as e:
-                print(f"SE层错误: {e}，跳过SE层")
-                # 出错时跳过SE层
-        
-        # 应用残差连接
-        if residual is not None and residual.size() == out.size():
-            out = out + residual
-        
-        # 应用层归一化
-        if self.use_layer_norm:
-            try:
-                # 检查形状是否匹配
-                if hasattr(self.layer_norm, 'normalized_shape'):
-                    expected_shape = self.layer_norm.normalized_shape[0]
-                    actual_shape = out.size(-1)
-                    if expected_shape != actual_shape:
-                        print(f"层归一化维度不匹配: 期望 {expected_shape}, 实际 {actual_shape}，跳过层归一化")
-                    else:
-                        out = self.layer_norm(out)
-                else:
-                    out = self.layer_norm(out)
-            except RuntimeError as e:
-                print(f"层归一化错误: {e}，跳过层归一化")
-                # 出错时跳过层归一化
-        
-        # 应用激活函数和dropout
-        out = self.act(out)
-        out = self.dropout(out)
-        
-        return out
+        return output
 
 
 class NeuronGAT(torch.nn.Module):
     """
-    增强型神经元图注意力网络
+    使用图注意力网络进行神经元功能模块识别
     
-    GAT模型通过学习节点之间的注意力权重来捕获神经元之间的功能关系，
-    包含多种先进技术增强性能：
-    1. GATv2卷积层 - 使用动态注意力机制
-    2. 通道注意力 - 使用SE模块
-    3. 残差连接和层归一化 - 稳定训练过程
-    4. 跳跃连接 - 结合多层特征
-    5. 辅助任务 - 通过多任务学习增强泛化能力
+    GAT模型通过学习节点之间的注意力权重来捕获神经元之间的功能关系
     """
     
-    def __init__(self, in_channels, hidden_channels, out_channels, heads=8, dropout=0.2, 
-                 residual=True, num_layers=4, edge_dim=None, alpha=0.2, use_gatv2=True,
-                 jk_mode='cat', use_layer_norm=True, use_se=True, se_reduction=8, 
-                 use_auxiliary_tasks=True):
+    def __init__(self, in_channels, hidden_channels, out_channels, heads=4, dropout=0.3, 
+                 residual=True, num_layers=3, edge_dim=None, alpha=0.2):
         """
-        初始化增强型神经元GAT模型
+        初始化神经元GAT模型
         
         参数:
             in_channels: 输入特征维度
@@ -298,123 +140,150 @@ class NeuronGAT(torch.nn.Module):
             num_layers: GAT层数
             edge_dim: 边特征维度，默认为None
             alpha: LeakyReLU的alpha参数
-            use_gatv2: 是否使用GATv2卷积
-            jk_mode: 跳跃连接模式 ('max', 'lstm', 'cat')
-            use_layer_norm: 是否使用层归一化
-            use_se: 是否使用Squeeze-and-Excitation模块
-            se_reduction: SE模块的压缩比例
-            use_auxiliary_tasks: 是否使用辅助任务
         """
         super(NeuronGAT, self).__init__()
         self.num_layers = num_layers
         self.residual = residual
         self.dropout_rate = dropout
-        self.jk_mode = jk_mode
-        self.use_auxiliary_tasks = use_auxiliary_tasks
+        self.hidden_channels = hidden_channels
+        self.heads = heads
         
-        # 特征初始处理
-        self.input_proj = nn.Sequential(
-            Linear(in_channels, hidden_channels),
-            nn.LayerNorm(hidden_channels) if use_layer_norm else nn.Identity(),
-            nn.GELU(),
-            nn.Dropout(dropout)
-        )
+        # 输入特征的归一化层
+        self.input_norm = torch.nn.LayerNorm(in_channels)
         
-        # GAT块
-        self.gnn_blocks = nn.ModuleList()
+        # 初始层
+        self.convs = nn.ModuleList()
+        self.batch_norms = nn.ModuleList()
+        self.layer_norms = nn.ModuleList()
         
-        # 第一层使用输入维度
-        self.gnn_blocks.append(
-            GNNBlock(
-                hidden_channels, hidden_channels, heads=heads, 
-                dropout=dropout, edge_dim=edge_dim, use_gatv2=use_gatv2,
-                use_layer_norm=use_layer_norm, use_se=use_se, 
-                reduction=se_reduction, alpha=alpha
-            )
-        )
+        # 第一层
+        self.convs.append(GATConv(in_channels, hidden_channels, heads=heads, 
+                           dropout=dropout, edge_dim=edge_dim, add_self_loops=True))
+        self.batch_norms.append(torch.nn.BatchNorm1d(hidden_channels * heads))
+        self.layer_norms.append(torch.nn.LayerNorm(hidden_channels * heads))
         
         # 中间层
-        for _ in range(num_layers - 1):
-            self.gnn_blocks.append(
-                GNNBlock(
-                    hidden_channels, hidden_channels, heads=heads, 
-                    dropout=dropout, edge_dim=edge_dim, use_gatv2=use_gatv2,
-                    use_layer_norm=use_layer_norm, use_se=use_se, 
-                    reduction=se_reduction, alpha=alpha
-                )
+        for i in range(num_layers - 2):
+            self.convs.append(
+                GATConv(hidden_channels * heads, hidden_channels, heads=heads, 
+                       dropout=dropout, edge_dim=edge_dim, add_self_loops=True)
             )
+            self.batch_norms.append(torch.nn.BatchNorm1d(hidden_channels * heads))
+            self.layer_norms.append(torch.nn.LayerNorm(hidden_channels * heads))
         
-        # 跳跃连接
-        if jk_mode == 'cat':
-            final_dim = hidden_channels * num_layers
-        else:
-            final_dim = hidden_channels
-            
-        self.jk = JumpingKnowledge(mode=jk_mode)
+        # 最后一个GAT层
+        if num_layers > 1:
+            self.convs.append(
+                GATConv(hidden_channels * heads, hidden_channels, heads=1, 
+                       dropout=dropout, edge_dim=edge_dim, add_self_loops=True)
+            )
+            self.batch_norms.append(torch.nn.BatchNorm1d(hidden_channels))
+            self.layer_norms.append(torch.nn.LayerNorm(hidden_channels))
         
-        # 全局注意力池化
+        # 改进型跳跃连接，使用加权模式而非简单的max模式
+        self.jk = JumpingKnowledge(mode='cat')
+        self.jk_linear = nn.Linear(hidden_channels * num_layers, hidden_channels)
+        
+        # 全局注意力池化层 - 使用更复杂的门控注意力机制
         self.glob_attn = GlobalAttention(
             nn.Sequential(
-                nn.Linear(hidden_channels, hidden_channels // 2), 
-                nn.GELU(), 
-                nn.Linear(hidden_channels // 2, 1)
+                nn.Linear(hidden_channels, hidden_channels), 
+                nn.LayerNorm(hidden_channels),  # 添加层归一化
+                nn.LeakyReLU(alpha), 
+                nn.Dropout(dropout),
+                nn.Linear(hidden_channels, 1)
             )
         )
         
-        # 多层感知机分类器
+        # 改进的分类器，使用更宽的隐藏层和更深的结构
         self.mlp = nn.Sequential(
-            nn.Linear(final_dim, hidden_channels),
-            nn.LayerNorm(hidden_channels) if use_layer_norm else nn.Identity(),
-            nn.GELU(),
+            nn.Linear(hidden_channels, hidden_channels * 2),
+            nn.LayerNorm(hidden_channels * 2),
+            nn.GELU(),  # 使用GELU激活函数替代LeakyReLU
             nn.Dropout(dropout),
-            nn.Linear(hidden_channels, hidden_channels // 2),
+            nn.Linear(hidden_channels * 2, hidden_channels),
+            nn.LayerNorm(hidden_channels),
             nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_channels // 2, out_channels)
+            nn.Dropout(dropout * 0.8),  # 降低最后一层dropout率
+            nn.Linear(hidden_channels, out_channels)
         )
         
-        # 辅助任务
-        if use_auxiliary_tasks:
-            # 边预测任务
-            self.edge_predictor = nn.Sequential(
-                nn.Linear(hidden_channels * 2, hidden_channels),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_channels, 1),
-                nn.Sigmoid()
-            )
-            
-            # 节点特征重构任务
-            self.node_reconstructor = nn.Sequential(
-                nn.Linear(hidden_channels, hidden_channels),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_channels, in_channels)
-            )
-        
-        # 残差连接投影层
+        # 残差连接的投影层
         if residual:
             self.res_projs = nn.ModuleList()
-            for _ in range(num_layers):
-                self.res_projs.append(nn.Linear(hidden_channels, hidden_channels, bias=False))
+            in_dim = in_channels
+            for i in range(num_layers):
+                out_dim = hidden_channels if i == num_layers - 1 else hidden_channels * heads
+                # 使用正交初始化
+                self.res_projs.append(nn.Linear(in_dim, out_dim, bias=False))
+                in_dim = hidden_channels * heads
         
-        # 自注意力增强
-        self.self_attention = MultiHeadSelfAttention(
-            hidden_channels, num_heads=4, dropout=dropout, 
-            use_layer_norm=use_layer_norm
-        )
+        # 层间维度调整投影层
+        self.dim_projections = nn.ModuleList()
+        # 只有当有多个层且最后一层头数为1时才需要进行维度调整
+        if num_layers > 1 and (heads > 1 or edge_dim is not None):
+            for i in range(num_layers - 1):
+                # 第i层输出维度
+                in_dim = hidden_channels * heads
+                # 最后一层输出维度
+                out_dim = hidden_channels
+                self.dim_projections.append(nn.Linear(in_dim, out_dim, bias=False))
         
-        # 权重初始化
-        self.apply(self._init_weights)
+        # 增强型自注意力模块
+        self.attention_enhancement = MultiHeadSelfAttention(hidden_channels, num_heads=heads, dropout=dropout * 0.7)
         
-    def _init_weights(self, module):
-        """初始化模型权重"""
-        if isinstance(module, nn.Linear):
-            # 使用Kaiming初始化线性层
-            nn.init.kaiming_normal_(module.weight, a=0.01, nonlinearity='leaky_relu')
-            if module.bias is not None:
-                nn.init.zeros_(module.bias)
+        # 动态特征缩放层 - 使用ModuleDict以适应不同的特征维度
+        self.feature_gates = nn.ModuleDict({
+            'hidden': nn.Sequential(
+                nn.Linear(hidden_channels, hidden_channels),
+                nn.Sigmoid()
+            ),
+            'hidden_heads': nn.Sequential(
+                nn.Linear(hidden_channels * heads, hidden_channels * heads),
+                nn.Sigmoid()
+            )
+        })
         
+        # 初始化权重
+        self._init_weights()
+        
+    def _init_weights(self):
+        """初始化模型权重以获得更好的训练效果"""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm1d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+    
+    def _apply_feature_gate(self, x):
+        """动态应用特征门控，适应不同的特征维度"""
+        # 获取特征维度
+        feat_dim = x.size(-1)
+        
+        # 根据特征维度选择合适的特征门控
+        if feat_dim == self.hidden_channels:
+            return x * self.feature_gates['hidden'](x)
+        elif feat_dim == self.hidden_channels * self.heads:
+            return x * self.feature_gates['hidden_heads'](x)
+        else:
+            # 如果维度不匹配，创建临时特征门控层
+            temp_gate = nn.Sequential(
+                nn.Linear(feat_dim, feat_dim),
+                nn.Sigmoid()
+            ).to(x.device)
+            # 初始化权重
+            for m in temp_gate.modules():
+                if isinstance(m, nn.Linear):
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                    if m.bias is not None:
+                        nn.init.zeros_(m.bias)
+            
+            # 应用门控并返回
+            return x * temp_gate(x)
+                
     def forward(self, data):
         """
         前向传播
@@ -423,14 +292,18 @@ class NeuronGAT(torch.nn.Module):
             data: PyTorch Geometric数据对象
         
         返回:
-            out: 模型主要输出
-            aux_outputs: 辅助任务输出字典（如启用）
+            x: 模型输出
         """
         x, edge_index = data.x, data.edge_index
-        edge_weight = data.edge_attr if hasattr(data, 'edge_attr') else None
+        edge_weight = data.edge_weight if hasattr(data, 'edge_weight') else None
         
-        # 特征初始处理
-        x = self.input_proj(x)
+        # 打印输入数据的形状，帮助调试
+        # print(f"GAT输入形状: x={x.shape}, edge_index={edge_index.shape}")
+        # if edge_weight is not None:
+        #     print(f"edge_weight形状: {edge_weight.shape}")
+        
+        # 输入特征归一化
+        x = self.input_norm(x)
         
         # 存储每层的输出用于跳跃连接
         layer_outputs = []
@@ -440,131 +313,130 @@ class NeuronGAT(torch.nn.Module):
             # 残差连接
             res = self.res_projs[i](x) if self.residual else None
             
-            # 应用GAT块
-            x = self.gnn_blocks[i](x, edge_index, edge_weight, res)
+            # 应用GAT卷积
+            if edge_weight is not None:
+                x = self.convs[i](x, edge_index, edge_weight)
+            else:
+                x = self.convs[i](x, edge_index)
+            
+            # 打印每层卷积后的特征形状
+            # print(f"第{i+1}层GAT卷积后的特征形状: {x.shape}")
+            
+            # 混合使用批归一化和层归一化
+            x = self.batch_norms[i](x)
+            x = self.layer_norms[i](x)
+            
+            # 添加残差连接 - 改进的缩放残差机制
+            if self.residual and res is not None:
+                if x.size() == res.size():
+                    x = x + res
+                else:
+                    # 使用自适应调整
+                    try:
+                        x = x + F.adaptive_avg_pool1d(res.unsqueeze(1), x.size(-1)).squeeze(1)
+                    except:
+                        # 如果自适应池化失败，使用线性投影
+                        print(f"自适应池化失败，尝试线性投影。res形状: {res.shape}, x形状: {x.shape}")
+                        proj = nn.Linear(res.size(-1), x.size(-1)).to(x.device)
+                        nn.init.xavier_normal_(proj.weight)
+                        x = x + proj(res)
+            
+            # 非线性激活 - 使用GELU替代LeakyReLU提高性能
+            x = F.gelu(x)
+            
+            # 逐步减少Dropout率，使后面层的特征更稳定
+            effective_dropout = self.dropout_rate * (1.0 - 0.1 * i)
+            x = F.dropout(x, p=effective_dropout, training=self.training)
+            
+            # 应用动态特征门控机制，安全地选择重要特征
+            if i < self.num_layers - 1:  # 在非最后一层应用
+                try:
+                    x = self._apply_feature_gate(x)
+                except Exception as e:
+                    print(f"应用特征门控失败: {e}, 形状: {x.shape}")
+                    # 出错时跳过特征门控
+                    pass
             
             # 存储层输出
             layer_outputs.append(x)
         
-        # 应用跳跃连接
-        try:
-            if self.jk_mode == 'cat':
-                x = self.jk(layer_outputs)  # 输出形状: [num_nodes, hidden_channels * num_layers]
-            else:
-                x = self.jk(layer_outputs)  # 输出形状: [num_nodes, hidden_channels]
-        except RuntimeError as e:
-            print(f"跳跃连接错误: {e}，使用最后一层输出替代")
-            # 出错时直接使用最后一层的输出
-            x = layer_outputs[-1]
+        # 改进的跳跃连接机制
+        if len(layer_outputs) > 1:
+            try:
+                # 检查是否需要维度调整
+                first_shape = layer_outputs[0].shape
+                last_shape = layer_outputs[-1].shape
+                
+                # 打印各层输出形状以便调试
+                # for i, lo in enumerate(layer_outputs):
+                    # print(f"第{i+1}层输出形状: {lo.shape}")
+                
+                # 检查维度不匹配
+                if first_shape[-1] != last_shape[-1]:
+                    # 需要维度调整
+                    if len(self.dim_projections) > 0:
+                        normalized_outputs = []
+                        for i, layer_output in enumerate(layer_outputs):
+                            if i < len(layer_outputs) - 1 and i < len(self.dim_projections):  
+                                # 对除最后一层外的所有层应用投影
+                                normalized_outputs.append(self.dim_projections[i](layer_output))
+                            else:
+                                normalized_outputs.append(layer_output)
+                        
+                        # 改进的跳跃连接 - 使用cat然后通过线性层降维
+                        x = self.jk(normalized_outputs)
+                    else:
+                        # 如果没有预定义的投影层，创建临时投影
+                        print("创建临时投影层进行维度调整")
+                        normalized_outputs = []
+                        out_dim = last_shape[-1]
+                        
+                        for i, layer_output in enumerate(layer_outputs):
+                            in_dim = layer_output.size(-1)
+                            if in_dim != out_dim:
+                                proj = nn.Linear(in_dim, out_dim).to(layer_output.device)
+                                nn.init.xavier_normal_(proj.weight)
+                                normalized_outputs.append(proj(layer_output))
+                            else:
+                                normalized_outputs.append(layer_output)
+                        
+                        x = self.jk(normalized_outputs)
+                else:
+                    # 维度已经一致
+                    x = self.jk(layer_outputs)
+                
+                # 应用JK线性层
+                x = self.jk_linear(x)
+            except Exception as e:
+                print(f"跳跃连接处理失败: {e}")
+                # 出错时使用最后一层输出
+                x = layer_outputs[-1]
+        else:
+            x = layer_outputs[0]
         
-        # 存储节点嵌入用于辅助任务
-        node_embeddings = x
-        
-        # 应用自注意力增强
+        # 使用增强型自注意力机制
         try:
-            x = self.self_attention(x)
-        except RuntimeError as e:
-            print(f"自注意力模块错误: {e}，跳过自注意力处理")
-            # 出错时跳过自注意力处理
+            x = self.attention_enhancement(x)
+        except Exception as e:
+            print(f"自注意力增强失败: {e}, 形状: {x.shape}")
+            # 出错时跳过自注意力
+            pass
         
         # 应用全局注意力池化（如果需要）
         batch = data.batch if hasattr(data, 'batch') else None
         if batch is not None:
             try:
                 x = self.glob_attn(x, batch)
-            except RuntimeError as e:
-                print(f"全局注意力池化错误: {e}，跳过全局注意力池化")
-                # 出错时跳过全局注意力池化
+            except Exception as e:
+                print(f"全局注意力池化失败: {e}, 使用平均池化")
+                # 使用平均池化作为备选
+                from torch_geometric.nn import global_mean_pool
+                x = global_mean_pool(x, batch)
         
-        # 使用MLP分类器生成主要输出
-        out = self.mlp(x)
+        # 使用改进的MLP分类器
+        x = self.mlp(x)
         
-        # 如果不使用辅助任务，直接返回主要输出
-        if not self.use_auxiliary_tasks:
-            return out
-            
-        # 辅助任务
-        aux_outputs = {}
-        
-        # 边预测任务
-        if hasattr(data, 'edge_index'):
-            # 采样一些边和非边用于预测
-            pos_edge_index, neg_edge_index = self._sample_edges(data.edge_index, data.num_nodes)
-            
-            # 计算边预测输出
-            edge_pred_loss = self._compute_edge_pred_loss(
-                node_embeddings, pos_edge_index, neg_edge_index
-            )
-            aux_outputs['edge_pred_loss'] = edge_pred_loss
-        
-        # 节点特征重构任务
-        node_recon = self.node_reconstructor(node_embeddings)
-        node_recon_loss = F.mse_loss(node_recon, data.x)
-        aux_outputs['node_recon_loss'] = node_recon_loss
-        
-        return out, aux_outputs
-        
-    def _sample_edges(self, edge_index, num_nodes, neg_ratio=1.0):
-        """采样正边和负边用于边预测任务"""
-        # 移除自环
-        edge_index, _ = remove_self_loops(edge_index)
-        
-        # 正边
-        pos_edge_index = edge_index
-        
-        # 负采样 - 实际实现中可能需要更高效的实现
-        num_neg_samples = int(pos_edge_index.size(1) * neg_ratio)
-        neg_edge_index = self._negative_sampling(edge_index, num_nodes, num_neg_samples)
-        
-        return pos_edge_index, neg_edge_index
-    
-    def _negative_sampling(self, edge_index, num_nodes, num_neg_samples):
-        """负采样 - 生成不在图中的边"""
-        # 简单实现 - 实际应用中可能需要更高效的方法
-        num_neg_samples = min(num_neg_samples, num_nodes * num_nodes - edge_index.size(1))
-        
-        # 创建邻接矩阵
-        adj = torch.zeros((num_nodes, num_nodes), device=edge_index.device)
-        adj[edge_index[0], edge_index[1]] = 1
-        
-        # 找到所有不在图中的边
-        mask = adj == 0
-        neg_row, neg_col = mask.nonzero(as_tuple=True)
-        
-        # 随机选择负样本
-        perm = torch.randperm(neg_row.size(0))[:num_neg_samples]
-        neg_edge_index = torch.stack([neg_row[perm], neg_col[perm]], dim=0)
-        
-        return neg_edge_index
-    
-    def _compute_edge_pred_loss(self, x, pos_edge_index, neg_edge_index):
-        """计算边预测任务的损失"""
-        # 正边预测
-        pos_out = self._get_edge_scores(x, pos_edge_index)
-        neg_out = self._get_edge_scores(x, neg_edge_index)
-        
-        # 使用BCE损失
-        pos_loss = F.binary_cross_entropy(
-            pos_out, torch.ones_like(pos_out)
-        )
-        neg_loss = F.binary_cross_entropy(
-            neg_out, torch.zeros_like(neg_out)
-        )
-        
-        return pos_loss + neg_loss
-    
-    def _get_edge_scores(self, x, edge_index):
-        """计算边的分数"""
-        # 获取边的首尾节点特征
-        src, dst = edge_index
-        src_x = x[src]
-        dst_x = x[dst]
-        
-        # 拼接特征
-        edge_features = torch.cat([src_x, dst_x], dim=1)
-        
-        # 使用边预测器计算分数
-        return self.edge_predictor(edge_features).view(-1)
+        return x
         
     def get_embeddings(self, data):
         """
@@ -577,10 +449,10 @@ class NeuronGAT(torch.nn.Module):
             embeddings: 节点嵌入向量
         """
         x, edge_index = data.x, data.edge_index
-        edge_weight = data.edge_attr if hasattr(data, 'edge_attr') else None
+        edge_weight = data.edge_weight if hasattr(data, 'edge_weight') else None
         
-        # 特征初始处理
-        x = self.input_proj(x)
+        # 输入特征归一化
+        x = self.input_norm(x)
         
         # 存储每层的输出用于跳跃连接
         layer_outputs = []
@@ -590,20 +462,89 @@ class NeuronGAT(torch.nn.Module):
             # 残差连接
             res = self.res_projs[i](x) if self.residual else None
             
-            # 应用GAT块
-            x = self.gnn_blocks[i](x, edge_index, edge_weight, res)
+            # 应用GAT卷积
+            if edge_weight is not None:
+                x = self.convs[i](x, edge_index, edge_weight)
+            else:
+                x = self.convs[i](x, edge_index)
+            
+            # 混合使用批归一化和层归一化
+            x = self.batch_norms[i](x)
+            x = self.layer_norms[i](x)
+            
+            # 添加残差连接 - 改进的缩放残差机制
+            if self.residual and res is not None:
+                if x.size() == res.size():
+                    x = x + res
+                else:
+                    # 使用自适应调整
+                    try:
+                        x = x + F.adaptive_avg_pool1d(res.unsqueeze(1), x.size(-1)).squeeze(1)
+                    except:
+                        # 如果自适应池化失败，使用线性投影
+                        proj = nn.Linear(res.size(-1), x.size(-1)).to(x.device)
+                        nn.init.xavier_normal_(proj.weight)
+                        x = x + proj(res)
+            
+            # 非线性激活
+            x = F.gelu(x)
             
             # 存储层输出
             layer_outputs.append(x)
         
         # 应用跳跃连接
-        if self.jk_mode == 'cat':
-            embeddings = self.jk(layer_outputs)  # 输出形状: [num_nodes, hidden_channels * num_layers]
+        if len(layer_outputs) > 1:
+            try:
+                # 检查是否需要维度调整
+                first_shape = layer_outputs[0].shape
+                last_shape = layer_outputs[-1].shape
+                
+                # 检查维度不匹配
+                if first_shape[-1] != last_shape[-1]:
+                    # 需要维度调整
+                    if len(self.dim_projections) > 0:
+                        normalized_outputs = []
+                        for i, layer_output in enumerate(layer_outputs):
+                            if i < len(layer_outputs) - 1 and i < len(self.dim_projections):
+                                normalized_outputs.append(self.dim_projections[i](layer_output))
+                            else:
+                                normalized_outputs.append(layer_output)
+                        
+                        # 改进的跳跃连接 - 使用cat然后通过线性层降维
+                        embeddings = self.jk(normalized_outputs)
+                    else:
+                        # 如果没有预定义的投影层，创建临时投影
+                        normalized_outputs = []
+                        out_dim = last_shape[-1]
+                        
+                        for i, layer_output in enumerate(layer_outputs):
+                            in_dim = layer_output.size(-1)
+                            if in_dim != out_dim:
+                                proj = nn.Linear(in_dim, out_dim).to(layer_output.device)
+                                nn.init.xavier_normal_(proj.weight)
+                                normalized_outputs.append(proj(layer_output))
+                            else:
+                                normalized_outputs.append(layer_output)
+                        
+                        embeddings = self.jk(normalized_outputs)
+                else:
+                    # 维度已经一致
+                    embeddings = self.jk(layer_outputs)
+                
+                # 应用JK线性层
+                embeddings = self.jk_linear(embeddings)
+            except Exception as e:
+                # 出错时使用最后一层输出
+                embeddings = layer_outputs[-1]
         else:
-            embeddings = self.jk(layer_outputs)  # 输出形状: [num_nodes, hidden_channels]
+            embeddings = layer_outputs[0]
         
         # 应用自注意力增强
-        embeddings = self.self_attention(embeddings)
+        try:
+            embeddings = self.attention_enhancement(embeddings)
+        except Exception as e:
+            # 出错时跳过自注意力
+            pass
         
         return embeddings
 
