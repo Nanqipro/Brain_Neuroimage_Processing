@@ -164,13 +164,20 @@ class AnalysisConfig:
             'gcn_residual': True,  # 是否使用残差连接
             
             # GAT模型参数
-            'gat_heads': 4,  # GAT注意力头数
-            'gat_hidden_channels': 128,  # 增加GAT隐藏层维度
-            'gat_dropout': 0.3,  # 减弱GAT特定的Dropout率
+            'gat_heads': 8,  # 增加GAT注意力头数
+            'gat_hidden_channels': 196,  # 增加GAT隐藏层维度
+            'gat_dropout': 0.2,  # 优化GAT的Dropout率
             'gat_residual': True,  # 启用残差连接
-            'gat_num_layers': 3,  # GAT层数
+            'gat_num_layers': 4,  # 增加层数以提高模型容量
             'gat_alpha': 0.2,  # LeakyReLU的alpha参数
-            'gat_jk_mode': 'max',  # 跳跃连接模式：max, lstm, cat
+            'gat_jk_mode': 'cat',  # 跳跃连接模式：max, lstm, cat
+            'gat_use_gatv2': True,  # 使用GATv2卷积
+            'gat_use_layer_norm': True,  # 使用层归一化
+            'gat_use_se': True,  # 使用Squeeze-and-Excitation模块
+            'gat_se_reduction': 8,  # SE模块的压缩比例
+            'gat_use_auxiliary_tasks': True,  # 使用辅助任务
+            'gat_learning_rate': 0.001,  # 降低学习率以稳定训练
+            'gat_weight_decay': 3e-4,  # 增加权重衰减以防止过拟合
                       
         }
         
