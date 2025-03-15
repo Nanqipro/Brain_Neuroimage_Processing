@@ -105,6 +105,23 @@ class NeuronTopologyAnalyzer:
         self.background_image_path = None
         self.background_image_size = None
         
+        # 预先初始化神经元状态为空字典，防止异常情况下未初始化
+        self.neuron_states = {}
+        
+        # 初始化帧存储
+        self.frames_data = {
+            'node_x': [], 'node_y': [], 'node_text': [],
+            'node_color': [], 'node_size': [], 'edge_x': [], 'edge_y': [],
+            'edge_color': [], 'titles': [], 'behaviors': []
+        }
+        
+        # 预先初始化网络类型
+        self.network_type = "GCN拓扑结构分析"
+        
+        # 预先初始化节点颜色
+        self.active_node_color = 'red'  # 活跃节点的颜色
+        self.inactive_node_color = 'lightgray'  # 非活跃节点的颜色
+        
         # 加载网络文件路径
         self.network_file_path = network_file or config.network_analysis_file
         
@@ -162,8 +179,13 @@ class NeuronTopologyAnalyzer:
             self.normal_edge_color = "rgba(180, 180, 180, 0.5)"
             
             # Initialize neuron IDs and positions
-            self.neuron_ids = self._get_neuron_ids()
-            self.pos = self._get_positions()
+            try:
+                self.neuron_ids = self._get_neuron_ids()
+                self.pos = self._get_positions()
+            except Exception as e:
+                print(f"获取神经元ID或位置数据失败: {str(e)}")
+                self.neuron_ids = []
+                self.pos = {}
             
             # Validate data
             self._validate_data()
@@ -193,7 +215,11 @@ class NeuronTopologyAnalyzer:
             self.color_cycle = self._initialize_colors()
             
             # 神经元状态: 1表示活跃, 0表示不活跃
-            self.neuron_states = {nid: 0 for nid in self.neuron_ids}
+            # 确保neuron_ids不为空再初始化
+            if self.neuron_ids:
+                self.neuron_states = {nid: 0 for nid in self.neuron_ids}
+            else:
+                self.neuron_states = {}
             
             # Initialize frame storage
             self.frames_data = {
@@ -433,6 +459,10 @@ class NeuronTopologyAnalyzer:
         Args:
             frame_num (int): The frame number to process
         """
+        # 确保神经元状态已初始化，如果未初始化则为其创建默认值
+        if not hasattr(self, 'neuron_states') or self.neuron_states is None:
+            self.neuron_states = {nid: 0 for nid in self.neuron_ids}
+            
         # Get timestamp and activity values
         t = self.neuron_data['stamp'].iloc[frame_num]
         behavior = self.neuron_data['behavior'].iloc[frame_num]  # 获取行为标签
@@ -528,12 +558,28 @@ class NeuronTopologyAnalyzer:
             timestamp (float): 当前时间戳
             behavior (str): 当前行为标签
         """
+        # 确保 frames_data 已初始化
+        if not hasattr(self, 'frames_data') or self.frames_data is None:
+            self.frames_data = {
+                'node_x': [], 'node_y': [], 'node_text': [],
+                'node_color': [], 'node_size': [], 'edge_x': [], 'edge_y': [],
+                'edge_color': [], 'titles': [], 'behaviors': []
+            }
+            
+        # 确保 network_type 已初始化
+        if not hasattr(self, 'network_type') or self.network_type is None:
+            self.network_type = "GCN拓扑结构分析"
+            
         # 存储节点信息
         node_x = []
         node_y = []
         node_text = []
         node_color = []
         node_size = []
+        
+        # 确保神经元状态已初始化，如果未初始化则为其创建默认值
+        if not hasattr(self, 'neuron_states') or self.neuron_states is None:
+            self.neuron_states = {nid: 0 for nid in self.neuron_ids}
         
         # 获取活跃的神经元列表
         active_neurons = [nid for nid, state in self.neuron_states.items() if state == 1]
@@ -590,6 +636,11 @@ class NeuronTopologyAnalyzer:
         返回:
             go.Figure: 包含初始节点和边的图形
         """
+        # 确保颜色属性已初始化
+        if not hasattr(self, 'active_node_color') or self.active_node_color is None:
+            self.active_node_color = 'red'
+        if not hasattr(self, 'inactive_node_color') or self.inactive_node_color is None:
+            self.inactive_node_color = 'lightgray'
         # 创建所有边的跟踪对象（固定位置）
         edge_x = []
         edge_y = []
@@ -649,17 +700,36 @@ class NeuronTopologyAnalyzer:
     def _create_layout(self) -> go.Layout:
         """创建图形布局"""
         # 检查行为类型是否可用
-        behavior_available = 'Behavior' in self.neuron_data.columns
+        behavior_available = 'Behavior' in self.neuron_data.columns if self.neuron_data is not None else False
         
-        # 计算节点位置的范围
-        x_coords = [pos[0] for pos in self.pos.values()]
-        y_coords = [pos[1] for pos in self.pos.values()]
-        min_x, max_x = min(x_coords), max(x_coords)
-        min_y, max_y = min(y_coords), max(y_coords)
+        # 检查坐标是否为空
+        if not self.pos or len(self.pos) == 0:
+            # 如果坐标为空，使用默认值
+            print("警告: 坐标数据为空，使用默认坐标范围")
+            min_x, max_x = 0, 1
+            min_y, max_y = 0, 1
+            x_range = 1
+            y_range = 1
+        else:
+            # 计算节点位置的范围
+            x_coords = [pos[0] for pos in self.pos.values()]
+            y_coords = [pos[1] for pos in self.pos.values()]
+            
+            if not x_coords or not y_coords:
+                print("警告: 坐标列表为空，使用默认坐标范围")
+                min_x, max_x = 0, 1
+                min_y, max_y = 0, 1
+                x_range = 1
+                y_range = 1
+            else:
+                min_x, max_x = min(x_coords), max(x_coords)
+                min_y, max_y = min(y_coords), max(y_coords)
+                
+                # 计算坐标范围
+                x_range = max_x - min_x
+                y_range = max_y - min_y
         
-        # 计算坐标范围和添加边距
-        x_range = max_x - min_x
-        y_range = max_y - min_y
+        # 添加边距
         padding = 0.2  # 增加20%的边距
         
         x_min = min_x - (x_range * padding)
