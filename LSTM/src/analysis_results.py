@@ -963,6 +963,7 @@ class ResultAnalyzer:
                         
                 metrics['communities'] = community_dict
                 metrics['number_of_communities'] = len(communities)
+                metrics['communities_list'] = communities  # 保存原始社区列表，用于行为映射
                 
                 # 计算模块度
                 metrics['modularity'] = nx.community.modularity(G, communities)
@@ -977,6 +978,7 @@ class ResultAnalyzer:
                         community_dict[node] = i
                 metrics['communities'] = community_dict
                 metrics['number_of_communities'] = len(connected_components)
+                metrics['communities_list'] = connected_components  # 保存原始社区列表，用于行为映射
                 metrics['modularity'] = 0.0
             
             # 网络密度和其他统计指标
@@ -1052,6 +1054,291 @@ class ResultAnalyzer:
         max_edges = (n * (n - 1)) / 2
         return len(subgraph.edges()) / max_edges if max_edges > 0 else 0
 
+    def map_communities_to_behaviors(self, G, communities, X_scaled, y):
+        """
+        将神经元社区与行为标签关联起来，分析每个社区与行为的关系
+        
+        参数：
+            G: networkx图对象
+            communities: 社区列表，每个社区是一组节点
+            X_scaled: 标准化后的神经元活动数据
+            y: 行为标签数据
+            
+        返回：
+            community_behavior_mapping: 社区-行为映射字典，包含每个社区最相关的行为
+        """
+        print("\n分析社区与行为的关联...")
+        
+        # 初始化结果字典
+        community_behavior_mapping = {}
+        
+        # 确保社区列表有效
+        if not communities or len(communities) == 0:
+            print("警告: 没有有效的社区信息")
+            return {}
+        
+        # 确保行为标签信息有效
+        if not hasattr(self, 'behavior_labels') or len(self.behavior_labels) == 0:
+            print("警告: 没有有效的行为标签信息")
+            return {}
+        
+        # 准备节点名称到索引的映射（用于将G中的节点名称映射到X_scaled中的列索引）
+        node_to_index = {}
+        if hasattr(self.processor, 'available_neuron_cols'):
+            # 如果处理器有可用神经元列表，使用它建立映射
+            for i, neuron in enumerate(self.processor.available_neuron_cols):
+                node_to_index[neuron] = i
+        else:
+            # 否则假设节点名称格式为'n1', 'n2'等，从中提取索引
+            for node in G.nodes():
+                if isinstance(node, str) and node.startswith('n'):
+                    try:
+                        index = int(node[1:]) - 1  # 'n1' -> 0, 'n2' -> 1, etc.
+                        node_to_index[node] = index
+                    except ValueError:
+                        pass
+        
+        # 如果映射为空，则使用简单的顺序映射
+        if not node_to_index:
+            print("警告: 无法建立节点名称到索引的映射，使用顺序映射")
+            for i, node in enumerate(G.nodes()):
+                node_to_index[node] = i if i < X_scaled.shape[1] else 0
+                
+        # 为每个社区分析与行为的关联
+        for community_idx, community in enumerate(communities):
+            # 将这个社区中的神经元转换为X_scaled中的列索引
+            neuron_indices = []
+            for node in community:
+                if node in node_to_index and node_to_index[node] < X_scaled.shape[1]:
+                    neuron_indices.append(node_to_index[node])
+            
+            if not neuron_indices:  # 如果没有有效的索引，跳过此社区
+                continue
+                
+            # 计算每种行为与该社区神经元的关联强度
+            behavior_associations = {}
+            
+            # 对每个行为标签计算
+            for behavior_idx, behavior in enumerate(self.behavior_labels):
+                # 该行为的样本掩码
+                behavior_mask = (y == behavior_idx)
+                
+                if np.sum(behavior_mask) == 0:  # 如果没有该行为的样本，跳过
+                    continue
+                    
+                # 计算该行为下社区神经元的平均活动
+                community_activity_in_behavior = np.mean(X_scaled[behavior_mask][:, neuron_indices], axis=0)
+                
+                # 计算其他行为下社区神经元的平均活动
+                other_activity = np.mean(X_scaled[~behavior_mask][:, neuron_indices], axis=0)
+                
+                # 计算效应量（Cohen's d）
+                behavior_std = np.std(X_scaled[behavior_mask][:, neuron_indices], axis=0)
+                other_std = np.std(X_scaled[~behavior_mask][:, neuron_indices], axis=0)
+                pooled_std = np.sqrt((behavior_std**2 + other_std**2) / 2)
+                effect_size = np.mean(np.abs(community_activity_in_behavior - other_activity) / (pooled_std + 1e-10))
+                
+                # 保存该行为的关联强度
+                behavior_associations[behavior] = {
+                    'effect_size': effect_size,
+                    'mean_activity': np.mean(community_activity_in_behavior),
+                    'mean_activity_diff': np.mean(community_activity_in_behavior - other_activity)
+                }
+            
+            # 找出与该社区关联最强的行为
+            if behavior_associations:
+                strongest_behavior = max(behavior_associations.items(), key=lambda x: x[1]['effect_size'])
+                
+                # 保存社区-行为映射
+                community_behavior_mapping[f'Community_{community_idx+1}'] = {
+                    'behavior': strongest_behavior[0],
+                    'effect_size': strongest_behavior[1]['effect_size'],
+                    'mean_activity': strongest_behavior[1]['mean_activity'],
+                    'mean_activity_diff': strongest_behavior[1]['mean_activity_diff'],
+                    'neurons': list(community),  # 社区中的神经元
+                    'size': len(community),  # 社区大小
+                    'behavior_associations': behavior_associations  # 所有行为的关联信息
+                }
+                
+                print(f"社区 {community_idx+1} ({len(community)} 个神经元) 与行为 '{strongest_behavior[0]}' 最相关 (效应量: {strongest_behavior[1]['effect_size']:.3f})")
+        
+        return community_behavior_mapping
+    
+    def visualize_communities_behaviors(self, G, community_behavior_mapping, output_path=None):
+        """
+        可视化社区与行为的关联
+        
+        参数：
+            G: networkx图对象
+            community_behavior_mapping: 社区-行为映射字典
+            output_path: 输出文件路径，默认为None使用配置中的路径
+        """
+        if not output_path:
+            output_path = os.path.join(self.config.analysis_dir, 'community_behavior_mapping.png')
+            
+        print(f"\n可视化社区与行为的关联关系...")
+        
+        # 准备数据
+        communities = []
+        behaviors = []
+        effect_sizes = []
+        community_sizes = []
+        
+        for comm_id, data in community_behavior_mapping.items():
+            communities.append(comm_id)
+            behaviors.append(data['behavior'])
+            effect_sizes.append(data['effect_size'])
+            community_sizes.append(data['size'])
+        
+        if not communities:  # 如果没有数据，返回
+            print("警告: 没有社区-行为映射数据可视化")
+            return
+        
+        # 创建图表
+        plt.figure(figsize=(14, 8))
+        
+        # 创建颜色映射
+        unique_behaviors = list(set(behaviors))
+        behavior_colors = plt.cm.tab10(np.linspace(0, 1, len(unique_behaviors)))
+        behavior_color_map = {b: behavior_colors[i] for i, b in enumerate(unique_behaviors)}
+        
+        # 将社区按大小排序
+        sorted_indices = np.argsort(community_sizes)[::-1]  # 从大到小排序
+        
+        # 创建柱状图
+        bar_positions = np.arange(len(communities))
+        bars = plt.bar(bar_positions, 
+                       [effect_sizes[i] for i in sorted_indices], 
+                       width=0.8,
+                       color=[behavior_color_map[behaviors[i]] for i in sorted_indices],
+                       alpha=0.8)
+        
+        # 添加社区大小标注
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height + 0.05,
+                    f'{community_sizes[sorted_indices[i]]} neurons',
+                    ha='center', va='bottom', rotation=0,
+                    fontsize=9)
+        
+        # 添加标签和标题
+        plt.xlabel('Neural communities', fontsize=12)
+        plt.ylabel('Behavioral association intensity (effect size)', fontsize=12)
+        plt.title('Neural communities and behavioral association analysis', fontsize=14)
+        
+        # 设置x轴刻度
+        plt.xticks(bar_positions, [communities[i] for i in sorted_indices], rotation=45)
+        
+        # 添加行为图例
+        legend_elements = [plt.Rectangle((0,0), 1, 1, color=behavior_color_map[b], alpha=0.8, label=b) 
+                          for b in unique_behaviors]
+        plt.legend(handles=legend_elements, title='Behavior type', loc='upper right')
+        
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"社区-行为关联可视化已保存到: {output_path}")
+        
+        # 创建网络图可视化
+        network_output_path = os.path.join(os.path.dirname(output_path), 'community_behavior_network.png')
+        self.visualize_community_behavior_network(G, community_behavior_mapping, network_output_path)
+        
+    def visualize_community_behavior_network(self, G, community_behavior_mapping, output_path):
+        """
+        可视化基于社区划分的神经元网络，不同社区使用不同颜色，并根据行为关联标注
+        
+        参数：
+            G: networkx图对象
+            community_behavior_mapping: 社区-行为映射字典
+            output_path: 输出文件路径
+        """
+        plt.figure(figsize=(16, 16))
+        
+        # 创建颜色映射
+        unique_behaviors = list(set([data['behavior'] for data in community_behavior_mapping.values()]))
+        behavior_colors = plt.cm.tab10(np.linspace(0, 1, len(unique_behaviors)))
+        behavior_color_map = {b: behavior_colors[i] for i, b in enumerate(unique_behaviors)}
+        
+        # 创建节点颜色映射
+        node_colors = {}
+        node_communities = {}
+        for comm_id, data in community_behavior_mapping.items():
+            behavior = data['behavior']
+            color = behavior_color_map[behavior]
+            for node in data['neurons']:
+                node_colors[node] = color
+                node_communities[node] = comm_id
+        
+        # 使用spring布局 - 这里我们控制随机种子以确保每次可视化结果一致
+        pos = nx.spring_layout(G, seed=42, k=0.3)
+        
+        # 绘制节点
+        for node in G.nodes():
+            if node in node_colors:
+                nx.draw_networkx_nodes(G, pos, nodelist=[node], 
+                                     node_color=[node_colors[node]], 
+                                     node_size=100, alpha=0.8)
+            else:
+                # 对于没有社区的节点，使用灰色
+                nx.draw_networkx_nodes(G, pos, nodelist=[node], 
+                                     node_color=['lightgray'], 
+                                     node_size=50, alpha=0.5)
+        
+        # 绘制边 - 根据是否连接同一社区的节点使用不同透明度
+        same_community_edges = []
+        diff_community_edges = []
+        for u, v in G.edges():
+            if u in node_communities and v in node_communities:
+                if node_communities[u] == node_communities[v]:
+                    same_community_edges.append((u, v))
+                else:
+                    diff_community_edges.append((u, v))
+            else:
+                diff_community_edges.append((u, v))
+        
+        # 同一社区内的边使用高透明度
+        nx.draw_networkx_edges(G, pos, edgelist=same_community_edges, 
+                             width=1.5, alpha=0.7, edge_color='gray')
+        # 不同社区之间的边使用低透明度
+        nx.draw_networkx_edges(G, pos, edgelist=diff_community_edges, 
+                             width=0.5, alpha=0.2, edge_color='lightgray')
+        
+        # 添加社区标签
+        # 计算每个社区的中心位置
+        community_centers = {}
+        for comm_id, data in community_behavior_mapping.items():
+            comm_nodes = data['neurons']
+            if not comm_nodes:
+                continue
+            # 计算社区节点的平均位置
+            center_x = np.mean([pos[node][0] for node in comm_nodes if node in pos])
+            center_y = np.mean([pos[node][1] for node in comm_nodes if node in pos])
+            community_centers[comm_id] = (center_x, center_y)
+        
+        # 绘制社区标签
+        for comm_id, center in community_centers.items():
+            behavior = community_behavior_mapping[comm_id]['behavior']
+            plt.text(center[0], center[1], 
+                    f"{comm_id}\n({behavior})", 
+                    fontsize=12, fontweight='bold', 
+                    ha='center', va='center',
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        
+        # 添加图例
+        legend_elements = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color, 
+                                    markersize=10, label=behavior) 
+                          for behavior, color in behavior_color_map.items()]
+        plt.legend(handles=legend_elements, loc='upper right', title='Behavior type')
+        
+        plt.title('Neural community-behavior association network', fontsize=16)
+        plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"社区-行为网络可视化已保存到: {output_path}")
+    
     def visualize_network_topology(self, G, metrics, modules):
         """
         可视化网络拓扑分析结果
@@ -1818,6 +2105,65 @@ class ResultAnalyzer:
                 output_path=self.config.gcn_interactive_topology
             )
             
+            # 分析GCN拓扑中的社区与行为标签关联
+            print("\n分析GCN社区与行为标签的关联...")
+            try:
+                # 获取社区划分
+                communities = community_louvain.best_partition(G_gnn)
+                
+                # 导入社区-行为映射函数
+                from gnn_topology import analyze_community_behaviors, visualize_community_behavior_mapping
+                
+                # 获取行为标签名称列表
+                if hasattr(self, 'behavior_labels') and len(self.behavior_labels) > 0:
+                    behavior_names = self.behavior_labels
+                elif hasattr(self.config, 'behavior_labels') and len(self.config.behavior_labels) > 0:
+                    behavior_names = self.config.behavior_labels
+                else:
+                    # 如果没有定义行为标签名称，则使用数字索引
+                    behavior_names = [f"Behavior_{i}" for i in range(len(np.unique(y)))]
+                
+                # 分析社区与行为标签的关联
+                community_behavior_mapping = analyze_community_behaviors(
+                    G=G_gnn,
+                    communities=communities,
+                    X_scaled=X_scaled,
+                    y=y,
+                    behavior_labels=behavior_names
+                )
+                
+                # 可视化社区-行为映射
+                community_behavior_viz_path = os.path.join(
+                    os.path.dirname(self.config.gcn_topology_data),
+                    'community_behavior_mapping.png'
+                )
+                
+                community_behavior_network_path = visualize_community_behavior_mapping(
+                    G=G_gnn,
+                    community_behavior_mapping=community_behavior_mapping,
+                    output_path=community_behavior_viz_path
+                )
+                
+                print(f"社区-行为映射可视化已保存至: {community_behavior_viz_path}")
+                
+                # 将社区-行为映射结果保存为JSON
+                community_behavior_json = os.path.join(
+                    os.path.dirname(self.config.gcn_topology_data),
+                    'community_behavior_mapping.json'
+                )
+                
+                with open(community_behavior_json, 'w') as f:
+                    json.dump(community_behavior_mapping, f, indent=4)
+                
+                print(f"社区-行为映射数据已保存至: {community_behavior_json}")
+                
+            except Exception as e:
+                print(f"分析社区-行为关联时出错: {str(e)}")
+                import traceback
+                print(f"错误详情:\n{traceback.format_exc()}")
+                community_behavior_viz_path = None
+                community_behavior_mapping = {}
+            
             # 记录GCN分析结果
             gnn_results = {
                 'gcn_behavior_prediction': {
@@ -1828,7 +2174,9 @@ class ResultAnalyzer:
                     'accuracy_plot_path': accuracy_plot_path,
                     'train_acc_history': accuracies['train'],
                     'val_acc_history': accuracies['val'],
-                    'epochs': epochs
+                    'epochs': epochs,
+                    'community_behavior_mapping': community_behavior_mapping,
+                    'community_behavior_viz_path': community_behavior_viz_path
                 }
             }
         except Exception as e:
@@ -2009,6 +2357,59 @@ class ResultAnalyzer:
                         # 分析GAT拓扑结构
                         topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
                         
+                        # 分析GAT拓扑中的社区与行为标签关联
+                        print("\n分析GAT社区与行为标签的关联...")
+                        try:
+                            # 获取行为标签名称列表
+                            if hasattr(self, 'behavior_labels') and len(self.behavior_labels) > 0:
+                                behavior_names = self.behavior_labels
+                            elif hasattr(self.config, 'behavior_labels') and len(self.config.behavior_labels) > 0:
+                                behavior_names = self.config.behavior_labels
+                            else:
+                                # 如果没有定义行为标签名称，则使用数字索引
+                                behavior_names = [f"Behavior_{i}" for i in range(len(np.unique(y)))]
+                            
+                            # 分析社区与行为标签的关联
+                            gat_community_behavior_mapping = analyze_community_behaviors(
+                                G=gat_G,
+                                communities=communities,  # 使用之前检测到的社区
+                                X_scaled=X_scaled,
+                                y=y,
+                                behavior_labels=behavior_names
+                            )
+                            
+                            # 可视化社区-行为映射
+                            gat_community_behavior_viz_path = os.path.join(
+                                os.path.dirname(self.config.gat_topology_data),
+                                'gat_community_behavior_mapping.png'
+                            )
+                            
+                            gat_community_behavior_network_path = visualize_community_behavior_mapping(
+                                G=gat_G,
+                                community_behavior_mapping=gat_community_behavior_mapping,
+                                output_path=gat_community_behavior_viz_path
+                            )
+                            
+                            print(f"GAT社区-行为映射可视化已保存至: {gat_community_behavior_viz_path}")
+                            
+                            # 将社区-行为映射结果保存为JSON
+                            gat_community_behavior_json = os.path.join(
+                                os.path.dirname(self.config.gat_topology_data),
+                                'gat_community_behavior_mapping.json'
+                            )
+                            
+                            with open(gat_community_behavior_json, 'w') as f:
+                                json.dump(gat_community_behavior_mapping, f, indent=4)
+                            
+                            print(f"GAT社区-行为映射数据已保存至: {gat_community_behavior_json}")
+                            
+                        except Exception as e:
+                            print(f"分析GAT社区-行为关联时出错: {str(e)}")
+                            import traceback
+                            print(f"错误详情:\n{traceback.format_exc()}")
+                            gat_community_behavior_viz_path = None
+                            gat_community_behavior_mapping = {}
+                        
                         # 保存GAT拓扑分析结果
                         gnn_results['gat_topology'] = {
                             'visualization_path': gat_static_topo_path,  # 使用静态拓扑图路径
@@ -2016,7 +2417,9 @@ class ResultAnalyzer:
                             'data_path': self.config.gat_topology_data,
                             'topology_metrics': topo_metrics,
                             'node_count': gat_G.number_of_nodes(),
-                            'edge_count': gat_G.number_of_edges()
+                            'edge_count': gat_G.number_of_edges(),
+                            'community_behavior_mapping': gat_community_behavior_mapping if 'gat_community_behavior_mapping' in locals() else {},
+                            'community_behavior_viz_path': gat_community_behavior_viz_path if 'gat_community_behavior_viz_path' in locals() else None
                         }
                         
                     except Exception as e:
