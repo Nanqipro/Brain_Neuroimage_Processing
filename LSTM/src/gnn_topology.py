@@ -822,6 +822,11 @@ def analyze_community_behaviors(G, communities, X_scaled, y, behavior_labels):
         print("警告: 没有有效的行为标签信息")
         return {}
     
+    # 创建行为标签索引映射，出现改变时确保matching
+    behavior_indices = {}
+    for i, behavior in enumerate(behavior_labels):
+        behavior_indices[behavior] = i
+    
     # 将社区分组
     comm_groups = {}
     for node, comm_id in communities.items():
@@ -850,8 +855,11 @@ def analyze_community_behaviors(G, communities, X_scaled, y, behavior_labels):
         
         # 对每个行为标签计算
         for behavior_idx, behavior in enumerate(behavior_labels):
+            # 获取当前行为的索引
+            curr_behavior_idx = behavior_indices.get(behavior, behavior_idx)
+            
             # 该行为的样本掩码
-            behavior_mask = (y == behavior_idx)
+            behavior_mask = (y == curr_behavior_idx)
             
             if np.sum(behavior_mask) == 0:  # 如果没有该行为的样本，跳过
                 continue

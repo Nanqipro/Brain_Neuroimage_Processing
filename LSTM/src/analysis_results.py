@@ -255,6 +255,25 @@ class ResultAnalyzer:
         X_scaled, y = self.processor.preprocess_data()
         self.behavior_labels = self.processor.label_encoder.classes_
         
+        # 如果配置为不纳入CD1行为标签，在结果分析器中进一步处理
+        if not self.config.include_cd1_behavior and 'CD1' in self.behavior_labels:
+            print("\n结果分析器中排除CD1行为标签")
+            # 获取CD1标签的索引
+            cd1_idx = np.where(self.behavior_labels == 'CD1')[0][0]
+            
+            # 创建排除CD1数据的掩码
+            mask = (y != cd1_idx)
+            original_shape = X_scaled.shape[0]
+            
+            # 应用掩码过滤数据
+            X_scaled = X_scaled[mask]
+            y = y[mask]
+            
+            # 更新行为标签列表，排除CD1
+            self.behavior_labels = np.array([label for label in self.behavior_labels if label != 'CD1'])
+            
+            print(f"已排除CD1行为数据: 从 {original_shape} 条数据减少到 {X_scaled.shape[0]} 条")
+        
         # 打印数据集信息
         n_neurons = X_scaled.shape[1]
         print(f"\n数据集信息:")
@@ -2367,7 +2386,12 @@ class ResultAnalyzer:
                                 behavior_names = self.config.behavior_labels
                             else:
                                 # 如果没有定义行为标签名称，则使用数字索引
-                                behavior_names = [f"Behavior_{i}" for i in range(len(np.unique(y)))]
+                                behavior_names = [f"Behavior_{i}" for i in range(len(np.unique(y)))]  
+                            
+                            # 确保行为标签名称与配置一致，如果配置为不纳入CD1，确保behavior_names中不包含CD1
+                            if not self.config.include_cd1_behavior and 'CD1' in behavior_names:
+                                print("\n社区行为分析中排除CD1行为标签")
+                                behavior_names = [label for label in behavior_names if label != 'CD1']
                             
                             # 分析社区与行为标签的关联
                             gat_community_behavior_mapping = analyze_community_behaviors(

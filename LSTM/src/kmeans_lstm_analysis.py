@@ -153,6 +153,18 @@ class NeuronDataProcessor:
         # 确保行为标签是字符串类型
         behavior_data = behavior_data.astype(str)
         
+        # 根据include_cd1_behavior配置决定是否纳入CD1行为标签
+        if not self.config.include_cd1_behavior:
+            print("\n配置设置为不纳入CD1行为标签")
+            # 创建新的DataFrame以保存非CD1数据
+            mask = (behavior_data != 'CD1')
+            original_shape = behavior_data.shape[0]
+            behavior_data = behavior_data[mask]
+            self.data = self.data[mask].reset_index(drop=True)
+            X = X[mask]
+            X_scaled = X_scaled[mask]
+            print(f"\n已排除CD1行为数据: 从 {original_shape} 条数据减少到 {behavior_data.shape[0]} 条")
+        
         try:
             y = self.label_encoder.fit_transform(behavior_data)
         except Exception as e:

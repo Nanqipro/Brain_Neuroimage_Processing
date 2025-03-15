@@ -108,6 +108,9 @@ class AnalysisConfig:
         self.num_heads = 4            # 注意力头数：多头注意力机制的头数量
         self.dropout = 0.2            # Dropout率：防止过拟合的神经元随机失活比例
         
+        # 行为标签配置
+        self.include_cd1_behavior = True  # 是否在分析中纳入CD1行为标签
+        
         # 分析参数配置
         self.analysis_params = {
             'min_samples_per_behavior': 10,  # 每种行为的最小样本数要求
