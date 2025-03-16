@@ -852,48 +852,6 @@ def analyze_community_behaviors(G, communities, X_scaled, y, behavior_labels):
         
         # 计算每种行为与该社区神经元的关联强度
         behavior_associations = {}
-        behavior_sample_counts = {}
-        
-        # 首先计算每个行为的样本数量
-        for behavior_idx, behavior in enumerate(behavior_labels):
-            curr_behavior_idx = behavior_indices.get(behavior, behavior_idx)
-            behavior_mask = (y == curr_behavior_idx)
-            sample_count = np.sum(behavior_mask)
-            if sample_count > 0:
-                behavior_sample_counts[behavior] = sample_count
-        
-        # 分类标记行为的样本量级别
-        total_samples = sum(behavior_sample_counts.values())
-        # 样本极少的行为（不足或等于2个样本）
-        extremely_rare_behaviors = [b for b, count in behavior_sample_counts.items() if count <= 2]
-        # 样本很少的行为（3-5个样本）
-        very_rare_behaviors = [b for b, count in behavior_sample_counts.items() if 2 < count <= 5]
-        # 样本少的行为（5-10样本或总量的1%）
-        rare_behaviors = [b for b, count in behavior_sample_counts.items() 
-                       if 5 < count < max(10, total_samples * 0.01)]
-        # 样本多的行为（超过50%）
-        dominant_behaviors = [b for b, count in behavior_sample_counts.items() 
-                          if count > total_samples * 0.5]
-        
-        # 打印行为样本统计信息
-        print("\n行为样本统计:")
-        for behavior, count in behavior_sample_counts.items():
-            percentage = (count / total_samples) * 100
-            category = ""
-            if behavior in extremely_rare_behaviors:
-                category = "[极稀有]"
-            elif behavior in very_rare_behaviors:
-                category = "[非常稀有]"
-            elif behavior in rare_behaviors:
-                category = "[稀有]"
-            elif behavior in dominant_behaviors:
-                category = "[主要]"
-            print(f"  {behavior}: {count} 样本 ({percentage:.2f}%) {category}")
-        
-        # 如果有极稀有行为，进行额外的处理
-        if extremely_rare_behaviors:
-            print(f"\n警告: 检测到极稀有行为标签: {', '.join(extremely_rare_behaviors)}")
-            print(f"  这些行为的样本数量过少，将应用严格的平衡因子")
         
         # 对每个行为标签计算
         for behavior_idx, behavior in enumerate(behavior_labels):
@@ -908,154 +866,43 @@ def analyze_community_behaviors(G, communities, X_scaled, y, behavior_labels):
                 
             # 计算该行为下社区神经元的平均活动
             try:
-                # 提取当前行为下的活动数据
-                behavior_activity = X_scaled[behavior_mask][:, neuron_indices]
-                community_activity_in_behavior = np.mean(behavior_activity, axis=0)
-                behavior_std = np.std(behavior_activity, axis=0)
+                community_activity_in_behavior = np.mean(X_scaled[behavior_mask][:, neuron_indices], axis=0)
                 
                 # 计算其他行为下社区神经元的平均活动
-                other_activity_data = X_scaled[~behavior_mask][:, neuron_indices]
-                other_activity = np.mean(other_activity_data, axis=0)
-                other_std = np.std(other_activity_data, axis=0)
+                other_activity = np.mean(X_scaled[~behavior_mask][:, neuron_indices], axis=0)
                 
-                # 1. 计算效应量（Cohen's d）
+                # 计算效应量（Cohen's d）
+                behavior_std = np.std(X_scaled[behavior_mask][:, neuron_indices], axis=0)
+                other_std = np.std(X_scaled[~behavior_mask][:, neuron_indices], axis=0)
                 pooled_std = np.sqrt((behavior_std**2 + other_std**2) / 2)
                 effect_size = np.mean(np.abs(community_activity_in_behavior - other_activity) / (pooled_std + 1e-10))
                 
-                # 2. 新增: 计算信号噪声比SNR（信号对噪声的比率）
-                signal = np.abs(community_activity_in_behavior - other_activity)
-                noise = (behavior_std + other_std) / 2
-                snr = np.mean(signal / (noise + 1e-10))
-                
-                # 3. 新增: 计算一致性强度（每个神经元的一致性响应）
-                activation_consistency = np.sum(np.sign(behavior_activity - np.mean(other_activity_data, axis=0)) == 
-                                             np.sign(np.mean(behavior_activity, axis=0) - np.mean(other_activity_data, axis=0))) / len(neuron_indices)
-                
-                # 4. 新增: 计算触发率（在活动过程中真正参与的神经元比例）
-                threshold = np.mean(X_scaled[:, neuron_indices]) + 0.5 * np.std(X_scaled[:, neuron_indices])
-                activation_ratio = np.mean(np.mean(behavior_activity > threshold, axis=0))
-                
-                # 样本稀少性严格平衡机制
-                balance_factor = 1.0
-                sample_count = behavior_sample_counts.get(behavior, 0)
-                total_samples = sum(behavior_sample_counts.values())
-                
-                # 极稀有行为标签（1-2个样本）特殊处理 - 特別针对CD1等这样的行为
-                if sample_count <= 2:
-                    # 针对1个样本的行为采用极低的平衡因子，培免其成为主要关联
-                    if sample_count == 1:
-                        balance_factor = 0.01  # 几乎完全忽略
-                    else:
-                        balance_factor = 0.05  # 2个样本也使用非常低的权重
-                    print(f"\n对极稀有行为'{behavior}'应用超低样本平衡因子: {balance_factor:.4f} (样本数: {sample_count})")
-                
-                # 非常稀有行为标签（3-5个样本）
-                elif sample_count <= 5:
-                    balance_factor = 0.1 + ((sample_count - 2) / 3) * 0.15  # 0.1-0.25范围
-                    print(f"对非常稀有行为'{behavior}'应用低样本平衡因子: {balance_factor:.2f} (样本数: {sample_count})")
-                
-                # 稀有行为标签（5-10个样本或总样本的1%）
-                elif sample_count < max(10, int(total_samples * 0.01)):
-                    min_samples = 5
-                    max_samples = max(10, int(total_samples * 0.01))
-                    balance_factor = 0.25 + ((sample_count - min_samples) / (max_samples - min_samples)) * 0.45  # 0.25-0.7范围
-                    print(f"对稀有行为'{behavior}'应用平衡因子: {balance_factor:.2f} (样本数: {sample_count})")
-                
-                # 对样本极多的行为也适当平衡（避免数量优势）
-                elif sample_count > total_samples * 0.5:
-                    behavior_ratio = sample_count / total_samples
-                    # 样本越多，平衡因子越小，但不会太低
-                    balance_factor = 1.0 - (behavior_ratio - 0.5) * 0.4  # 最低降到0.8
-                    print(f"对主要行为'{behavior}'应用样本平衡因子: {balance_factor:.2f} (样本占比: {behavior_ratio:.2f})")
-                
-                # 对1个样本的行为，检查标准差是否过低（可能导致计算效应量异常值）
-                if sample_count <= 1 and (np.isclose(behavior_std, 0).any() or np.mean(behavior_std) < 1e-5):
-                    # 对于标准差近零的情况，效应量可能异常大，额外调整
-                    print(f"\n警告: 行为'{behavior}'只有1个样本，且标准差接近零，强制降低关联强度")
-                    effect_size = effect_size * 0.01  # 严格降低效应量
-                    snr = snr * 0.01  # 降低信号噪声比
-                
-                # 调整指标权重：对于极少样本的行为，降低效应量SNR的权重，提高一致性和触发率的权重
-                if sample_count <= 2:
-                    # 对于极少样本的行为，更多地依赖一致性和触发率
-                    weights = [0.1, 0.1, 0.4, 0.4]  # effect_size, snr, consistency, activation_ratio
-                elif sample_count <= 5:
-                    weights = [0.2, 0.2, 0.3, 0.3]
-                else:
-                    weights = [0.4, 0.3, 0.2, 0.1]  # 正常样本量的行为用正常权重
-                
-                # 综合各项指标计算最终关联强度
-                combined_score = (weights[0] * effect_size + 
-                                 weights[1] * snr + 
-                                 weights[2] * activation_consistency + 
-                                 weights[3] * activation_ratio) * balance_factor
-                
                 # 保存该行为的关联强度
                 behavior_associations[behavior] = {
-                    'effect_size': float(effect_size),  # 原始效应量
-                    'snr': float(snr),  # 信号噪声比
-                    'consistency': float(activation_consistency),  # 一致性
-                    'activation_ratio': float(activation_ratio),  # 触发率
-                    'combined_score': float(combined_score),  # 综合分数
+                    'effect_size': float(effect_size),  # 确保是原生类型
                     'mean_activity': float(np.mean(community_activity_in_behavior)),
-                    'mean_activity_diff': float(np.mean(community_activity_in_behavior - other_activity)),
-                    'sample_count': int(np.sum(behavior_mask)),  # 样本数量
-                    'balance_factor': float(balance_factor)  # 平衡因子
+                    'mean_activity_diff': float(np.mean(community_activity_in_behavior - other_activity))
                 }
             except Exception as e:
                 print(f"计算社区{comm_id}与行为{behavior}的关联时出错: {str(e)}")
                 continue
         
-        # 找出与该社区关联最强的行为（基于综合分数）
+        # 找出与该社区关联最强的行为
         if behavior_associations:
-            # 先根据样本数量划分不同类别的行为关联
-            single_sample_associations = {k: v for k, v in behavior_associations.items() 
-                                        if behavior_sample_counts.get(k, 0) == 1}
-            very_rare_associations = {k: v for k, v in behavior_associations.items() 
-                                    if 1 < behavior_sample_counts.get(k, 0) <= 5}
-            rare_associations = {k: v for k, v in behavior_associations.items() 
-                              if 5 < behavior_sample_counts.get(k, 0) < max(10, total_samples * 0.01)}
-            common_associations = {k: v for k, v in behavior_associations.items() 
-                                if behavior_sample_counts.get(k, 0) >= max(10, total_samples * 0.01)}
-            
-            # 必须至少有两个样本的行为才能成为有效的最强关联
-            # 首先尝试使用普通样本量的行为
-            if common_associations:
-                valid_associations = common_associations
-                print(f"\n社区{comm_id}使用普通样本量行为进行关联选择")
-            # 如果没有普通行为，尝试使用稀有行为
-            elif rare_associations:
-                valid_associations = rare_associations
-                print(f"\n社区{comm_id}使用稀有行为进行关联选择")
-            # 如果没有稀有行为，尝试使用非常稀有行为
-            elif very_rare_associations:
-                valid_associations = very_rare_associations
-                print(f"\n社区{comm_id}使用非常稀有行为进行关联选择")
-            # 最后才考虑单样本行为
-            else:
-                valid_associations = single_sample_associations
-                print(f"\n警告: 社区{comm_id}只能使用单样本行为进行关联选择")
-            
-            strongest_behavior = max(valid_associations.items(), key=lambda x: x[1]['combined_score'])
+            strongest_behavior = max(behavior_associations.items(), key=lambda x: x[1]['effect_size'])
             
             # 保存社区-行为映射
             community_behavior_mapping[f'Community_{comm_id}'] = {
                 'behavior': strongest_behavior[0],
-                'combined_score': strongest_behavior[1]['combined_score'],
                 'effect_size': strongest_behavior[1]['effect_size'],
-                'snr': strongest_behavior[1]['snr'],
-                'consistency': strongest_behavior[1]['consistency'],
-                'activation_ratio': strongest_behavior[1]['activation_ratio'],
                 'mean_activity': strongest_behavior[1]['mean_activity'],
                 'mean_activity_diff': strongest_behavior[1]['mean_activity_diff'],
-                'sample_count': strongest_behavior[1]['sample_count'],
                 'neurons': [str(node) for node in nodes],  # 确保是字符串类型
                 'size': len(nodes),
                 'behavior_associations': behavior_associations
             }
             
-            # 打印社区与行为关联信息，包含综合分数和各项指标
-            print(f"社区 {comm_id} ({len(nodes)} 个神经元) 与行为 '{strongest_behavior[0]}' 最相关 (综合分数: {strongest_behavior[1]['combined_score']:.3f}, 效应量: {strongest_behavior[1]['effect_size']:.3f}, SNR: {strongest_behavior[1]['snr']:.3f}, 一致性: {strongest_behavior[1]['consistency']:.3f})")
+            print(f"社区 {comm_id} ({len(nodes)} 个神经元) 与行为 '{strongest_behavior[0]}' 最相关 (效应量: {strongest_behavior[1]['effect_size']:.3f})")
     
     print(f"分析完成，共发现{len(community_behavior_mapping)}个社区与行为的关联")
     return community_behavior_mapping
@@ -1090,16 +937,11 @@ def visualize_community_behavior_mapping(G, community_behavior_mapping, output_p
         community_sizes.append(data['size'])
     
     # 创建图表
-    plt.figure(figsize=(14, 10))
+    plt.figure(figsize=(14, 8))
     
     # 创建颜色映射
     unique_behaviors = list(set(behaviors))
-    # 为了增强可视化区分度，使用区别度更高的色谱
-    behavior_colors = plt.cm.tab20(np.linspace(0, 1, min(20, len(unique_behaviors))))
-    if len(unique_behaviors) > 20:
-        # 如果行为超过20种，混合其他色谱
-        additional_colors = plt.cm.Set3(np.linspace(0, 1, len(unique_behaviors) - 20))
-        behavior_colors = np.vstack((behavior_colors, additional_colors))
+    behavior_colors = plt.cm.tab10(np.linspace(0, 1, len(unique_behaviors)))
     behavior_color_map = {b: behavior_colors[i] for i, b in enumerate(unique_behaviors)}
     
     # 将社区按大小排序
