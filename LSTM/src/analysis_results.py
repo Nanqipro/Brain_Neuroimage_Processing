@@ -680,7 +680,7 @@ class ResultAnalyzer:
         width = 0.15
         
         # 创建颜色映射
-        colors = plt.cm.viridis(np.linspace(0, 1, self.config.analysis_params['top_neurons_count']))
+        colors = plt.cm.tab10(np.linspace(0, 1, self.config.analysis_params['top_neurons_count']))
         
         # 绘制柱状图并添加神经元编号标注
         for i in range(self.config.analysis_params['top_neurons_count']):
@@ -1670,7 +1670,7 @@ class ResultAnalyzer:
             X_scaled: 标准化后的神经元活动数据
             hidden_states: 隐藏状态序列
             
-        返回:
+        返回：
             patterns: 转换模式信息列表
         """
         transitions = np.where(np.diff(hidden_states) != 0)[0]
@@ -1697,12 +1697,12 @@ class ResultAnalyzer:
         """
         评估转换点预测的准确性
         
-        参数:
+        参数：
             predicted: 预测的转换点
             actual: 实际的转换点
             tolerance: 容忍误差范围
             
-        返回:
+        返回：
             评估指标字典，包含精确率、召回率和F1分数
         """
         correct_predictions = 0
@@ -1848,12 +1848,12 @@ class ResultAnalyzer:
         """
         选择最优HMM参数
         
-        参数:
+        参数：
             X_reduced: 降维后的数据
             y: 行为标签
             max_states: 最大状态数
             
-        返回:
+        返回：
             best_params: 包含最优参数的字典
         """
         print("选择最优HMM参数...")
@@ -1917,11 +1917,11 @@ class ResultAnalyzer:
         """
         分析HMM状态与行为标签的对应关系
         
-        参数:
+        参数：
             hidden_states: HMM预测的隐藏状态序列
             y: 行为标签
             
-        返回:
+        返回：
             mapping_probs: 状态-行为映射概率矩阵
         """
         print("\n分析状态-行为映射关系...")
@@ -1980,14 +1980,14 @@ class ResultAnalyzer:
         """
         使用GNN分析神经元网络
         
-        参数:
+        参数：
             G: NetworkX图对象
             correlation_matrix: 相关性矩阵
             X_scaled: 标准化的神经元活动数据
             y: 行为标签
             available_neurons: 可用神经元列表
             
-        返回:
+        返回：
             gnn_results: GNN分析结果字典
         """
         print("\n使用GNN进行神经元网络分析...")
@@ -2119,7 +2119,7 @@ class ResultAnalyzer:
             create_interactive_gnn_topology(
                 G=G_gnn,
                 embeddings=trained_model.get_embeddings(data).detach().cpu().numpy(),
-                similarities=nx.adjacency_matrix(G_gnn).todense().astype(float),
+                similarities=nx.adjacency_matrix(G_gnn).todense(),
                 node_names=[f"N{i+1}" for i in range(len(available_neurons))],
                 output_path=self.config.gcn_interactive_topology
             )
@@ -2522,10 +2522,10 @@ def convert_to_serializable(obj):
     """
     将对象转换为可JSON序列化的格式
     
-    参数:
+    参数：
         obj: 需要转换的对象
         
-    返回:
+    返回：
         转换后的对象
     """
     if isinstance(obj, np.integer):
@@ -2553,7 +2553,7 @@ def set_all_random_seeds(seed=42):
     """
     设置所有相关库的随机种子，确保结果可重现
     
-    参数:
+    参数：
         seed: 随机种子值，默认为42
     """
     import random
@@ -2594,264 +2594,269 @@ def main():
         config.setup_directories()
         config.validate_paths()
         
-        # 创建StringIO对象以捕获所有输出
-        output_buffer = io.StringIO()
+        # 创建一个保存日志的列表
+        log_lines = []
         
-        # 使用redirect_stdout重定向标准输出
-        with contextlib.redirect_stdout(output_buffer):
-            # 检查GNN依赖项
-            print("\n检查GNN依赖项...")
-            gnn_ok, missing_deps = check_gnn_dependencies()
-            if gnn_ok:
-                print("GNN依赖项检查通过，将启用GNN分析功能")
-                if hasattr(config, 'use_gnn'):
-                    print(f"使用GNN: {'启用' if config.use_gnn else '禁用'}")
-                else:
-                    print("配置中未找到use_gnn属性，将默认启用GNN")
-                    config.use_gnn = True
+        # 创建一个自定义的print函数，同时输出到终端和保存到日志列表
+        def custom_print(*args, **kwargs):
+            # 使用原始的print函数打印到控制台（实时输出）
+            print(*args, **kwargs)
+            # 将输出内容添加到日志列表
+            log_text = " ".join(str(arg) for arg in args)
+            if "end" in kwargs and kwargs["end"] != "\n":
+                log_text += kwargs["end"]
             else:
-                print(f"GNN依赖项检查失败，以下组件缺失: {', '.join(missing_deps)}")
-                print("将禁用GNN分析功能")
-                config.use_gnn = False
-                print("""
+                log_text += "\n"
+            log_lines.append(log_text)
+        
+        # 检查GNN依赖项
+        custom_print("\n检查GNN依赖项...")
+        gnn_ok, missing_deps = check_gnn_dependencies()
+        if gnn_ok:
+            custom_print("GNN依赖项检查通过，将启用GNN分析功能")
+            if hasattr(config, 'use_gnn'):
+                custom_print(f"使用GNN: {'启用' if config.use_gnn else '禁用'}")
+            else:
+                custom_print("配置中未找到use_gnn属性，将默认启用GNN")
+                config.use_gnn = True
+        else:
+            custom_print(f"GNN依赖项检查失败，以下组件缺失: {', '.join(missing_deps)}")
+            custom_print("将禁用GNN分析功能")
+            config.use_gnn = False
+            custom_print("""
 如需启用GNN功能，请安装以下依赖项:
 pip install torch-geometric torch-scatter torch-sparse
 详情请参考: https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html
 """)
+        
+        # 记录分析开始时间
+        start_time = datetime.now()
+        custom_print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        custom_print(f"数据标识符: {config.data_identifier}")
+        custom_print("=" * 50)
+        
+        # Initialize analyzer
+        analyzer = ResultAnalyzer(config)
+        
+        # 加载模型和数据
+        custom_print("加载模型和数据...")
+        model, X_scaled, y = analyzer.load_model_and_data()
+        
+        custom_print("\n分析行为-神经元相关性...")
+        behavior_activity_df = analyzer.analyze_behavior_neuron_correlation(X_scaled, y)
+        custom_print(f"相关性分析完成。结果保存在: {config.correlation_plot}")
+        
+        custom_print("\n分析时间模式...")
+        analyzer.analyze_temporal_patterns(X_scaled, y)
+        custom_print(f"时间模式分析完成。结果保存在: {config.temporal_pattern_dir}")
+        
+        custom_print("\n分析时间相关性...")
+        analyzer.analyze_temporal_correlations(X_scaled, y)
+        custom_print(f"时间相关性分析完成。结果保存在: {config.temporal_correlation_dir}")
+        
+        custom_print("\n分析行为转换...")
+        transitions = analyzer.analyze_behavior_transitions(y)
+        custom_print(f"转换分析完成。结果保存在: {config.transition_plot}")
+        
+        custom_print("\n识别关键神经元...")
+        behavior_importance = analyzer.identify_key_neurons(X_scaled, y)
+        custom_print("\n每种行为的关键神经元:")
+        for behavior, data in behavior_importance.items():
+            custom_print(f"\n{behavior}:")
+            for i, (neuron, effect) in enumerate(zip(data['neurons'], data['effect_sizes'])):
+                custom_print(f"  神经元 {neuron}: 效应量 = {effect:.3f}")
+        
+        custom_print("\n开始神经元网络拓扑分析...")
+        # 构建神经元功能连接网络
+        G, correlation_matrix, available_neurons = analyzer.build_neuron_network(
+            X_scaled, 
+            threshold=config.analysis_params['correlation_threshold']
+        )
+        
+        # 提取主要连接线路
+        main_methods = ['threshold', 'top_edges', 'mst']
+        for method in main_methods:
+            custom_print(f"\n使用{method}方法提取主要连接线路...")
+            if method == 'threshold':
+                main_G = analyzer.extract_main_connections(
+                    G, correlation_matrix, available_neurons,
+                    method=method, threshold=0.2
+                )
+            elif method == 'top_edges':
+                main_G = analyzer.extract_main_connections(
+                    G, correlation_matrix, available_neurons,
+                    method=method, top_k=8
+                )
+            elif method == 'mst':
+                main_G = analyzer.extract_main_connections(
+                    G, correlation_matrix, available_neurons,
+                    method=method
+                )
             
-            # 记录分析开始时间
-            start_time = datetime.now()
-            print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"数据标识符: {config.data_identifier}")
-            print("=" * 50)
+            # 导出为JSON文件
+            output_file = os.path.join(config.analysis_dir, f'neuron_network_main_{method}.json')
+            analyzer.export_network_to_json(main_G, output_file)
+            custom_print(f"{method}方法的主要连接线路已导出到: {output_file}")
             
-            # Initialize analyzer
-            analyzer = ResultAnalyzer(config)
+            # 可视化主要连接线路
+            plt.figure(figsize=(12, 12))
+            pos = nx.spring_layout(main_G, k=1/np.sqrt(len(main_G.nodes())), iterations=50)
+            node_sizes = [300 for _ in main_G.nodes()]
+            edge_weights = [main_G[u][v]['weight'] * 5 for u, v in main_G.edges()]
             
-            # 加载模型和数据
-            print("加载模型和数据...")
-            model, X_scaled, y = analyzer.load_model_and_data()
-            
-            print("\n分析行为-神经元相关性...")
-            behavior_activity_df = analyzer.analyze_behavior_neuron_correlation(X_scaled, y)
-            print(f"相关性分析完成。结果保存在: {config.correlation_plot}")
-            
-            print("\n分析时间模式...")
-            analyzer.analyze_temporal_patterns(X_scaled, y)
-            print(f"时间模式分析完成。结果保存在: {config.temporal_pattern_dir}")
-            
-            print("\n分析时间相关性...")
-            analyzer.analyze_temporal_correlations(X_scaled, y)
-            print(f"时间相关性分析完成。结果保存在: {config.temporal_correlation_dir}")
-            
-            print("\n分析行为转换...")
-            transitions = analyzer.analyze_behavior_transitions(y)
-            print(f"转换分析完成。结果保存在: {config.transition_plot}")
-            
-            print("\n识别关键神经元...")
-            behavior_importance = analyzer.identify_key_neurons(X_scaled, y)
-            print("\n每种行为的关键神经元:")
-            for behavior, data in behavior_importance.items():
-                print(f"\n{behavior}:")
-                for i, (neuron, effect) in enumerate(zip(data['neurons'], data['effect_sizes'])):
-                    print(f"  神经元 {neuron}: 效应量 = {effect:.3f}")
-            
-            print("\n开始神经元网络拓扑分析...")
-            # 构建神经元功能连接网络
-            G, correlation_matrix, available_neurons = analyzer.build_neuron_network(
-                X_scaled, 
-                threshold=config.analysis_params['correlation_threshold']
+            nx.draw_networkx(
+                main_G, pos,
+                with_labels=True,
+                node_size=node_sizes,
+                node_color='skyblue',
+                font_size=10,
+                width=edge_weights,
+                edge_color='gray',
+                alpha=0.8
             )
             
-            # 提取主要连接线路
-            main_methods = ['threshold', 'top_edges', 'mst']
+            plt.title(f'Neuron Connection Network (Method: {method})', fontsize=16)
+            plt.axis('off')
+            plt.tight_layout()
+            plt.savefig(os.path.join(config.analysis_dir, f'neuron_network_main_{method}.png'), 
+                       dpi=300, bbox_inches='tight')
+            plt.close()
+        
+        # 分析网络拓扑特征
+        topology_metrics = analyzer.analyze_network_topology(G)
+        
+        # 识别功能模块
+        functional_modules = analyzer.identify_functional_modules(G, correlation_matrix, available_neurons)
+        
+        # 可视化分析结果
+        analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
+        
+        # 生成交互式神经元网络可视化
+        try:
+            from visualization import VisualizationManager
+            visualizer = VisualizationManager(config)
+            interactive_path = visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
+            if interactive_path:
+                custom_print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
+        except Exception as e:
+            custom_print(f"生成交互式神经元网络可视化时出错: {str(e)}")
+        
+        # 尝试为主要连接也生成交互式可视化
+        try:
+            from visualization import VisualizationManager
+            visualizer = VisualizationManager(config)
             for method in main_methods:
-                print(f"\n使用{method}方法提取主要连接线路...")
-                if method == 'threshold':
-                    main_G = analyzer.extract_main_connections(
-                        G, correlation_matrix, available_neurons,
-                        method=method, threshold=0.2
-                    )
-                elif method == 'top_edges':
-                    main_G = analyzer.extract_main_connections(
-                        G, correlation_matrix, available_neurons,
-                        method=method, top_k=8
-                    )
-                elif method == 'mst':
-                    main_G = analyzer.extract_main_connections(
-                        G, correlation_matrix, available_neurons,
-                        method=method
-                    )
-                
-                # 导出为JSON文件
-                output_file = os.path.join(config.analysis_dir, f'neuron_network_main_{method}.json')
-                analyzer.export_network_to_json(main_G, output_file)
-                print(f"{method}方法的主要连接线路已导出到: {output_file}")
-                
-                # 可视化主要连接线路
-                plt.figure(figsize=(12, 12))
-                pos = nx.spring_layout(main_G, k=1/np.sqrt(len(main_G.nodes())), iterations=50)
-                node_sizes = [300 for _ in main_G.nodes()]
-                edge_weights = [main_G[u][v]['weight'] * 5 for u, v in main_G.edges()]
-                
-                nx.draw_networkx(
-                    main_G, pos,
-                    with_labels=True,
-                    node_size=node_sizes,
-                    node_color='skyblue',
-                    font_size=10,
-                    width=edge_weights,
-                    edge_color='gray',
-                    alpha=0.8
+                main_G = analyzer.extract_main_connections(
+                    G, correlation_matrix, available_neurons,
+                    method=method, threshold=0.4 if method == 'threshold' else None,
+                    top_k=3 if method == 'top_edges' else None
                 )
-                
-                plt.title(f'Neuron Connection Network (Method: {method})', fontsize=16)
-                plt.axis('off')
-                plt.tight_layout()
-                plt.savefig(os.path.join(config.analysis_dir, f'neuron_network_main_{method}.png'), 
-                           dpi=300, bbox_inches='tight')
-                plt.close()
-            
-            # 分析网络拓扑特征
-            topology_metrics = analyzer.analyze_network_topology(G)
-            
-            # 识别功能模块
-            functional_modules = analyzer.identify_functional_modules(G, correlation_matrix, available_neurons)
-            
-            # 可视化分析结果
-            analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
-            
-            # 生成交互式神经元网络可视化
-            try:
-                from visualization import VisualizationManager
-                visualizer = VisualizationManager(config)
-                interactive_path = visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
+                interactive_path = visualizer.plot_interactive_neuron_network(
+                    main_G, 
+                    topology_metrics, 
+                    functional_modules, 
+                    output_path=config.gnn_interactive_template.format(method)
+                )
                 if interactive_path:
-                    print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
-            except Exception as e:
-                print(f"生成交互式神经元网络可视化时出错: {str(e)}")
+                    custom_print(f"生成主要连接({method})交互式可视化完成。结果保存在: {interactive_path}")
+        except Exception as e:
+            custom_print(f"生成主要连接交互式可视化时出错: {str(e)}")
+        
+        # 执行行为状态转换分析
+        custom_print("\n开始行为状态转换分析...")
+        
+        # 1. HMM分析
+        hmm_results = analyzer.analyze_behavior_state_transitions(X_scaled, y)
+        if hmm_results is not None:
+            # 2. 分析神经元与状态转换的关系
+            relationships = analyzer.analyze_neuron_state_relationships(
+                X_scaled, 
+                hmm_results['hidden_states']
+            )
             
-            # 尝试为主要连接也生成交互式可视化
-            try:
-                from visualization import VisualizationManager
-                visualizer = VisualizationManager(config)
-                for method in main_methods:
-                    main_G = analyzer.extract_main_connections(
-                        G, correlation_matrix, available_neurons,
-                        method=method, threshold=0.4 if method == 'threshold' else None,
-                        top_k=3 if method == 'top_edges' else None
-                    )
-                    interactive_path = visualizer.plot_interactive_neuron_network(
-                        main_G, 
-                        topology_metrics, 
-                        functional_modules, 
-                        output_path=config.gnn_interactive_template.format(method)
-                    )
-                    if interactive_path:
-                        print(f"生成主要连接({method})交互式可视化完成。结果保存在: {interactive_path}")
-            except Exception as e:
-                print(f"生成主要连接交互式可视化时出错: {str(e)}")
+            # 3. 预测状态转换点
+            transition_points = analyzer.predict_transition_points(
+                X_scaled,
+                hmm_results['hidden_states']
+            )
             
-            # 执行行为状态转换分析
-            print("\n开始行为状态转换分析...")
-            
-            # 1. HMM分析
-            hmm_results = analyzer.analyze_behavior_state_transitions(X_scaled, y)
-            if hmm_results is not None:
-                # 2. 分析神经元与状态转换的关系
-                relationships = analyzer.analyze_neuron_state_relationships(
-                    X_scaled, 
-                    hmm_results['hidden_states']
-                )
-                
-                # 3. 预测状态转换点
-                transition_points = analyzer.predict_transition_points(
-                    X_scaled,
-                    hmm_results['hidden_states']
-                )
-                
-                # 将状态转换分析结果添加到总结果中
-                results = {
-                    'topology_metrics': topology_metrics,
-                    'functional_modules': functional_modules,
-                    'state_transitions': {
-                        'hmm_results': {
-                            'transition_matrix': hmm_results['transition_matrix'],
-                            'avg_durations': hmm_results['avg_durations'],
-                            'model_score': float(hmm_results['model_score']),
-                            'n_states': hmm_results['n_states'],
-                            'covariance_type': hmm_results['covariance_type'],
-                            'pca_components': hmm_results['pca_components'],
-                            'pca_explained_variance': hmm_results['pca_explained_variance'],
-                            'mapping_probs': hmm_results['mapping_probs'].tolist() if 'mapping_probs' in hmm_results else None
-                        },
-                        'neuron_state_relationships': relationships,
-                        'transition_points': transition_points
-                    }
+            # 将状态转换分析结果添加到总结果中
+            results = {
+                'topology_metrics': topology_metrics,
+                'functional_modules': functional_modules,
+                'state_transitions': {
+                    'hmm_results': {
+                        'transition_matrix': hmm_results['transition_matrix'],
+                        'avg_durations': hmm_results['avg_durations'],
+                        'model_score': float(hmm_results['model_score']),
+                        'n_states': hmm_results['n_states'],
+                        'covariance_type': hmm_results['covariance_type'],
+                        'pca_components': hmm_results['pca_components'],
+                        'pca_explained_variance': hmm_results['pca_explained_variance'],
+                        'mapping_probs': hmm_results['mapping_probs'].tolist() if 'mapping_probs' in hmm_results else None
+                    },
+                    'neuron_state_relationships': relationships,
+                    'transition_points': transition_points
                 }
-            else:
-                results = {
-                    'topology_metrics': topology_metrics,
-                    'functional_modules': functional_modules
-                }
-            
-            # 将结果保存为JSON文件
-            results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
-            print(f"\n保存分析结果到: {results_path}")
-            
-            # 添加网络图对象到结果中
-            if 'topology_metrics' in results:
-                results['topology_metrics']['graph'] = G
-                
-            with open(results_path, 'w', encoding='utf-8') as f:
-                serializable_results = convert_to_serializable(results)
-                json.dump(serializable_results, f, indent=4, ensure_ascii=False)
-            
-            # 记录分析结束时间
-            end_time = datetime.now()
-            duration = end_time - start_time
-            print(f"=" * 50)
-            print(f"分析结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"总耗时: {duration.total_seconds():.2f} 秒")
-            print("分析完成！所有结果已保存。")
-            
-            # 在现有网络分析后添加GNN分析
-            if hasattr(config, 'use_gnn') and config.use_gnn:
-                print("\n使用GNN进行神经元网络分析...")
-                gnn_results = analyzer.analyze_network_with_gnn(
-                    G, correlation_matrix, X_scaled, y, available_neurons
-                )
-                
-                # 将GNN结果添加到分析结果中
-                if gnn_results:
-                    # 读取已保存的分析结果
-                    try:
-                        with open(config.network_analysis_file, 'r') as f:
-                            results = json.load(f)
-                        
-                        # 添加GNN分析结果
-                        results['gnn_analysis'] = gnn_results
-                        
-                        # 更新网络分析结果文件
-                        with open(config.network_analysis_file, 'w') as f:
-                            # 使用convert_to_serializable函数确保所有数据都可JSON序列化
-                            serializable_results = convert_to_serializable(results)
-                            json.dump(serializable_results, f, indent=4)
-                        print(f"更新的网络分析结果（包含GNN分析）已保存到 {config.network_analysis_file}")
-                    except Exception as e:
-                        print(f"更新网络分析结果文件时出错: {str(e)}")
+            }
+        else:
+            results = {
+                'topology_metrics': topology_metrics,
+                'functional_modules': functional_modules
+            }
         
-        # 将捕获的输出保存到日志文件
-        log_content = output_buffer.getvalue()
+        # 将结果保存为JSON文件
+        results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
+        custom_print(f"\n保存分析结果到: {results_path}")
         
-        # 同时打印到控制台
-        print(log_content)
+        # 添加网络图对象到结果中
+        if 'topology_metrics' in results:
+            results['topology_metrics']['graph'] = G
+            
+        with open(results_path, 'w', encoding='utf-8') as f:
+            serializable_results = convert_to_serializable(results)
+            json.dump(serializable_results, f, indent=4, ensure_ascii=False)
         
-        # 保存日志到文件
+        # 记录分析结束时间
+        end_time = datetime.now()
+        duration = end_time - start_time
+        custom_print(f"=" * 50)
+        custom_print(f"分析结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        custom_print(f"总耗时: {duration.total_seconds():.2f} 秒")
+        custom_print("分析完成！所有结果已保存。")
+        
+        # 在现有网络分析后添加GNN分析
+        if hasattr(config, 'use_gnn') and config.use_gnn:
+            custom_print("\n使用GNN进行神经元网络分析...")
+            gnn_results = analyzer.analyze_network_with_gnn(
+                G, correlation_matrix, X_scaled, y, available_neurons
+            )
+            
+            # 将GNN结果添加到分析结果中
+            if gnn_results:
+                # 读取已保存的分析结果
+                try:
+                    with open(config.network_analysis_file, 'r') as f:
+                        results = json.load(f)
+                    
+                    # 添加GNN分析结果
+                    results['gnn_analysis'] = gnn_results
+                    
+                    # 更新网络分析结果文件
+                    with open(config.network_analysis_file, 'w') as f:
+                        # 使用convert_to_serializable函数确保所有数据都可JSON序列化
+                        serializable_results = convert_to_serializable(results)
+                        json.dump(serializable_results, f, indent=4)
+                    custom_print(f"更新的网络分析结果（包含GNN分析）已保存到 {config.network_analysis_file}")
+                except Exception as e:
+                    custom_print(f"更新网络分析结果文件时出错: {str(e)}")
+    
+        # 将日志内容写入日志文件
+        log_content = "".join(log_lines)
         with open(config.log_file, 'w', encoding='utf-8') as log_file:
             log_file.write(log_content)
             
-        print(f"分析日志已保存到: {config.log_file}")
+        custom_print(f"分析日志已保存到: {config.log_file}")
             
     except Exception as e:
         error_message = f"分析过程中出现错误: {str(e)}"
