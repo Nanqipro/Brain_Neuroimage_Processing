@@ -708,6 +708,53 @@ def visualize_gcn_topology_with_real_positions(topology_data_path, position_data
         import pandas as pd
         position_df = pd.read_csv(position_data_path)
         
+        # 检查CSV列名
+        columns = position_df.columns.tolist()
+        print(f"位置数据CSV列名: {columns}")
+        
+        # 自动检测坐标列名
+        x_col = None
+        y_col = None
+        id_col = None
+        
+        # 尝试查找常见的坐标列名
+        for col in columns:
+            col_lower = col.lower()
+            if 'x' in col_lower or 'lon' in col_lower:
+                x_col = col
+            elif 'y' in col_lower or 'lat' in col_lower:
+                y_col = col
+            elif 'num' in col_lower or 'id' in col_lower or 'index' in col_lower:
+                id_col = col
+        
+        # 如果没有找到合适的列名，使用默认值
+        if x_col is None and 'relative_x' in columns:
+            x_col = 'relative_x'
+        if y_col is None and 'relative_y' in columns:
+            y_col = 'relative_y'
+        if id_col is None and 'number' in columns:
+            id_col = 'number'
+            
+        # 如果仍然没有找到，使用第一列作为ID，第二列作为x，第三列作为y
+        if x_col is None and len(columns) >= 2:
+            x_col = columns[1]
+        if y_col is None and len(columns) >= 3:
+            y_col = columns[2]
+        if id_col is None and len(columns) >= 1:
+            id_col = columns[0]
+            
+        print(f"使用的列名: ID={id_col}, X={x_col}, Y={y_col}")
+        
+        # 创建节点编号到CSV行索引的映射，确保正确匹配位置数据
+        node_to_csv_row = {}
+        neuron_ids = position_df[id_col].values
+        
+        # 将CSV文件中的neuron ID映射到行索引
+        for idx, neuron_id in enumerate(neuron_ids):
+            node_to_csv_row[int(neuron_id)] = idx
+        
+        print(f"从CSV文件中加载了{len(node_to_csv_row)}个神经元位置数据")
+        
         # 创建NetworkX图对象
         G = nx.Graph()
         
@@ -740,18 +787,72 @@ def visualize_gcn_topology_with_real_positions(topology_data_path, position_data
         
         # 创建位置字典
         pos = {}
+        nodes_with_positions = 0
+        nodes_with_random_positions = 0
+        
+        # 找出所有节点的最大和最小坐标，用于归一化
+        all_x = []
+        all_y = []
+        for i in range(len(position_df)):
+            all_x.append(position_df.iloc[i][x_col])
+            all_y.append(position_df.iloc[i][y_col])
+        
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+        
         for i, node in enumerate(G.nodes()):
-            # 在位置数据中查找对应节点（节点ID+1因为position_df中的编号从1开始）
-            node_num = node + 1
-            if node_num <= len(position_df):
-                # 使用相对坐标作为节点位置
-                x_pos = position_df.iloc[node_num-1]['relative_x']
-                y_pos = position_df.iloc[node_num-1]['relative_y']
-                pos[node] = (x_pos, y_pos)
-            else:
-                # 如果找不到对应位置，使用随机位置
-                print(f"警告：无法找到节点{node}的位置数据，使用随机位置")
+            # 寻找与该节点对应的神经元编号
+            node_num = node + 1  # 节点ID+1，因为position_df中的编号从1开始
+            
+            try:
+                # 首先尝试直接查找节点编号
+                if node_num in node_to_csv_row:
+                    row_idx = node_to_csv_row[node_num]
+                    
+                    # 获取坐标
+                    x_pos = position_df.iloc[row_idx][x_col]
+                    y_pos = position_df.iloc[row_idx][y_col]
+                    
+                    # 反转Y坐标以修复上下颠倒问题
+                    # 使用1减去归一化后的y值
+                    y_pos = 1.0 - ((y_pos - min_y) / (max_y - min_y)) if max_y > min_y else y_pos
+                    # 归一化x坐标
+                    x_pos = (x_pos - min_x) / (max_x - min_x) if max_x > min_x else x_pos
+                    
+                    pos[node] = (x_pos, y_pos)
+                    nodes_with_positions += 1
+                    
+                    # 打印前几个节点的真实位置日志
+                    if i < 10:
+                        print(f"节点{node}(N{node_num})位置: 原始({position_df.iloc[row_idx][x_col]:.3f}, {position_df.iloc[row_idx][y_col]:.3f}) => 转换后({x_pos:.3f}, {y_pos:.3f})")
+                
+                # 回退: 尝试使用node作为索引
+                elif node < len(position_df):
+                    # 使用相对坐标作为节点位置
+                    x_pos = position_df.iloc[node][x_col]
+                    y_pos = position_df.iloc[node][y_col]
+                    
+                    # 反转Y坐标以修复上下颠倒问题
+                    y_pos = 1.0 - ((y_pos - min_y) / (max_y - min_y)) if max_y > min_y else y_pos
+                    x_pos = (x_pos - min_x) / (max_x - min_x) if max_x > min_x else x_pos
+                    
+                    pos[node] = (x_pos, y_pos)
+                    nodes_with_positions += 1
+                    
+                    if i < 10:
+                        print(f"节点{node}(回退)位置: 原始({position_df.iloc[node][x_col]:.3f}, {position_df.iloc[node][y_col]:.3f}) => 转换后({x_pos:.3f}, {y_pos:.3f})")
+                else:
+                    # 如果找不到对应位置，使用随机位置
+                    pos[node] = (np.random.random(), np.random.random())
+                    nodes_with_random_positions += 1
+                    if i < 10:
+                        print(f"警告: 无法找到节点{node}的位置数据，使用随机位置")
+            except Exception as e:
+                print(f"处理节点{node}位置时出错: {str(e)}")
                 pos[node] = (np.random.random(), np.random.random())
+                nodes_with_random_positions += 1
+        
+        print(f"节点总数: {len(G.nodes())}, 使用真实位置节点数: {nodes_with_positions}, 使用随机位置节点数: {nodes_with_random_positions}")
         
         # 设置绘图参数
         plt.figure(figsize=(15, 15))
@@ -765,7 +866,17 @@ def visualize_gcn_topology_with_real_positions(topology_data_path, position_data
         nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.9)
         
         # 添加节点标签
-        labels = {node: f'N{node+1}' for node in G.nodes()}
+        labels = {}
+        for node in G.nodes():
+            node_num = node + 1  # 根据需要调整
+            if node_num in node_to_csv_row:
+                # 使用CSV中的实际编号
+                actual_num = int(position_df.iloc[node_to_csv_row[node_num]][id_col])
+                labels[node] = f'N{actual_num}'
+            else:
+                # 回退到默认编号
+                labels[node] = f'N{node_num}'
+        
         nx.draw_networkx_labels(G, pos, labels, font_size=9, font_weight='bold')
         
         plt.title('GCN-Based Neuron Network Topology (Real Positions)', fontsize=16)
@@ -790,7 +901,7 @@ def visualize_gcn_topology_with_real_positions(topology_data_path, position_data
         print(f"生成基于真实位置的GCN拓扑结构图时出错: {str(e)}")
         import traceback
         print(f"错误详情:\n{traceback.format_exc()}")
-        return None 
+        return None
 
 
 def analyze_community_behaviors(G, communities, X_scaled, y, behavior_labels):
