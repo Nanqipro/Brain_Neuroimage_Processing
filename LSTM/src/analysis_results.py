@@ -5,15 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib as mpl
 from typing import Tuple, List, Dict, Any, Optional, Union, Set
-
-# 字体配置：解决'Arial'字体警告问题
-mpl.rcParams['font.family'] = 'sans-serif'
-mpl.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Liberation Sans', 'FreeSans', 'Helvetica', 'sans-serif']
-# 避免使用Arial字体
-mpl.rcParams['mathtext.fontset'] = 'cm'
-# 设置中文显示支持（如有需要）
-mpl.rcParams['axes.unicode_minus'] = False
-
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import os
@@ -35,6 +26,16 @@ from scipy.signal import find_peaks
 import warnings
 warnings.filterwarnings('ignore')
 from sklearn.decomposition import PCA
+import torch.nn.functional as F
+
+# 字体配置：解决'Arial'字体警告问题
+mpl.rcParams['font.family'] = 'sans-serif'
+mpl.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Liberation Sans', 'FreeSans', 'Helvetica', 'sans-serif']
+# 避免使用Arial字体
+mpl.rcParams['mathtext.fontset'] = 'cm'
+# 设置中文显示支持（如有需要）
+mpl.rcParams['axes.unicode_minus'] = False
+
 
 # 从 neuron_lstm.py 导入必要的类和函数
 from neuron_lstm import (
@@ -47,7 +48,7 @@ from neuron_lstm import (
 from kmeans_lstm_analysis import NeuronDataProcessor
 from analysis_config import AnalysisConfig
 
-import torch.nn.functional as F
+
 
 
 # 添加安全的全局变量
