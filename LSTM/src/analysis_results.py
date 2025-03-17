@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib as mpl
+from typing import Tuple, List, Dict, Any, Optional, Union, Set
 
 # 字体配置：解决'Arial'字体警告问题
 mpl.rcParams['font.family'] = 'sans-serif'
@@ -84,13 +85,19 @@ except ImportError as e:
 # 导入GNN拓扑可视化模块（删除重复的导入）
 HAS_GNN_TOPOLOGY = HAS_GNN_SUPPORT  # 使用相同的标志，因为已经导入了所有需要的模块
 
-def check_gnn_dependencies():
+def check_gnn_dependencies() -> Tuple[bool, List[str]]:
     """
     检查GNN相关依赖项是否正确安装
     
-    返回:
-        status: 依赖项检查状态
-        missing: 缺失的依赖项列表
+    检查当前环境中是否已正确安装GNN相关依赖项，包括torch,
+    torch_geometric, torch_scatter, torch_sparse等
+    
+    返回
+    ----------
+    status : bool
+        依赖项检查状态，True表示所有依赖项都已安装
+    missing : List[str]
+        缺失的依赖项列表
     """
     dependencies = {
         'torch': False,
@@ -150,6 +157,7 @@ def check_gnn_dependencies():
 class ResultAnalyzer:
     """
     结果分析器类：用于分析神经元活动数据和行为之间的关系
+    
     主要功能包括：
     1. 加载训练好的模型和数据
     2. 分析行为和神经元活动的相关性
@@ -157,27 +165,48 @@ class ResultAnalyzer:
     4. 分析行为转换模式
     5. 识别关键神经元
     6. 分析时间相关性
+    
+    参数
+    ----------
+    config : AnalysisConfig
+        配置对象，包含所有必要的参数和路径
     """
-    def __init__(self, config):
+    def __init__(self, config: AnalysisConfig) -> None:
         """
         初始化结果分析器
-        参数：
-            config: 配置对象，包含所有必要的参数和路径
+        
+        参数
+        ----------
+        config : AnalysisConfig
+            配置对象，包含所有必要的参数和路径
         """
         self.config = config
         self.processor = NeuronDataProcessor(config)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-    def balance_data(self, X, y, min_samples):
+    def balance_data(self, X: np.ndarray, y: np.ndarray, min_samples: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         对数据进行平衡处理
-        参数：
-            X: 输入数据
-            y: 标签数据
-            min_samples: 每个类别的最小样本数
-        返回：
-            balanced_X: 平衡后的输入数据
-            balanced_y: 平衡后的标签数据
+        
+        通过对每个类别进行采样，确保各类别样本数量平衡，
+        对于样本数低于min_samples的类别进行过采样，
+        对于样本数高于min_samples的类别进行欠采样
+        
+        参数
+        ----------
+        X : np.ndarray
+            输入数据
+        y : np.ndarray
+            标签数据
+        min_samples : int
+            每个类别的最小样本数
+            
+        返回
+        ----------
+        balanced_X : np.ndarray
+            平衡后的输入数据
+        balanced_y : np.ndarray
+            平衡后的标签数据
         """
         unique_labels, counts = np.unique(y, return_counts=True)
         if np.all(counts >= min_samples):
@@ -207,18 +236,33 @@ class ResultAnalyzer:
 
         return np.vstack(balanced_X), np.concatenate(balanced_y)
 
-    def merge_rare_behaviors(self, X, y, behavior_labels, min_samples):
+    def merge_rare_behaviors(self, X: np.ndarray, y: np.ndarray, behavior_labels: np.ndarray, 
+                          min_samples: int) -> Tuple[np.ndarray, np.ndarray, List[str]]:
         """
         合并样本数过少的稀有行为
-        参数：
-            X: 输入数据
-            y: 标签数据
-            behavior_labels: 行为标签名称
-            min_samples: 最小样本数阈值
-        返回：
-            X: 处理后的输入数据
-            y: 处理后的标签数据
-            new_behavior_labels: 更新后的行为标签名称
+        
+        将样本数低于阈值的稀有行为类别合并为一个"其他"类别，
+        简化数据集并提高主要行为类别的分析效果
+        
+        参数
+        ----------
+        X : np.ndarray
+            输入数据
+        y : np.ndarray
+            标签数据
+        behavior_labels : np.ndarray
+            行为标签名称
+        min_samples : int
+            最小样本数阈值
+            
+        返回
+        ----------
+        X : np.ndarray
+            处理后的输入数据
+        y : np.ndarray
+            处理后的标签数据
+        new_behavior_labels : List[str]
+            更新后的行为标签名称
         """
         unique_labels, counts = np.unique(y, return_counts=True)
         rare_labels = unique_labels[counts < min_samples]
@@ -243,13 +287,24 @@ class ResultAnalyzer:
 
         return X, final_y, new_behavior_labels
 
-    def load_model_and_data(self):
+    def load_model_and_data(self) -> Tuple[EnhancedNeuronLSTM, np.ndarray, np.ndarray]:
         """
         加载预训练模型和预处理数据
-        返回:
-            model: 训练好的LSTM模型
-            X_scaled: 标准化后的神经元数据
-            y: 行为标签
+        
+        步骤：
+        1. 加载并预处理神经元数据
+        2. 处理行为标签，可选择性排除CD1行为
+        3. 平衡数据，确保各行为类别有足够样本
+        4. 加载预训练的神经网络模型
+        
+        返回
+        ----------
+        model : EnhancedNeuronLSTM
+            训练好的LSTM模型
+        X_scaled : np.ndarray
+            标准化后的神经元数据
+        y : np.ndarray
+            行为标签
         """
         # 加载和预处理数据
         X_scaled, y = self.processor.preprocess_data()
@@ -707,17 +762,30 @@ class ResultAnalyzer:
         plt.close()
         return behavior_importance
 
-    def build_neuron_network(self, X_scaled, threshold=0.4):
+    def build_neuron_network(self, X_scaled: np.ndarray, threshold: float = 0.4) -> Tuple[nx.Graph, np.ndarray, List[str], float]:
         """
         构建神经元功能连接网络
-        参数:
-            X_scaled: 标准化后的神经元活动数据
-            threshold: 相关性阈值
-        返回:
-            G: NetworkX图对象
-            correlation_matrix: 相关性矩阵
-            available_neurons: 可用神经元列表
-            threshold: 相关性阈值  此处设置为0.35
+        
+        基于神经元活动数据的相关性分析，构建功能连接网络，
+        表示不同神经元之间的功能关联强度
+        
+        参数
+        ----------
+        X_scaled : np.ndarray
+            标准化后的神经元活动数据
+        threshold : float, 默认 0.4
+            相关性阈值，只有超过此阈值的连接才会被添加到网络中
+            
+        返回
+        ----------
+        G : nx.Graph
+            NetworkX图对象，表示神经元连接网络
+        correlation_matrix : np.ndarray
+            神经元间的相关性矩阵
+        available_neurons : List[str]
+            可用神经元列表，包含实际使用的神经元标识符
+        threshold : float
+            使用的相关性阈值
         """
         print("\n构建神经元功能连接网络...")
         
@@ -759,24 +827,40 @@ class ResultAnalyzer:
                               weight=abs(correlation_matrix[i, j]))
         
         print(f"网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
-        return G, correlation_matrix, available_neurons
+        return G, correlation_matrix, available_neurons, threshold
 
-    def extract_main_connections(self, G, correlation_matrix, available_neurons, method='top_edges', **kwargs):
+    def extract_main_connections(self, G: nx.Graph, correlation_matrix: np.ndarray, 
+                               available_neurons: List[str], method: str = 'top_edges', 
+                               **kwargs) -> nx.Graph:
         """
         从完整网络中提取主要连接线路
         
-        参数:
-            G: 原始网络图
-            correlation_matrix: 相关性矩阵
-            available_neurons: 可用神经元列表
-            method: 提取方法，可选 'threshold', 'top_edges', 'mst', 'backbone'
-            **kwargs: 其他参数
-                - threshold: 更高的相关性阈值（用于'threshold'方法）
-                - top_k: 每个节点保留的最强连接数（用于'top_edges'方法）
-                - alpha: 显著性水平（用于'backbone'方法）
+        通过不同的方法从原始神经元网络中提取主要的功能连接，
+        简化网络结构并突出关键连接模式
+        
+        参数
+        ----------
+        G : nx.Graph
+            原始网络图
+        correlation_matrix : np.ndarray
+            相关性矩阵
+        available_neurons : List[str]
+            可用神经元列表
+        method : str, 默认 'top_edges'
+            提取方法，可选 'threshold', 'top_edges', 'mst', 'backbone'
+        **kwargs : dict
+            其他参数
+                - threshold : float
+                  更高的相关性阈值（用于'threshold'方法）
+                - top_k : int
+                  每个节点保留的最强连接数（用于'top_edges'方法）
+                - alpha : float
+                  显著性水平（用于'backbone'方法）
                 
-        返回:
-            main_G: 提取出的主要连接网络
+        返回
+        ----------
+        main_G : nx.Graph
+            提取出的主要连接网络
         """
         print(f"\n正在使用'{method}'方法提取主要连接线路...")
         
@@ -2518,15 +2602,22 @@ class ResultAnalyzer:
         
         return gnn_results
 
-def convert_to_serializable(obj):
+def convert_to_serializable(obj: Any) -> Any:
     """
     将对象转换为可JSON序列化的格式
     
-    参数：
-        obj: 需要转换的对象
+    递归地将各种类型的Python和NumPy对象转换为可JSON序列化的标准格式，
+    包括NumPy数组、整数、浮点数等特殊类型
+    
+    参数
+    ----------
+    obj : Any
+        需要转换的对象
         
-    返回：
-        转换后的对象
+    返回
+    ----------
+    Any
+        转换后的可序列化对象
     """
     if isinstance(obj, np.integer):
         return int(obj)
@@ -2549,12 +2640,17 @@ def convert_to_serializable(obj):
         except:
             return f"不可序列化对象: {type(obj)}"
 
-def set_all_random_seeds(seed=42):
+def set_all_random_seeds(seed: int = 42) -> None:
     """
     设置所有相关库的随机种子，确保结果可重现
     
-    参数：
-        seed: 随机种子值，默认为42
+    为Python内置random、NumPy和PyTorch等库设置随机种子，
+    确保每次运行产生相同的随机数序列，提高实验的可重复性
+    
+    参数
+    ----------
+    seed : int, 默认 42
+        随机种子值
     """
     import random
     import numpy as np
@@ -2581,8 +2677,18 @@ def set_all_random_seeds(seed=42):
     
     print(f"已设置所有随机种子为: {seed}")
 
-def main():
-    """主函数，运行神经元活动数据分析流程"""
+def main() -> None:
+    """
+    主函数，运行神经元活动数据分析流程
+    
+    执行步骤:
+    1. 设置随机种子确保结果可重现
+    2. 加载和验证配置
+    3. 初始化结果分析器
+    4. 加载模型和数据
+    5. 执行多种神经元活动分析
+    6. 可视化并保存分析结果
+    """
     try:
         # 首先设置所有随机种子确保结果可重现
         set_all_random_seeds(42)
@@ -2668,7 +2774,7 @@ pip install torch-geometric torch-scatter torch-sparse
         
         custom_print("\n开始神经元网络拓扑分析...")
         # 构建神经元功能连接网络
-        G, correlation_matrix, available_neurons = analyzer.build_neuron_network(
+        G, correlation_matrix, available_neurons, threshold = analyzer.build_neuron_network(
             X_scaled, 
             threshold=config.analysis_params['correlation_threshold']
         )

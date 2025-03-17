@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List, Optional, Union, Any
 
 class AnalysisConfig:
     """
@@ -13,7 +14,13 @@ class AnalysisConfig:
     
     该类确保所有组件使用一致的配置，并提供集中的参数调整接口。
     """
-    def __init__(self):
+    def __init__(self) -> None:
+        """
+        初始化分析配置对象
+        
+        创建并设置所有必要的配置参数，包括路径、模型参数、分析参数和可视化参数。
+        同时创建必要的目录结构并验证关键路径的有效性。
+        """
         # 基础目录配置
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根目录
         
@@ -89,30 +96,30 @@ class AnalysisConfig:
         self.network_analysis_file = os.path.join(self.analysis_dir, f'network_analysis_results.json')  # 网络分析结果
         self.neuron_effect_file = os.path.join(self.analysis_dir, f'neuron_effect_sizes.csv')  # 神经元效应大小
         
-        # 模型超参数配置
-        self.sequence_length = 10     # 序列长度：用于LSTM的输入序列长度
-        self.hidden_size = 256        # 隐藏层大小：LSTM隐藏状态的维度
-        self.num_layers = 3           # LSTM层数：模型中LSTM层的数量
-        self.batch_size = 64          # 批次大小：训练时的批量大小
-        self.learning_rate = 0.001    # 学习率：模型训练的学习率
-        self.num_epochs = 100         # 训练轮数：模型训练的总轮数
-        self.n_clusters = 5           # 聚类数量：K-means聚类的类别数
-        self.test_size = 0.2          # 测试集比例：数据集中测试集的占比
-        self.random_seed = 42         # 随机种子：确保结果可重复性
+        # LSTM模型超参数配置
+        self.sequence_length: int = 10     # 序列长度：用于LSTM的输入序列长度
+        self.hidden_size: int = 256        # 隐藏层大小：LSTM隐藏状态的维度
+        self.num_layers: int = 3           # LSTM层数：模型中LSTM层的数量
+        self.batch_size: int = 64          # 批次大小：训练时的批量大小
+        self.learning_rate: float = 0.001  # 学习率：模型训练的学习率
+        self.num_epochs: int = 100         # 训练轮数：模型训练的总轮数
+        self.n_clusters: int = 5           # 聚类数量：K-means聚类的类别数
+        self.test_size: float = 0.2        # 测试集比例：数据集中测试集的占比
+        self.random_seed: int = 42         # 随机种子：确保结果可重复性
         
-        self.weight_decay = 1e-4      # 权重衰减：优化器的权重衰减参数
-        self.early_stopping = False    # 早停：是否启用早停机制
+        self.weight_decay: float = 1e-4    # 权重衰减：优化器的权重衰减参数
+        self.early_stopping: bool = False  # 早停：是否启用早停机制
          
         # 神经网络高级参数 - 新添加
-        self.latent_dim = 32          # 潜在维度：自编码器的潜在特征维度
-        self.num_heads = 4            # 注意力头数：多头注意力机制的头数量
-        self.dropout = 0.2            # Dropout率：防止过拟合的神经元随机失活比例
+        self.latent_dim: int = 32          # 潜在维度：自编码器的潜在特征维度
+        self.num_heads: int = 4            # 注意力头数：多头注意力机制的头数量
+        self.dropout: float = 0.2          # Dropout率：防止过拟合的神经元随机失活比例
         
         # 行为标签配置
-        self.include_cd1_behavior = True  # 是否在分析中纳入CD1行为标签
+        self.include_cd1_behavior: bool = True  # 是否在分析中纳入CD1行为标签
         
         # 分析参数配置
-        self.analysis_params = {
+        self.analysis_params: Dict[str, Any] = {
             'min_samples_per_behavior': 10,  # 每种行为的最小样本数要求
             'correlation_windows': [10, 20, 50],  # 时间相关性分析的窗口大小列表
             'behavior_merge_threshold': 0.8,  # 行为合并的相似度阈值
@@ -180,7 +187,7 @@ class AnalysisConfig:
         }
         
         # 可视化参数配置
-        self.visualization_params = {
+        self.visualization_params: Dict[str, Any] = {
             'figure_sizes': {  # 不同类型图表的尺寸设置
                 'correlation': (15, 10),  # 相关性图尺寸
                 'temporal': (15, 5),      # 时间序列图尺寸
@@ -225,10 +232,10 @@ class AnalysisConfig:
         }
         
         # GNN 分析配置
-        self.use_gnn = True  # 是否使用GNN分析
+        self.use_gnn: bool = True  # 是否使用GNN分析
         
         # GAT模型控制开关
-        self.use_gat = False  # 是否使用GAT模型
+        self.use_gat: bool = False  # 是否使用GAT模型
         
         # 设置目录
         self.setup_directories()
@@ -236,10 +243,19 @@ class AnalysisConfig:
         # 验证路径
         self.validate_paths()
         
-    def setup_directories(self):
+    def setup_directories(self) -> None:
         """
         创建必要的目录结构并验证权限
-        确保所有需要的输出目录都存在
+        
+        确保分析和结果所需的所有目录都存在，并验证它们具有适当的写入权限。
+        如果目录不存在，将自动创建；如果无法创建或写入，则抛出异常。
+        
+        异常
+        ----------
+        RuntimeError
+            当无法创建必要的目录结构时抛出
+        PermissionError
+            当无法在目录中写入文件时抛出
         """
         directories = [
             self.output_dir,           # 结果输出目录
@@ -249,7 +265,7 @@ class AnalysisConfig:
             self.temporal_pattern_dir, # 时间模式分析目录
             self.temporal_correlation_dir,  # 时间相关性分析目录
             self.topology_dir,         # 拓扑分析目录
-            self.gnn_results_dir,      # GNN结果目录 - 已在__init__中设置，不需要再次设置
+            self.gnn_results_dir,      # GNN结果目录
             self.interactive_dir       # 交互式可视化目录
         ]
         
@@ -280,11 +296,21 @@ class AnalysisConfig:
                     pass
             raise RuntimeError(f"创建目录结构失败: {str(e)}")
         
-    def validate_paths(self):
+    def validate_paths(self) -> None:
         """
         验证必要文件的存在性
-        检查数据文件和模型文件是否存在
-        如果缺少必要文件，抛出FileNotFoundError异常
+        
+        检查关键数据文件和模型文件是否存在，以及目录结构是否正确。
+        如果缺少必要文件或目录，或者没有适当的访问权限，则抛出异常。
+        
+        异常
+        ----------
+        FileNotFoundError
+            当必要的数据文件未找到时抛出
+        NotADirectoryError
+            当必要的目录不存在时抛出
+        PermissionError
+            当没有目录的写入权限时抛出
         """
         # 检查数据文件
         if not os.path.exists(self.data_file):
@@ -304,22 +330,38 @@ class AnalysisConfig:
             if not os.access(path, os.W_OK):
                 raise PermissionError(f"没有{name}的写入权限: {path}")
             
-    def get_temporal_pattern_path(self, behavior):
+    def get_temporal_pattern_path(self, behavior: str) -> str:
         """
         获取特定行为的时间模式图保存路径
-        参数：
-            behavior: 行为类型名称
-        返回：
-            对应行为的时间模式图文件路径
+        
+        根据给定的行为类型名称，生成对应的时间模式分析图文件路径。
+        
+        参数
+        ----------
+        behavior : str
+            行为类型名称
+            
+        返回
+        ----------
+        str
+            对应行为的时间模式图文件完整路径
         """
         return os.path.join(self.temporal_pattern_dir, f'temporal_pattern_{behavior}.png')
     
-    def get_temporal_correlation_path(self, window_size):
+    def get_temporal_correlation_path(self, window_size: int) -> str:
         """
         获取特定窗口大小的时间相关性图保存路径
-        参数：
-            window_size: 时间窗口大小
-        返回：
-            对应窗口大小的时间相关性图文件路径
+        
+        根据给定的时间窗口大小，生成对应的时间相关性分析图文件路径。
+        
+        参数
+        ----------
+        window_size : int
+            时间窗口大小
+            
+        返回
+        ----------
+        str
+            对应窗口大小的时间相关性图文件完整路径
         """
         return os.path.join(self.temporal_correlation_dir, f'temporal_correlation_{window_size}.png') 

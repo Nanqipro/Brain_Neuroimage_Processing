@@ -15,6 +15,7 @@ import datetime
 from analysis_config import AnalysisConfig
 import re
 import copy
+from typing import Tuple, List, Dict, Any, Optional, Union
 warnings.filterwarnings('ignore')
 
 # 导入从neuron_lstm.py迁移的类和函数
@@ -31,11 +32,28 @@ from neuron_lstm import (
 
 # 数据加载和预处理类
 class NeuronDataProcessor:
-    def __init__(self, config):
+    """
+    神经元数据处理器类：负责加载、预处理神经元活动数据和行为标签
+    
+    主要功能:
+    1. 加载神经元数据文件
+    2. 识别和预处理神经元活动数据
+    3. 处理行为标签
+    4. 应用标准化和聚类分析
+    
+    参数
+    ----------
+    config : AnalysisConfig
+        配置对象，包含数据文件路径等参数
+    """
+    def __init__(self, config: AnalysisConfig) -> None:
         """
         初始化神经元数据处理器
-        参数:
-            config: 配置对象,包含数据文件路径等参数
+        
+        参数
+        ----------
+        config : AnalysisConfig
+            配置对象，包含数据文件路径等参数
         """
         self.config = config
         try:
@@ -49,14 +67,29 @@ class NeuronDataProcessor:
             
         self.scaler = StandardScaler()  # 用于数据标准化
         self.label_encoder = LabelEncoder()  # 用于行为标签编码
+        self.available_neuron_cols: List[str] = []  # 存储可用的神经元列名
         
-    def preprocess_data(self):
+    def preprocess_data(self) -> Tuple[np.ndarray, np.ndarray]:
         """
-        数据预处理函数：
+        数据预处理函数
+        
+        执行步骤:
         1. 提取神经元数据
         2. 处理缺失值
         3. 标准化数据
         4. 编码行为标签
+        
+        返回
+        ----------
+        X_scaled : np.ndarray
+            标准化后的神经元数据
+        y : np.ndarray
+            编码后的行为标签
+            
+        异常
+        ----------
+        ValueError
+            当数据为空或无法识别神经元数据列时抛出
         """
         if self.data.empty:
             raise ValueError("数据为空，无法进行预处理")
@@ -185,7 +218,22 @@ class NeuronDataProcessor:
         
         return X_scaled, y
 
-    def apply_kmeans(self, X):
+    def apply_kmeans(self, X: np.ndarray) -> Tuple[KMeans, np.ndarray]:
+        """
+        应用K-means聚类分析
+        
+        参数
+        ----------
+        X : np.ndarray
+            用于聚类的数据
+            
+        返回
+        ----------
+        kmeans : KMeans
+            训练好的KMeans模型
+        cluster_labels : np.ndarray
+            聚类标签数组
+        """
         # 应用K-means聚类
         print(f"\n使用 {self.config.n_clusters} 个聚类进行K-means聚类")
         kmeans = KMeans(n_clusters=self.config.n_clusters, 
@@ -201,9 +249,11 @@ class NeuronDataProcessor:
         
         return kmeans, cluster_labels
 
-def main():
+def main() -> None:
     """
-    主函数：
+    主函数
+    
+    执行步骤:
     1. 初始化配置
     2. 数据预处理
     3. 聚类分析
