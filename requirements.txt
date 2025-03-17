@@ -1,4 +1,4 @@
-# Core dependencies
+# 核心依赖
 numpy>=1.21.0
 pandas>=1.3.0
 scikit-learn>=1.0.0
@@ -6,12 +6,19 @@ matplotlib>=3.4.0
 seaborn>=0.11.0
 scipy>=1.7.0
 
-# LSTM module dependencies
+# LSTM模块依赖
 torch>=2.1.0
 torchvision>=0.16.0
 torchaudio>=2.1.0
 
-# Topology analysis module dependencies
+# 图神经网络(GNN)相关依赖
+torch-geometric>=2.0.0
+torch-scatter>=2.0.9
+torch-sparse>=0.6.13
+torch-cluster>=1.6.0
+torch-spline-conv>=1.2.1
+
+# 拓扑分析模块依赖
 networkx>=2.6.0
 plotly>=5.3.0
 typing-extensions>=3.10.0
@@ -20,15 +27,24 @@ tqdm>=4.62.0
 pillow>=8.3.0
 imageio>=2.9.0
 
-# Visualization and interactive components
+# 可视化和交互式组件
 jupyter>=1.0.0
 ipywidgets>=7.6.0
 selenium>=4.0.0
 webdriver-manager>=3.5.0
+plotly-express>=0.4.0
+ipykernel>=6.0.0
 
-# Dimensionality reduction and clustering
+# 降维和聚类
 umap-learn>=0.5.3
 hdbscan>=0.8.29
+sklearn-extra>=0.2.0  # 额外的聚类算法
 
-# Testing
-pytest>=6.2.5 
+# 测试工具
+pytest>=6.2.5
+pytest-cov>=2.12.0
+
+# 数据处理与分析
+statsmodels>=0.13.0  # 统计分析
+h5py>=3.6.0  # 处理HDF5格式数据
+openpyxl>=3.0.9  # Excel文件支持

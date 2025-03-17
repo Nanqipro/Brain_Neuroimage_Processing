@@ -419,18 +419,22 @@ class VisualizationManager:
         plt.savefig(save_path, dpi=self.config.visualization_params['dpi'])
         plt.close()
         
-    def plot_interactive_neuron_network(self, G, metrics, modules):
+    def plot_interactive_neuron_network(self, G, metrics=None, modules=None, output_path=None):
         """
-        生成交互式的神经元网络可视化图
+        创建交互式神经元网络可视化
         
-        参数：
-            G: networkx图对象
-            metrics: 拓扑分析指标
-            modules: 功能模块信息
+        参数:
+            G: NetworkX图对象
+            metrics: 拓扑指标字典
+            modules: 功能模块字典
+            output_path: 输出HTML文件路径（可选）
         
-        返回：
-            保存的HTML文件路径
+        返回:
+            html_path: 保存的HTML文件路径
         """
+        if output_path is None:
+            output_path = self.config.interactive_neuron_network
+        
         try:
             from pyvis.network import Network
         except ImportError:
@@ -537,9 +541,6 @@ class VisualizationManager:
             weight = data.get('weight', 1.0)
             width = weight * 0.8  # 减小边的宽度
             net.add_edge(u, v, value=weight, width=width, title=f"相关性: {weight:.3f}", color={'opacity': 0.15})
-        
-        # 输出文件路径
-        output_path = os.path.join(interactive_dir, 'interactive_neuron_network.html')
         
         # 使用自定义模板添加标题和CSS
         html_template = """

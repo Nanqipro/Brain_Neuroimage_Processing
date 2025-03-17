@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib as mpl
+from typing import Tuple, List, Dict, Any, Optional, Union, Set
 
 # 字体配置：解决'Arial'字体警告问题
 mpl.rcParams['font.family'] = 'sans-serif'
@@ -35,10 +36,19 @@ import warnings
 warnings.filterwarnings('ignore')
 from sklearn.decomposition import PCA
 
-from kmeans_lstm_analysis import EnhancedNeuronLSTM, NeuronDataProcessor
+# 从 neuron_lstm.py 导入必要的类和函数
+from neuron_lstm import (
+    NeuronDataset, 
+    NeuronAutoencoder, 
+    MultiHeadAttention, 
+    TemporalAttention, 
+    EnhancedNeuronLSTM
+)
+from kmeans_lstm_analysis import NeuronDataProcessor
 from analysis_config import AnalysisConfig
 
 import torch.nn.functional as F
+
 
 # 添加安全的全局变量
 add_safe_globals(['_reconstruct'])
@@ -47,9 +57,107 @@ add_safe_globals(['_reconstruct'])
 import logging
 logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 
+# 导入GNN相关模块
+try:
+    import torch_geometric
+    # 导入PyTorch Geometric的Data类
+    from torch_geometric.data import Data
+    # 导入GCN和基础GNN模块
+    from neuron_gnn import GNNAnalyzer, NeuronGCN, TemporalGNN, ModuleGNN
+    from neuron_gnn import train_gnn_model, plot_gnn_results, visualize_node_embeddings
+    # 从独立的GAT模块导入
+    from neuron_gat import NeuronGAT, visualize_gat_topology, visualize_gat_attention_weights
+    from gnn_topology import (create_gnn_based_topology, visualize_gnn_topology,
+                             create_interactive_gnn_topology, save_gnn_topology_data, 
+                             analyze_gnn_topology, visualize_gcn_topology,
+                             visualize_gcn_topology_with_real_positions)
+    from gnn_visualization import GNNVisualizer
+    # 设置GNN支持标志为True，表示成功导入了所有GNN相关模块
+    # 此标志将在后续代码中用于条件性地启用GNN分析功能
+    HAS_GNN_SUPPORT = True
+    print("成功加载GNN支持模块，GNN分析功能已启用")
+except ImportError as e:
+    print(f"警告: 未找到GNN支持模块 ({str(e)})，将禁用GNN分析功能")
+    print("请确保已安装PyTorch Geometric及相关依赖项")
+    print("安装命令: pip install torch-geometric torch-scatter torch-sparse")
+    HAS_GNN_SUPPORT = False
+
+# 导入GNN拓扑可视化模块（删除重复的导入）
+HAS_GNN_TOPOLOGY = HAS_GNN_SUPPORT  # 使用相同的标志，因为已经导入了所有需要的模块
+
+def check_gnn_dependencies() -> Tuple[bool, List[str]]:
+    """
+    检查GNN相关依赖项是否正确安装
+    
+    检查当前环境中是否已正确安装GNN相关依赖项，包括torch,
+    torch_geometric, torch_scatter, torch_sparse等
+    
+    返回
+    ----------
+    status : bool
+        依赖项检查状态，True表示所有依赖项都已安装
+    missing : List[str]
+        缺失的依赖项列表
+    """
+    dependencies = {
+        'torch': False,
+        'torch_geometric': False,
+        'torch_scatter': False,
+        'torch_sparse': False,
+    }
+    
+    missing = []
+
+    # 检查是否能导入我们的GNN模块
+    try:
+        import neuron_gnn
+        print("成功导入neuron_gnn模块")
+    except ImportError as e:
+        print(f"无法导入neuron_gnn模块: {str(e)}")
+        print(f"当前Python路径: {sys.path}")
+        missing.append('neuron_gnn')
+    
+    # 检查PyTorch
+    try:
+        import torch
+        dependencies['torch'] = True
+        print(f"PyTorch版本: {torch.__version__}")
+    except ImportError:
+        missing.append('torch')
+    
+    # 检查PyTorch Geometric
+    try:
+        import torch_geometric
+        dependencies['torch_geometric'] = True
+        print(f"PyTorch Geometric版本: {torch_geometric.__version__}")
+    except ImportError:
+        missing.append('torch_geometric')
+    
+    # 检查torch_scatter
+    try:
+        import torch_scatter
+        dependencies['torch_scatter'] = True
+        print(f"Torch Scatter版本: {torch_scatter.__version__}")
+    except ImportError:
+        missing.append('torch_scatter')
+    
+    # 检查torch_sparse
+    try:
+        import torch_sparse
+        dependencies['torch_sparse'] = True
+        print(f"Torch Sparse版本: {torch_sparse.__version__}")
+    except ImportError:
+        missing.append('torch_sparse')
+    
+    
+    status = all(dependencies.values())
+    
+    return status, missing
+
 class ResultAnalyzer:
     """
     结果分析器类：用于分析神经元活动数据和行为之间的关系
+    
     主要功能包括：
     1. 加载训练好的模型和数据
     2. 分析行为和神经元活动的相关性
@@ -57,27 +165,48 @@ class ResultAnalyzer:
     4. 分析行为转换模式
     5. 识别关键神经元
     6. 分析时间相关性
+    
+    参数
+    ----------
+    config : AnalysisConfig
+        配置对象，包含所有必要的参数和路径
     """
-    def __init__(self, config):
+    def __init__(self, config: AnalysisConfig) -> None:
         """
         初始化结果分析器
-        参数：
-            config: 配置对象，包含所有必要的参数和路径
+        
+        参数
+        ----------
+        config : AnalysisConfig
+            配置对象，包含所有必要的参数和路径
         """
         self.config = config
         self.processor = NeuronDataProcessor(config)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-    def balance_data(self, X, y, min_samples):
+    def balance_data(self, X: np.ndarray, y: np.ndarray, min_samples: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         对数据进行平衡处理
-        参数：
-            X: 输入数据
-            y: 标签数据
-            min_samples: 每个类别的最小样本数
-        返回：
-            balanced_X: 平衡后的输入数据
-            balanced_y: 平衡后的标签数据
+        
+        通过对每个类别进行采样，确保各类别样本数量平衡，
+        对于样本数低于min_samples的类别进行过采样，
+        对于样本数高于min_samples的类别进行欠采样
+        
+        参数
+        ----------
+        X : np.ndarray
+            输入数据
+        y : np.ndarray
+            标签数据
+        min_samples : int
+            每个类别的最小样本数
+            
+        返回
+        ----------
+        balanced_X : np.ndarray
+            平衡后的输入数据
+        balanced_y : np.ndarray
+            平衡后的标签数据
         """
         unique_labels, counts = np.unique(y, return_counts=True)
         if np.all(counts >= min_samples):
@@ -107,18 +236,33 @@ class ResultAnalyzer:
 
         return np.vstack(balanced_X), np.concatenate(balanced_y)
 
-    def merge_rare_behaviors(self, X, y, behavior_labels, min_samples):
+    def merge_rare_behaviors(self, X: np.ndarray, y: np.ndarray, behavior_labels: np.ndarray, 
+                          min_samples: int) -> Tuple[np.ndarray, np.ndarray, List[str]]:
         """
         合并样本数过少的稀有行为
-        参数：
-            X: 输入数据
-            y: 标签数据
-            behavior_labels: 行为标签名称
-            min_samples: 最小样本数阈值
-        返回：
-            X: 处理后的输入数据
-            y: 处理后的标签数据
-            new_behavior_labels: 更新后的行为标签名称
+        
+        将样本数低于阈值的稀有行为类别合并为一个"其他"类别，
+        简化数据集并提高主要行为类别的分析效果
+        
+        参数
+        ----------
+        X : np.ndarray
+            输入数据
+        y : np.ndarray
+            标签数据
+        behavior_labels : np.ndarray
+            行为标签名称
+        min_samples : int
+            最小样本数阈值
+            
+        返回
+        ----------
+        X : np.ndarray
+            处理后的输入数据
+        y : np.ndarray
+            处理后的标签数据
+        new_behavior_labels : List[str]
+            更新后的行为标签名称
         """
         unique_labels, counts = np.unique(y, return_counts=True)
         rare_labels = unique_labels[counts < min_samples]
@@ -143,17 +287,47 @@ class ResultAnalyzer:
 
         return X, final_y, new_behavior_labels
 
-    def load_model_and_data(self):
+    def load_model_and_data(self) -> Tuple[EnhancedNeuronLSTM, np.ndarray, np.ndarray]:
         """
         加载预训练模型和预处理数据
-        返回:
-            model: 训练好的LSTM模型
-            X_scaled: 标准化后的神经元数据
-            y: 行为标签
+        
+        步骤：
+        1. 加载并预处理神经元数据
+        2. 处理行为标签，可选择性排除CD1行为
+        3. 平衡数据，确保各行为类别有足够样本
+        4. 加载预训练的神经网络模型
+        
+        返回
+        ----------
+        model : EnhancedNeuronLSTM
+            训练好的LSTM模型
+        X_scaled : np.ndarray
+            标准化后的神经元数据
+        y : np.ndarray
+            行为标签
         """
         # 加载和预处理数据
         X_scaled, y = self.processor.preprocess_data()
         self.behavior_labels = self.processor.label_encoder.classes_
+        
+        # 如果配置为不纳入CD1行为标签，在结果分析器中进一步处理
+        if not self.config.include_cd1_behavior and 'CD1' in self.behavior_labels:
+            print("\n结果分析器中排除CD1行为标签")
+            # 获取CD1标签的索引
+            cd1_idx = np.where(self.behavior_labels == 'CD1')[0][0]
+            
+            # 创建排除CD1数据的掩码
+            mask = (y != cd1_idx)
+            original_shape = X_scaled.shape[0]
+            
+            # 应用掩码过滤数据
+            X_scaled = X_scaled[mask]
+            y = y[mask]
+            
+            # 更新行为标签列表，排除CD1
+            self.behavior_labels = np.array([label for label in self.behavior_labels if label != 'CD1'])
+            
+            print(f"已排除CD1行为数据: 从 {original_shape} 条数据减少到 {X_scaled.shape[0]} 条")
         
         # 打印数据集信息
         n_neurons = X_scaled.shape[1]
@@ -178,9 +352,13 @@ class ResultAnalyzer:
             )
         
         # 加载训练好的模型
-        input_size = X_scaled.shape[1] + 1  # +1 for cluster label
+        # 注意：这里修正了与训练时 input_size 不一致的问题
+        input_size = X_scaled.shape[1]  # 移除了 +1 for cluster label，与训练时保持一致
         num_classes = len(np.unique(y))
         
+        print(f"创建 EnhancedNeuronLSTM 模型: input_size={input_size}, num_classes={num_classes}")
+        
+        # 初始化模型结构，确保与训练时结构一致
         model = EnhancedNeuronLSTM(
             input_size=input_size,
             hidden_size=self.config.hidden_size,
@@ -192,16 +370,34 @@ class ResultAnalyzer:
         ).to(self.device)
         
         try:
-            # 尝试使用 weights_only=True 加载模型
-            checkpoint = torch.load(self.config.model_path, weights_only=True)
+            print(f"尝试加载模型: {self.config.model_path}")
+            # 首先尝试基本加载方式
+            checkpoint = torch.load(self.config.model_path, map_location=self.device)
             model.load_state_dict(checkpoint['model_state_dict'])
+            print("模型加载成功!")
         except Exception as e1:
+            print(f"基本加载失败: {str(e1)}")
             try:
                 print("尝试使用 weights_only=False 加载模型...")
-                checkpoint = torch.load(self.config.model_path, weights_only=False)
+                checkpoint = torch.load(self.config.model_path, map_location=self.device, weights_only=False)
                 model.load_state_dict(checkpoint['model_state_dict'])
+                print("模型使用 weights_only=False 加载成功!")
             except Exception as e2:
-                raise RuntimeError(f"加载模型失败。错误1: {str(e1)}\n错误2: {str(e2)}")
+                try:
+                    print("尝试其他兼容方式加载...")
+                    # 尝试宽松加载模式
+                    checkpoint = torch.load(self.config.model_path, map_location=self.device)
+                    # 过滤并仅加载模型中存在的参数
+                    model_dict = model.state_dict()
+                    pretrained_dict = {k: v for k, v in checkpoint['model_state_dict'].items() if k in model_dict}
+                    model_dict.update(pretrained_dict)
+                    model.load_state_dict(model_dict)
+                    print("模型使用兼容模式加载成功!")
+                except Exception as e3:
+                    # 详细记录所有错误，帮助诊断
+                    error_msg = f"加载模型失败。\n错误1: {str(e1)}\n错误2: {str(e2)}\n错误3: {str(e3)}"
+                    print(error_msg)
+                    raise RuntimeError(error_msg)
         
         model.eval()
         return model, X_scaled, y
@@ -215,13 +411,13 @@ class ResultAnalyzer:
         返回：
             behavior_activity_df: 行为-神经元活动相关性数据框
         """
-        # Calculate mean activity for each behavior
+        # 计算每种行为的平均神经元活动
         behavior_means = {}
         for behavior_idx in range(len(self.behavior_labels)):
             behavior_mask = (y == behavior_idx)
             behavior_means[self.behavior_labels[behavior_idx]] = np.mean(X_scaled[behavior_mask], axis=0)
         
-        # Create correlation heatmap
+        # 创建相关性热图
         behavior_activity_df = pd.DataFrame(behavior_means).T
         behavior_activity_df.columns = [f'Neuron {i+1}' for i in range(behavior_activity_df.shape[1])]
         
@@ -539,7 +735,7 @@ class ResultAnalyzer:
         width = 0.15
         
         # 创建颜色映射
-        colors = plt.cm.viridis(np.linspace(0, 1, self.config.analysis_params['top_neurons_count']))
+        colors = plt.cm.tab10(np.linspace(0, 1, self.config.analysis_params['top_neurons_count']))
         
         # 绘制柱状图并添加神经元编号标注
         for i in range(self.config.analysis_params['top_neurons_count']):
@@ -566,16 +762,30 @@ class ResultAnalyzer:
         plt.close()
         return behavior_importance
 
-    def build_neuron_network(self, X_scaled, threshold=0.3):
+    def build_neuron_network(self, X_scaled: np.ndarray, threshold: float = 0.4) -> Tuple[nx.Graph, np.ndarray, List[str], float]:
         """
         构建神经元功能连接网络
-        参数:
-            X_scaled: 标准化后的神经元活动数据
-            threshold: 相关性阈值
-        返回:
-            G: NetworkX图对象
-            correlation_matrix: 相关性矩阵
-            available_neurons: 可用神经元列表
+        
+        基于神经元活动数据的相关性分析，构建功能连接网络，
+        表示不同神经元之间的功能关联强度
+        
+        参数
+        ----------
+        X_scaled : np.ndarray
+            标准化后的神经元活动数据
+        threshold : float, 默认 0.4
+            相关性阈值，只有超过此阈值的连接才会被添加到网络中
+            
+        返回
+        ----------
+        G : nx.Graph
+            NetworkX图对象，表示神经元连接网络
+        correlation_matrix : np.ndarray
+            神经元间的相关性矩阵
+        available_neurons : List[str]
+            可用神经元列表，包含实际使用的神经元标识符
+        threshold : float
+            使用的相关性阈值
         """
         print("\n构建神经元功能连接网络...")
         
@@ -617,24 +827,40 @@ class ResultAnalyzer:
                               weight=abs(correlation_matrix[i, j]))
         
         print(f"网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
-        return G, correlation_matrix, available_neurons
+        return G, correlation_matrix, available_neurons, threshold
 
-    def extract_main_connections(self, G, correlation_matrix, available_neurons, method='top_edges', **kwargs):
+    def extract_main_connections(self, G: nx.Graph, correlation_matrix: np.ndarray, 
+                               available_neurons: List[str], method: str = 'top_edges', 
+                               **kwargs) -> nx.Graph:
         """
         从完整网络中提取主要连接线路
         
-        参数:
-            G: 原始网络图
-            correlation_matrix: 相关性矩阵
-            available_neurons: 可用神经元列表
-            method: 提取方法，可选 'threshold', 'top_edges', 'mst', 'backbone'
-            **kwargs: 其他参数
-                - threshold: 更高的相关性阈值（用于'threshold'方法）
-                - top_k: 每个节点保留的最强连接数（用于'top_edges'方法）
-                - alpha: 显著性水平（用于'backbone'方法）
+        通过不同的方法从原始神经元网络中提取主要的功能连接，
+        简化网络结构并突出关键连接模式
+        
+        参数
+        ----------
+        G : nx.Graph
+            原始网络图
+        correlation_matrix : np.ndarray
+            相关性矩阵
+        available_neurons : List[str]
+            可用神经元列表
+        method : str, 默认 'top_edges'
+            提取方法，可选 'threshold', 'top_edges', 'mst', 'backbone'
+        **kwargs : dict
+            其他参数
+                - threshold : float
+                  更高的相关性阈值（用于'threshold'方法）
+                - top_k : int
+                  每个节点保留的最强连接数（用于'top_edges'方法）
+                - alpha : float
+                  显著性水平（用于'backbone'方法）
                 
-        返回:
-            main_G: 提取出的主要连接网络
+        返回
+        ----------
+        main_G : nx.Graph
+            提取出的主要连接网络
         """
         print(f"\n正在使用'{method}'方法提取主要连接线路...")
         
@@ -647,7 +873,7 @@ class ResultAnalyzer:
         
         if method == 'threshold':
             # 使用更高的阈值过滤边
-            higher_threshold = kwargs.get('threshold', 0.6)  # 默认提高到0.6
+            higher_threshold = kwargs.get('threshold', 0.42)  # 默认提高到0.4
             print(f"使用更高的相关性阈值: {higher_threshold}")
             
             for u, v, data in G.edges(data=True):
@@ -656,7 +882,7 @@ class ResultAnalyzer:
                     
         elif method == 'top_edges':
             # 为每个节点只保留top_k个最强连接
-            top_k = kwargs.get('top_k', 5)  # 默认每个节点保留3个最强连接
+            top_k = kwargs.get('top_k', 8)  # 默认每个节点保留3个最强连接
             print(f"为每个节点保留{top_k}个最强连接")
             
             for node in G.nodes():
@@ -840,6 +1066,7 @@ class ResultAnalyzer:
                         
                 metrics['communities'] = community_dict
                 metrics['number_of_communities'] = len(communities)
+                metrics['communities_list'] = communities  # 保存原始社区列表，用于行为映射
                 
                 # 计算模块度
                 metrics['modularity'] = nx.community.modularity(G, communities)
@@ -854,6 +1081,7 @@ class ResultAnalyzer:
                         community_dict[node] = i
                 metrics['communities'] = community_dict
                 metrics['number_of_communities'] = len(connected_components)
+                metrics['communities_list'] = connected_components  # 保存原始社区列表，用于行为映射
                 metrics['modularity'] = 0.0
             
             # 网络密度和其他统计指标
@@ -929,6 +1157,291 @@ class ResultAnalyzer:
         max_edges = (n * (n - 1)) / 2
         return len(subgraph.edges()) / max_edges if max_edges > 0 else 0
 
+    def map_communities_to_behaviors(self, G, communities, X_scaled, y):
+        """
+        将神经元社区与行为标签关联起来，分析每个社区与行为的关系
+        
+        参数：
+            G: networkx图对象
+            communities: 社区列表，每个社区是一组节点
+            X_scaled: 标准化后的神经元活动数据
+            y: 行为标签数据
+            
+        返回：
+            community_behavior_mapping: 社区-行为映射字典，包含每个社区最相关的行为
+        """
+        print("\n分析社区与行为的关联...")
+        
+        # 初始化结果字典
+        community_behavior_mapping = {}
+        
+        # 确保社区列表有效
+        if not communities or len(communities) == 0:
+            print("警告: 没有有效的社区信息")
+            return {}
+        
+        # 确保行为标签信息有效
+        if not hasattr(self, 'behavior_labels') or len(self.behavior_labels) == 0:
+            print("警告: 没有有效的行为标签信息")
+            return {}
+        
+        # 准备节点名称到索引的映射（用于将G中的节点名称映射到X_scaled中的列索引）
+        node_to_index = {}
+        if hasattr(self.processor, 'available_neuron_cols'):
+            # 如果处理器有可用神经元列表，使用它建立映射
+            for i, neuron in enumerate(self.processor.available_neuron_cols):
+                node_to_index[neuron] = i
+        else:
+            # 否则假设节点名称格式为'n1', 'n2'等，从中提取索引
+            for node in G.nodes():
+                if isinstance(node, str) and node.startswith('n'):
+                    try:
+                        index = int(node[1:]) - 1  # 'n1' -> 0, 'n2' -> 1, etc.
+                        node_to_index[node] = index
+                    except ValueError:
+                        pass
+        
+        # 如果映射为空，则使用简单的顺序映射
+        if not node_to_index:
+            print("警告: 无法建立节点名称到索引的映射，使用顺序映射")
+            for i, node in enumerate(G.nodes()):
+                node_to_index[node] = i if i < X_scaled.shape[1] else 0
+                
+        # 为每个社区分析与行为的关联
+        for community_idx, community in enumerate(communities):
+            # 将这个社区中的神经元转换为X_scaled中的列索引
+            neuron_indices = []
+            for node in community:
+                if node in node_to_index and node_to_index[node] < X_scaled.shape[1]:
+                    neuron_indices.append(node_to_index[node])
+            
+            if not neuron_indices:  # 如果没有有效的索引，跳过此社区
+                continue
+                
+            # 计算每种行为与该社区神经元的关联强度
+            behavior_associations = {}
+            
+            # 对每个行为标签计算
+            for behavior_idx, behavior in enumerate(self.behavior_labels):
+                # 该行为的样本掩码
+                behavior_mask = (y == behavior_idx)
+                
+                if np.sum(behavior_mask) == 0:  # 如果没有该行为的样本，跳过
+                    continue
+                    
+                # 计算该行为下社区神经元的平均活动
+                community_activity_in_behavior = np.mean(X_scaled[behavior_mask][:, neuron_indices], axis=0)
+                
+                # 计算其他行为下社区神经元的平均活动
+                other_activity = np.mean(X_scaled[~behavior_mask][:, neuron_indices], axis=0)
+                
+                # 计算效应量（Cohen's d）
+                behavior_std = np.std(X_scaled[behavior_mask][:, neuron_indices], axis=0)
+                other_std = np.std(X_scaled[~behavior_mask][:, neuron_indices], axis=0)
+                pooled_std = np.sqrt((behavior_std**2 + other_std**2) / 2)
+                effect_size = np.mean(np.abs(community_activity_in_behavior - other_activity) / (pooled_std + 1e-10))
+                
+                # 保存该行为的关联强度
+                behavior_associations[behavior] = {
+                    'effect_size': effect_size,
+                    'mean_activity': np.mean(community_activity_in_behavior),
+                    'mean_activity_diff': np.mean(community_activity_in_behavior - other_activity)
+                }
+            
+            # 找出与该社区关联最强的行为
+            if behavior_associations:
+                strongest_behavior = max(behavior_associations.items(), key=lambda x: x[1]['effect_size'])
+                
+                # 保存社区-行为映射
+                community_behavior_mapping[f'Community_{community_idx+1}'] = {
+                    'behavior': strongest_behavior[0],
+                    'effect_size': strongest_behavior[1]['effect_size'],
+                    'mean_activity': strongest_behavior[1]['mean_activity'],
+                    'mean_activity_diff': strongest_behavior[1]['mean_activity_diff'],
+                    'neurons': list(community),  # 社区中的神经元
+                    'size': len(community),  # 社区大小
+                    'behavior_associations': behavior_associations  # 所有行为的关联信息
+                }
+                
+                print(f"社区 {community_idx+1} ({len(community)} 个神经元) 与行为 '{strongest_behavior[0]}' 最相关 (效应量: {strongest_behavior[1]['effect_size']:.3f})")
+        
+        return community_behavior_mapping
+    
+    def visualize_communities_behaviors(self, G, community_behavior_mapping, output_path=None):
+        """
+        可视化社区与行为的关联
+        
+        参数：
+            G: networkx图对象
+            community_behavior_mapping: 社区-行为映射字典
+            output_path: 输出文件路径，默认为None使用配置中的路径
+        """
+        if not output_path:
+            output_path = os.path.join(self.config.analysis_dir, 'community_behavior_mapping.png')
+            
+        print(f"\n可视化社区与行为的关联关系...")
+        
+        # 准备数据
+        communities = []
+        behaviors = []
+        effect_sizes = []
+        community_sizes = []
+        
+        for comm_id, data in community_behavior_mapping.items():
+            communities.append(comm_id)
+            behaviors.append(data['behavior'])
+            effect_sizes.append(data['effect_size'])
+            community_sizes.append(data['size'])
+        
+        if not communities:  # 如果没有数据，返回
+            print("警告: 没有社区-行为映射数据可视化")
+            return
+        
+        # 创建图表
+        plt.figure(figsize=(14, 8))
+        
+        # 创建颜色映射
+        unique_behaviors = list(set(behaviors))
+        behavior_colors = plt.cm.tab10(np.linspace(0, 1, len(unique_behaviors)))
+        behavior_color_map = {b: behavior_colors[i] for i, b in enumerate(unique_behaviors)}
+        
+        # 将社区按大小排序
+        sorted_indices = np.argsort(community_sizes)[::-1]  # 从大到小排序
+        
+        # 创建柱状图
+        bar_positions = np.arange(len(communities))
+        bars = plt.bar(bar_positions, 
+                       [effect_sizes[i] for i in sorted_indices], 
+                       width=0.8,
+                       color=[behavior_color_map[behaviors[i]] for i in sorted_indices],
+                       alpha=0.8)
+        
+        # 添加社区大小标注
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height + 0.05,
+                    f'{community_sizes[sorted_indices[i]]} neurons',
+                    ha='center', va='bottom', rotation=0,
+                    fontsize=9)
+        
+        # 添加标签和标题
+        plt.xlabel('Neural communities', fontsize=12)
+        plt.ylabel('Behavioral association intensity (effect size)', fontsize=12)
+        plt.title('Neural communities and behavioral association analysis', fontsize=14)
+        
+        # 设置x轴刻度
+        plt.xticks(bar_positions, [communities[i] for i in sorted_indices], rotation=45)
+        
+        # 添加行为图例
+        legend_elements = [plt.Rectangle((0,0), 1, 1, color=behavior_color_map[b], alpha=0.8, label=b) 
+                          for b in unique_behaviors]
+        plt.legend(handles=legend_elements, title='Behavior type', loc='upper right')
+        
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"社区-行为关联可视化已保存到: {output_path}")
+        
+        # 创建网络图可视化
+        network_output_path = os.path.join(os.path.dirname(output_path), 'community_behavior_network.png')
+        self.visualize_community_behavior_network(G, community_behavior_mapping, network_output_path)
+        
+    def visualize_community_behavior_network(self, G, community_behavior_mapping, output_path):
+        """
+        可视化基于社区划分的神经元网络，不同社区使用不同颜色，并根据行为关联标注
+        
+        参数：
+            G: networkx图对象
+            community_behavior_mapping: 社区-行为映射字典
+            output_path: 输出文件路径
+        """
+        plt.figure(figsize=(16, 16))
+        
+        # 创建颜色映射
+        unique_behaviors = list(set([data['behavior'] for data in community_behavior_mapping.values()]))
+        behavior_colors = plt.cm.tab10(np.linspace(0, 1, len(unique_behaviors)))
+        behavior_color_map = {b: behavior_colors[i] for i, b in enumerate(unique_behaviors)}
+        
+        # 创建节点颜色映射
+        node_colors = {}
+        node_communities = {}
+        for comm_id, data in community_behavior_mapping.items():
+            behavior = data['behavior']
+            color = behavior_color_map[behavior]
+            for node in data['neurons']:
+                node_colors[node] = color
+                node_communities[node] = comm_id
+        
+        # 使用spring布局 - 这里我们控制随机种子以确保每次可视化结果一致
+        pos = nx.spring_layout(G, seed=42, k=0.3)
+        
+        # 绘制节点
+        for node in G.nodes():
+            if node in node_colors:
+                nx.draw_networkx_nodes(G, pos, nodelist=[node], 
+                                     node_color=[node_colors[node]], 
+                                     node_size=100, alpha=0.8)
+            else:
+                # 对于没有社区的节点，使用灰色
+                nx.draw_networkx_nodes(G, pos, nodelist=[node], 
+                                     node_color=['lightgray'], 
+                                     node_size=50, alpha=0.5)
+        
+        # 绘制边 - 根据是否连接同一社区的节点使用不同透明度
+        same_community_edges = []
+        diff_community_edges = []
+        for u, v in G.edges():
+            if u in node_communities and v in node_communities:
+                if node_communities[u] == node_communities[v]:
+                    same_community_edges.append((u, v))
+                else:
+                    diff_community_edges.append((u, v))
+            else:
+                diff_community_edges.append((u, v))
+        
+        # 同一社区内的边使用高透明度
+        nx.draw_networkx_edges(G, pos, edgelist=same_community_edges, 
+                             width=1.5, alpha=0.7, edge_color='gray')
+        # 不同社区之间的边使用低透明度
+        nx.draw_networkx_edges(G, pos, edgelist=diff_community_edges, 
+                             width=0.5, alpha=0.2, edge_color='lightgray')
+        
+        # 添加社区标签
+        # 计算每个社区的中心位置
+        community_centers = {}
+        for comm_id, data in community_behavior_mapping.items():
+            comm_nodes = data['neurons']
+            if not comm_nodes:
+                continue
+            # 计算社区节点的平均位置
+            center_x = np.mean([pos[node][0] for node in comm_nodes if node in pos])
+            center_y = np.mean([pos[node][1] for node in comm_nodes if node in pos])
+            community_centers[comm_id] = (center_x, center_y)
+        
+        # 绘制社区标签
+        for comm_id, center in community_centers.items():
+            behavior = community_behavior_mapping[comm_id]['behavior']
+            plt.text(center[0], center[1], 
+                    f"{comm_id}\n({behavior})", 
+                    fontsize=12, fontweight='bold', 
+                    ha='center', va='center',
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        
+        # 添加图例
+        legend_elements = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color, 
+                                    markersize=10, label=behavior) 
+                          for behavior, color in behavior_color_map.items()]
+        plt.legend(handles=legend_elements, loc='upper right', title='Behavior type')
+        
+        plt.title('Neural community-behavior association network', fontsize=16)
+        plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"社区-行为网络可视化已保存到: {output_path}")
+    
     def visualize_network_topology(self, G, metrics, modules):
         """
         可视化网络拓扑分析结果
@@ -1039,7 +1552,7 @@ class ResultAnalyzer:
             pca = PCA(n_components=n_components_pca)
             X_reduced = pca.fit_transform(X_balanced)
             
-            n_states = 2  # 固定使用2个状态
+            n_states = 3  # 固定使用3个状态
             print(f"使用最小状态数: {n_states}")
             
             model = hmm.GaussianHMM(
@@ -1241,7 +1754,7 @@ class ResultAnalyzer:
             X_scaled: 标准化后的神经元活动数据
             hidden_states: 隐藏状态序列
             
-        返回:
+        返回：
             patterns: 转换模式信息列表
         """
         transitions = np.where(np.diff(hidden_states) != 0)[0]
@@ -1268,12 +1781,12 @@ class ResultAnalyzer:
         """
         评估转换点预测的准确性
         
-        参数:
+        参数：
             predicted: 预测的转换点
             actual: 实际的转换点
             tolerance: 容忍误差范围
             
-        返回:
+        返回：
             评估指标字典，包含精确率、召回率和F1分数
         """
         correct_predictions = 0
@@ -1419,12 +1932,12 @@ class ResultAnalyzer:
         """
         选择最优HMM参数
         
-        参数:
+        参数：
             X_reduced: 降维后的数据
             y: 行为标签
             max_states: 最大状态数
             
-        返回:
+        返回：
             best_params: 包含最优参数的字典
         """
         print("选择最优HMM参数...")
@@ -1488,11 +2001,11 @@ class ResultAnalyzer:
         """
         分析HMM状态与行为标签的对应关系
         
-        参数:
+        参数：
             hidden_states: HMM预测的隐藏状态序列
             y: 行为标签
             
-        返回:
+        返回：
             mapping_probs: 状态-行为映射概率矩阵
         """
         print("\n分析状态-行为映射关系...")
@@ -1547,266 +2060,909 @@ class ResultAnalyzer:
         
         return mapping_probs
 
-def convert_to_serializable(obj):
+    def analyze_network_with_gnn(self, G, correlation_matrix, X_scaled, y, available_neurons):
+        """
+        使用GNN分析神经元网络
+        
+        参数：
+            G: NetworkX图对象
+            correlation_matrix: 相关性矩阵
+            X_scaled: 标准化的神经元活动数据
+            y: 行为标签
+            available_neurons: 可用神经元列表
+            
+        返回：
+            gnn_results: GNN分析结果字典
+        """
+        print("\n使用GNN进行神经元网络分析...")
+        
+        # 创建GNN分析器
+        gnn_analyzer = GNNAnalyzer(self.config)
+        
+        # 特征归一化 - 确保特征在合适的范围内
+        from sklearn.preprocessing import StandardScaler
+        X_normalized = StandardScaler().fit_transform(X_scaled)
+        
+        # 转换为GNN格式
+        print("\n开始使用GNN进行神经元网络分析...")
+        print(f"GNN分析器将使用设备: {gnn_analyzer.device}")
+        print("将神经元网络转换为GNN数据格式...")
+        data = gnn_analyzer.convert_network_to_gnn_format(G, X_normalized, y)
+        print(f"GNN数据转换完成: {data}")
+        
+        # GNN分析结果字典
+        gnn_results = {}
+        
+        # 1. 行为预测GCN模型
+        print("\n训练行为预测GCN模型...")
+        try:
+            # 获取类别数
+            num_classes = len(np.unique(y))
+            
+            # 创建GCN模型
+            gcn_model = NeuronGCN(
+                in_channels=X_normalized.shape[1],
+                hidden_channels=self.config.analysis_params.get('gcn_hidden_channels', 128),  # 增加隐藏层维度
+                out_channels=num_classes,
+                dropout=self.config.analysis_params.get('gnn_dropout', 0.4),  # 稍微增加dropout
+                num_layers=self.config.analysis_params.get('gcn_num_layers', 4),  # 增加层数
+                heads=self.config.analysis_params.get('gcn_heads', 4),  # 增加注意力头数
+                use_batch_norm=self.config.analysis_params.get('gcn_use_batch_norm', True),
+                activation=self.config.analysis_params.get('gcn_activation', 'leaky_relu'),
+                alpha=self.config.analysis_params.get('gcn_alpha', 0.2),
+                residual=self.config.analysis_params.get('gcn_residual', True)
+            )
+            
+            # 设置训练参数
+            epochs = self.config.analysis_params.get('gnn_epochs', 200)
+            lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
+            weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
+            patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
+            early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
+            
+            # 训练模型   
+            trained_model, losses, accuracies = train_gnn_model(
+                model=gcn_model,
+                data=data,
+                epochs=epochs,
+                lr=lr,
+                weight_decay=weight_decay,
+                patience=patience,
+                device=gnn_analyzer.device,
+                early_stopping_enabled=early_stopping_enabled
+            )
+            
+            # 绘制训练曲线
+            loss_plot_path = self.config.gcn_training_plot
+            plot_gnn_results(losses, loss_plot_path)
+            
+            # 绘制准确率曲线
+            # 创建GNN可视化器用于绘制准确率曲线
+            from gnn_visualization import GNNVisualizer
+            visualizer = GNNVisualizer(self.config)
+            acc_epochs = list(range(1, len(accuracies['train'])+1))
+            accuracy_plot_path = visualizer.plot_training_metrics(
+                acc_epochs, 
+                accuracies['train'], 
+                accuracies['val'], 
+                metric_name='Accuracy',
+                title='GCN Model Training Accuracy Change',
+                filename='gcn_accuracy_curve.png'
+            )
+            
+            # 可视化节点嵌入
+            gnn_topo_path = self.config.gcn_topology_png
+            visualize_node_embeddings(
+                trained_model, 
+                data, 
+                save_path=gnn_topo_path,
+                title='GCN Node Embeddings'
+            )
+            
+            # 评估模型
+            trained_model.eval()
+            with torch.no_grad():
+                out = trained_model(data)
+                _, predicted = torch.max(out, 1)
+                correct = (predicted == data.y).sum().item()
+                accuracy = correct / len(data.y)
+            
+            print(f"GCN行为预测模型完成，准确率: {accuracy:.4f}")
+            
+            # 基于GCN模型创建拓扑结构
+            print("\n基于GCN模型创建神经元拓扑结构...")
+            G_gnn = create_gnn_based_topology(
+                trained_model, 
+                data, 
+                G.copy(), 
+                node_names=[f"N{i+1}" for i in range(len(available_neurons))]
+            )
+            
+            print(f"GCN拓扑结构创建完成: {G_gnn.number_of_nodes()} 个节点, {G_gnn.number_of_edges()} 条边")
+            
+            # 保存GCN拓扑数据
+            save_gnn_topology_data(
+                G_gnn,
+                trained_model.get_embeddings(data).detach().cpu().numpy(),
+                nx.adjacency_matrix(G_gnn).todense(),
+                [f"N{i+1}" for i in range(len(available_neurons))],
+                self.config.gcn_topology_data
+            )
+            
+            # 生成静态拓扑结构图
+            visualize_gcn_topology(self.config.gcn_topology_data)
+            
+            # 使用真实位置坐标生成拓扑结构图
+            real_pos_topo_path = visualize_gcn_topology_with_real_positions(
+                self.config.gcn_topology_data,
+                self.config.position_data_file
+            )
+            print(f"基于真实位置的GCN拓扑结构图已保存至: {real_pos_topo_path}")
+            
+            # 创建交互式可视化
+            create_interactive_gnn_topology(
+                G=G_gnn,
+                embeddings=trained_model.get_embeddings(data).detach().cpu().numpy(),
+                similarities=nx.adjacency_matrix(G_gnn).todense(),
+                node_names=[f"N{i+1}" for i in range(len(available_neurons))],
+                output_path=self.config.gcn_interactive_topology
+            )
+            
+            # 分析GCN拓扑中的社区与行为标签关联
+            print("\n分析GCN社区与行为标签的关联...")
+            try:
+                # 获取社区划分
+                communities = community_louvain.best_partition(G_gnn)
+                
+                # 导入社区-行为映射函数
+                from gnn_topology import analyze_community_behaviors, visualize_community_behavior_mapping
+                
+                # 获取行为标签名称列表
+                if hasattr(self, 'behavior_labels') and len(self.behavior_labels) > 0:
+                    behavior_names = self.behavior_labels
+                elif hasattr(self.config, 'behavior_labels') and len(self.config.behavior_labels) > 0:
+                    behavior_names = self.config.behavior_labels
+                else:
+                    # 如果没有定义行为标签名称，则使用数字索引
+                    behavior_names = [f"Behavior_{i}" for i in range(len(np.unique(y)))]
+                
+                # 分析社区与行为标签的关联
+                community_behavior_mapping = analyze_community_behaviors(
+                    G=G_gnn,
+                    communities=communities,
+                    X_scaled=X_scaled,
+                    y=y,
+                    behavior_labels=behavior_names
+                )
+                
+                # 可视化社区-行为映射
+                community_behavior_viz_path = os.path.join(
+                    os.path.dirname(self.config.gcn_topology_data),
+                    'community_behavior_mapping.png'
+                )
+                
+                community_behavior_network_path = visualize_community_behavior_mapping(
+                    G=G_gnn,
+                    community_behavior_mapping=community_behavior_mapping,
+                    output_path=community_behavior_viz_path
+                )
+                
+                print(f"社区-行为映射可视化已保存至: {community_behavior_viz_path}")
+                
+                # 将社区-行为映射结果保存为JSON
+                community_behavior_json = os.path.join(
+                    os.path.dirname(self.config.gcn_topology_data),
+                    'community_behavior_mapping.json'
+                )
+                
+                with open(community_behavior_json, 'w') as f:
+                    json.dump(community_behavior_mapping, f, indent=4)
+                
+                print(f"社区-行为映射数据已保存至: {community_behavior_json}")
+                
+            except Exception as e:
+                print(f"分析社区-行为关联时出错: {str(e)}")
+                import traceback
+                print(f"错误详情:\n{traceback.format_exc()}")
+                community_behavior_viz_path = None
+                community_behavior_mapping = {}
+            
+            # 记录GCN分析结果
+            gnn_results = {
+                'gcn_behavior_prediction': {
+                    'accuracy': accuracy,
+                    'loss_plot_path': loss_plot_path,
+                    'topology_plot_path': gnn_topo_path,
+                    'real_positions_topology_path': real_pos_topo_path,  # 添加真实位置拓扑图路径
+                    'accuracy_plot_path': accuracy_plot_path,
+                    'train_acc_history': accuracies['train'],
+                    'val_acc_history': accuracies['val'],
+                    'epochs': epochs,
+                    'community_behavior_mapping': community_behavior_mapping,
+                    'community_behavior_viz_path': community_behavior_viz_path
+                }
+            }
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"GCN行为预测模型训练出错: {str(e)}")
+            print(f"错误详情:\n{error_trace}")
+        
+        # 2. 神经元模块识别GAT模型
+        print("\n训练神经元模块识别GAT模型...")
+        try:
+            # 首先检查配置是否启用GAT分析
+            if not hasattr(self.config, 'use_gat') or not self.config.use_gat:
+                print("GAT模型分析已在配置中禁用。")
+                gnn_results['gat_module_detection'] = {
+                    'status': 'disabled',
+                    'message': 'GAT模型分析已在配置中禁用'
+                }
+            else:
+                # 创建GAT模型
+                # 先使用社区检测算法获取社区作为标签
+                try:
+                    communities = community_louvain.best_partition(G)
+                    community_labels = np.array([communities[node] for node in G.nodes()])
+                    num_communities = len(set(communities.values()))
+                    
+                    # 创建新的数据对象，确保节点特征和标签维度匹配
+                    # 修复维度不匹配问题：
+                    # 1. 如果有样本数据，则使用样本特征而不是使用之前为GCN准备的data
+                    node_features = []
+                    for node in G.nodes():
+                        # 提取该节点的度作为特征
+                        node_degree = G.degree(node)
+                        # 创建简单的特征向量
+                        node_features.append([float(node_degree)])
+                    
+                    # 创建基于节点的数据对象(而非基于样本)
+                    node_features = torch.tensor(node_features, dtype=torch.float)
+                    
+                    # 修复边索引创建 - 使用正确的节点索引
+                    edge_index = []
+                    edge_weights = []
+                    node_idx_map = {node: idx for idx, node in enumerate(G.nodes())}
+                    
+                    for u, v, attr in G.edges(data=True):
+                        edge_index.append((node_idx_map[u], node_idx_map[v]))
+                        edge_index.append((node_idx_map[v], node_idx_map[u]))  # 添加双向边
+                        # 使用相关性作为边权重
+                        edge_weights.append(attr['weight'])
+                        edge_weights.append(attr['weight'])
+                    
+                    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+                    edge_weight = torch.tensor(edge_weights, dtype=torch.float)
+                    
+                    # 创建新的数据对象
+                    gat_data = Data(
+                        x=node_features,
+                        edge_index=edge_index,
+                        edge_attr=edge_weight,
+                        y=torch.tensor(community_labels, dtype=torch.long)
+                    )
+                    
+                    print(f"为GAT创建的数据: {gat_data}")
+                    
+                    # 使用配置参数创建GAT模型
+                    gat_model = NeuronGAT(
+                        in_channels=node_features.size(1),  # 使用节点特征维度
+                        hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 128),
+                        out_channels=num_communities,
+                        heads=self.config.analysis_params.get('gat_heads', 4),
+                        dropout=self.config.analysis_params.get('gat_dropout', 0.3),
+                        residual=self.config.analysis_params.get('gat_residual', True),
+                        num_layers=self.config.analysis_params.get('gat_num_layers', 3),
+                        alpha=self.config.analysis_params.get('gat_alpha', 0.2)
+                    )
+                    
+                    # 设置训练参数 - 使用GAT特定参数
+                    epochs = self.config.analysis_params.get('gat_epochs', 300)
+                    lr = self.config.analysis_params.get('gat_learning_rate', 0.005)
+                    weight_decay = self.config.analysis_params.get('gat_weight_decay', 5e-4)
+                    patience = self.config.analysis_params.get('gat_patience', 20)
+                    early_stopping_enabled = self.config.analysis_params.get('gat_early_stopping_enabled', False)
+                    
+                    # 训练模型 - 使用新创建的gat_data
+                    trained_gat, gat_losses, gat_accuracies = train_gnn_model(
+                        model=gat_model,
+                        data=gat_data,
+                        epochs=epochs,
+                        lr=lr,
+                        weight_decay=weight_decay,
+                        patience=patience,
+                        device=gnn_analyzer.device,
+                        early_stopping_enabled=early_stopping_enabled
+                    )
+                    
+                    # 绘制GAT训练曲线
+                    gat_loss_plot_path = self.config.gat_training_plot
+                    plot_gnn_results(gat_losses, gat_loss_plot_path)
+                    
+                    # 绘制GAT准确率曲线
+                    gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
+                    gat_accuracy_plot_path = visualizer.plot_training_metrics(
+                        gat_acc_epochs, 
+                        gat_accuracies['train'], 
+                        gat_accuracies['val'], 
+                        metric_name='Accuracy',
+                        title='GAT Model Training Accuracy Change',
+                        filename='gat_accuracy_curve.png'
+                    )
+                    
+                    # 评估模型
+                    trained_gat.eval()
+                    with torch.no_grad():
+                        out = trained_gat(gat_data)
+                        _, predicted = torch.max(out, 1)
+                        gat_accuracy = (predicted == gat_data.y).sum().item() / len(gat_data.y)
+                    
+                    print(f"GAT模块识别模型完成，准确率: {gat_accuracy:.4f}")
+                    
+                    # 保存结果
+                    gnn_results['gat_module_detection'] = {
+                        'accuracy': gat_accuracy,
+                        'loss_plot_path': gat_loss_plot_path,
+                        'accuracy_plot_path': gat_accuracy_plot_path,
+                        'num_communities': num_communities,
+                        'train_acc_history': gat_accuracies['train'],
+                        'val_acc_history': gat_accuracies['val']
+                    }
+                    
+                    # 基于GAT创建新的拓扑结构
+                    try:
+                        print("\n基于GAT模型创建神经元拓扑结构...")
+                        
+                        # 使用GNN模型创建拓扑结构
+                        gat_G = create_gnn_based_topology(
+                            model=trained_gat,
+                            data=gat_data,
+                            G=G.copy(),
+                            node_names=[f"N{i+1}" for i in range(len(available_neurons))],
+                            threshold=0.5 # 使用更高阈值突出模块结构
+                        )
+                        
+                        # 获取节点嵌入和相似度矩阵
+                        with torch.no_grad():
+                            gat_embeddings = trained_gat.get_embeddings(gat_data).detach().cpu().numpy()
+                        gat_similarities = nx.adjacency_matrix(gat_G).todense()
+                        
+                        print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
+                        
+                        # 创建交互式GNN拓扑可视化
+                        print(f"开始创建交互式GNN拓扑可视化: {self.config.gat_interactive_topology}")
+                        try:
+                            create_interactive_gnn_topology(
+                                G=gat_G,
+                                embeddings=gat_embeddings,
+                                similarities=gat_similarities.astype(float) if hasattr(gat_similarities, 'astype') else gat_similarities,
+                                node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
+                                output_path=self.config.gat_interactive_topology
+                            )
+                            print(f"交互式神经元网络已成功保存到: {self.config.gat_interactive_topology}")
+                        except Exception as e:
+                            print(f"创建交互式GAT拓扑结构时出错: {str(e)}")
+                        
+                        # 保存GAT拓扑数据
+                        save_gnn_topology_data(
+                            G=gat_G,
+                            embeddings=gat_embeddings,
+                            similarities=gat_similarities,
+                            node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
+                            output_path=self.config.gat_topology_data
+                        )
+                        print(f"GNN拓扑数据已保存到: {self.config.gat_topology_data}")
+                        
+                        # 使用visualize_gat_topology生成GAT静态拓扑图
+                        print("\n开始生成GAT静态拓扑结构图...")
+                        gat_static_topo_path = visualize_gat_topology(self.config.gat_topology_data)
+                        
+                        # 分析GAT拓扑结构
+                        topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
+                        
+                        # 分析GAT拓扑中的社区与行为标签关联
+                        print("\n分析GAT社区与行为标签的关联...")
+                        try:
+                            # 获取行为标签名称列表
+                            if hasattr(self, 'behavior_labels') and len(self.behavior_labels) > 0:
+                                behavior_names = self.behavior_labels
+                            elif hasattr(self.config, 'behavior_labels') and len(self.config.behavior_labels) > 0:
+                                behavior_names = self.config.behavior_labels
+                            else:
+                                # 如果没有定义行为标签名称，则使用数字索引
+                                behavior_names = [f"Behavior_{i}" for i in range(len(np.unique(y)))]  
+                            
+                            # 确保行为标签名称与配置一致，如果配置为不纳入CD1，确保behavior_names中不包含CD1
+                            if not self.config.include_cd1_behavior and 'CD1' in behavior_names:
+                                print("\n社区行为分析中排除CD1行为标签")
+                                behavior_names = [label for label in behavior_names if label != 'CD1']
+                            
+                            # 分析社区与行为标签的关联
+                            gat_community_behavior_mapping = analyze_community_behaviors(
+                                G=gat_G,
+                                communities=communities,  # 使用之前检测到的社区
+                                X_scaled=X_scaled,
+                                y=y,
+                                behavior_labels=behavior_names
+                            )
+                            
+                            # 可视化社区-行为映射
+                            gat_community_behavior_viz_path = os.path.join(
+                                os.path.dirname(self.config.gat_topology_data),
+                                'gat_community_behavior_mapping.png'
+                            )
+                            
+                            gat_community_behavior_network_path = visualize_community_behavior_mapping(
+                                G=gat_G,
+                                community_behavior_mapping=gat_community_behavior_mapping,
+                                output_path=gat_community_behavior_viz_path
+                            )
+                            
+                            print(f"GAT社区-行为映射可视化已保存至: {gat_community_behavior_viz_path}")
+                            
+                            # 将社区-行为映射结果保存为JSON
+                            gat_community_behavior_json = os.path.join(
+                                os.path.dirname(self.config.gat_topology_data),
+                                'gat_community_behavior_mapping.json'
+                            )
+                            
+                            with open(gat_community_behavior_json, 'w') as f:
+                                json.dump(gat_community_behavior_mapping, f, indent=4)
+                            
+                            print(f"GAT社区-行为映射数据已保存至: {gat_community_behavior_json}")
+                            
+                        except Exception as e:
+                            print(f"分析GAT社区-行为关联时出错: {str(e)}")
+                            import traceback
+                            print(f"错误详情:\n{traceback.format_exc()}")
+                            gat_community_behavior_viz_path = None
+                            gat_community_behavior_mapping = {}
+                        
+                        # 保存GAT拓扑分析结果
+                        gnn_results['gat_topology'] = {
+                            'visualization_path': gat_static_topo_path,  # 使用静态拓扑图路径
+                            'interactive_path': self.config.gat_interactive_topology,
+                            'data_path': self.config.gat_topology_data,
+                            'topology_metrics': topo_metrics,
+                            'node_count': gat_G.number_of_nodes(),
+                            'edge_count': gat_G.number_of_edges(),
+                            'community_behavior_mapping': gat_community_behavior_mapping if 'gat_community_behavior_mapping' in locals() else {},
+                            'community_behavior_viz_path': gat_community_behavior_viz_path if 'gat_community_behavior_viz_path' in locals() else None
+                        }
+                        
+                    except Exception as e:
+                        print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
+                        import traceback
+                        print(f"错误详情:\n{traceback.format_exc()}")
+                        gnn_results['gat_topology'] = {
+                            'error': str(e)
+                        }
+                except Exception as e:
+                    print(f"GAT训练过程中出错: {str(e)}")
+                    import traceback
+                    print(f"错误详情:\n{traceback.format_exc()}")
+                    gnn_results['gat_module_detection'] = {
+                        'error': str(e)
+                    }
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"GAT模型训练整体过程出错: {str(e)}")
+            print(f"错误详情:\n{error_trace}")
+            gnn_results['gat_error'] = str(e)
+        
+        # 3. 时间序列GNN分析
+        print("\n准备时间序列GNN数据...")
+        try:
+            # 设置时间窗口参数
+            window_size = self.config.analysis_params.get('temporal_window_size', 10)
+            stride = self.config.analysis_params.get('temporal_stride', 5)
+            
+            # 准备时间序列数据
+            temporal_data = gnn_analyzer.prepare_temporal_gnn_data(
+                G, X_scaled, window_size=window_size, stride=stride
+            )
+            
+            print(f"时间序列GNN数据准备完成，共 {len(temporal_data)} 个窗口")
+            
+            # 保存结果
+            gnn_results['temporal_gnn'] = {
+                'windows_count': len(temporal_data),
+                'window_size': window_size,
+                'stride': stride
+            }
+            
+        except Exception as e:
+            print(f"时间序列GNN数据准备出错: {str(e)}")
+            gnn_results['temporal_gnn'] = {'error': str(e)}
+        
+        # 保存GNN分析结果到JSON文件
+        gnn_results_file = self.config.gnn_analysis_results
+        try:
+            # 将不可序列化的对象转换为字符串
+            serializable_results = convert_to_serializable(gnn_results)
+            with open(gnn_results_file, 'w') as f:
+                json.dump(serializable_results, f, indent=4)
+            print(f"GNN分析结果已保存到 {gnn_results_file}")
+            
+            # 更新网络分析结果
+            if hasattr(self, 'network_analysis_results') and self.network_analysis_results is not None:
+                self.network_analysis_results['gnn_analysis'] = serializable_results
+                
+                # 保存更新后的网络分析结果
+                network_results_path = os.path.join(self.config.analysis_dir, 'network_analysis_results.json')
+                with open(network_results_path, 'w') as f:
+                    json.dump(convert_to_serializable(self.network_analysis_results), f, indent=4)
+                print(f"更新的网络分析结果（包含GNN分析）已保存到 {network_results_path}")
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"保存GNN分析结果时出错: {str(e)}")
+            print(f"错误详情:\n{error_trace}")
+        
+        return gnn_results
+
+def convert_to_serializable(obj: Any) -> Any:
     """
     将对象转换为可JSON序列化的格式
     
-    参数：
-        obj: 需要转换的对象
-    返回：
+    递归地将各种类型的Python和NumPy对象转换为可JSON序列化的标准格式，
+    包括NumPy数组、整数、浮点数等特殊类型
+    
+    参数
+    ----------
+    obj : Any
+        需要转换的对象
+        
+    返回
+    ----------
+    Any
         转换后的可序列化对象
     """
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, dict):
-        return {k: convert_to_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [convert_to_serializable(item) for item in obj]
-    elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
+    if isinstance(obj, np.integer):
         return int(obj)
-    elif isinstance(obj, (np.float64, np.float32, np.float16)):
+    elif isinstance(obj, np.floating):
         return float(obj)
-    elif isinstance(obj, (set, frozenset)):
-        return list(obj)
-    elif 'networkx' in str(type(obj)):
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    elif isinstance(obj, (str, int, float, type(None))):
+        return obj
+    elif isinstance(obj, dict):
+        return {convert_to_serializable(k): convert_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_to_serializable(i) for i in obj]
+    else:
         try:
-            # 如果是NetworkX图对象，转换为边列表和节点列表
-            return {
-                'nodes': list(obj.nodes()),
-                'edges': [(u, v, d.get('weight', 1.0)) for u, v, d in obj.edges(data=True)]
-            }
-        except:
+            # 尝试转换为可序列化对象
             return str(obj)
-    return obj
+        except:
+            return f"不可序列化对象: {type(obj)}"
 
-def main():
+def set_all_random_seeds(seed: int = 42) -> None:
     """
-    主函数：执行完整的分析流程
-    1. 加载配置
-    2. 初始化分析器
-    3. 加载模型和数据
-    4. 执行各种分析
-    5. 保存分析结果
-    """
-    # Initialize configuration
-    config = AnalysisConfig()
+    设置所有相关库的随机种子，确保结果可重现
     
+    为Python内置random、NumPy和PyTorch等库设置随机种子，
+    确保每次运行产生相同的随机数序列，提高实验的可重复性
+    
+    参数
+    ----------
+    seed : int, 默认 42
+        随机种子值
+    """
+    import random
+    import numpy as np
+    import torch
+    
+    # 设置Python内置random模块种子
+    random.seed(seed)
+    
+    # 设置NumPy种子
+    np.random.seed(seed)
+    
+    # 设置PyTorch种子
+    torch.manual_seed(seed)
+    
+    # 如果可用，设置CUDA种子
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # 如果使用多GPU
+        
+        # 为了完全的确定性，可以设置以下选项
+        # 但可能影响性能
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    
+    print(f"已设置所有随机种子为: {seed}")
+
+def main() -> None:
+    """
+    主函数，运行神经元活动数据分析流程
+    
+    执行步骤:
+    1. 设置随机种子确保结果可重现
+    2. 加载和验证配置
+    3. 初始化结果分析器
+    4. 加载模型和数据
+    5. 执行多种神经元活动分析
+    6. 可视化并保存分析结果
+    """
     try:
+        # 首先设置所有随机种子确保结果可重现
+        set_all_random_seeds(42)
+        
+        # 加载配置
+        config = AnalysisConfig()
+        
         # Setup and validate directories
         config.setup_directories()
         config.validate_paths()
         
-        # 创建StringIO对象以捕获所有输出
-        output_buffer = io.StringIO()
+        # 创建一个保存日志的列表
+        log_lines = []
         
-        # 使用redirect_stdout重定向标准输出
-        with contextlib.redirect_stdout(output_buffer):
-            # 记录分析开始时间
-            start_time = datetime.now()
-            print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"数据标识符: {config.data_identifier}")
-            print(f"=" * 50)
+        # 创建一个自定义的print函数，同时输出到终端和保存到日志列表
+        def custom_print(*args, **kwargs):
+            # 使用原始的print函数打印到控制台（实时输出）
+            print(*args, **kwargs)
+            # 将输出内容添加到日志列表
+            log_text = " ".join(str(arg) for arg in args)
+            if "end" in kwargs and kwargs["end"] != "\n":
+                log_text += kwargs["end"]
+            else:
+                log_text += "\n"
+            log_lines.append(log_text)
+        
+        # 检查GNN依赖项
+        custom_print("\n检查GNN依赖项...")
+        gnn_ok, missing_deps = check_gnn_dependencies()
+        if gnn_ok:
+            custom_print("GNN依赖项检查通过，将启用GNN分析功能")
+            if hasattr(config, 'use_gnn'):
+                custom_print(f"使用GNN: {'启用' if config.use_gnn else '禁用'}")
+            else:
+                custom_print("配置中未找到use_gnn属性，将默认启用GNN")
+                config.use_gnn = True
+        else:
+            custom_print(f"GNN依赖项检查失败，以下组件缺失: {', '.join(missing_deps)}")
+            custom_print("将禁用GNN分析功能")
+            config.use_gnn = False
+            custom_print("""
+如需启用GNN功能，请安装以下依赖项:
+pip install torch-geometric torch-scatter torch-sparse
+详情请参考: https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html
+""")
+        
+        # 记录分析开始时间
+        start_time = datetime.now()
+        custom_print(f"分析开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        custom_print(f"数据标识符: {config.data_identifier}")
+        custom_print("=" * 50)
+        
+        # Initialize analyzer
+        analyzer = ResultAnalyzer(config)
+        
+        # 加载模型和数据
+        custom_print("加载模型和数据...")
+        model, X_scaled, y = analyzer.load_model_and_data()
+        
+        custom_print("\n分析行为-神经元相关性...")
+        behavior_activity_df = analyzer.analyze_behavior_neuron_correlation(X_scaled, y)
+        custom_print(f"相关性分析完成。结果保存在: {config.correlation_plot}")
+        
+        custom_print("\n分析时间模式...")
+        analyzer.analyze_temporal_patterns(X_scaled, y)
+        custom_print(f"时间模式分析完成。结果保存在: {config.temporal_pattern_dir}")
+        
+        custom_print("\n分析时间相关性...")
+        analyzer.analyze_temporal_correlations(X_scaled, y)
+        custom_print(f"时间相关性分析完成。结果保存在: {config.temporal_correlation_dir}")
+        
+        custom_print("\n分析行为转换...")
+        transitions = analyzer.analyze_behavior_transitions(y)
+        custom_print(f"转换分析完成。结果保存在: {config.transition_plot}")
+        
+        custom_print("\n识别关键神经元...")
+        behavior_importance = analyzer.identify_key_neurons(X_scaled, y)
+        custom_print("\n每种行为的关键神经元:")
+        for behavior, data in behavior_importance.items():
+            custom_print(f"\n{behavior}:")
+            for i, (neuron, effect) in enumerate(zip(data['neurons'], data['effect_sizes'])):
+                custom_print(f"  神经元 {neuron}: 效应量 = {effect:.3f}")
+        
+        custom_print("\n开始神经元网络拓扑分析...")
+        # 构建神经元功能连接网络
+        G, correlation_matrix, available_neurons, threshold = analyzer.build_neuron_network(
+            X_scaled, 
+            threshold=config.analysis_params['correlation_threshold']
+        )
+        
+        # 提取主要连接线路
+        main_methods = ['threshold', 'top_edges', 'mst']
+        for method in main_methods:
+            custom_print(f"\n使用{method}方法提取主要连接线路...")
+            if method == 'threshold':
+                main_G = analyzer.extract_main_connections(
+                    G, correlation_matrix, available_neurons,
+                    method=method, threshold=0.2
+                )
+            elif method == 'top_edges':
+                main_G = analyzer.extract_main_connections(
+                    G, correlation_matrix, available_neurons,
+                    method=method, top_k=8
+                )
+            elif method == 'mst':
+                main_G = analyzer.extract_main_connections(
+                    G, correlation_matrix, available_neurons,
+                    method=method
+                )
             
-            # Initialize analyzer
-            analyzer = ResultAnalyzer(config)
+            # 导出为JSON文件
+            output_file = os.path.join(config.analysis_dir, f'neuron_network_main_{method}.json')
+            analyzer.export_network_to_json(main_G, output_file)
+            custom_print(f"{method}方法的主要连接线路已导出到: {output_file}")
             
-            print("加载模型和数据...")
-            model, X_scaled, y = analyzer.load_model_and_data()
+            # 可视化主要连接线路
+            plt.figure(figsize=(12, 12))
+            pos = nx.spring_layout(main_G, k=1/np.sqrt(len(main_G.nodes())), iterations=50)
+            node_sizes = [300 for _ in main_G.nodes()]
+            edge_weights = [main_G[u][v]['weight'] * 5 for u, v in main_G.edges()]
             
-            print("\n分析行为-神经元相关性...")
-            behavior_activity_df = analyzer.analyze_behavior_neuron_correlation(X_scaled, y)
-            print(f"相关性分析完成。结果保存在: {config.correlation_plot}")
-            
-            print("\n分析时间模式...")
-            analyzer.analyze_temporal_patterns(X_scaled, y)
-            print(f"时间模式分析完成。结果保存在: {config.temporal_pattern_dir}")
-            
-            print("\n分析时间相关性...")
-            analyzer.analyze_temporal_correlations(X_scaled, y)
-            print(f"时间相关性分析完成。结果保存在: {config.temporal_correlation_dir}")
-            
-            print("\n分析行为转换...")
-            transitions = analyzer.analyze_behavior_transitions(y)
-            print(f"转换分析完成。结果保存在: {config.transition_plot}")
-            
-            print("\n识别关键神经元...")
-            behavior_importance = analyzer.identify_key_neurons(X_scaled, y)
-            print("\n每种行为的关键神经元:")
-            for behavior, data in behavior_importance.items():
-                print(f"\n{behavior}:")
-                for i, (neuron, effect) in enumerate(zip(data['neurons'], data['effect_sizes'])):
-                    print(f"  神经元 {neuron}: 效应量 = {effect:.3f}")
-            
-            print("\n开始神经元网络拓扑分析...")
-            # 构建神经元功能连接网络
-            G, correlation_matrix, available_neurons = analyzer.build_neuron_network(
-                X_scaled, 
-                threshold=config.analysis_params['correlation_threshold']
+            nx.draw_networkx(
+                main_G, pos,
+                with_labels=True,
+                node_size=node_sizes,
+                node_color='skyblue',
+                font_size=10,
+                width=edge_weights,
+                edge_color='gray',
+                alpha=0.8
             )
             
-            # 提取主要连接线路
-            main_methods = ['threshold', 'top_edges', 'mst']
+            plt.title(f'Neuron Connection Network (Method: {method})', fontsize=16)
+            plt.axis('off')
+            plt.tight_layout()
+            plt.savefig(os.path.join(config.analysis_dir, f'neuron_network_main_{method}.png'), 
+                       dpi=300, bbox_inches='tight')
+            plt.close()
+        
+        # 分析网络拓扑特征
+        topology_metrics = analyzer.analyze_network_topology(G)
+        
+        # 识别功能模块
+        functional_modules = analyzer.identify_functional_modules(G, correlation_matrix, available_neurons)
+        
+        # 可视化分析结果
+        analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
+        
+        # 生成交互式神经元网络可视化
+        try:
+            from visualization import VisualizationManager
+            visualizer = VisualizationManager(config)
+            interactive_path = visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
+            if interactive_path:
+                custom_print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
+        except Exception as e:
+            custom_print(f"生成交互式神经元网络可视化时出错: {str(e)}")
+        
+        # 尝试为主要连接也生成交互式可视化
+        try:
+            from visualization import VisualizationManager
+            visualizer = VisualizationManager(config)
             for method in main_methods:
-                print(f"\n使用{method}方法提取主要连接线路...")
-                if method == 'threshold':
-                    main_G = analyzer.extract_main_connections(
-                        G, correlation_matrix, available_neurons,
-                        method=method, threshold=0.6
-                    )
-                elif method == 'top_edges':
-                    main_G = analyzer.extract_main_connections(
-                        G, correlation_matrix, available_neurons,
-                        method=method, top_k=3
-                    )
-                elif method == 'mst':
-                    main_G = analyzer.extract_main_connections(
-                        G, correlation_matrix, available_neurons,
-                        method=method
-                    )
-                
-                # 导出为JSON文件
-                output_file = os.path.join(config.analysis_dir, f'neuron_network_main_{method}.json')
-                analyzer.export_network_to_json(main_G, output_file)
-                print(f"{method}方法的主要连接线路已导出到: {output_file}")
-                
-                # 可视化主要连接线路
-                plt.figure(figsize=(12, 12))
-                pos = nx.spring_layout(main_G, k=1/np.sqrt(len(main_G.nodes())), iterations=50)
-                node_sizes = [300 for _ in main_G.nodes()]
-                edge_weights = [main_G[u][v]['weight'] * 5 for u, v in main_G.edges()]
-                
-                nx.draw_networkx(
-                    main_G, pos,
-                    with_labels=True,
-                    node_size=node_sizes,
-                    node_color='skyblue',
-                    font_size=10,
-                    width=edge_weights,
-                    edge_color='gray',
-                    alpha=0.8
+                main_G = analyzer.extract_main_connections(
+                    G, correlation_matrix, available_neurons,
+                    method=method, threshold=0.4 if method == 'threshold' else None,
+                    top_k=3 if method == 'top_edges' else None
                 )
-                
-                plt.title(f'Neuron Connection Network (Method: {method})', fontsize=16)
-                plt.axis('off')
-                plt.tight_layout()
-                plt.savefig(os.path.join(config.analysis_dir, f'neuron_network_main_{method}.png'), 
-                           dpi=300, bbox_inches='tight')
-                plt.close()
-            
-            # 分析网络拓扑特征
-            topology_metrics = analyzer.analyze_network_topology(G)
-            
-            # 识别功能模块
-            functional_modules = analyzer.identify_functional_modules(G, correlation_matrix, available_neurons)
-            
-            # 可视化分析结果
-            analyzer.visualize_network_topology(G, topology_metrics, functional_modules)
-            
-            # 生成交互式神经元网络可视化
-            try:
-                from visualization import VisualizationManager
-                visualizer = VisualizationManager(config)
-                interactive_path = visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
+                interactive_path = visualizer.plot_interactive_neuron_network(
+                    main_G, 
+                    topology_metrics, 
+                    functional_modules, 
+                    output_path=config.gnn_interactive_template.format(method)
+                )
                 if interactive_path:
-                    print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
-            except Exception as e:
-                print(f"生成交互式神经元网络可视化时出错: {str(e)}")
+                    custom_print(f"生成主要连接({method})交互式可视化完成。结果保存在: {interactive_path}")
+        except Exception as e:
+            custom_print(f"生成主要连接交互式可视化时出错: {str(e)}")
+        
+        # 执行行为状态转换分析
+        custom_print("\n开始行为状态转换分析...")
+        
+        # 1. HMM分析
+        hmm_results = analyzer.analyze_behavior_state_transitions(X_scaled, y)
+        if hmm_results is not None:
+            # 2. 分析神经元与状态转换的关系
+            relationships = analyzer.analyze_neuron_state_relationships(
+                X_scaled, 
+                hmm_results['hidden_states']
+            )
             
-            # 尝试为主要连接也生成交互式可视化
-            try:
-                from visualization import VisualizationManager
-                visualizer = VisualizationManager(config)
-                for method in main_methods:
-                    main_G = analyzer.extract_main_connections(
-                        G, correlation_matrix, available_neurons,
-                        method=method, threshold=0.6 if method == 'threshold' else None,
-                        top_k=3 if method == 'top_edges' else None
-                    )
-                    interactive_path = visualizer.plot_interactive_neuron_network(
-                        main_G, 
-                        topology_metrics, 
-                        functional_modules, 
-                        filename=f'interactive_network_main_{method}.html'
-                    )
-                    if interactive_path:
-                        print(f"生成主要连接({method})交互式可视化完成。结果保存在: {interactive_path}")
-            except Exception as e:
-                print(f"生成主要连接交互式可视化时出错: {str(e)}")
+            # 3. 预测状态转换点
+            transition_points = analyzer.predict_transition_points(
+                X_scaled,
+                hmm_results['hidden_states']
+            )
             
-            # 执行行为状态转换分析
-            print("\n开始行为状态转换分析...")
-            
-            # 1. HMM分析
-            hmm_results = analyzer.analyze_behavior_state_transitions(X_scaled, y)
-            if hmm_results is not None:
-                # 2. 分析神经元与状态转换的关系
-                relationships = analyzer.analyze_neuron_state_relationships(
-                    X_scaled, 
-                    hmm_results['hidden_states']
-                )
-                
-                # 3. 预测状态转换点
-                transition_points = analyzer.predict_transition_points(
-                    X_scaled,
-                    hmm_results['hidden_states']
-                )
-                
-                # 将状态转换分析结果添加到总结果中
-                results = {
-                    'topology_metrics': topology_metrics,
-                    'functional_modules': functional_modules,
-                    'state_transitions': {
-                        'hmm_results': {
-                            'transition_matrix': hmm_results['transition_matrix'],
-                            'avg_durations': hmm_results['avg_durations'],
-                            'model_score': float(hmm_results['model_score']),
-                            'n_states': hmm_results['n_states'],
-                            'covariance_type': hmm_results['covariance_type'],
-                            'pca_components': hmm_results['pca_components'],
-                            'pca_explained_variance': hmm_results['pca_explained_variance'],
-                            'mapping_probs': hmm_results['mapping_probs'].tolist() if 'mapping_probs' in hmm_results else None
-                        },
-                        'neuron_state_relationships': relationships,
-                        'transition_points': transition_points
-                    }
+            # 将状态转换分析结果添加到总结果中
+            results = {
+                'topology_metrics': topology_metrics,
+                'functional_modules': functional_modules,
+                'state_transitions': {
+                    'hmm_results': {
+                        'transition_matrix': hmm_results['transition_matrix'],
+                        'avg_durations': hmm_results['avg_durations'],
+                        'model_score': float(hmm_results['model_score']),
+                        'n_states': hmm_results['n_states'],
+                        'covariance_type': hmm_results['covariance_type'],
+                        'pca_components': hmm_results['pca_components'],
+                        'pca_explained_variance': hmm_results['pca_explained_variance'],
+                        'mapping_probs': hmm_results['mapping_probs'].tolist() if 'mapping_probs' in hmm_results else None
+                    },
+                    'neuron_state_relationships': relationships,
+                    'transition_points': transition_points
                 }
-            else:
-                results = {
-                    'topology_metrics': topology_metrics,
-                    'functional_modules': functional_modules
-                }
-            
-            # 将结果保存为JSON文件
-            results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
-            print(f"\n保存分析结果到: {results_path}")
-            
-            # 添加网络图对象到结果中
-            if 'topology_metrics' in results:
-                results['topology_metrics']['graph'] = G
-                
-            with open(results_path, 'w', encoding='utf-8') as f:
-                serializable_results = convert_to_serializable(results)
-                json.dump(serializable_results, f, indent=4, ensure_ascii=False)
-            
-            # 记录分析结束时间
-            end_time = datetime.now()
-            duration = end_time - start_time
-            print(f"=" * 50)
-            print(f"分析结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"总耗时: {duration.total_seconds():.2f} 秒")
-            print("分析完成！所有结果已保存。")
+            }
+        else:
+            results = {
+                'topology_metrics': topology_metrics,
+                'functional_modules': functional_modules
+            }
         
-        # 将捕获的输出保存到日志文件
-        log_content = output_buffer.getvalue()
+        # 将结果保存为JSON文件
+        results_path = os.path.join(config.analysis_dir, 'network_analysis_results.json')
+        custom_print(f"\n保存分析结果到: {results_path}")
         
-        # 同时打印到控制台
-        print(log_content)
+        # 添加网络图对象到结果中
+        if 'topology_metrics' in results:
+            results['topology_metrics']['graph'] = G
+            
+        with open(results_path, 'w', encoding='utf-8') as f:
+            serializable_results = convert_to_serializable(results)
+            json.dump(serializable_results, f, indent=4, ensure_ascii=False)
         
-        # 保存日志到文件
+        # 记录分析结束时间
+        end_time = datetime.now()
+        duration = end_time - start_time
+        custom_print(f"=" * 50)
+        custom_print(f"分析结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        custom_print(f"总耗时: {duration.total_seconds():.2f} 秒")
+        custom_print("分析完成！所有结果已保存。")
+        
+        # 在现有网络分析后添加GNN分析
+        if hasattr(config, 'use_gnn') and config.use_gnn:
+            custom_print("\n使用GNN进行神经元网络分析...")
+            gnn_results = analyzer.analyze_network_with_gnn(
+                G, correlation_matrix, X_scaled, y, available_neurons
+            )
+            
+            # 将GNN结果添加到分析结果中
+            if gnn_results:
+                # 读取已保存的分析结果
+                try:
+                    with open(config.network_analysis_file, 'r') as f:
+                        results = json.load(f)
+                    
+                    # 添加GNN分析结果
+                    results['gnn_analysis'] = gnn_results
+                    
+                    # 更新网络分析结果文件
+                    with open(config.network_analysis_file, 'w') as f:
+                        # 使用convert_to_serializable函数确保所有数据都可JSON序列化
+                        serializable_results = convert_to_serializable(results)
+                        json.dump(serializable_results, f, indent=4)
+                    custom_print(f"更新的网络分析结果（包含GNN分析）已保存到 {config.network_analysis_file}")
+                except Exception as e:
+                    custom_print(f"更新网络分析结果文件时出错: {str(e)}")
+    
+        # 将日志内容写入日志文件
+        log_content = "".join(log_lines)
         with open(config.log_file, 'w', encoding='utf-8') as log_file:
             log_file.write(log_content)
             
-        print(f"分析日志已保存到: {config.log_file}")
+        custom_print(f"分析日志已保存到: {config.log_file}")
             
     except Exception as e:
         error_message = f"分析过程中出现错误: {str(e)}"
@@ -1826,4 +2982,3 @@ def main():
 
 if __name__ == "__main__":
     main() 
-

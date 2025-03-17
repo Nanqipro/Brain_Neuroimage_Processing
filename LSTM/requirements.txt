@@ -1,8 +1,31 @@
+# 核心PyTorch依赖
 torch>=2.1.0
 torchvision>=0.16.0
 torchaudio>=2.1.0
+
+# 数据处理与分析库
 numpy>=1.21.0
 pandas>=1.3.0
 scikit-learn>=1.0.0
+scipy>=1.7.0
+
+# 可视化库
 matplotlib>=3.4.0
-seaborn>=0.11.0 
+seaborn>=0.11.0
+plotly>=5.3.0
+
+# GNN相关依赖(需根据CUDA版本安装适配版本)
+torch-geometric>=2.0.0
+torch-scatter>=2.0.9
+torch-sparse>=0.6.13
+torch-cluster>=1.6.0
+torch-spline-conv>=1.2.1
+
+# 网络分析库
+networkx>=2.6.0
+
+# 交互式可视化组件
+ipywidgets>=7.6.0
+
+# 测试工具
+pytest>=7.0.0
