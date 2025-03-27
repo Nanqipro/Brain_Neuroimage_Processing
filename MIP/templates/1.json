@@ -1,0 +1,118 @@
+[
+    {
+        "method": "remove_small_spots",
+        "params": {
+            "kernel_size": 2,
+            "iterations": 2
+        }
+    },
+    {
+        "method": "adaptive_bright_spot_enhancement",
+        "params": {
+            "window_size": 15,
+            "sensitivity": 1.2,
+            "min_contrast": 10
+        }
+    },
+    {
+        "method": "remove_small_spots",
+        "params": {
+            "kernel_size": 3,
+            "iterations": 2
+        }
+    },
+    {
+        "method": "adaptive_region_enhancement",
+        "params": {
+            "region_size": 96,
+            "overlap": 0.9,
+            "enhancement_factor": 2
+        }
+    },
+    {
+        "method": "adjust_gamma",
+        "params": {
+            "gamma": 0.6
+        }
+    },
+    {
+        "method": "edge_preserving_smooth",
+        "params": {
+            "sigma_s": 10,
+            "sigma_r": 0.4
+        }
+    },
+    {
+        "method": "suppress_small_spots",
+        "params": {
+            "spot_size": 3,
+            "strength": 1
+        }
+    },
+    {
+        "method": "adaptive_bright_spot_enhancement",
+        "params": {
+            "window_size": 15,
+            "sensitivity": 1.6,
+            "min_contrast": 10
+        }
+    },
+    {
+        "method": "remove_small_spots",
+        "params": {
+            "kernel_size": 3,
+            "iterations": 3
+        }
+    },
+    {
+        "method": "edge_preserving_smooth",
+        "params": {
+            "sigma_s": 25,
+            "sigma_r": 0.4
+        }
+    },
+    {
+        "method": "adaptive_region_enhancement",
+        "params": {
+            "region_size": 80,
+            "overlap": 0.5,
+            "enhancement_factor": 2
+        }
+    },
+    {
+        "method": "remove_small_spots",
+        "params": {
+            "kernel_size": 2,
+            "iterations": 5
+        }
+    },
+    {
+        "method": "adjust_gamma",
+        "params": {
+            "gamma": 0.8
+        }
+    },
+    {
+        "method": "adaptive_region_enhancement",
+        "params": {
+            "region_size": 64,
+            "overlap": 0.5,
+            "enhancement_factor": 2
+        }
+    },
+    {
+        "method": "edge_preserving_smooth",
+        "params": {
+            "sigma_s": 35,
+            "sigma_r": 0.4
+        }
+    },
+    {
+        "method": "adaptive_bright_spot_enhancement",
+        "params": {
+            "window_size": 21,
+            "sensitivity": 1,
+            "min_contrast": 10
+        }
+    }
+]
