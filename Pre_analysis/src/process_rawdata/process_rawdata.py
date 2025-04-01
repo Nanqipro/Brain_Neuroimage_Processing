@@ -4,7 +4,7 @@ import os
 
 def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataFrame:
     """
-    处理原始数据，确保Position和behavior列每行都有对应标签
+    处理原始数据，确保Position列每行都有对应标签
     
     Parameters
     ----------
@@ -22,19 +22,17 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
     data = pd.read_excel(input_file_path, sheet_name='Sheet1')
     
     # 确保数据列存在
-    required_columns = ['stamp', 'Position', 'behavior']
+    required_columns = ['stamp', 'Position']
     for col in required_columns:
         if col not in data.columns:
             # 如果列不存在，创建空列
             data[col] = np.nan
             print(f"警告: 创建了缺失的列 '{col}'")
     
-    # 使用前向填充处理Position和behavior列，确保每行都有值
-    for col in ['Position', 'behavior']:
-        # 将空字符串替换为NaN以便正确填充
-        data[col] = data[col].replace('', np.nan)
-        # 使用前向填充填充空值
-        data[col] = data[col].ffill()
+    # 将空字符串替换为NaN以便正确填充
+    data['Position'] = data['Position'].replace('', np.nan)
+    # 使用前向填充填充空值
+    data['Position'] = data['Position'].ffill()
     
     # 将所有仍为NaN的值替换为'NULL'字符串
     data = data.fillna('NULL')
@@ -59,4 +57,3 @@ if __name__ == "__main__":
     # 打印处理结果统计信息
     print(f"处理完成，共处理 {len(processed_data)} 行数据")
     print(f"Position列非空值数量: {processed_data['Position'].ne('NULL').sum()}")
-    print(f"behavior列非空值数量: {processed_data['behavior'].ne('NULL').sum()}")
