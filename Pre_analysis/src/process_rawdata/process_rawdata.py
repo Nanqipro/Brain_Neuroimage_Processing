@@ -1,25 +1,62 @@
 import pandas as pd
 import numpy as np
+import os
 
-# 加载包含行为标记的文件（CHB工作表），只选择 'stamp' 和 'FrameLost' 列
-behavior_labels = pd.read_excel('../../raw_data/29792409EM2Trace.xlsx', sheet_name='Sheet1', usecols=['stamp', 'FrameLost'])
+def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataFrame:
+    """
+    处理原始数据，确保Position和behavior列每行都有对应标签
+    
+    Parameters
+    ----------
+    input_file_path : str
+        输入Excel文件路径
+    output_file_path : str, optional
+        输出Excel文件路径，默认为None
+        
+    Returns
+    -------
+    pd.DataFrame
+        处理后的数据框
+    """
+    # 加载原始数据
+    data = pd.read_excel(input_file_path, sheet_name='Sheet1')
+    
+    # 确保数据列存在
+    required_columns = ['stamp', 'Position', 'behavior']
+    for col in required_columns:
+        if col not in data.columns:
+            # 如果列不存在，创建空列
+            data[col] = np.nan
+            print(f"警告: 创建了缺失的列 '{col}'")
+    
+    # 使用前向填充处理Position和behavior列，确保每行都有值
+    for col in ['Position', 'behavior']:
+        # 将空字符串替换为NaN以便正确填充
+        data[col] = data[col].replace('', np.nan)
+        # 使用前向填充填充空值
+        data[col] = data[col].ffill()
+    
+    # 将所有仍为NaN的值替换为'NULL'字符串
+    data = data.fillna('NULL')
+    
+    # 如果提供了输出路径，保存到Excel
+    if output_file_path:
+        # 确保输出目录存在
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+        data.to_excel(output_file_path, index=False)
+        print(f"文件已保存为: {output_file_path}")
+    
+    return data
 
-# 加载 29792409EM2Trace 数据
-data = pd.read_excel('../../raw_data/29792409EM2Trace.xlsx', sheet_name='Sheet1')
-
-# 使用 forward fill 填充 FrameLost 列中的空值，使每个 stamp 行都有对应的行为
-# 避免 inplace 警告，使用直接赋值
-behavior_labels['FrameLost'] = behavior_labels['FrameLost'].ffill()
-
-# 基于 'stamp' 列合并，将填充后的 'FrameLost' 数据添加到  数据中
-merged_data = data.merge(behavior_labels, on='stamp', how='left')
-
-# 如果 'FrameLost' 列为空，将对应行标记为 'null'
-merged_data['FrameLost'] = merged_data['FrameLost'].replace('', np.nan)  # 如果空字符串要处理为NaN
-merged_data['FrameLost'] = merged_data['FrameLost'].where(merged_data['FrameLost'].notna(), 'null')
-
-# 保存合并后的数据到新的 Excel 文件
-output_path = '../../raw_data/EM2Trace_with_behavior_labels_filled.xlsx'
-merged_data.to_excel(output_path, index=False)
-
-print(f"文件已保存为: {output_path}")
+if __name__ == "__main__":
+    # 定义输入和输出文件路径
+    input_path = '../../raw_data/29792409EM2Trace.xlsx'
+    output_path = '../../processed_data/EM2Trace_processed.xlsx'
+    
+    # 处理数据
+    processed_data = process_data(input_path, output_path)
+    
+    # 打印处理结果统计信息
+    print(f"处理完成，共处理 {len(processed_data)} 行数据")
+    print(f"Position列非空值数量: {processed_data['Position'].ne('NULL').sum()}")
+    print(f"behavior列非空值数量: {processed_data['behavior'].ne('NULL').sum()}")
