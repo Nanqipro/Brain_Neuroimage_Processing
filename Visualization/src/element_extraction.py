@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import os
 
 def detect_calcium_transients(data, fs=1.0, min_snr=2.0, min_duration=3, smooth_window=5, 
-                             peak_distance=5, baseline_percentile=20):
+                             peak_distance=5, baseline_percentile=20, max_duration=200):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)
     
@@ -27,6 +27,8 @@ def detect_calcium_transients(data, fs=1.0, min_snr=2.0, min_duration=3, smooth_
         峰值间最小距离，默认为5
     baseline_percentile : int, 可选
         用于估计基线的百分位数，默认为20
+    max_duration : int, 可选
+        钙爆发最大持续时间（采样点数），默认为200
         
     返回
     -------
@@ -56,15 +58,44 @@ def detect_calcium_transients(data, fs=1.0, min_snr=2.0, min_duration=3, smooth_
     # 4. 分析每个钙爆发
     transients = []
     for i, peak_idx in enumerate(peaks):
-        # 寻找开始点（从峰值向左搜索，直到数据低于阈值）
+        # 寻找左侧边界（从峰值向左搜索）
         start_idx = peak_idx
-        while start_idx > 0 and smoothed_data[start_idx] > baseline:
+        # 向左搜索到信号低于基线或达到最大距离或达到前一个峰值的右边界
+        left_limit = 0 if i == 0 else peaks[i-1]
+        while start_idx > left_limit and smoothed_data[start_idx] > baseline:
             start_idx -= 1
-            
-        # 寻找结束点（从峰值向右搜索，直到数据低于阈值）
+            # 如果搜索范围过大，在局部最小值处停止
+            if peak_idx - start_idx > max_duration:
+                # 找到从peak_idx向左max_duration点范围内的局部最小值
+                local_min_idx = start_idx + np.argmin(smoothed_data[start_idx:start_idx+max_duration])
+                start_idx = local_min_idx
+                break
+        
+        # 寻找右侧边界（从峰值向右搜索）
         end_idx = peak_idx
-        while end_idx < len(smoothed_data) - 1 and smoothed_data[end_idx] > baseline:
+        # 向右搜索到信号低于基线或达到最大距离或达到下一个峰值的左边界
+        right_limit = len(smoothed_data) - 1 if i == len(peaks) - 1 else peaks[i+1]
+        while end_idx < right_limit and smoothed_data[end_idx] > baseline:
             end_idx += 1
+            # 如果搜索范围过大，在局部最小值处停止
+            if end_idx - peak_idx > max_duration:
+                # 找到从peak_idx向右max_duration点范围内的局部最小值
+                search_end = min(end_idx + max_duration, len(smoothed_data))
+                if peak_idx < search_end - 1:
+                    local_min_idx = peak_idx + np.argmin(smoothed_data[peak_idx:search_end])
+                    end_idx = local_min_idx
+                break
+        
+        # 如果峰值之间的信号始终高于基线，则使用峰值之间的最低点作为分界
+        if i < len(peaks) - 1 and end_idx >= peaks[i+1]:
+            # 寻找两个峰值之间的最低点作为分界
+            valley_idx = peak_idx + np.argmin(smoothed_data[peak_idx:peaks[i+1]])
+            end_idx = valley_idx
+        
+        if i > 0 and start_idx <= peaks[i-1]:
+            # 寻找两个峰值之间的最低点作为分界
+            valley_idx = peaks[i-1] + np.argmin(smoothed_data[peaks[i-1]:peak_idx])
+            start_idx = valley_idx
             
         # 计算持续时间
         duration = (end_idx - start_idx) / fs
@@ -289,6 +320,58 @@ def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='be
     
     return pd.DataFrame(results)
 
+def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None):
+    """
+    分析所有神经元的钙爆发并为每个爆发分配唯一ID
+    
+    参数
+    ----------
+    data_df : pandas.DataFrame
+        包含多个神经元数据的DataFrame
+    neuron_columns : list of str
+        要处理的神经元列名列表
+    fs : float, 可选
+        采样频率，默认为1.0Hz
+    save_path : str, 可选
+        Excel文件保存路径，默认为None（不保存）
+        
+    返回
+    -------
+    all_transients_df : pandas.DataFrame
+        包含所有神经元所有钙爆发特征的DataFrame
+    """
+    all_transients = []
+    transient_id = 1  # 起始ID
+    
+    for neuron in neuron_columns:
+        print(f"处理神经元 {neuron} 的钙爆发...")
+        neuron_data = data_df[neuron].values
+        
+        # 检测钙爆发
+        transients, smoothed_data = detect_calcium_transients(neuron_data, fs=fs)
+        
+        # 为该神经元的每个钙爆发分配ID并添加到列表
+        for t in transients:
+            t['neuron'] = neuron
+            t['transient_id'] = transient_id
+            all_transients.append(t)
+            transient_id += 1
+    
+    # 如果没有检测到钙爆发，返回空DataFrame
+    if len(all_transients) == 0:
+        print("未检测到任何钙爆发")
+        return pd.DataFrame()
+    
+    # 创建DataFrame
+    all_transients_df = pd.DataFrame(all_transients)
+    
+    # 如果指定了保存路径，则保存到Excel
+    if save_path:
+        all_transients_df.to_excel(save_path, index=False)
+        print(f"成功将所有钙爆发数据保存到: {save_path}")
+    
+    return all_transients_df
+
 if __name__ == "__main__":
     """
     从Excel文件加载神经元数据并进行特征提取的示例
@@ -312,13 +395,16 @@ if __name__ == "__main__":
             neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
             print(f"检测到 {len(neuron_columns)} 个神经元数据列")
             
-            # 示例：可视化第一个神经元的数据
-            if len(neuron_columns) > 0:
-                neuron_data = df[neuron_columns[0]].values
-                features, transients = extract_calcium_features(neuron_data, visualize=True)
-                print(f"神经元 {neuron_columns[0]} 的特征:")
-                for key, value in features.items():
-                    print(f"  {key}: {value}")
+            # 分析所有神经元的钙爆发并保存到Excel
+            save_path = '../results/all_neurons_transients.xlsx'
+            
+            # 确保保存目录存在
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            
+            # 分析并保存所有钙爆发数据
+            all_transients = analyze_all_neurons_transients(df, neuron_columns, save_path=save_path)
+            print(f"共检测到 {len(all_transients)} 个钙爆发")
+            
         except Exception as e:
             print(f"加载或处理数据时出错: {str(e)}")
     else:
