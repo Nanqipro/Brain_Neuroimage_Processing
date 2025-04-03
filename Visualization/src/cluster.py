@@ -13,6 +13,7 @@ from sklearn.metrics import silhouette_score
 import os
 from matplotlib.colors import ListedColormap
 import matplotlib.cm as cm
+import argparse  # 导入命令行参数处理模块
 
 def load_data(file_path):
     """
@@ -360,7 +361,7 @@ def add_cluster_to_excel(input_file, output_file, labels):
     df.to_excel(output_file, index=False)
     print(f"聚类结果已保存到 {output_file}")
 
-def visualize_neuron_cluster_distribution(df, labels):
+def visualize_neuron_cluster_distribution(df, labels, k_value=None):
     """
     可视化不同神经元的聚类分布
     
@@ -370,6 +371,8 @@ def visualize_neuron_cluster_distribution(df, labels):
         原始数据
     labels : numpy.ndarray
         聚类标签
+    k_value : int, 可选
+        当前使用的K值，用于文件命名
     """
     print("可视化不同神经元的聚类分布...")
     # 将标签添加到数据框
@@ -381,31 +384,144 @@ def visualize_neuron_cluster_distribution(df, labels):
     
     # 绘制堆叠条形图
     ax = cluster_counts.plot(kind='bar', stacked=True, figsize=(12, 6), colormap='tab10')
-    ax.set_title('Cluster Distribution for Different Neurons')
+    ax.set_title(f'Cluster Distribution for Different Neurons (k={len(np.unique(labels))})')
     ax.set_xlabel('Neuron')
     ax.set_ylabel('Number of Calcium Transients')
     ax.legend(title='Cluster', bbox_to_anchor=(1.05, 1), loc='upper left')
     ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('../results/neuron_cluster_distribution.png', dpi=300)
+    
+    # 根据k_value调整文件名
+    if k_value:
+        filename = f'../results/neuron_cluster_distribution_k{k_value}.png'
+    else:
+        filename = '../results/neuron_cluster_distribution.png'
+    
+    plt.savefig(filename, dpi=300)
+    print(f"神经元聚类分布图已保存到: {filename}")
+
+def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file):
+    """
+    比较不同K值的聚类效果
+    
+    参数
+    ----------
+    features_scaled : numpy.ndarray
+        标准化后的特征数据
+    feature_names : list
+        特征名称列表
+    df_clean : pandas.DataFrame
+        清洗后的数据
+    k_values : list
+        要比较的K值列表
+    input_file : str
+        输入文件路径，用于生成输出文件名
+    """
+    print(f"正在比较不同K值的聚类效果: {k_values}...")
+    
+    # 计算每个K值的轮廓系数
+    silhouette_scores_dict = {}
+    
+    # 创建比较图
+    fig, axes = plt.subplots(1, len(k_values), figsize=(5*len(k_values), 5))
+    if len(k_values) == 1:
+        axes = [axes]
+    
+    for i, k in enumerate(k_values):
+        # 执行K-means聚类
+        labels = cluster_kmeans(features_scaled, k)
+        
+        # 计算轮廓系数
+        sil_score = silhouette_score(features_scaled, labels)
+        silhouette_scores_dict[k] = sil_score
+        
+        # 使用PCA降维可视化
+        reducer = PCA(n_components=2, random_state=42)
+        embedding = reducer.fit_transform(features_scaled)
+        
+        # 绘制聚类结果
+        cmap = ListedColormap(plt.cm.tab10(np.linspace(0, 1, k+1)))
+        
+        # 在子图中绘制
+        for j in range(k):
+            axes[i].scatter(embedding[labels==j, 0], embedding[labels==j, 1], 
+                         c=[cmap(j)], marker='o', label=f'Cluster {j+1}')
+        
+        axes[i].set_title(f'K={k}, Silhouette={sil_score:.3f}')
+        axes[i].set_xlabel('PCA Dimension 1')
+        axes[i].set_ylabel('PCA Dimension 2')
+        axes[i].grid(True, alpha=0.3)
+        
+        # 保存该K值的结果
+        output_file = f'../results/all_neurons_transients_clustered_k{k}.xlsx'
+        add_cluster_to_excel(input_file, output_file, labels)
+        
+        # 生成该K值的特征分布图
+        visualize_feature_distribution(df_clean, labels)
+        plt.savefig(f'../results/cluster_feature_distribution_k{k}.png', dpi=300)
+        
+        # 神经元簇分布
+        visualize_neuron_cluster_distribution(df_clean, labels, k_value=k)
+    
+    plt.tight_layout()
+    plt.savefig('../results/k_comparison.png', dpi=300)
+    
+    # 绘制轮廓系数比较图
+    plt.figure(figsize=(8, 5))
+    plt.bar(silhouette_scores_dict.keys(), silhouette_scores_dict.values(), color='skyblue')
+    plt.title('Silhouette Score Comparison for Different K Values')
+    plt.xlabel('Number of Clusters (K)')
+    plt.ylabel('Silhouette Score')
+    plt.grid(True, alpha=0.3)
+    plt.xticks(list(silhouette_scores_dict.keys()))
+    plt.tight_layout()
+    plt.savefig('../results/silhouette_comparison.png', dpi=300)
+    
+    print("不同K值对比完成，结果已保存")
+    
+    # 返回轮廓系数最高的K值
+    best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
+    return best_k
 
 def main():
     """
     主函数
     """
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='钙爆发事件聚类分析工具')
+    parser.add_argument('--k', type=int, help='指定聚类数K，不指定则自动确定最佳值')
+    parser.add_argument('--compare', type=str, help='比较多个K值的效果，格式如"2,3,4,5"')
+    parser.add_argument('--input', type=str, default='../results/all_neurons_transients.xlsx', 
+                        help='输入数据文件路径')
+    args = parser.parse_args()
+    
     # 确保结果目录存在
     os.makedirs('../results', exist_ok=True)
     
     # 加载数据
-    input_file = '../results/all_neurons_transients.xlsx'
+    input_file = args.input
     df = load_data(input_file)
     
     # 预处理数据
     features_scaled, feature_names, df_clean = preprocess_data(df)
     
-    # 确定最佳聚类数
-    optimal_k = determine_optimal_k(features_scaled)
+    # 处理聚类数K
+    if args.compare:
+        # 如果需要比较多个K值
+        k_values = [int(k) for k in args.compare.split(',')]
+        best_k = compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file)
+        print(f"在比较的K值中，K={best_k}的轮廓系数最高")
+        # 使用最佳K值进行后续分析
+        optimal_k = best_k
+    else:
+        # 如果指定了K值，使用指定值
+        if args.k:
+            optimal_k = args.k
+            print(f"使用指定的聚类数: K={optimal_k}")
+        else:
+            # 自动确定最佳聚类数
+            optimal_k = determine_optimal_k(features_scaled)
     
     # K均值聚类
     kmeans_labels = cluster_kmeans(features_scaled, optimal_k)
@@ -427,7 +543,7 @@ def main():
     visualize_neuron_cluster_distribution(df_clean, kmeans_labels)
     
     # 将聚类标签添加到Excel
-    output_file = '../results/all_neurons_transients_clustered.xlsx'
+    output_file = f'../results/all_neurons_transients_clustered_k{optimal_k}.xlsx'
     add_cluster_to_excel(input_file, output_file, kmeans_labels)
     
     print("聚类分析完成!")

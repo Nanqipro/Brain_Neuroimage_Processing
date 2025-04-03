@@ -6,7 +6,7 @@ from numpy import trapezoid
 import matplotlib.pyplot as plt
 import os
 
-def detect_calcium_transients(data, fs=1.0, min_snr=2.0, min_duration=3, smooth_window=5, 
+def detect_calcium_transients(data, fs=1.0, min_snr=3.0, min_duration=3, smooth_window=5, 
                              peak_distance=5, baseline_percentile=20, max_duration=200):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)
@@ -18,7 +18,7 @@ def detect_calcium_transients(data, fs=1.0, min_snr=2.0, min_duration=3, smooth_
     fs : float, 可选
         采样频率，默认为1.0Hz
     min_snr : float, 可选
-        最小信噪比阈值，默认为2.0
+        最小信噪比阈值，默认为3.0
     min_duration : int, 可选
         最小持续时间（采样点数），默认为3
     smooth_window : int, 可选
