@@ -70,14 +70,14 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) 
     
     Returns
     -------
-    Figure
+    Figure  
         matplotlib图像对象
     """
     if neuron_id not in df.columns:
         raise ValueError(f"神经元ID {neuron_id} 在数据中不存在")
     
     # 创建图像
-    fig, ax = plt.subplots(figsize=(50, 10))
+    fig, ax = plt.subplots(figsize=(60, 10))
     
     # 绘制钙离子浓度变化曲线
     ax.plot(df['stamp'], df[neuron_id], linewidth=2, color='#1f77b4')
