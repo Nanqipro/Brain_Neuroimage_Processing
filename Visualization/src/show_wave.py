@@ -55,8 +55,7 @@ def load_data(file_path: str) -> pd.DataFrame:
     else:
         raise ValueError(f"不支持的文件格式: {file_path}")
 
-def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None, 
-                      smooth_method: str = 'savgol', smooth_window: int = 20) -> Figure:
+def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) -> Figure:
     """
     绘制单个神经元的钙离子波动图
     
@@ -68,15 +67,10 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
         神经元ID，对应DataFrame中的列名
     save_dir : str, optional
         图像保存目录，默认为None（不保存）
-    smooth_method : str, optional
-        平滑方法，可选值：'savgol'（Savitzky-Golay滤波器）, 'sma'（默认，简单移动平均）, 
-        'ema'（指数移动平均）, 'none'（不进行平滑）
-    smooth_window : int, optional
-        平滑窗口大小，默认为20
     
     Returns
     -------
-    Figure
+    Figure  
         matplotlib图像对象
     """
     if neuron_id not in df.columns:
@@ -88,33 +82,12 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
     # 绘制钙离子浓度变化曲线
     ax.plot(df['stamp'], df[neuron_id], linewidth=2, color='#1f77b4')
     
-    # 添加平滑曲线（根据所选方法进行平滑）
-    if smooth_method != 'none' and smooth_window > 1:
-        if smooth_method == 'savgol':
-            # 使用Savitzky-Golay滤波器
-            from scipy import signal
-            smooth_data = signal.savgol_filter(df[neuron_id].values, smooth_window, 3)
-            smooth_label = f'Savgol Filter (Window={smooth_window})'
-        elif smooth_method == 'sma':
-            # 使用简单移动平均
-            smooth_data = df[neuron_id].rolling(window=smooth_window, center=True).mean()
-            # 填充NaN值（窗口两端）
-            smooth_data = smooth_data.fillna(method='bfill').fillna(method='ffill')
-            smooth_label = f'Moving Average (Window={smooth_window})'
-        elif smooth_method == 'ema':
-            # 使用指数移动平均
-            alpha = 2 / (smooth_window + 1)  # 平滑因子
-            smooth_data = df[neuron_id].ewm(alpha=alpha, adjust=False).mean()
-            smooth_label = f'Exp Moving Avg (α={alpha:.4f})'
-        else:
-            # 未知方法，使用默认的SMA
-            smooth_data = df[neuron_id].rolling(window=smooth_window, center=True).mean()
-            smooth_data = smooth_data.fillna(method='bfill').fillna(method='ffill')
-            smooth_label = f'Smooth Curve (Window={smooth_window})'
-        
-        # 绘制平滑曲线
+    # 添加平滑曲线（移动平均）
+    window_size = min(10, len(df) // 10)  # 根据数据长度调整窗口大小
+    if window_size > 1:
+        smooth_data = df[neuron_id].rolling(window=window_size, center=True).mean()
         ax.plot(df['stamp'], smooth_data, linewidth=2.5, color='#ff7f0e', alpha=0.7, 
-                label=smooth_label)
+                label=f'Smooth Curve (Window={window_size})')
     
     # 设置图表样式和标题
     ax.set_title(f'Neuron {neuron_id} Calcium Concentration Fluctuation', fontsize=16)
@@ -169,8 +142,7 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
     return fig
 
 def plot_all_neurons(df: pd.DataFrame, save_dir: str = '../results/calcium_waves', 
-                     exclude_cols: List[str] = ['stamp', 'behavior'],
-                     smooth_method: str = 'sma', smooth_window: int = 20) -> List[Figure]:
+                     exclude_cols: List[str] = ['stamp', 'behavior']) -> List[Figure]:
     """
     绘制所有神经元的钙离子波动图
     
@@ -182,10 +154,6 @@ def plot_all_neurons(df: pd.DataFrame, save_dir: str = '../results/calcium_waves
         图像保存目录，默认为'../results/calcium_waves'
     exclude_cols : List[str], optional
         需要排除的列名列表，默认排除'stamp'和'behavior'列
-    smooth_method : str, optional
-        平滑方法，可选值：'savgol', 'sma'（默认）, 'ema', 'none'
-    smooth_window : int, optional
-        平滑窗口大小，默认为20
     
     Returns
     -------
@@ -203,9 +171,7 @@ def plot_all_neurons(df: pd.DataFrame, save_dir: str = '../results/calcium_waves
     figures = []
     for neuron_id in neuron_cols:
         try:
-            fig = plot_neuron_calcium(df, neuron_id, save_dir, 
-                                     smooth_method=smooth_method, 
-                                     smooth_window=smooth_window)
+            fig = plot_neuron_calcium(df, neuron_id, save_dir)
             figures.append(fig)
             plt.close(fig)  # 关闭图像以释放内存
         except Exception as e:
@@ -271,7 +237,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具')
-    parser.add_argument('--data', type=str, default='../datasets/Day6_with_behavior_labels_filled.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/processed_Day6.xlsx',
                         help='数据文件路径，支持.md, .csv, .xlsx格式')
     parser.add_argument('--output', type=str, default='../results/calcium_waves',
                         help='图像保存目录')
@@ -279,11 +245,6 @@ def main():
                         help='指定要可视化的神经元ID，不指定则处理所有神经元')
     parser.add_argument('--report', action='store_true',
                         help='生成神经元统计摘要报告')
-    parser.add_argument('--smooth', type=str, default='savgol', 
-                        choices=['savgol', 'sma', 'ema', 'none'],
-                        help='平滑方法: savgol (Savitzky-Golay滤波器), sma (简单移动平均), ema (指数移动平均), none (不平滑)')
-    parser.add_argument('--window', type=int, default=20,
-                        help='平滑窗口大小')
     
     args = parser.parse_args()
     
@@ -295,16 +256,10 @@ def main():
     # 根据参数执行可视化
     if args.neuron:
         print(f"正在为神经元 {args.neuron} 生成图像...")
-        print(f"使用 {args.smooth} 平滑方法，窗口大小 = {args.window}")
-        plot_neuron_calcium(df, args.neuron, args.output, 
-                           smooth_method=args.smooth, 
-                           smooth_window=args.window)
+        plot_neuron_calcium(df, args.neuron, args.output)
     else:
         print("正在为所有神经元生成图像...")
-        print(f"使用 {args.smooth} 平滑方法，窗口大小 = {args.window}")
-        plot_all_neurons(df, args.output, 
-                        smooth_method=args.smooth, 
-                        smooth_window=args.window)
+        plot_all_neurons(df, args.output)
     
     # 生成报告（如果需要）
     if args.report:

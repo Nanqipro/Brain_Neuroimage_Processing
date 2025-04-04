@@ -5,11 +5,9 @@ from scipy.signal import find_peaks, peak_widths
 from numpy import trapezoid
 import matplotlib.pyplot as plt
 import os
-import argparse
 
-def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
-                             peak_distance=30, baseline_percentile=20, max_duration=350,
-                             smooth_method='savgol'):
+def detect_calcium_transients(data, fs=1.0, min_snr=10.0, min_duration=20, smooth_window=50, 
+                             peak_distance=30, baseline_percentile=20, max_duration=350):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)
     
@@ -31,9 +29,6 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         用于估计基线的百分位数，默认为20
     max_duration : int, 可选
         钙爆发最大持续时间（采样点数），默认为200
-    smooth_method : str, 可选
-        平滑方法，可选值：'savgol'（默认，Savitzky-Golay滤波器）, 'sma'（简单移动平均）, 
-        'ema'（指数移动平均）, 'none'（不进行平滑）
         
     返回
     -------
@@ -42,87 +37,19 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     smoothed_data : numpy.ndarray
         平滑后的数据
     """
-    # 原始数据备份
-    raw_data = data.copy()
-    
-    # 1. 应用平滑处理
-    if smooth_method == 'none' or smooth_window <= 1:
-        # 不进行平滑处理
-        smoothed_data = raw_data.copy()
-        print("未应用平滑处理")
-    elif smooth_method == 'savgol':
-        # 使用Savitzky-Golay滤波器平滑数据
-        # 确保窗口大小是奇数
-        if smooth_window % 2 == 0:
-            smooth_window += 1
-        smoothed_data = signal.savgol_filter(raw_data, smooth_window, 3)
-        print(f"应用Savitzky-Golay滤波器平滑处理（窗口大小={smooth_window}）")
-    elif smooth_method == 'sma':
-        # 使用简单移动平均(SMA)平滑数据
-        # pandas rolling方法需要Series类型输入
-        series = pd.Series(raw_data)
-        # center=True确保窗口以当前点为中心
-        smoothed_series = series.rolling(window=smooth_window, center=True).mean()
-        # 填充NaN值（窗口两端）
-        smoothed_series = smoothed_series.fillna(method='bfill').fillna(method='ffill')
-        smoothed_data = smoothed_series.values
-        print(f"应用简单移动平均(SMA)平滑处理（窗口大小={smooth_window}）")
-    elif smooth_method == 'ema':
-        # 使用指数移动平均(EMA)平滑数据
-        series = pd.Series(raw_data)
-        # 计算α值（平滑因子）
-        alpha = 2 / (smooth_window + 1)
-        # 应用EMA
-        smoothed_series = series.ewm(alpha=alpha, adjust=False).mean()
-        smoothed_data = smoothed_series.values
-        print(f"应用指数移动平均(EMA)平滑处理（窗口大小={smooth_window}，α={alpha:.4f}）")
+    # 1. 应用平滑滤波器
+    if smooth_window > 1:
+        smoothed_data = signal.savgol_filter(data, smooth_window, 3)
     else:
-        raise ValueError(f"不支持的平滑方法: {smooth_method}，支持的方法有：'savgol', 'sma', 'ema', 'none'")
+        smoothed_data = data.copy()
     
     # 2. 估计基线和噪声水平
-    # 使用平滑后的数据估计基线
     baseline = np.percentile(smoothed_data, baseline_percentile)
-    
-    # 对于噪声水平估计, 使用平滑后数据低于中位数的部分
-    # 这样可以避免将信号成分视为噪声
-    noise_data = smoothed_data[smoothed_data < np.median(smoothed_data)]
-    if len(noise_data) > 0:
-        noise_level = np.std(noise_data)
-    else:
-        # 如果没有数据点小于中位数，使用较小的噪声估计
-        noise_level = np.std(smoothed_data) * 0.1
-    
-    # 如果噪声水平过低（可能是因为过度平滑），设置一个合理的最小值
-    min_noise_threshold = np.std(raw_data) * 0.001
-    if noise_level < min_noise_threshold:
-        noise_level = min_noise_threshold
-    
-    # 计算信噪比
-    signal_range = np.max(smoothed_data) - baseline
-    actual_snr = signal_range / noise_level
-    print(f"数据基线: {baseline:.4f}, 噪声水平: {noise_level:.4f}, 估计信噪比: {actual_snr:.1f}")
+    noise_level = np.std(smoothed_data[smoothed_data < np.percentile(smoothed_data, 50)])
     
     # 3. 检测峰值
-    # 调整检测阈值 - 重要: 不同平滑方法会改变噪声特性，因此需要调整
     threshold = baseline + min_snr * noise_level
-    
-    # 根据平滑方法进行调整
-    if smooth_method == 'savgol':
-        # Savgol可能会增强峰值
-        peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance)
-    elif smooth_method == 'sma':
-        # SMA可能会降低峰值，小幅降低阈值
-        adjusted_threshold = baseline + min_snr * noise_level * 0.9
-        peaks, peak_props = find_peaks(smoothed_data, height=adjusted_threshold, distance=peak_distance)
-    elif smooth_method == 'ema':
-        # EMA对最近数据敏感
-        peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance)
-    else:
-        # 不平滑时需要更高阈值以过滤噪声峰
-        adjusted_threshold = baseline + min_snr * noise_level * 1.2
-        peaks, peak_props = find_peaks(smoothed_data, height=adjusted_threshold, distance=peak_distance)
-    
-    print(f"检测阈值: {threshold:.4f}, 检测到 {len(peaks)} 个峰值")
+    peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance)
     
     # 如果没有检测到峰值，返回空列表
     if len(peaks) == 0:
@@ -212,10 +139,9 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         
         transients.append(transient)
     
-    print(f"过滤后保留 {len(transients)} 个有效钙爆发")
     return transients, smoothed_data
 
-def extract_calcium_features(neuron_data, fs=1.0, visualize=False, smooth_method='savgol', smooth_window=50):
+def extract_calcium_features(neuron_data, fs=1.0, visualize=False):
     """
     从钙离子浓度数据中提取关键特征
     
@@ -227,11 +153,6 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False, smooth_method
         采样频率，默认为1.0Hz
     visualize : bool, 可选
         是否可视化结果，默认为False
-    smooth_method : str, 可选
-        平滑方法，可选值：'savgol'（默认，Savitzky-Golay滤波器）, 'sma'（简单移动平均）, 
-        'ema'（指数移动平均）, 'none'（不进行平滑）
-    smooth_window : int, 可选
-        平滑窗口大小，默认为50
         
     返回
     -------
@@ -246,9 +167,7 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False, smooth_method
         data = neuron_data
     
     # 检测钙爆发
-    transients, smoothed_data = detect_calcium_transients(data, fs=fs, 
-                                                         smooth_method=smooth_method,
-                                                         smooth_window=smooth_window)
+    transients, smoothed_data = detect_calcium_transients(data, fs=fs)
     
     # 如果没有检测到钙爆发，返回空特征
     if len(transients) == 0:
@@ -335,7 +254,7 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
     plt.tight_layout()
     plt.show()
 
-def process_multiple_neurons(data_df, neuron_columns, fs=1.0, smooth_method='savgol', smooth_window=50):
+def process_multiple_neurons(data_df, neuron_columns, fs=1.0):
     """
     处理多个神经元的钙离子数据并提取特征
     
@@ -347,10 +266,6 @@ def process_multiple_neurons(data_df, neuron_columns, fs=1.0, smooth_method='sav
         要处理的神经元列名列表
     fs : float, 可选
         采样频率，默认为1.0Hz
-    smooth_method : str, 可选
-        平滑方法，可选值：'savgol'（默认）, 'sma', 'ema', 'none'
-    smooth_window : int, 可选
-        平滑窗口大小，默认为50
         
     返回
     -------
@@ -361,18 +276,13 @@ def process_multiple_neurons(data_df, neuron_columns, fs=1.0, smooth_method='sav
     
     for neuron in neuron_columns:
         print(f"处理神经元 {neuron}...")
-        features, _ = extract_calcium_features(data_df[neuron], fs=fs, 
-                                             smooth_method=smooth_method,
-                                             smooth_window=smooth_window)
+        features, _ = extract_calcium_features(data_df[neuron], fs=fs)
         features['neuron'] = neuron
-        features['smooth_method'] = smooth_method
-        features['smooth_window'] = smooth_window
         results.append(features)
     
     return pd.DataFrame(results)
 
-def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='behavior', fs=1.0,
-                                      smooth_method='savgol', smooth_window=50):
+def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='behavior', fs=1.0):
     """
     分析不同行为条件下的钙离子特征
     
@@ -386,10 +296,6 @@ def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='be
         行为标签列名，默认为'behavior'
     fs : float, 可选
         采样频率，默认为1.0Hz
-    smooth_method : str, 可选
-        平滑方法，可选值：'savgol'（默认）, 'sma', 'ema', 'none'
-    smooth_window : int, 可选
-        平滑窗口大小，默认为50
         
     返回
     -------
@@ -407,19 +313,14 @@ def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='be
             
             if len(behavior_data) > 0:
                 print(f"分析神经元 {neuron} 在行为 '{behavior}' 下的特征...")
-                features, _ = extract_calcium_features(behavior_data, fs=fs, 
-                                                    smooth_method=smooth_method,
-                                                    smooth_window=smooth_window)
+                features, _ = extract_calcium_features(behavior_data, fs=fs)
                 features['neuron'] = neuron
                 features['behavior'] = behavior
-                features['smooth_method'] = smooth_method
-                features['smooth_window'] = smooth_window
                 results.append(features)
     
     return pd.DataFrame(results)
 
-def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None,
-                               smooth_method='savgol', smooth_window=50):
+def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
     
@@ -433,10 +334,6 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         采样频率，默认为1.0Hz
     save_path : str, 可选
         Excel文件保存路径，默认为None（不保存）
-    smooth_method : str, 可选
-        平滑方法，可选值：'savgol'（默认）, 'sma', 'ema', 'none'
-    smooth_window : int, 可选
-        平滑窗口大小，默认为50
         
     返回
     -------
@@ -451,16 +348,12 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         neuron_data = data_df[neuron].values
         
         # 检测钙爆发
-        transients, smoothed_data = detect_calcium_transients(neuron_data, fs=fs,
-                                                           smooth_method=smooth_method,
-                                                           smooth_window=smooth_window)
+        transients, smoothed_data = detect_calcium_transients(neuron_data, fs=fs)
         
         # 为该神经元的每个钙爆发分配ID并添加到列表
         for t in transients:
             t['neuron'] = neuron
             t['transient_id'] = transient_id
-            t['smooth_method'] = smooth_method
-            t['smooth_window'] = smooth_window
             all_transients.append(t)
             transient_id += 1
     
@@ -479,116 +372,14 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
     
     return all_transients_df
 
-def compare_smoothing_methods(data_df, neuron_columns=None, fs=1.0):
-    """
-    比较不同平滑方法对钙爆发检测的影响
-    
-    参数
-    ----------
-    data_df : pandas.DataFrame
-        包含多个神经元数据的DataFrame
-    neuron_columns : list of str, optional
-        要处理的神经元列名列表，默认为None（自动检测）
-    fs : float, 可选
-        采样频率，默认为1.0Hz
-        
-    返回
-    -------
-    comparison_df : pandas.DataFrame
-        比较不同平滑方法对钙爆发检测影响的结果
-    """
-    if neuron_columns is None:
-        # 自动检测神经元列
-        neuron_columns = [col for col in data_df.columns if col.startswith('n') and col[1:].isdigit()]
-    
-    # 要比较的平滑方法和窗口大小
-    smooth_methods = ['none', 'savgol', 'sma', 'ema']
-    window_sizes = [5, 20, 50, 100]
-    
-    results = []
-    
-    for neuron in neuron_columns:
-        print(f"\n分析神经元 {neuron} 的不同平滑方法效果:")
-        neuron_data = data_df[neuron].values
-        
-        # 首先检测不平滑的情况作为基准
-        print("未平滑处理:")
-        base_transients, _ = detect_calcium_transients(neuron_data, fs=fs, smooth_method='none')
-        base_count = len(base_transients)
-        print(f"  检测到 {base_count} 个钙爆发")
-        
-        result_row = {
-            'neuron': neuron,
-            'none_count': base_count,
-        }
-        
-        # 对每种平滑方法和窗口大小进行测试
-        for method in ['savgol', 'sma', 'ema']:
-            for window in window_sizes:
-                if method == 'savgol' and window % 2 == 0:
-                    # Savitzky-Golay 需要奇数窗口大小
-                    window += 1
-                
-                print(f"{method.upper()} 平滑 (窗口={window}):")
-                transients, _ = detect_calcium_transients(neuron_data, fs=fs, 
-                                                     smooth_method=method,
-                                                     smooth_window=window)
-                count = len(transients)
-                diff = count - base_count
-                diff_percent = (diff / base_count * 100) if base_count > 0 else float('inf')
-                
-                print(f"  检测到 {count} 个钙爆发 (相比无平滑变化: {diff:+d}, {diff_percent:+.1f}%)")
-                
-                # 添加到结果中
-                result_row[f'{method}_{window}_count'] = count
-                result_row[f'{method}_{window}_diff'] = diff
-                result_row[f'{method}_{window}_diff_percent'] = diff_percent
-        
-        results.append(result_row)
-    
-    # 创建比较结果DataFrame
-    comparison_df = pd.DataFrame(results)
-    
-    # 输出汇总统计
-    print("\n===== 总体平滑效果统计 =====")
-    for method in ['savgol', 'sma', 'ema']:
-        for window in window_sizes:
-            if method == 'savgol' and window % 2 == 0:
-                window += 1
-            
-            # 计算平均变化百分比
-            diff_percent_col = f'{method}_{window}_diff_percent'
-            if diff_percent_col in comparison_df.columns:
-                mean_diff_percent = comparison_df[diff_percent_col].mean()
-                print(f"{method.upper()} (窗口={window}): 平均变化 {mean_diff_percent:+.1f}%")
-    
-    return comparison_df
-
 if __name__ == "__main__":
     """
     从Excel文件加载神经元数据并进行特征提取的示例
     """
     
-    # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
-    parser.add_argument('--data', type=str, default='../datasets/Day6_with_behavior_labels_filled.xlsx',
-                      help='数据文件路径')
-    parser.add_argument('--output', type=str, default='../results/all_neurons_transients.xlsx',
-                      help='结果保存路径')
-    parser.add_argument('--smooth', type=str, default='savgol', 
-                      choices=['savgol', 'sma', 'ema', 'none'],
-                      help='平滑方法: savgol (Savitzky-Golay滤波器), sma (简单移动平均), ema (指数移动平均), none (不平滑)')
-    parser.add_argument('--window', type=int, default=50,
-                      help='平滑窗口大小')
-    parser.add_argument('--compare', action='store_true',
-                      help='比较不同平滑方法的效果')
-    parser.add_argument('--neurons', type=str, default=None,
-                      help='要处理的神经元列表，用逗号分隔（如 "n1,n5,n10"）。不指定则处理所有神经元')
-    
-    args = parser.parse_args()
     
     # 定义数据文件路径
-    data_path = args.data
+    data_path = '../datasets/processed_Day6.xlsx'
     
     # 检查文件是否存在
     if os.path.exists(data_path):
@@ -601,50 +392,20 @@ if __name__ == "__main__":
             print(f"成功加载数据，共 {len(df)} 行")
             
             # 提取神经元列
-            if args.neurons:
-                neuron_columns = [n.strip() for n in args.neurons.split(',')]
-                print(f"将处理指定的 {len(neuron_columns)} 个神经元")
-            else:
-                neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
-                print(f"检测到 {len(neuron_columns)} 个神经元数据列")
+            neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
+            print(f"检测到 {len(neuron_columns)} 个神经元数据列")
             
-            # 检测指定的神经元是否存在于数据中
-            for neuron in neuron_columns:
-                if neuron not in df.columns:
-                    print(f"警告: 神经元 {neuron} 不在数据中！")
+            # 分析所有神经元的钙爆发并保存到Excel
+            save_path = '../results/all_neurons_transients.xlsx'
             
-            # 过滤出存在的神经元
-            neuron_columns = [n for n in neuron_columns if n in df.columns]
+            # 确保保存目录存在
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             
-            if args.compare:
-                # 比较不同平滑方法
-                print("\n正在比较不同平滑方法的效果...")
-                comparison_df = compare_smoothing_methods(df, neuron_columns)
-                
-                # 保存比较结果
-                compare_path = os.path.join(os.path.dirname(args.output), 'smoothing_comparison.xlsx')
-                comparison_df.to_excel(compare_path, index=False)
-                print(f"平滑方法比较结果已保存至: {compare_path}")
-            else:
-                # 分析所有神经元的钙爆发并保存到Excel
-                save_path = args.output
-                
-                # 确保保存目录存在
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                
-                # 显示平滑方法信息
-                print(f"使用 {args.smooth} 平滑方法，窗口大小 = {args.window}")
-                
-                # 分析并保存所有钙爆发数据
-                all_transients = analyze_all_neurons_transients(df, neuron_columns, 
-                                                             save_path=save_path,
-                                                             smooth_method=args.smooth,
-                                                             smooth_window=args.window)
-                print(f"共检测到 {len(all_transients)} 个钙爆发")
+            # 分析并保存所有钙爆发数据
+            all_transients = analyze_all_neurons_transients(df, neuron_columns, save_path=save_path)
+            print(f"共检测到 {len(all_transients)} 个钙爆发")
             
         except Exception as e:
-            import traceback
-            print(f"加载或处理数据时出错:")
-            traceback.print_exc()
+            print(f"加载或处理数据时出错: {str(e)}")
     else:
         print(f"错误: 找不到数据文件 '{data_path}'，请检查文件路径")
