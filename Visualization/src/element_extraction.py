@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import os
 import argparse
 
-def detect_calcium_transients(data, fs=1.0, min_snr=10.0, min_duration=20, smooth_window=50, 
+def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
                              peak_distance=30, baseline_percentile=20, max_duration=350):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)

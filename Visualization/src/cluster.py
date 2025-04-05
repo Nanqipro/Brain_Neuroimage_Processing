@@ -526,40 +526,11 @@ def main():
     parser = argparse.ArgumentParser(description='钙爆发事件聚类分析工具')
     parser.add_argument('--k', type=int, help='指定聚类数K，不指定则自动确定最佳值')
     parser.add_argument('--compare', type=str, help='比较多个K值的效果，格式如"2,3,4,5"')
-    parser.add_argument('--input', type=str, default=None, 
-                        help='输入数据文件路径，例如"../results/processed_Day6/all_neurons_transients.xlsx"')
+    parser.add_argument('--input', type=str, default='../results/processed_Day6/all_neurons_transients.xlsx', 
+                        help='输入数据文件路径')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
     args = parser.parse_args()
-    
-    # 如果未指定输入文件，尝试查找可能的输入文件
-    if args.input is None:
-        # 首先检查results目录下的子目录
-        results_dir = "../results"
-        potential_files = []
-        
-        if os.path.exists(results_dir):
-            for subdir in os.listdir(results_dir):
-                potential_file = os.path.join(results_dir, subdir, "all_neurons_transients.xlsx")
-                if os.path.isfile(potential_file):
-                    potential_files.append(potential_file)
-        
-        if len(potential_files) == 1:
-            # 如果只找到一个文件，自动使用它
-            args.input = potential_files[0]
-            print(f"自动选择输入文件: {args.input}")
-        elif len(potential_files) > 1:
-            # 如果找到多个文件，提示用户选择
-            print("找到多个可能的输入文件:")
-            for i, file in enumerate(potential_files):
-                print(f"{i+1}. {file}")
-            print("请使用--input参数指定要使用的文件")
-            return
-        else:
-            # 如果没有找到任何文件，显示错误信息
-            print("错误: 找不到输入文件，请先运行element_extraction.py生成钙爆发数据")
-            print("或者使用--input参数指定输入文件路径")
-            return
     
     # 根据输入文件名生成输出目录
     if args.output is None:
@@ -583,18 +554,9 @@ def main():
     # 确保结果目录存在
     os.makedirs(output_dir, exist_ok=True)
     
-    # 检查输入文件是否存在
-    if not os.path.exists(args.input):
-        print(f"错误: 输入文件 '{args.input}' 不存在")
-        return
-    
     # 加载数据
     input_file = args.input
-    try:
-        df = load_data(input_file)
-    except Exception as e:
-        print(f"加载数据时出错: {str(e)}")
-        return
+    df = load_data(input_file)
     
     # 预处理数据
     features_scaled, feature_names, df_clean = preprocess_data(df)
@@ -602,15 +564,11 @@ def main():
     # 处理聚类数K
     if args.compare:
         # 如果需要比较多个K值
-        try:
-            k_values = [int(k) for k in args.compare.split(',')]
-            best_k = compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir=output_dir)
-            print(f"在比较的K值中，K={best_k}的轮廓系数最高")
-            # 使用最佳K值进行后续分析
-            optimal_k = best_k
-        except Exception as e:
-            print(f"比较K值时出错: {str(e)}")
-            return
+        k_values = [int(k) for k in args.compare.split(',')]
+        best_k = compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir=output_dir)
+        print(f"在比较的K值中，K={best_k}的轮廓系数最高")
+        # 使用最佳K值进行后续分析
+        optimal_k = best_k
     else:
         # 如果指定了K值，使用指定值
         if args.k:
@@ -618,40 +576,32 @@ def main():
             print(f"使用指定的聚类数: K={optimal_k}")
         else:
             # 自动确定最佳聚类数
-            try:
-                optimal_k = determine_optimal_k(features_scaled, output_dir=output_dir)
-            except Exception as e:
-                print(f"确定最佳聚类数时出错: {str(e)}")
-                return
+            optimal_k = determine_optimal_k(features_scaled, output_dir=output_dir)
     
     # K均值聚类
-    try:
-        kmeans_labels = cluster_kmeans(features_scaled, optimal_k)
-        
-        # 可视化聚类结果
-        visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='pca', output_dir=output_dir)
-        visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='t-sne', output_dir=output_dir)
-        
-        # 特征分布可视化
-        visualize_feature_distribution(df_clean, kmeans_labels, output_dir=output_dir)
-        
-        # 分析聚类结果
-        cluster_stats = analyze_clusters(df_clean, kmeans_labels, output_dir=output_dir)
-        
-        # 雷达图可视化
-        visualize_cluster_radar(cluster_stats, output_dir=output_dir)
-        
-        # 神经元簇分布
-        visualize_neuron_cluster_distribution(df_clean, kmeans_labels, output_dir=output_dir)
-        
-        # 将聚类标签添加到Excel
-        output_file = f'{output_dir}/all_neurons_transients_clustered_k{optimal_k}.xlsx'
-        add_cluster_to_excel(input_file, output_file, kmeans_labels)
-        
-        print("聚类分析完成!")
-    except Exception as e:
-        print(f"聚类过程中出错: {str(e)}")
-        return
+    kmeans_labels = cluster_kmeans(features_scaled, optimal_k)
+    
+    # 可视化聚类结果
+    visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='pca', output_dir=output_dir)
+    visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='t-sne', output_dir=output_dir)
+    
+    # 特征分布可视化
+    visualize_feature_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    
+    # 分析聚类结果
+    cluster_stats = analyze_clusters(df_clean, kmeans_labels, output_dir=output_dir)
+    
+    # 雷达图可视化
+    visualize_cluster_radar(cluster_stats, output_dir=output_dir)
+    
+    # 神经元簇分布
+    visualize_neuron_cluster_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    
+    # 将聚类标签添加到Excel
+    output_file = f'{output_dir}/all_neurons_transients_clustered_k{optimal_k}.xlsx'
+    add_cluster_to_excel(input_file, output_file, kmeans_labels)
+    
+    print("聚类分析完成!")
 
 if __name__ == "__main__":
     main()
