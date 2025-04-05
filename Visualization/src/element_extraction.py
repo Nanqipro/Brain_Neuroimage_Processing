@@ -1,16 +1,18 @@
 import numpy as np
 import pandas as pd
 from scipy import signal
-from scipy.signal import find_peaks, peak_widths
+from scipy.signal import find_peaks, peak_widths, savgol_filter
 from numpy import trapezoid
 import matplotlib.pyplot as plt
 import os
 import argparse
 
-def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
-                             peak_distance=30, baseline_percentile=20, max_duration=350):
+def detect_calcium_transients(data, fs=1.0, min_snr=5.0, min_duration=15, smooth_window=50, 
+                             peak_distance=30, baseline_percentile=20, max_duration=350,
+                             detect_subpeaks=True, subpeak_prominence=0.25, 
+                             subpeak_width=10, subpeak_distance=15, debug=False, neuron_id=None):
     """
-    检测钙离子浓度数据中的钙爆发(calcium transients)
+    检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     
     参数
     ----------
@@ -19,17 +21,29 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     fs : float, 可选
         采样频率，默认为1.0Hz
     min_snr : float, 可选
-        最小信噪比阈值，默认为3.0
+        最小信噪比阈值，默认为5.0 (降低以提高敏感度)
     min_duration : int, 可选
-        最小持续时间（采样点数），默认为3
+        最小持续时间（采样点数），默认为15 (降低以捕获更短的爆发)
     smooth_window : int, 可选
-        平滑窗口大小，默认为5
+        平滑窗口大小，默认为50
     peak_distance : int, 可选
-        峰值间最小距离，默认为5
+        峰值间最小距离，默认为30
     baseline_percentile : int, 可选
         用于估计基线的百分位数，默认为20
     max_duration : int, 可选
-        钙爆发最大持续时间（采样点数），默认为200
+        钙爆发最大持续时间（采样点数），默认为350
+    detect_subpeaks : bool, 可选
+        是否检测大波中的小波峰，默认为True
+    subpeak_prominence : float, 可选
+        子峰的相对突出度（主峰振幅的比例），默认为0.25
+    subpeak_width : int, 可选
+        子峰的最小宽度，默认为10
+    subpeak_distance : int, 可选
+        子峰间的最小距离，默认为15
+    debug : bool, 可选
+        是否打印详细的调试信息，默认为False
+    neuron_id : str, 可选
+        当前处理的神经元ID，用于调试输出
         
     返回
     -------
@@ -48,16 +62,49 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     baseline = np.percentile(smoothed_data, baseline_percentile)
     noise_level = np.std(smoothed_data[smoothed_data < np.percentile(smoothed_data, 50)])
     
-    # 3. 检测峰值
+    # 3. 检测主要峰值
     threshold = baseline + min_snr * noise_level
+    
+    if debug:
+        neuron_label = f"神经元 {neuron_id}" if neuron_id else "当前神经元"
+        print(f"[DEBUG] {neuron_label} 检测参数:")
+        print(f"  - 基线值: {baseline:.4f}")
+        print(f"  - 噪声水平: {noise_level:.4f}")
+        print(f"  - 检测阈值: {threshold:.4f} (基线 + {min_snr} * 噪声)")
+        print(f"  - 数据范围: [{np.min(smoothed_data):.4f}, {np.max(smoothed_data):.4f}]")
+        print(f"  - 数据平均值: {np.mean(smoothed_data):.4f}")
+        print(f"  - 数据标准差: {np.std(smoothed_data):.4f}")
+    
     peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance)
     
-    # 如果没有检测到峰值，返回空列表
+    # 如果没有检测到峰值，尝试降低阈值（仅在调试模式下）
+    if len(peaks) == 0 and debug:
+        print(f"[DEBUG] {neuron_label} 未检测到钙爆发，尝试降低阈值...")
+        # 尝试使用更低的阈值
+        reduced_snr = min_snr * 0.7  # 降低到原阈值的70%
+        lowered_threshold = baseline + reduced_snr * noise_level
+        print(f"  - 降低后的阈值: {lowered_threshold:.4f} (基线 + {reduced_snr} * 噪声)")
+        
+        peaks, peak_props = find_peaks(smoothed_data, height=lowered_threshold, distance=peak_distance)
+        if len(peaks) > 0:
+            print(f"  - 使用降低的阈值检测到 {len(peaks)} 个潜在峰值")
+        else:
+            print(f"  - 即使降低阈值也未检测到峰值")
+            # 获取最高的几个点
+            sorted_indices = np.argsort(smoothed_data)[-5:]  # 获取最高的5个点
+            highest_values = smoothed_data[sorted_indices]
+            print(f"  - 数据中最高的5个值: {highest_values}")
+    
     if len(peaks) == 0:
         return [], smoothed_data
     
+    if debug:
+        print(f"[DEBUG] {neuron_label} 初步检测到 {len(peaks)} 个钙爆发峰值")
+    
     # 4. 分析每个钙爆发
     transients = []
+    
+    # 第一遍检测：主要钙爆发
     for i, peak_idx in enumerate(peaks):
         # 寻找左侧边界（从峰值向左搜索）
         start_idx = peak_idx
@@ -103,6 +150,8 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         
         # 如果持续时间太短，跳过此峰值
         if (end_idx - start_idx) < min_duration:
+            if debug:
+                print(f"[DEBUG] 峰值 #{i+1} 持续时间过短 ({end_idx - start_idx} < {min_duration})，已跳过")
             continue
             
         # 计算特征
@@ -122,6 +171,93 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         segment = smoothed_data[start_idx:end_idx+1] - baseline
         auc = trapezoid(segment, dx=1.0/fs)
         
+        # 检测波形的子峰值（如果启用）
+        subpeaks = []
+        if detect_subpeaks and (end_idx - start_idx) > 3 * subpeak_width:
+            # 计算当前波形区间
+            wave_segment = smoothed_data[start_idx:end_idx+1]
+            
+            # 计算相对突出度阈值（基于主峰的振幅）
+            abs_prominence = subpeak_prominence * amplitude
+            
+            # 在此波形内找到所有局部峰值
+            sub_peaks, sub_properties = find_peaks(
+                wave_segment,
+                prominence=abs_prominence,
+                width=subpeak_width,
+                distance=subpeak_distance
+            )
+            
+            # 转换为原始数据索引
+            sub_peaks = sub_peaks + start_idx
+            
+            # 排除与主峰相同的峰
+            sub_peaks = [sp for sp in sub_peaks if abs(sp - peak_idx) > subpeak_distance]
+            
+            # 记录子峰特征
+            for sp_idx in sub_peaks:
+                # 计算子峰特征
+                sp_value = smoothed_data[sp_idx]
+                sp_amplitude = sp_value - baseline
+                
+                # 子峰的半高宽特性
+                try:
+                    sp_widths, _, sp_left_ips, sp_right_ips = peak_widths(
+                        smoothed_data, [sp_idx], rel_height=0.5
+                    )
+                    sp_fwhm = sp_widths[0] / fs
+                    
+                    # 找出子峰的边界（局部最小值点）
+                    # 向左寻找局部最小值
+                    sp_start = sp_idx
+                    left_search_limit = max(start_idx, sp_idx - max_duration//2)
+                    while sp_start > left_search_limit:
+                        if sp_start == left_search_limit + 1 or smoothed_data[sp_start] <= smoothed_data[sp_start-1]:
+                            break
+                        sp_start -= 1
+                    
+                    # 向右寻找局部最小值
+                    sp_end = sp_idx
+                    right_search_limit = min(end_idx, sp_idx + max_duration//2)
+                    while sp_end < right_search_limit:
+                        if sp_end == right_search_limit - 1 or smoothed_data[sp_end] <= smoothed_data[sp_end+1]:
+                            break
+                        sp_end += 1
+                    
+                    # 子峰持续时间
+                    sp_duration = (sp_end - sp_start) / fs
+                    
+                    # 上升和衰减时间
+                    sp_rise_time = (sp_idx - sp_start) / fs
+                    sp_decay_time = (sp_end - sp_idx) / fs
+                    
+                    # 计算子峰面积
+                    sp_segment = smoothed_data[sp_start:sp_end+1] - baseline
+                    sp_auc = trapezoid(sp_segment, dx=1.0/fs)
+                    
+                    # 添加子峰信息
+                    subpeaks.append({
+                        'index': sp_idx,
+                        'value': sp_value,
+                        'amplitude': sp_amplitude,
+                        'start_idx': sp_start,
+                        'end_idx': sp_end,
+                        'duration': sp_duration,
+                        'fwhm': sp_fwhm,
+                        'rise_time': sp_rise_time,
+                        'decay_time': sp_decay_time,
+                        'auc': sp_auc
+                    })
+                except Exception as e:
+                    # 子峰分析失败，跳过该子峰
+                    if debug:
+                        print(f"[DEBUG] 子峰分析失败: {e}")
+                    pass
+        
+        # 收集主波形对象特征
+        wave_type = "complex" if len(subpeaks) > 0 else "simple"
+        subpeaks_count = len(subpeaks)
+        
         # 存储此次钙爆发的特征
         transient = {
             'start_idx': start_idx,
@@ -135,14 +271,38 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
             'rise_time': rise_time,
             'decay_time': decay_time,
             'auc': auc,
-            'snr': amplitude / noise_level
+            'snr': amplitude / noise_level,
+            'wave_type': wave_type,
+            'subpeaks_count': subpeaks_count,
+            'subpeaks': subpeaks
         }
         
         transients.append(transient)
+        
+        if debug:
+            print(f"[DEBUG] 峰值 #{i+1}: 幅值={amplitude:.4f}, 持续时间={duration:.2f}秒, SNR={amplitude/noise_level:.2f}")
+    
+    # 检测是否有复杂波形或组合波形（不同特征的波）
+    wave_types = {t['wave_type'] for t in transients}
+    complex_waves = [t for t in transients if t['wave_type'] == 'complex']
+    
+    # 输出波形分类统计
+    if len(transients) > 0:
+        output_prefix = f"[{neuron_id}] " if neuron_id else ""
+        print(f"{output_prefix}总共检测到 {len(transients)} 个钙爆发，其中：")
+        print(f"{output_prefix}  - 简单波形: {len(transients) - len(complex_waves)} 个")
+        print(f"{output_prefix}  - 复合波形: {len(complex_waves)} 个 (含有子峰)")
+        
+        # 计算子峰总数
+        total_subpeaks = sum(t['subpeaks_count'] for t in transients)
+        if total_subpeaks > 0:
+            print(f"{output_prefix}  - 子峰总数: {total_subpeaks} 个")
+    elif debug:
+        print(f"[DEBUG] {neuron_label} 未能提取出任何有效的钙爆发")
     
     return transients, smoothed_data
 
-def extract_calcium_features(neuron_data, fs=1.0, visualize=False):
+def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpeaks=True, debug=False, neuron_id=None):
     """
     从钙离子浓度数据中提取关键特征
     
@@ -154,6 +314,12 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False):
         采样频率，默认为1.0Hz
     visualize : bool, 可选
         是否可视化结果，默认为False
+    detect_subpeaks : bool, 可选
+        是否检测大波中的小波峰，默认为True
+    debug : bool, 可选
+        是否打印详细的调试信息，默认为False
+    neuron_id : str, 可选
+        当前处理的神经元ID，用于调试输出
         
     返回
     -------
@@ -168,7 +334,8 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False):
         data = neuron_data
     
     # 检测钙爆发
-    transients, smoothed_data = detect_calcium_transients(data, fs=fs)
+    transients, smoothed_data = detect_calcium_transients(data, fs=fs, detect_subpeaks=detect_subpeaks, 
+                                                          debug=debug, neuron_id=neuron_id)
     
     # 如果没有检测到钙爆发，返回空特征
     if len(transients) == 0:
@@ -180,7 +347,9 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False):
             'mean_rise_time': np.nan,
             'mean_decay_time': np.nan,
             'mean_auc': np.nan,
-            'frequency': 0
+            'frequency': 0,
+            'complex_waves_ratio': 0,
+            'subpeaks_per_wave': 0
         }, []
     
     # 计算特征统计值
@@ -190,6 +359,13 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False):
     rise_times = [t['rise_time'] for t in transients]
     decay_times = [t['decay_time'] for t in transients]
     aucs = [t['auc'] for t in transients]
+    
+    # 统计复杂波形比例
+    complex_waves = [t for t in transients if t['wave_type'] == 'complex']
+    complex_waves_ratio = len(complex_waves) / len(transients) if len(transients) > 0 else 0
+    
+    # 计算每个波的平均子峰数
+    subpeaks_per_wave = sum(t['subpeaks_count'] for t in transients) / len(transients) if len(transients) > 0 else 0
     
     # 记录总体特征
     total_time = len(data) / fs  # 总时间（秒）
@@ -201,7 +377,9 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False):
         'mean_rise_time': np.mean(rise_times),
         'mean_decay_time': np.mean(decay_times),
         'mean_auc': np.mean(aucs),
-        'frequency': len(transients) / total_time  # 每秒事件数
+        'frequency': len(transients) / total_time,  # 每秒事件数
+        'complex_waves_ratio': complex_waves_ratio,
+        'subpeaks_per_wave': subpeaks_per_wave
     }
     
     # 可视化（如果需要）
@@ -226,32 +404,75 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
         采样频率，默认为1.0Hz
     """
     time = np.arange(len(raw_data)) / fs
-    plt.figure(figsize=(12, 6))
-    plt.plot(time, raw_data, 'k-', alpha=0.4, label='Raw data')
-    plt.plot(time, smoothed_data, 'b-', label='Smoothed data')
+    plt.figure(figsize=(14, 8))
+    
+    # 创建两个子图：原始数据和放大的波峰
+    ax1 = plt.subplot(2, 1, 1)
+    ax1.plot(time, raw_data, 'k-', alpha=0.4, label='Raw data')
+    ax1.plot(time, smoothed_data, 'b-', label='Smoothed data')
     
     # 标记钙爆发
     for i, t in enumerate(transients):
-        # 标记峰值
-        plt.plot(t['peak_idx']/fs, t['peak_value'], 'ro', markersize=8)
+        # 使用不同的颜色标记简单波和复杂波
+        color = 'green' if t['wave_type'] == 'simple' else 'red'
+        marker_size = 8 if t['wave_type'] == 'simple' else 10
+        
+        # 标记主峰值
+        ax1.plot(t['peak_idx']/fs, t['peak_value'], 'o', color=color, markersize=marker_size)
         
         # 标记开始和结束
-        plt.axvline(x=t['start_idx']/fs, color='g', linestyle='--', alpha=0.5)
-        plt.axvline(x=t['end_idx']/fs, color='r', linestyle='--', alpha=0.5)
-        
-        # 标记半高宽
-        half_max = t['baseline'] + t['amplitude'] / 2
-        plt.plot([t['start_idx']/fs, t['end_idx']/fs], [half_max, half_max], 'y-', linewidth=2)
+        ax1.axvline(x=t['start_idx']/fs, color='g', linestyle='--', alpha=0.5)
+        ax1.axvline(x=t['end_idx']/fs, color='r', linestyle='--', alpha=0.5)
         
         # 添加编号
-        plt.text(t['peak_idx']/fs, t['peak_value']*1.05, f"{i+1}", 
+        ax1.text(t['peak_idx']/fs, t['peak_value']*1.05, f"{i+1}", 
                  horizontalalignment='center', verticalalignment='bottom')
+        
+        # 标记子峰（如果有）
+        if 'subpeaks' in t and t['subpeaks']:
+            for sp in t['subpeaks']:
+                ax1.plot(sp['index']/fs, sp['value'], '*', color='magenta', markersize=8)
     
-    plt.xlabel('Time (seconds)')
-    plt.ylabel('Calcium Signal Intensity')
-    plt.title(f'Detected {len(transients)} calcium transient events')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
+    ax1.set_xlabel('Time (seconds)')
+    ax1.set_ylabel('Calcium Signal Intensity')
+    ax1.set_title(f'Detected {len(transients)} calcium transient events')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # 选择一个复杂波形进行放大显示
+    complex_waves = [t for t in transients if t['wave_type'] == 'complex']
+    if complex_waves:
+        ax2 = plt.subplot(2, 1, 2)
+        
+        # 选择子峰数最多的复杂波
+        t = max(complex_waves, key=lambda x: x['subpeaks_count'])
+        
+        # 计算放大区域
+        margin = 20  # 左右额外显示的点数
+        zoom_start = max(0, t['start_idx'] - margin)
+        zoom_end = min(len(raw_data), t['end_idx'] + margin)
+        
+        # 绘制放大区域
+        zoom_time = time[zoom_start:zoom_end]
+        ax2.plot(zoom_time, raw_data[zoom_start:zoom_end], 'k-', alpha=0.4, label='Raw data')
+        ax2.plot(zoom_time, smoothed_data[zoom_start:zoom_end], 'b-', label='Smoothed data')
+        
+        # 标记主峰
+        ax2.plot(t['peak_idx']/fs, t['peak_value'], 'o', color='red', markersize=10, label='Main peak')
+        
+        # 标记子峰
+        for sp in t['subpeaks']:
+            ax2.plot(sp['index']/fs, sp['value'], '*', color='magenta', markersize=8)
+            # 标记子峰边界
+            ax2.axvline(x=sp['start_idx']/fs, color='c', linestyle=':', alpha=0.7)
+            ax2.axvline(x=sp['end_idx']/fs, color='m', linestyle=':', alpha=0.7)
+        
+        ax2.set_xlabel('Time (seconds)')
+        ax2.set_ylabel('Calcium Signal Intensity')
+        ax2.set_title(f'Complex wave with {len(t["subpeaks"])} subpeaks')
+        ax2.legend(loc='upper right')
+        ax2.grid(True, alpha=0.3)
+    
     plt.tight_layout()
     plt.show()
 
@@ -321,7 +542,7 @@ def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='be
     
     return pd.DataFrame(results)
 
-def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None):
+def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None, debug=False, min_snr=5.0):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
     
@@ -335,6 +556,10 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         采样频率，默认为1.0Hz
     save_path : str, 可选
         Excel文件保存路径，默认为None（不保存）
+    debug : bool, 可选
+        是否打印详细的调试信息，默认为False
+    min_snr : float, 可选
+        最小信噪比阈值，默认为5.0 (可调整敏感度)
         
     返回
     -------
@@ -344,12 +569,20 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
     all_transients = []
     transient_id = 1  # 起始ID
     
+    # 统计每个神经元的钙爆发数
+    neuron_counts = {}
+    
     for neuron in neuron_columns:
         print(f"处理神经元 {neuron} 的钙爆发...")
         neuron_data = data_df[neuron].values
         
         # 检测钙爆发
-        transients, smoothed_data = detect_calcium_transients(neuron_data, fs=fs)
+        transients, smoothed_data = detect_calcium_transients(
+            neuron_data, fs=fs, min_snr=min_snr, debug=debug, neuron_id=neuron
+        )
+        
+        # 记录此神经元的钙爆发数
+        neuron_counts[neuron] = len(transients)
         
         # 为该神经元的每个钙爆发分配ID并添加到列表
         for t in transients:
@@ -365,6 +598,20 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
     
     # 创建DataFrame
     all_transients_df = pd.DataFrame(all_transients)
+    
+    # 打印钙爆发数统计
+    print("\n各神经元钙爆发统计:")
+    for neuron in sorted(neuron_columns):
+        count = neuron_counts.get(neuron, 0)
+        print(f"  - {neuron}: {count} 个钙爆发")
+    
+    # 检查是否有神经元未检测到钙爆发
+    zero_neurons = [n for n in neuron_columns if neuron_counts.get(n, 0) == 0]
+    if zero_neurons:
+        print(f"\n警告：以下 {len(zero_neurons)} 个神经元未检测到任何钙爆发:")
+        for n in sorted(zero_neurons):
+            print(f"  - {n}")
+        print("可能需要调整检测参数或检查这些神经元的数据质量")
     
     # 如果指定了保存路径，则保存到Excel
     if save_path:
@@ -386,6 +633,12 @@ if __name__ == "__main__":
                         help='数据文件路径，支持.xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
+    parser.add_argument('--min-snr', type=float, default=5.0,
+                        help='最小信噪比阈值，默认为5.0')
+    parser.add_argument('--debug', action='store_true',
+                        help='开启调试模式，显示详细日志')
+    parser.add_argument('--neuron', type=str,
+                        help='仅分析指定神经元（如n2,n18）')
     args = parser.parse_args()
     
     # 检查文件是否存在
@@ -399,8 +652,18 @@ if __name__ == "__main__":
             print(f"成功加载数据，共 {len(df)} 行")
             
             # 提取神经元列
-            neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
-            print(f"检测到 {len(neuron_columns)} 个神经元数据列")
+            if args.neuron:
+                requested_neurons = args.neuron.split(',')
+                neuron_columns = [col for col in df.columns if col in requested_neurons]
+                if not neuron_columns:
+                    print(f"错误: 未找到指定的神经元列 {requested_neurons}")
+                    neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
+                    print(f"可用的神经元列: {neuron_columns}")
+                    exit(1)
+                print(f"按要求分析 {len(neuron_columns)} 个指定神经元: {neuron_columns}")
+            else:
+                neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
+                print(f"检测到 {len(neuron_columns)} 个神经元数据列")
             
             # 根据数据文件名生成输出目录
             if args.output is None:
@@ -414,15 +677,20 @@ if __name__ == "__main__":
                 save_path = f"{output_dir}/all_neurons_transients.xlsx"
             
             print(f"输出目录设置为: {output_dir}")
+            print(f"使用信噪比阈值: {args.min_snr}")
             
             # 确保保存目录存在
             os.makedirs(output_dir, exist_ok=True)
             
             # 分析并保存所有钙爆发数据
-            all_transients = analyze_all_neurons_transients(df, neuron_columns, save_path=save_path)
+            all_transients = analyze_all_neurons_transients(
+                df, neuron_columns, save_path=save_path, debug=args.debug, min_snr=args.min_snr
+            )
             print(f"共检测到 {len(all_transients)} 个钙爆发")
             
         except Exception as e:
             print(f"加载或处理数据时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
     else:
         print(f"错误: 找不到数据文件 '{args.data}'，请检查文件路径")
