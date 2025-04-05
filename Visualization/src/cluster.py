@@ -71,7 +71,7 @@ def preprocess_data(df):
     print(f"预处理完成，保留{len(df)}个有效样本")
     return features_scaled, feature_names, df
 
-def determine_optimal_k(features_scaled, max_k=10):
+def determine_optimal_k(features_scaled, max_k=10, output_dir='../results'):
     """
     确定最佳聚类数
     
@@ -81,6 +81,8 @@ def determine_optimal_k(features_scaled, max_k=10):
         标准化后的特征数据
     max_k : int, 可选
         最大测试聚类数，默认为10
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
         
     返回
     -------
@@ -115,7 +117,10 @@ def determine_optimal_k(features_scaled, max_k=10):
     plt.ylabel('Silhouette Score')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig('../results/optimal_k_determination.png', dpi=300)
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig(f'{output_dir}/optimal_k_determination.png', dpi=300)
     
     # 找到轮廓系数最高的k值
     optimal_k = silhouette_scores.index(max(silhouette_scores)) + 2
@@ -163,7 +168,7 @@ def cluster_dbscan(features_scaled):
     labels = dbscan.fit_predict(features_scaled)
     return labels
 
-def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca'):
+def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca', output_dir='../results'):
     """
     使用降维方法可视化聚类结果
     
@@ -177,6 +182,8 @@ def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca'):
         特征名称列表
     method : str, 可选
         降维方法，'pca'或't-sne'，默认为'pca'
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
     """
     n_clusters = len(np.unique(labels))
     if -1 in np.unique(labels):  # DBSCAN可能有噪声点标记为-1
@@ -191,13 +198,13 @@ def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca'):
         reducer = PCA(n_components=2, random_state=42)
         embedding = reducer.fit_transform(features_scaled)
         title = 'PCA Dimensionality Reduction Cluster Visualization'
-        filename = '../results/cluster_visualization_pca.png'
+        filename = f'{output_dir}/cluster_visualization_pca.png'
     else:  # t-SNE
         print("使用t-SNE降维可视化...")
         reducer = TSNE(n_components=2, random_state=42)
         embedding = reducer.fit_transform(features_scaled)
         title = 't-SNE Dimensionality Reduction Cluster Visualization'
-        filename = '../results/cluster_visualization_tsne.png'
+        filename = f'{output_dir}/cluster_visualization_tsne.png'
     
     # 创建散点图
     plt.figure(figsize=(10, 8))
@@ -215,9 +222,12 @@ def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca'):
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
     plt.savefig(filename, dpi=300)
 
-def visualize_feature_distribution(df, labels):
+def visualize_feature_distribution(df, labels, output_dir='../results'):
     """
     可视化各个簇的特征分布
     
@@ -227,6 +237,8 @@ def visualize_feature_distribution(df, labels):
         原始数据
     labels : numpy.ndarray
         聚类标签
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
     """
     print("可视化各个簇的特征分布...")
     # 将标签添加到数据框
@@ -251,9 +263,12 @@ def visualize_feature_distribution(df, labels):
         axes[i].grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('../results/cluster_feature_distribution.png', dpi=300)
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig(f'{output_dir}/cluster_feature_distribution.png', dpi=300)
 
-def analyze_clusters(df, labels):
+def analyze_clusters(df, labels, output_dir='../results'):
     """
     分析各个簇的特征统计信息
     
@@ -263,6 +278,8 @@ def analyze_clusters(df, labels):
         原始数据
     labels : numpy.ndarray
         聚类标签
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
         
     返回
     -------
@@ -289,13 +306,15 @@ def analyze_clusters(df, labels):
     # 合并统计信息
     cluster_stats = pd.concat([cluster_means, cluster_stds.add_suffix('_std'), cluster_counts], axis=1)
     
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
     # 保存到CSV
-    cluster_stats.to_csv('../results/cluster_statistics.csv')
+    cluster_stats.to_csv(f'{output_dir}/cluster_statistics.csv')
     
-    print(f"聚类统计信息已保存到 '../results/cluster_statistics.csv'")
+    print(f"聚类统计信息已保存到 '{output_dir}/cluster_statistics.csv'")
     return cluster_stats
 
-def visualize_cluster_radar(cluster_stats):
+def visualize_cluster_radar(cluster_stats, output_dir='../results'):
     """
     使用雷达图可视化各簇的特征
     
@@ -303,6 +322,8 @@ def visualize_cluster_radar(cluster_stats):
     ----------
     cluster_stats : pandas.DataFrame
         每个簇的特征统计信息
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
     """
     print("使用雷达图可视化各簇的特征...")
     features = ['amplitude', 'duration', 'fwhm', 'rise_time', 'decay_time', 'auc', 'snr']
@@ -335,7 +356,10 @@ def visualize_cluster_radar(cluster_stats):
     ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
     
     plt.tight_layout()
-    plt.savefig('../results/cluster_radar.png', dpi=300)
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig(f'{output_dir}/cluster_radar.png', dpi=300)
 
 def add_cluster_to_excel(input_file, output_file, labels):
     """
@@ -361,7 +385,7 @@ def add_cluster_to_excel(input_file, output_file, labels):
     df.to_excel(output_file, index=False)
     print(f"聚类结果已保存到 {output_file}")
 
-def visualize_neuron_cluster_distribution(df, labels, k_value=None):
+def visualize_neuron_cluster_distribution(df, labels, k_value=None, output_dir='../results'):
     """
     可视化不同神经元的聚类分布
     
@@ -373,6 +397,8 @@ def visualize_neuron_cluster_distribution(df, labels, k_value=None):
         聚类标签
     k_value : int, 可选
         当前使用的K值，用于文件命名
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
     """
     print("可视化不同神经元的聚类分布...")
     # 将标签添加到数据框
@@ -392,16 +418,19 @@ def visualize_neuron_cluster_distribution(df, labels, k_value=None):
     
     plt.tight_layout()
     
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    
     # 根据k_value调整文件名
     if k_value:
-        filename = f'../results/neuron_cluster_distribution_k{k_value}.png'
+        filename = f'{output_dir}/neuron_cluster_distribution_k{k_value}.png'
     else:
-        filename = '../results/neuron_cluster_distribution.png'
+        filename = f'{output_dir}/neuron_cluster_distribution.png'
     
     plt.savefig(filename, dpi=300)
     print(f"神经元聚类分布图已保存到: {filename}")
 
-def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file):
+def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir='../results'):
     """
     比较不同K值的聚类效果
     
@@ -417,6 +446,8 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
         要比较的K值列表
     input_file : str
         输入文件路径，用于生成输出文件名
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
     """
     print(f"正在比较不同K值的聚类效果: {k_values}...")
     
@@ -454,18 +485,21 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
         axes[i].grid(True, alpha=0.3)
         
         # 保存该K值的结果
-        output_file = f'../results/all_neurons_transients_clustered_k{k}.xlsx'
+        output_file = f'{output_dir}/all_neurons_transients_clustered_k{k}.xlsx'
         add_cluster_to_excel(input_file, output_file, labels)
         
         # 生成该K值的特征分布图
-        visualize_feature_distribution(df_clean, labels)
-        plt.savefig(f'../results/cluster_feature_distribution_k{k}.png', dpi=300)
+        visualize_feature_distribution(df_clean, labels, output_dir=output_dir)
+        plt.savefig(f'{output_dir}/cluster_feature_distribution_k{k}.png', dpi=300)
         
         # 神经元簇分布
-        visualize_neuron_cluster_distribution(df_clean, labels, k_value=k)
+        visualize_neuron_cluster_distribution(df_clean, labels, k_value=k, output_dir=output_dir)
     
     plt.tight_layout()
-    plt.savefig('../results/k_comparison.png', dpi=300)
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig(f'{output_dir}/k_comparison.png', dpi=300)
     
     # 绘制轮廓系数比较图
     plt.figure(figsize=(8, 5))
@@ -476,7 +510,7 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     plt.grid(True, alpha=0.3)
     plt.xticks(list(silhouette_scores_dict.keys()))
     plt.tight_layout()
-    plt.savefig('../results/silhouette_comparison.png', dpi=300)
+    plt.savefig(f'{output_dir}/silhouette_comparison.png', dpi=300)
     
     print("不同K值对比完成，结果已保存")
     
@@ -492,16 +526,75 @@ def main():
     parser = argparse.ArgumentParser(description='钙爆发事件聚类分析工具')
     parser.add_argument('--k', type=int, help='指定聚类数K，不指定则自动确定最佳值')
     parser.add_argument('--compare', type=str, help='比较多个K值的效果，格式如"2,3,4,5"')
-    parser.add_argument('--input', type=str, default='../results/all_neurons_transients.xlsx', 
-                        help='输入数据文件路径')
+    parser.add_argument('--input', type=str, default=None, 
+                        help='输入数据文件路径，例如"../results/processed_Day6/all_neurons_transients.xlsx"')
+    parser.add_argument('--output', type=str, default=None,
+                        help='输出目录，不指定则根据数据集名称自动生成')
     args = parser.parse_args()
     
+    # 如果未指定输入文件，尝试查找可能的输入文件
+    if args.input is None:
+        # 首先检查results目录下的子目录
+        results_dir = "../results"
+        potential_files = []
+        
+        if os.path.exists(results_dir):
+            for subdir in os.listdir(results_dir):
+                potential_file = os.path.join(results_dir, subdir, "all_neurons_transients.xlsx")
+                if os.path.isfile(potential_file):
+                    potential_files.append(potential_file)
+        
+        if len(potential_files) == 1:
+            # 如果只找到一个文件，自动使用它
+            args.input = potential_files[0]
+            print(f"自动选择输入文件: {args.input}")
+        elif len(potential_files) > 1:
+            # 如果找到多个文件，提示用户选择
+            print("找到多个可能的输入文件:")
+            for i, file in enumerate(potential_files):
+                print(f"{i+1}. {file}")
+            print("请使用--input参数指定要使用的文件")
+            return
+        else:
+            # 如果没有找到任何文件，显示错误信息
+            print("错误: 找不到输入文件，请先运行element_extraction.py生成钙爆发数据")
+            print("或者使用--input参数指定输入文件路径")
+            return
+    
+    # 根据输入文件名生成输出目录
+    if args.output is None:
+        # 提取输入文件目录
+        input_dir = os.path.dirname(args.input)
+        # 如果输入在datasets目录，则用文件名，否则用所在目录名
+        if 'datasets' in input_dir:
+            # 提取数据文件名（不含扩展名）
+            data_basename = os.path.basename(args.input)
+            dataset_name = os.path.splitext(data_basename)[0]
+            output_dir = f"../results/{dataset_name}"
+        else:
+            # 使用输入文件所在的目录名
+            dir_name = os.path.basename(input_dir)
+            output_dir = f"../results/{dir_name}"
+    else:
+        output_dir = args.output
+    
+    print(f"输出目录设置为: {output_dir}")
+    
     # 确保结果目录存在
-    os.makedirs('../results', exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 检查输入文件是否存在
+    if not os.path.exists(args.input):
+        print(f"错误: 输入文件 '{args.input}' 不存在")
+        return
     
     # 加载数据
     input_file = args.input
-    df = load_data(input_file)
+    try:
+        df = load_data(input_file)
+    except Exception as e:
+        print(f"加载数据时出错: {str(e)}")
+        return
     
     # 预处理数据
     features_scaled, feature_names, df_clean = preprocess_data(df)
@@ -509,11 +602,15 @@ def main():
     # 处理聚类数K
     if args.compare:
         # 如果需要比较多个K值
-        k_values = [int(k) for k in args.compare.split(',')]
-        best_k = compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file)
-        print(f"在比较的K值中，K={best_k}的轮廓系数最高")
-        # 使用最佳K值进行后续分析
-        optimal_k = best_k
+        try:
+            k_values = [int(k) for k in args.compare.split(',')]
+            best_k = compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir=output_dir)
+            print(f"在比较的K值中，K={best_k}的轮廓系数最高")
+            # 使用最佳K值进行后续分析
+            optimal_k = best_k
+        except Exception as e:
+            print(f"比较K值时出错: {str(e)}")
+            return
     else:
         # 如果指定了K值，使用指定值
         if args.k:
@@ -521,32 +618,40 @@ def main():
             print(f"使用指定的聚类数: K={optimal_k}")
         else:
             # 自动确定最佳聚类数
-            optimal_k = determine_optimal_k(features_scaled)
+            try:
+                optimal_k = determine_optimal_k(features_scaled, output_dir=output_dir)
+            except Exception as e:
+                print(f"确定最佳聚类数时出错: {str(e)}")
+                return
     
     # K均值聚类
-    kmeans_labels = cluster_kmeans(features_scaled, optimal_k)
-    
-    # 可视化聚类结果
-    visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='pca')
-    visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='t-sne')
-    
-    # 特征分布可视化
-    visualize_feature_distribution(df_clean, kmeans_labels)
-    
-    # 分析聚类结果
-    cluster_stats = analyze_clusters(df_clean, kmeans_labels)
-    
-    # 雷达图可视化
-    visualize_cluster_radar(cluster_stats)
-    
-    # 神经元簇分布
-    visualize_neuron_cluster_distribution(df_clean, kmeans_labels)
-    
-    # 将聚类标签添加到Excel
-    output_file = f'../results/all_neurons_transients_clustered_k{optimal_k}.xlsx'
-    add_cluster_to_excel(input_file, output_file, kmeans_labels)
-    
-    print("聚类分析完成!")
+    try:
+        kmeans_labels = cluster_kmeans(features_scaled, optimal_k)
+        
+        # 可视化聚类结果
+        visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='pca', output_dir=output_dir)
+        visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='t-sne', output_dir=output_dir)
+        
+        # 特征分布可视化
+        visualize_feature_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+        
+        # 分析聚类结果
+        cluster_stats = analyze_clusters(df_clean, kmeans_labels, output_dir=output_dir)
+        
+        # 雷达图可视化
+        visualize_cluster_radar(cluster_stats, output_dir=output_dir)
+        
+        # 神经元簇分布
+        visualize_neuron_cluster_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+        
+        # 将聚类标签添加到Excel
+        output_file = f'{output_dir}/all_neurons_transients_clustered_k{optimal_k}.xlsx'
+        add_cluster_to_excel(input_file, output_file, kmeans_labels)
+        
+        print("聚类分析完成!")
+    except Exception as e:
+        print(f"聚类过程中出错: {str(e)}")
+        return
 
 if __name__ == "__main__":
     main()

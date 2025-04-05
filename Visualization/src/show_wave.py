@@ -141,7 +141,7 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) 
     
     return fig
 
-def plot_all_neurons(df: pd.DataFrame, save_dir: str = '../results/calcium_waves', 
+def plot_all_neurons(df: pd.DataFrame, save_dir: str = None, 
                      exclude_cols: List[str] = ['stamp', 'behavior']) -> List[Figure]:
     """
     绘制所有神经元的钙离子波动图
@@ -151,7 +151,7 @@ def plot_all_neurons(df: pd.DataFrame, save_dir: str = '../results/calcium_waves
     df : pd.DataFrame
         包含神经元数据的DataFrame
     save_dir : str, optional
-        图像保存目录，默认为'../results/calcium_waves'
+        图像保存目录，默认为None（由调用函数指定）
     exclude_cols : List[str], optional
         需要排除的列名列表，默认排除'stamp'和'behavior'列
     
@@ -160,7 +160,9 @@ def plot_all_neurons(df: pd.DataFrame, save_dir: str = '../results/calcium_waves
     List[Figure]
         所有图像对象的列表
     """
-    # 创建保存目录
+    # 确保保存目录存在
+    if save_dir is None:
+        save_dir = '../results/calcium_waves'
     os.makedirs(save_dir, exist_ok=True)
     
     # 使用element_extraction.py中的方法获取所有神经元列
@@ -180,7 +182,7 @@ def plot_all_neurons(df: pd.DataFrame, save_dir: str = '../results/calcium_waves
     print(f"已为 {len(figures)} 个神经元生成钙离子波动图，保存至 {save_dir}")
     return figures
 
-def generate_summary_report(df: pd.DataFrame, save_path: str = '../results/neuron_summary.html') -> None:
+def generate_summary_report(df: pd.DataFrame, save_path: str = None) -> None:
     """
     生成神经元钙离子数据的摘要报告
     
@@ -189,9 +191,11 @@ def generate_summary_report(df: pd.DataFrame, save_path: str = '../results/neuro
     df : pd.DataFrame
         包含神经元数据的DataFrame
     save_path : str, optional
-        报告保存路径，默认为'../results/neuron_summary.html'
+        报告保存路径，默认为None（由调用函数指定）
     """
     # 确保目录存在
+    if save_path is None:
+        save_path = '../results/neuron_summary.html'
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     
     # 使用element_extraction.py中的方法获取所有神经元列
@@ -239,8 +243,8 @@ def main():
     parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具')
     parser.add_argument('--data', type=str, default='../datasets/processed_Day6.xlsx',
                         help='数据文件路径，支持.md, .csv, .xlsx格式')
-    parser.add_argument('--output', type=str, default='../results/calcium_waves',
-                        help='图像保存目录')
+    parser.add_argument('--output', type=str, default=None,
+                        help='图像保存目录，不指定则根据数据集名称自动生成')
     parser.add_argument('--neuron', type=str, default=None,
                         help='指定要可视化的神经元ID，不指定则处理所有神经元')
     parser.add_argument('--report', action='store_true',
@@ -253,18 +257,30 @@ def main():
     df = load_data(args.data)
     print(f"数据加载完成，共有 {len(df)} 条记录和 {len(df.columns)} 个列")
     
+    # 根据数据文件名生成输出目录
+    if args.output is None:
+        # 提取数据文件名（不含扩展名）
+        data_basename = os.path.basename(args.data)
+        dataset_name = os.path.splitext(data_basename)[0]
+        output_dir = f"../results/{dataset_name}/calcium_waves"
+    else:
+        output_dir = args.output
+    
+    print(f"输出目录设置为: {output_dir}")
+    
     # 根据参数执行可视化
     if args.neuron:
         print(f"正在为神经元 {args.neuron} 生成图像...")
-        plot_neuron_calcium(df, args.neuron, args.output)
+        plot_neuron_calcium(df, args.neuron, output_dir)
     else:
         print("正在为所有神经元生成图像...")
-        plot_all_neurons(df, args.output)
+        plot_all_neurons(df, output_dir)
     
     # 生成报告（如果需要）
     if args.report:
         print("正在生成统计摘要报告...")
-        report_path = os.path.join(os.path.dirname(args.output), 'neuron_summary.html')
+        report_dir = os.path.dirname(output_dir)
+        report_path = os.path.join(report_dir, 'neuron_summary.html')
         generate_summary_report(df, report_path)
     
     print("处理完成!")

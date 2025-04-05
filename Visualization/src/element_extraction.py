@@ -5,6 +5,7 @@ from scipy.signal import find_peaks, peak_widths
 from numpy import trapezoid
 import matplotlib.pyplot as plt
 import os
+import argparse
 
 def detect_calcium_transients(data, fs=1.0, min_snr=10.0, min_duration=20, smooth_window=50, 
                              peak_distance=30, baseline_percentile=20, max_duration=350):
@@ -367,6 +368,8 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
     
     # 如果指定了保存路径，则保存到Excel
     if save_path:
+        # 确保保存目录存在
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         all_transients_df.to_excel(save_path, index=False)
         print(f"成功将所有钙爆发数据保存到: {save_path}")
     
@@ -377,16 +380,20 @@ if __name__ == "__main__":
     从Excel文件加载神经元数据并进行特征提取的示例
     """
     
-    
-    # 定义数据文件路径
-    data_path = '../datasets/processed_Day6.xlsx'
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
+    parser.add_argument('--data', type=str, default='../datasets/processed_Day6.xlsx',
+                        help='数据文件路径，支持.xlsx格式')
+    parser.add_argument('--output', type=str, default=None,
+                        help='输出目录，不指定则根据数据集名称自动生成')
+    args = parser.parse_args()
     
     # 检查文件是否存在
-    if os.path.exists(data_path):
+    if os.path.exists(args.data):
         try:
             # 从指定路径加载Excel数据
-            print(f"正在从 {data_path} 加载数据...")
-            df = pd.read_excel(data_path)
+            print(f"正在从 {args.data} 加载数据...")
+            df = pd.read_excel(args.data)
             # 清理列名（去除可能的空格）
             df.columns = [col.strip() for col in df.columns]
             print(f"成功加载数据，共 {len(df)} 行")
@@ -395,11 +402,21 @@ if __name__ == "__main__":
             neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
             print(f"检测到 {len(neuron_columns)} 个神经元数据列")
             
-            # 分析所有神经元的钙爆发并保存到Excel
-            save_path = '../results/all_neurons_transients.xlsx'
+            # 根据数据文件名生成输出目录
+            if args.output is None:
+                # 提取数据文件名（不含扩展名）
+                data_basename = os.path.basename(args.data)
+                dataset_name = os.path.splitext(data_basename)[0]
+                output_dir = f"../results/{dataset_name}"
+                save_path = f"{output_dir}/all_neurons_transients.xlsx"
+            else:
+                output_dir = args.output
+                save_path = f"{output_dir}/all_neurons_transients.xlsx"
+            
+            print(f"输出目录设置为: {output_dir}")
             
             # 确保保存目录存在
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            os.makedirs(output_dir, exist_ok=True)
             
             # 分析并保存所有钙爆发数据
             all_transients = analyze_all_neurons_transients(df, neuron_columns, save_path=save_path)
@@ -408,4 +425,4 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"加载或处理数据时出错: {str(e)}")
     else:
-        print(f"错误: 找不到数据文件 '{data_path}'，请检查文件路径")
+        print(f"错误: 找不到数据文件 '{args.data}'，请检查文件路径")
