@@ -527,46 +527,92 @@ def estimate_neuron_params(neuron_data):
     data_min = np.min(neuron_data)
     data_max = np.max(neuron_data)
     data_range = data_max - data_min
-    signal_noise_ratio = data_range / data_std if data_std > 0 else 0
+    
+    # 更稳健的信噪比计算
+    # 使用最高10%和最低10%的数据来计算信号差异
+    upper_10_percentile = np.percentile(neuron_data, 90)
+    lower_10_percentile = np.percentile(neuron_data, 10)
+    robust_range = upper_10_percentile - lower_10_percentile
+    
+    # 使用中位数绝对偏差(MAD)作为噪声度量，比标准差更稳健
+    median_val = np.median(neuron_data)
+    mad = np.median(np.abs(neuron_data - median_val))
+    
+    # 更稳健的信噪比计算
+    signal_noise_ratio = robust_range / (mad * 1.4826) if mad > 0 else 0  # 1.4826是使MAD与正态分布的标准差对应的系数
     
     # 评估数据的基线波动
     sorted_data = np.sort(neuron_data)
     lower_half = sorted_data[:len(sorted_data)//2]
     baseline_variability = np.std(lower_half) / np.mean(lower_half) if np.mean(lower_half) > 0 else 0
     
-    # 评估信号峰值特性
+    # 评估峰值特性
     upper_percentile = np.percentile(neuron_data, 95)
-    peak_intensity = (upper_percentile - data_mean) / data_std if data_std > 0 else 0
+    lower_percentile = np.percentile(neuron_data, 20)  # 使用较低百分位估计基线
+    peak_intensity = (upper_percentile - lower_percentile) / data_std if data_std > 0 else 0
+    
+    # 进行初步峰值检测来评估信号特征
+    # 使用一个保守的参数集来尝试检测峰值
+    from scipy.signal import find_peaks
+    peaks, _ = find_peaks(neuron_data, distance=20, prominence=data_std*1.5)
+    num_tentative_peaks = len(peaks)
     
     # 自适应参数配置
     params = {}
     
-    # 1. 根据信号噪声比调整min_snr
-    if signal_noise_ratio < 3:
-        # 低信噪比数据需要更低的阈值
-        params['min_snr'] = 4.0
-    elif signal_noise_ratio < 5:
-        params['min_snr'] = 6.0
-    elif signal_noise_ratio > 15:
-        # 高信噪比数据可以使用更高的阈值
-        params['min_snr'] = 10.0
+    # 1. 使用更灵活的min_snr调整策略
+    # 针对不同情况做特殊处理
+    if num_tentative_peaks == 0:  # 使用初步检测没发现任何峰值
+        # 大幅降低阈值以尝试检测微弱信号
+        params['min_snr'] = 2.5
+    elif num_tentative_peaks < 3:  # 只检测到很少的峰值
+        # 降低阈值，以便能够检测更多可能的峰值
+        params['min_snr'] = 3.0
     else:
-        # 默认值
-        params['min_snr'] = 8.0
+        # 根据信噪比使用更细致的调整
+        if signal_noise_ratio < 2:
+            params['min_snr'] = 2.5
+        elif signal_noise_ratio < 3:
+            params['min_snr'] = 3.0
+        elif signal_noise_ratio < 4:
+            params['min_snr'] = 3.5
+        elif signal_noise_ratio < 5:
+            params['min_snr'] = 4.0
+        elif signal_noise_ratio < 7:
+            params['min_snr'] = 5.0
+        elif signal_noise_ratio < 10:
+            params['min_snr'] = 6.0
+        elif signal_noise_ratio < 15:
+            params['min_snr'] = 7.0
+        else:
+            params['min_snr'] = 8.0
     
     # 2. 根据基线波动调整baseline_percentile
-    if baseline_variability > 0.3:
+    # 对于信号差异大的神经元，降低基线百分位以减少漏检
+    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
+        # 如果初步检测到的峰值很少或没有，使用更低的百分位数以减少漏检
+        params['baseline_percentile'] = 5
+    elif baseline_variability > 0.3:
         # 基线不稳定，使用更低的百分位数
+        params['baseline_percentile'] = 8
+    elif baseline_variability > 0.2:
         params['baseline_percentile'] = 10
     elif baseline_variability < 0.1:
         # 基线稳定，可以使用更高的百分位数
         params['baseline_percentile'] = 25
     else:
         # 默认值
-        params['baseline_percentile'] = 20
+        params['baseline_percentile'] = 15
     
     # 3. 根据信号特性调整平滑窗口
-    if baseline_variability > 0.25:
+    # 对于信号弱的神经元，减小平滑窗口以保留微弱信号
+    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
+        # 对于难以检测到峰值的神经元，减小平滑窗口
+        params['smooth_window'] = 21  # 确保是奇数
+    elif baseline_variability > 0.3:
+        # 噪声很大的信号需要更大的平滑窗口
+        params['smooth_window'] = 101
+    elif baseline_variability > 0.25:
         # 噪声大的信号需要更大的平滑窗口
         params['smooth_window'] = 75
     elif baseline_variability < 0.1:
@@ -574,37 +620,66 @@ def estimate_neuron_params(neuron_data):
         params['smooth_window'] = 25
     else:
         # 默认值
-        params['smooth_window'] = 50
+        params['smooth_window'] = 51  # 确保是奇数
     
     # 4. 根据峰值强度调整peak_distance
-    if peak_intensity < 2:
+    # 减小peak_distance以检测更密集的峰值
+    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
+        # 对于检测不到或很少峰值的神经元，使用非常小的距离阈值
+        params['peak_distance'] = 15
+    elif peak_intensity < 2:
         # 弱峰值可能需要更小的距离
         params['peak_distance'] = 20
     elif peak_intensity > 5:
         # 强峰值通常间隔更大
-        params['peak_distance'] = 40
+        params['peak_distance'] = 35
     else:
         # 默认值
-        params['peak_distance'] = 30
+        params['peak_distance'] = 25
     
     # 5. 根据信号特性调整min_duration
-    if baseline_variability > 0.2:
-        # 更嘈杂的信号，要求更长的持续时间以避免假阳性
+    # 减小min_duration以检测更短的事件
+    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
+        # 对于检测难度大的神经元，减小最小持续时间阈值
+        params['min_duration'] = 10
+    elif baseline_variability > 0.3:
+        # 非常嘈杂的信号，要求更长的持续时间以避免假阳性
         params['min_duration'] = 30
+    elif baseline_variability > 0.2:
+        # 更嘈杂的信号，要求更长的持续时间以避免假阳性
+        params['min_duration'] = 25
     elif baseline_variability < 0.1:
         # 干净的信号可以检测更短的事件
         params['min_duration'] = 15
     else:
         # 默认值
-        params['min_duration'] = 20
+        params['min_duration'] = 18
         
     # 6. 子峰检测参数调整
-    if peak_intensity > 4:
+    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
+        # 对于难以检测的神经元，降低子峰突出度要求
+        params['subpeak_prominence'] = 0.15
+    elif peak_intensity > 4:
         # 强峰值信号的子峰可能更明显
         params['subpeak_prominence'] = 0.3
     else:
         # 弱峰值信号需要更低的子峰阈值
         params['subpeak_prominence'] = 0.2
+        
+    # 7. 调整最大持续时间参数，以便适应不同类型的信号模式
+    if num_tentative_peaks < 3:
+        # 对于峰值少的数据，增加最大持续时间以捕获较长的事件
+        params['max_duration'] = 400
+    elif signal_noise_ratio > 10:
+        # 高信噪比的信号可能有较短的事件
+        params['max_duration'] = 300
+    else:
+        # 默认值
+        params['max_duration'] = 350
+        
+    # 8. 打印当前神经元的自适应参数，便于调试
+    print(f"  - 自适应参数: SNR={signal_noise_ratio:.2f}, min_snr={params['min_snr']}, "  
+          f"baseline={params['baseline_percentile']}, peaks={num_tentative_peaks}")
     
     return params
 
@@ -638,6 +713,7 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         # 如果启用自适应参数，为每个神经元生成自定义参数
         custom_params = None
         if adaptive_params:
+            print(f"  估计神经元 {neuron} 的最优参数...")
             custom_params = estimate_neuron_params(neuron_data)
         
         # 检测钙爆发
