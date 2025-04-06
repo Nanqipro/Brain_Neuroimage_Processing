@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import os
 import argparse
 
-def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
-                             peak_distance=30, baseline_percentile=20, max_duration=350,
-                             detect_subpeaks=True, subpeak_prominence=0.25, 
-                             subpeak_width=10, subpeak_distance=15, params=None):
+def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=30, smooth_window=80, 
+                             peak_distance=30, baseline_percentile=30, max_duration=350,
+                             detect_subpeaks=True, subpeak_prominence=0.30, 
+                             subpeak_width=15, subpeak_distance=20, params=None):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     
@@ -69,9 +69,12 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     else:
         smoothed_data = data.copy()
     
-    # 2. 估计基线和噪声水平
+    # 2. 改进基线和噪声水平估计方法
     baseline = np.percentile(smoothed_data, baseline_percentile)
-    noise_level = np.std(smoothed_data[smoothed_data < np.percentile(smoothed_data, 50)])
+    # 使用更稳健的噪声估计方法：中位数绝对偏差(MAD)
+    median_val = np.median(smoothed_data[smoothed_data < np.percentile(smoothed_data, 60)])
+    deviations = np.abs(smoothed_data[smoothed_data < np.percentile(smoothed_data, 60)] - median_val)
+    noise_level = np.median(deviations) * 1.4826  # 乘以1.4826使MAD与正态分布的标准差对应
     
     # 3. 检测主要峰值
     threshold = baseline + min_snr * noise_level
@@ -560,67 +563,67 @@ def estimate_neuron_params(neuron_data):
     # 自适应参数配置
     params = {}
     
-    # 1. 使用更灵活的min_snr调整策略
+    # 1. 提高min_snr阈值以减少小幅波动噪声的干扰
     # 针对不同情况做特殊处理
     if num_tentative_peaks == 0:  # 使用初步检测没发现任何峰值
-        # 大幅降低阈值以尝试检测微弱信号
-        params['min_snr'] = 2.5
+        # 使用适中阈值以过滤噪声但不错过显著的钙爆
+        params['min_snr'] = 3.5
     elif num_tentative_peaks < 3:  # 只检测到很少的峰值
-        # 降低阈值，以便能够检测更多可能的峰值
-        params['min_snr'] = 3.0
+        # 适当提高阈值，以过滤小幅波动
+        params['min_snr'] = 4.0
     else:
-        # 根据信噪比使用更细致的调整
+        # 根据信噪比进行更精细的阈值调整
         if signal_noise_ratio < 2:
-            params['min_snr'] = 2.5
+            params['min_snr'] = 4.0  # 低信噪比需要更高阈值以减少假阳性
         elif signal_noise_ratio < 3:
-            params['min_snr'] = 3.0
+            params['min_snr'] = 4.5
         elif signal_noise_ratio < 4:
-            params['min_snr'] = 3.5
-        elif signal_noise_ratio < 5:
-            params['min_snr'] = 4.0
-        elif signal_noise_ratio < 7:
             params['min_snr'] = 5.0
-        elif signal_noise_ratio < 10:
+        elif signal_noise_ratio < 5:
+            params['min_snr'] = 5.5
+        elif signal_noise_ratio < 7:
             params['min_snr'] = 6.0
-        elif signal_noise_ratio < 15:
+        elif signal_noise_ratio < 10:
             params['min_snr'] = 7.0
-        else:
+        elif signal_noise_ratio < 15:
             params['min_snr'] = 8.0
+        else:
+            params['min_snr'] = 9.0
     
-    # 2. 根据基线波动调整baseline_percentile
-    # 对于信号差异大的神经元，降低基线百分位以减少漏检
+    # 2. 优化基线估计策略，提高基线百分位以减少背景噪声的影响
+    # 对于信号差异大的神经元，使用适当的基线百分位以减少噪声影响
     if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 如果初步检测到的峰值很少或没有，使用更低的百分位数以减少漏检
-        params['baseline_percentile'] = 5
+        # 如果初步检测到的峰值很少或没有，使用适中的百分位数
+        params['baseline_percentile'] = 20
     elif baseline_variability > 0.3:
-        # 基线不稳定，使用更低的百分位数
-        params['baseline_percentile'] = 8
-    elif baseline_variability > 0.2:
-        params['baseline_percentile'] = 10
-    elif baseline_variability < 0.1:
-        # 基线稳定，可以使用更高的百分位数
+        # 基线不稳定，使用更高的百分位数以过滤背景噪声
         params['baseline_percentile'] = 25
+    elif baseline_variability > 0.2:
+        params['baseline_percentile'] = 22
+    elif baseline_variability < 0.1:
+        # 基线稳定，可以使用更高的百分位数，减少小波动影响
+        params['baseline_percentile'] = 35
     else:
-        # 默认值
-        params['baseline_percentile'] = 15
+        # 默认值提高以更好地过滤噪声
+        params['baseline_percentile'] = 30
     
-    # 3. 根据信号特性调整平滑窗口
-    # 对于信号弱的神经元，减小平滑窗口以保留微弱信号
+    # 3. 增强平滑效果以减少小幅波动的影响
+    # 对于所有类型的信号，增加平滑窗口大小以有效去除高频噪声
     if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 对于难以检测到峰值的神经元，减小平滑窗口
-        params['smooth_window'] = 21  # 确保是奇数
+        # 对于难以检测到峰值的神经元，使用适中的平滑窗口
+        params['smooth_window'] = 45  # 确保是奇数
     elif baseline_variability > 0.3:
         # 噪声很大的信号需要更大的平滑窗口
-        params['smooth_window'] = 101
+        params['smooth_window'] = 121
     elif baseline_variability > 0.25:
         # 噪声大的信号需要更大的平滑窗口
-        params['smooth_window'] = 75
+        params['smooth_window'] = 101
     elif baseline_variability < 0.1:
-        # 干净的信号可以使用更小的平滑窗口
-        params['smooth_window'] = 25
+        # 即使是干净的信号也使用较大的平滑窗口以消除小幅波动
+        params['smooth_window'] = 61
     else:
-        # 默认值
-        params['smooth_window'] = 51  # 确保是奇数
+        # 默认值显著增加以提高去噪效果
+        params['smooth_window'] = 81  # 确保是奇数
     
     # 4. 根据峰值强度调整peak_distance
     # 减小peak_distance以检测更密集的峰值
@@ -637,34 +640,38 @@ def estimate_neuron_params(neuron_data):
         # 默认值
         params['peak_distance'] = 25
     
-    # 5. 根据信号特性调整min_duration
-    # 减小min_duration以检测更短的事件
+    # 5. 提高最小持续时间阈值以排除短暂的钙离子小幅波动
+    # 增加min_duration以确保只检测到显著的钙爆事件
     if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 对于检测难度大的神经元，减小最小持续时间阈值
-        params['min_duration'] = 10
+        # 对于检测难度大的神经元，也要保持较高的持续时间阈值
+        params['min_duration'] = 25
     elif baseline_variability > 0.3:
         # 非常嘈杂的信号，要求更长的持续时间以避免假阳性
-        params['min_duration'] = 30
+        params['min_duration'] = 40
     elif baseline_variability > 0.2:
         # 更嘈杂的信号，要求更长的持续时间以避免假阳性
-        params['min_duration'] = 25
+        params['min_duration'] = 35
     elif baseline_variability < 0.1:
-        # 干净的信号可以检测更短的事件
-        params['min_duration'] = 15
+        # 即使是干净的信号也需要更长的持续时间以区分真实钙爆
+        params['min_duration'] = 30
     else:
-        # 默认值
-        params['min_duration'] = 18
+        # 默认值显著提高
+        params['min_duration'] = 32
         
-    # 6. 子峰检测参数调整
+    # 6. 提高子峰检测参数要求，减少对小波动的敏感度
     if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 对于难以检测的神经元，降低子峰突出度要求
-        params['subpeak_prominence'] = 0.15
+        # 提高子峰突出度要求以减少小波动的识别
+        params['subpeak_prominence'] = 0.30
     elif peak_intensity > 4:
-        # 强峰值信号的子峰可能更明显
-        params['subpeak_prominence'] = 0.3
+        # 强峰值信号的子峰要求更高突出度
+        params['subpeak_prominence'] = 0.40
     else:
-        # 弱峰值信号需要更低的子峰阈值
-        params['subpeak_prominence'] = 0.2
+        # 提高默认子峰阈值
+        params['subpeak_prominence'] = 0.35
+        
+    # 增加子峰宽度和距离参数
+    params['subpeak_width'] = 15
+    params['subpeak_distance'] = 20
         
     # 7. 调整最大持续时间参数，以便适应不同类型的信号模式
     if num_tentative_peaks < 3:
