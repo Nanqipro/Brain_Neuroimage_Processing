@@ -34,9 +34,9 @@ def load_data(file_path):
     print(f"成功加载数据，共{len(df)}行")
     return df
 
-def preprocess_data(df):
+def enhance_preprocess_data(df):
     """
-    预处理钙爆发数据
+    增强版预处理功能，支持子峰分析和更多特征
     
     参数
     ----------
@@ -50,8 +50,17 @@ def preprocess_data(df):
     feature_names : list
         特征名称列表
     """
-    # 选择用于聚类的特征
+    # 基础特征集
     feature_names = ['amplitude', 'duration', 'fwhm', 'rise_time', 'decay_time', 'auc', 'snr']
+    
+    # 检查是否包含波形类型信息，增加波形分类特征
+    if 'wave_type' in df.columns:
+        df['is_complex'] = df['wave_type'].apply(lambda x: 1 if x == 'complex' else 0)
+        feature_names.append('is_complex')
+    
+    # 检查是否包含子峰信息
+    if 'subpeaks_count' in df.columns:
+        feature_names.append('subpeaks_count')
     
     # 将特征值转为数值类型
     for col in feature_names:
@@ -68,7 +77,7 @@ def preprocess_data(df):
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
     
-    print(f"预处理完成，保留{len(df)}个有效样本")
+    print(f"预处理完成，保留{len(df)}个有效样本，使用特征: {', '.join(feature_names)}")
     return features_scaled, feature_names, df
 
 def determine_optimal_k(features_scaled, max_k=10, output_dir='../results'):
@@ -430,6 +439,98 @@ def visualize_neuron_cluster_distribution(df, labels, k_value=None, output_dir='
     plt.savefig(filename, dpi=300)
     print(f"神经元聚类分布图已保存到: {filename}")
 
+def visualize_wave_type_distribution(df, labels, output_dir='../results'):
+    """
+    可视化不同波形类型在各聚类中的分布
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含wave_type信息的数据
+    labels : numpy.ndarray
+        聚类标签
+    output_dir : str, 可选
+        输出目录路径
+    """
+    if 'wave_type' not in df.columns:
+        print("数据中没有wave_type信息，跳过波形类型分布可视化")
+        return
+        
+    print("可视化不同波形类型在各聚类中的分布...")
+    
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
+    
+    # 计算每个聚类中不同波形类型的分布
+    wave_type_counts = df_cluster.groupby(['cluster', 'wave_type']).size().unstack().fillna(0)
+    
+    # 计算百分比
+    wave_type_pcts = wave_type_counts.div(wave_type_counts.sum(axis=1), axis=0) * 100
+    
+    # 绘制堆叠条形图
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # 绝对数量图
+    wave_type_counts.plot(kind='bar', stacked=True, ax=ax1, colormap='Set3')
+    ax1.set_title('Wave Type Count in Each Cluster')
+    ax1.set_xlabel('Cluster')
+    ax1.set_ylabel('Count')
+    ax1.legend(title='Wave Type')
+    ax1.grid(True, alpha=0.3)
+    
+    # 百分比图
+    wave_type_pcts.plot(kind='bar', stacked=True, ax=ax2, colormap='Set3')
+    ax2.set_title('Wave Type Percentage in Each Cluster')
+    ax2.set_xlabel('Cluster')
+    ax2.set_ylabel('Percentage (%)')
+    ax2.legend(title='Wave Type')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/wave_type_distribution.png', dpi=300)
+    print(f"波形类型分布图已保存到: {output_dir}/wave_type_distribution.png")
+
+def analyze_subpeaks(df, labels, output_dir='../results'):
+    """
+    分析各聚类中子峰特征
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含subpeaks_count信息的数据
+    labels : numpy.ndarray
+        聚类标签
+    output_dir : str, 可选
+        输出目录路径
+    """
+    if 'subpeaks_count' not in df.columns:
+        print("数据中没有subpeaks_count信息，跳过子峰分析")
+        return
+        
+    print("分析各聚类中的子峰特征...")
+    
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
+    
+    # 绘制子峰数量箱线图 - 修复FutureWarning
+    plt.figure(figsize=(10, 6))
+    # 修改前: sns.boxplot(x='cluster', y='subpeaks_count', data=df_cluster, palette='Set2')
+    # 修改后: 将x变量分配给hue，并设置legend=False
+    sns.boxplot(x='cluster', y='subpeaks_count', hue='cluster', data=df_cluster, palette='Set2', legend=False)
+    plt.title('Distribution of Subpeaks Count in Each Cluster')
+    plt.xlabel('Cluster')
+    plt.ylabel('Number of Subpeaks')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/subpeaks_distribution.png', dpi=300)
+    
+    # 计算各聚类中子峰的统计信息
+    subpeak_stats = df_cluster.groupby('cluster')['subpeaks_count'].agg(['mean', 'median', 'std', 'min', 'max'])
+    subpeak_stats.to_csv(f'{output_dir}/subpeaks_statistics.csv')
+    print(f"子峰统计信息已保存到 {output_dir}/subpeaks_statistics.csv")
+
 def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir='../results'):
     """
     比较不同K值的聚类效果
@@ -494,6 +595,12 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
         
         # 神经元簇分布
         visualize_neuron_cluster_distribution(df_clean, labels, k_value=k, output_dir=output_dir)
+        
+        # 增加波形类型分析
+        visualize_wave_type_distribution(df_clean, labels, output_dir=f'{output_dir}/k{k}')
+        
+        # 增加子峰分析
+        analyze_subpeaks(df_clean, labels, output_dir=f'{output_dir}/k{k}')
     
     plt.tight_layout()
     
@@ -526,7 +633,7 @@ def main():
     parser = argparse.ArgumentParser(description='钙爆发事件聚类分析工具')
     parser.add_argument('--k', type=int, help='指定聚类数K，不指定则自动确定最佳值')
     parser.add_argument('--compare', type=str, help='比较多个K值的效果，格式如"2,3,4,5"')
-    parser.add_argument('--input', type=str, default='../results/processed_Day6/all_neurons_transients.xlsx', 
+    parser.add_argument('--input', type=str, default='../results/processed_Day9/all_neurons_transients.xlsx', 
                         help='输入数据文件路径')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
@@ -558,8 +665,8 @@ def main():
     input_file = args.input
     df = load_data(input_file)
     
-    # 预处理数据
-    features_scaled, feature_names, df_clean = preprocess_data(df)
+    # 使用增强版预处理函数替换原预处理函数
+    features_scaled, feature_names, df_clean = enhance_preprocess_data(df)
     
     # 处理聚类数K
     if args.compare:
@@ -596,6 +703,12 @@ def main():
     
     # 神经元簇分布
     visualize_neuron_cluster_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    
+    # 添加波形类型分析
+    visualize_wave_type_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    
+    # 添加子峰分析
+    analyze_subpeaks(df_clean, kmeans_labels, output_dir=output_dir)
     
     # 将聚类标签添加到Excel
     output_file = f'{output_dir}/all_neurons_transients_clustered_k{optimal_k}.xlsx'

@@ -750,7 +750,7 @@ if __name__ == "__main__":
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
-    parser.add_argument('--data', type=str, default='../datasets/processed_Day6.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/processed_Day9.xlsx',
                         help='数据文件路径，支持.xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
