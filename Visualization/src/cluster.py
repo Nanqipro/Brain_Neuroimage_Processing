@@ -625,6 +625,130 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
     return best_k
 
+def visualize_average_waveforms(df, labels, original_data_file, output_dir='../results'):
+    """
+    可视化各个聚类的平均钙爆波形
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含钙爆发特征的数据
+    labels : numpy.ndarray
+        聚类标签
+    original_data_file : str
+        原始钙离子浓度数据文件路径
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
+    """
+    print("可视化各类别平均钙爆波形...")
+    
+    try:
+        # 读取原始数据文件
+        orig_data = pd.read_excel(original_data_file)
+    except Exception as e:
+        print(f"无法读取原始数据文件: {e}")
+        print("跳过平均波形可视化")
+        return
+    
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
+    
+    # 获取唯一的聚类标签
+    unique_clusters = np.unique(labels)
+    if -1 in unique_clusters:  # 排除DBSCAN可能的噪声点
+        unique_clusters = unique_clusters[unique_clusters != -1]
+    
+    # 创建颜色映射
+    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_clusters)))
+    
+    # 创建图形
+    plt.figure(figsize=(12, 6))
+    
+    # 设置最大显示波形长度（采样点数）
+    max_window = 200  # 可根据需要调整
+    half_window = max_window // 2
+    
+    # 存储每个类别的所有对齐波形
+    cluster_waveforms = {c: [] for c in unique_clusters}
+    
+    # 处理每个钙爆发事件
+    for idx, row in df_cluster.iterrows():
+        cluster = int(row['cluster'])
+        
+        # 跳过噪声点（如果使用DBSCAN）
+        if cluster == -1:
+            continue
+            
+        # 获取神经元名称和事件信息
+        neuron = row['neuron']
+        start_idx = int(row['start_idx'])
+        peak_idx = int(row['peak_idx'])
+        end_idx = int(row['end_idx'])
+        
+        # 检查神经元是否在原始数据中
+        if neuron not in orig_data.columns:
+            continue
+            
+        # 获取该神经元的原始数据
+        neuron_data = orig_data[neuron].values
+        
+        # 以峰值为中心提取波形
+        left_pad = min(peak_idx, half_window)
+        right_pad = min(len(neuron_data) - peak_idx - 1, half_window)
+        
+        # 构建对齐的波形（以峰值为中心）
+        waveform = np.zeros(max_window)
+        waveform_segment = neuron_data[peak_idx - left_pad:peak_idx + right_pad + 1]
+        
+        # 计算中心位置
+        center = half_window
+        # 将波形放入中心位置
+        waveform[center - left_pad:center + right_pad + 1] = waveform_segment
+        
+        # 归一化波形（可选）
+        baseline = np.percentile(waveform, 10)
+        amplitude = np.max(waveform) - baseline
+        if amplitude > 0:
+            norm_waveform = (waveform - baseline) / amplitude
+            cluster_waveforms[cluster].append(norm_waveform)
+    
+    # 计算并绘制每个类别的平均波形
+    for i, cluster in enumerate(unique_clusters):
+        if not cluster_waveforms[cluster]:
+            continue
+            
+        # 计算平均波形和标准差
+        waveforms_array = np.array(cluster_waveforms[cluster])
+        mean_waveform = np.mean(waveforms_array, axis=0)
+        std_waveform = np.std(waveforms_array, axis=0)
+        
+        # X轴表示相对时间
+        x = np.arange(-half_window, half_window)
+        
+        # 绘制平均波形
+        plt.plot(x, mean_waveform, color=colors[i], label=f'类别 {cluster+1}', linewidth=2)
+        
+        # 绘制标准差区域（可选）
+        plt.fill_between(x, 
+                        mean_waveform - std_waveform, 
+                        mean_waveform + std_waveform, 
+                        color=colors[i], alpha=0.2)
+    
+    # 设置图形属性
+    plt.axvline(x=0, color='k', linestyle='--', alpha=0.5)  # Mark peak position
+    plt.xlabel('Relative Time Point (Peak=0)')
+    plt.ylabel('Normalized Calcium Signal Intensity')
+    plt.title('Average Calcium Transient Waveforms by Cluster')
+    plt.legend(loc='upper right')
+    plt.grid(True, alpha=0.3)
+    # 保存图形
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig(f'{output_dir}/average_waveforms.png', dpi=300)
+    plt.close()
+    
+    print(f"平均钙爆发波形图已保存到: {output_dir}/average_waveforms.png")
+
 def main():
     """
     主函数
@@ -637,6 +761,8 @@ def main():
                         help='输入数据文件路径')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
+    parser.add_argument('--original-data', type=str, default=None,
+                        help='原始钙离子浓度数据文件路径，用于波形可视化')
     args = parser.parse_args()
     
     # 根据输入文件名生成输出目录
@@ -713,6 +839,12 @@ def main():
     # 将聚类标签添加到Excel
     output_file = f'{output_dir}/all_neurons_transients_clustered_k{optimal_k}.xlsx'
     add_cluster_to_excel(input_file, output_file, kmeans_labels)
+    
+    # 添加平均钙爆发波形可视化
+    if args.original_data:
+        visualize_average_waveforms(df_clean, kmeans_labels, args.original_data, output_dir=output_dir)
+    else:
+        print("未提供原始数据文件，跳过平均波形可视化")
     
     print("聚类分析完成!")
 
