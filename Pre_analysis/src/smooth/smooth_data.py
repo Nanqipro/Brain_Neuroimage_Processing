@@ -248,9 +248,9 @@ def visualize_traces(
 def main():
     """主函数入口"""
     # 配置参数
-    input_file = '../../datasets/Day9_with_behavior_labels_filled.xlsx'
-    output_file = '../../datasets/processed_Day9.xlsx'
-    output_graph = '../../graph/smooth_traces_amplitude_day9.png'
+    input_file = '../../datasets/EM2Trace.xlsx'
+    output_file = '../../datasets/processed_EM2Trace.xlsx'
+    output_graph = '../../graph/smooth_traces_amplitude_EM2Trace.png'
     
     params = {
         'moving_avg_window': 3,

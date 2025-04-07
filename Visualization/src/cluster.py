@@ -633,7 +633,7 @@ def main():
     parser = argparse.ArgumentParser(description='钙爆发事件聚类分析工具')
     parser.add_argument('--k', type=int, help='指定聚类数K，不指定则自动确定最佳值')
     parser.add_argument('--compare', type=str, help='比较多个K值的效果，格式如"2,3,4,5"')
-    parser.add_argument('--input', type=str, default='../results/processed_Day9/all_neurons_transients.xlsx', 
+    parser.add_argument('--input', type=str, default='../results/processed_Day6/all_neurons_transients.xlsx', 
                         help='输入数据文件路径')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')

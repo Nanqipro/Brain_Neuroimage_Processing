@@ -241,7 +241,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具')
-    parser.add_argument('--data', type=str, default='../datasets/processed_Day9.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/processed_EMtrace.xlsx',
                         help='数据文件路径，支持.md, .csv, .xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='图像保存目录，不指定则根据数据集名称自动生成')
