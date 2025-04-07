@@ -841,10 +841,39 @@ def main():
     add_cluster_to_excel(input_file, output_file, kmeans_labels)
     
     # 添加平均钙爆发波形可视化
-    if args.original_data:
-        visualize_average_waveforms(df_clean, kmeans_labels, args.original_data, output_dir=output_dir)
+    # 直接在代码中指定原始数据文件路径，优先使用命令行参数(如果提供)
+    original_data_file = args.original_data
+    if original_data_file is None:
+        # 尝试自动推断原始数据文件路径
+        # 1. 尝试基于输入文件路径推断 (假设输入文件在results目录，原始文件在datasets目录)
+        input_basename = os.path.basename(input_file)
+        dataset_name = os.path.splitext(input_basename)[0]
+        
+        # 一些可能的原始数据文件路径
+        possible_paths = [
+            f"../datasets/{dataset_name}.xlsx",  # 同名
+            f"../datasets/{dataset_name}_raw.xlsx",  # 添加raw后缀
+            f"../datasets/processed_{dataset_name[10:]}.xlsx" if dataset_name.startswith("processed_") else None,  # 去掉processed_前缀
+        ]
+        
+        # 检查这些路径是否存在
+        for path in possible_paths:
+            if path and os.path.exists(path):
+                original_data_file = path
+                print(f"自动找到原始数据文件: {original_data_file}")
+                break
+        
+        # 2. 如果自动推断失败，使用硬编码的默认路径
+        if original_data_file is None:
+            # 修改这里为您的默认原始数据文件路径
+            original_data_file = "../datasets/Day6_with_behavior_labels_filled.xlsx"
+            print(f"使用默认原始数据文件: {original_data_file}")
+    
+    # 如果找到或指定了原始数据文件，则生成平均波形图
+    if original_data_file and os.path.exists(original_data_file):
+        visualize_average_waveforms(df_clean, kmeans_labels, original_data_file, output_dir=output_dir)
     else:
-        print("未提供原始数据文件，跳过平均波形可视化")
+        print(f"原始数据文件 {original_data_file} 不存在，跳过平均波形可视化")
     
     print("聚类分析完成!")
 
