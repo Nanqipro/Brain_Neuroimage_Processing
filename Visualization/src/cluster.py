@@ -650,6 +650,9 @@ def visualize_average_waveforms(df, labels, original_data_file, output_dir='../r
         print("跳过平均波形可视化")
         return
     
+    # 设置Matplotlib样式以获得更好的视觉效果
+    plt.style.use('seaborn-whitegrid')
+    
     # 将标签添加到数据框
     df_cluster = df.copy()
     df_cluster['cluster'] = labels
@@ -659,11 +662,14 @@ def visualize_average_waveforms(df, labels, original_data_file, output_dir='../r
     if -1 in unique_clusters:  # 排除DBSCAN可能的噪声点
         unique_clusters = unique_clusters[unique_clusters != -1]
     
-    # 创建颜色映射
-    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_clusters)))
+    # 使用更适合科学绘图的颜色
+    # 创建自定义颜色列表，更接近示例图的配色
+    custom_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                     '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
     
     # 创建图形
-    plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.patch.set_facecolor('white')  # 白色背景
     
     # 设置最大显示波形长度（采样点数）
     max_window = 200  # 可根据需要调整
@@ -674,77 +680,171 @@ def visualize_average_waveforms(df, labels, original_data_file, output_dir='../r
     
     # 处理每个钙爆发事件
     for idx, row in df_cluster.iterrows():
-        cluster = int(row['cluster'])
-        
-        # 跳过噪声点（如果使用DBSCAN）
-        if cluster == -1:
-            continue
+        try:
+            cluster = int(row['cluster'])
             
-        # 获取神经元名称和事件信息
-        neuron = row['neuron']
-        start_idx = int(row['start_idx'])
-        peak_idx = int(row['peak_idx'])
-        end_idx = int(row['end_idx'])
-        
-        # 检查神经元是否在原始数据中
-        if neuron not in orig_data.columns:
-            continue
+            # 跳过噪声点（如果使用DBSCAN）
+            if cluster == -1:
+                continue
+                
+            # 获取神经元名称和事件信息
+            neuron = row['neuron']
+            start_idx = int(row['start_idx'])
+            peak_idx = int(row['peak_idx'])
+            end_idx = int(row['end_idx'])
             
-        # 获取该神经元的原始数据
-        neuron_data = orig_data[neuron].values
-        
-        # 以峰值为中心提取波形
-        left_pad = min(peak_idx, half_window)
-        right_pad = min(len(neuron_data) - peak_idx - 1, half_window)
-        
-        # 构建对齐的波形（以峰值为中心）
-        waveform = np.zeros(max_window)
-        waveform_segment = neuron_data[peak_idx - left_pad:peak_idx + right_pad + 1]
-        
-        # 计算中心位置
-        center = half_window
-        # 将波形放入中心位置
-        waveform[center - left_pad:center + right_pad + 1] = waveform_segment
-        
-        # 归一化波形（可选）
-        baseline = np.percentile(waveform, 10)
-        amplitude = np.max(waveform) - baseline
-        if amplitude > 0:
-            norm_waveform = (waveform - baseline) / amplitude
-            cluster_waveforms[cluster].append(norm_waveform)
+            # 检查神经元是否在原始数据中
+            if neuron not in orig_data.columns:
+                continue
+                
+            # 获取该神经元的原始数据
+            neuron_data = orig_data[neuron].values
+            
+            # 以峰值为中心提取波形
+            left_pad = min(peak_idx, half_window)
+            right_pad = min(len(neuron_data) - peak_idx - 1, half_window)
+            
+            # 构建对齐的波形（以峰值为中心）
+            waveform = np.zeros(max_window)
+            waveform_segment = neuron_data[peak_idx - left_pad:peak_idx + right_pad + 1]
+            
+            # 计算目标位置
+            start_pos = half_window - left_pad
+            end_pos = start_pos + len(waveform_segment)
+            
+            # 确保不会越界
+            if end_pos > max_window:
+                waveform_segment = waveform_segment[:max_window-start_pos]
+                end_pos = max_window
+                
+            # 将波形放入目标位置
+            waveform[start_pos:end_pos] = waveform_segment
+            
+            # 归一化波形
+            baseline = np.percentile(waveform, 10)
+            amplitude = np.max(waveform) - baseline
+            if amplitude > 0:
+                norm_waveform = (waveform - baseline) / amplitude
+                cluster_waveforms[cluster].append(norm_waveform)
+        except Exception as e:
+            print(f"处理波形时出错（跳过）: {e}")
+            continue
+    
+    # 检查是否有足够的波形进行绘制
+    if all(len(waves) == 0 for waves in cluster_waveforms.values()):
+        print("所有聚类中均无有效波形，无法生成平均波形图")
+        return
+    
+    # 两种风格的图形：a. 左侧图 - 只显示平均波形，b. 右侧图 - 显示带有误差带的平均波形
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    fig.patch.set_facecolor('white')  # 白色背景
+    
+    # X轴表示相对时间（只显示部分范围，更接近示例图）
+    # 调整显示范围，只显示-100到100的部分
+    display_window = 100
+    x = np.arange(-display_window, display_window)
+    display_slice = slice(half_window-display_window, half_window+display_window)
     
     # 计算并绘制每个类别的平均波形
     for i, cluster in enumerate(unique_clusters):
         if not cluster_waveforms[cluster]:
+            print(f"Class {cluster+1} has no valid waveforms, skipping")
             continue
+        
+        # 设置罗马数字标签（I, II, III, IV, V）而不是数字
+        roman_numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
+        class_label = f"Class {roman_numerals[cluster]}" if cluster < len(roman_numerals) else f"Class {cluster+1}"
             
         # 计算平均波形和标准差
         waveforms_array = np.array(cluster_waveforms[cluster])
         mean_waveform = np.mean(waveforms_array, axis=0)
         std_waveform = np.std(waveforms_array, axis=0)
         
-        # X轴表示相对时间
-        x = np.arange(-half_window, half_window)
+        # 左侧图：仅平均波形
+        color = custom_colors[i % len(custom_colors)]
+        ax1.plot(x, mean_waveform[display_slice], color=color, label=class_label, linewidth=2)
         
-        # 绘制平均波形
-        plt.plot(x, mean_waveform, color=colors[i], label=f'类别 {cluster+1}', linewidth=2)
-        
-        # 绘制标准差区域（可选）
-        plt.fill_between(x, 
-                        mean_waveform - std_waveform, 
-                        mean_waveform + std_waveform, 
-                        color=colors[i], alpha=0.2)
+        # 右侧图：平均波形和误差带
+        ax2.plot(x, mean_waveform[display_slice], color=color, label=class_label, linewidth=2)
+        ax2.fill_between(x, 
+                        mean_waveform[display_slice] - std_waveform[display_slice], 
+                        mean_waveform[display_slice] + std_waveform[display_slice], 
+                        color=color, alpha=0.2)
     
-    # 设置图形属性
-    plt.axvline(x=0, color='k', linestyle='--', alpha=0.5)  # Mark peak position
-    plt.xlabel('Relative Time Point (Peak=0)')
-    plt.ylabel('Normalized Calcium Signal Intensity')
-    plt.title('Average Calcium Transient Waveforms by Cluster')
-    plt.legend(loc='upper right')
-    plt.grid(True, alpha=0.3)
+    # 设置图形属性 - 左侧图
+    ax1.axvline(x=0, color='k', linestyle='--', alpha=0.5)  # 标记峰值位置
+    ax1.set_xlabel('Relative Time (samples)', fontsize=12)
+    ax1.set_ylabel('Normalized Ca²⁺ Signal', fontsize=12)
+    ax1.set_title('Average Calcium Transient Waveforms', fontsize=14)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc='upper right', frameon=True)
+    
+    # 设置图形属性 - 右侧图
+    ax2.axvline(x=0, color='k', linestyle='--', alpha=0.5)  # 标记峰值位置
+    ax2.set_xlabel('Relative Time (samples)', fontsize=12)
+    ax2.set_ylabel('Normalized Ca²⁺ Signal', fontsize=12)
+    ax2.set_title('Average Waveforms with Std. Deviation', fontsize=14)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(loc='upper right', frameon=True)
+    
+    # 调整布局
+    plt.tight_layout()
+    
     # 保存图形
     os.makedirs(output_dir, exist_ok=True)
     plt.savefig(f'{output_dir}/average_waveforms.png', dpi=300)
+    
+    # 创建一个水平排列的单图版本，更接近示例图
+    plt.figure(figsize=(8, 5))
+    
+    # 创建有侧边轴刻度的子图
+    ax3 = plt.subplot(111)
+    
+    # 只绘制平均波形，没有误差带
+    for i, cluster in enumerate(unique_clusters):
+        if not cluster_waveforms[cluster]:
+            continue
+            
+        roman_numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
+        class_label = f"Class {roman_numerals[cluster]}" if cluster < len(roman_numerals) else f"Class {cluster+1}"
+        
+        waveforms_array = np.array(cluster_waveforms[cluster])
+        mean_waveform = np.mean(waveforms_array, axis=0)
+        
+        # 使用接近示例图的颜色
+        color = custom_colors[i % len(custom_colors)]
+        plt.plot(x, mean_waveform[display_slice], color=color, label=class_label, linewidth=2)
+    
+    # 设置侧边刻度和标签
+    plt.axvline(x=0, color='k', linestyle='--', alpha=0.5)  # 标记峰值位置
+    plt.xlabel('Time (samples)', fontsize=12)
+    plt.ylabel('ΔF/F', fontsize=12)  # 使用标准钙信号表示法
+    
+    # 移除顶部和右侧边框
+    ax3.spines['top'].set_visible(False)
+    ax3.spines['right'].set_visible(False)
+    
+    # 增加刻度线长度
+    ax3.tick_params(direction='out', length=6, width=1)
+    
+    # 添加图例
+    plt.legend(loc='upper right', frameon=True)
+    
+    # 添加标尺（类似示例图）
+    # 水平标尺：100个采样点
+    plt.plot([0, 100], [-0.15, -0.15], 'k-', linewidth=2)
+    plt.text(50, -0.2, '100', ha='center')
+    
+    # 垂直标尺：0.3单位
+    plt.plot([-90, -90], [0, 0.3], 'k-', linewidth=2)
+    plt.text(-95, 0.15, '0.3 ΔF/F', rotation=90, va='center')
+    
+    # 保存简化版本
+    plt.savefig(f'{output_dir}/average_waveforms_simple.png', dpi=300, bbox_inches='tight')
     plt.close()
     
     print(f"平均钙爆发波形图已保存到: {output_dir}/average_waveforms.png")
