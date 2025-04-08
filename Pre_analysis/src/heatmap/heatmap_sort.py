@@ -61,12 +61,12 @@ for cd1_time in cd1_indices:
         # plt.text(cd1_position + 0.5, -0.5, '放入CD1', color='yellow', rotation=90,
         #          verticalalignment='bottom', fontsize=12)
 
-plt.title('EMtrace-heatmap (add CD1)', fontsize=16)
+plt.title('EMtrace-heatmap', fontsize=16)
 plt.xlabel('stamp', fontsize=20)
 plt.ylabel('neuron', fontsize=20)
 
-# 修改Y轴标签（神经元标签）的字体大小和粗细
-ax.set_yticklabels(ax.get_yticklabels(), fontsize=14, fontweight='bold')
+# 修改Y轴标签（神经元标签）的字体大小和粗细，设置为水平方向
+ax.set_yticklabels(ax.get_yticklabels(), fontsize=14, fontweight='bold', rotation=0)
 
 # 修改X轴标签（时间戳）的字体大小和粗细
 ax.set_xticklabels(ax.get_xticklabels(), fontsize=14, fontweight='bold')
