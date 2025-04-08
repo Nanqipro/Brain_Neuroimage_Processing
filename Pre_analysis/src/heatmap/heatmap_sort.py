@@ -3,9 +3,11 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 # 加载数据
-day6_data = pd.read_excel('../../datasets/EMtrace.xlsx')
+day6_data = pd.read_excel('../../datasets/EMtrace_plus.xlsx')
 
 # 将 'stamp' 列设置为索引
 day6_data = day6_data.set_index('stamp')
@@ -32,34 +34,58 @@ sorted_neurons = peak_times.sort_values().index
 # 根据排序后的神经元顺序重新排列 DataFrame 的列
 sorted_day6_data = day6_data_standardized[sorted_neurons]
 
-# **步骤4：找到所有 '放入CD1' 的时间点**
+# **步骤4：找到所有行为标签的首次出现时间点**
 
-# 找到 'FrameLost' 列中值为 '放入CD1' 的索引位置
-cd1_indices = frame_lost[frame_lost == 'CD1'].index
+# 获取所有不同的行为标签
+unique_behaviors = frame_lost.dropna().unique()
+
+# 创建字典存储每种行为的首次出现时间点
+behavior_indices = {}
+
+# 对frame_lost进行处理，找出每种行为连续出现时的第一个时间点
+previous_behavior = None
+for timestamp, behavior in frame_lost.items():
+    # 跳过空值
+    if pd.isna(behavior):
+        continue
+    
+    # 如果与前一个行为不同，则记录该时间点
+    if behavior != previous_behavior:
+        if behavior not in behavior_indices:
+            behavior_indices[behavior] = []
+        behavior_indices[behavior].append(timestamp)
+    
+    previous_behavior = behavior
 
 # **步骤5：绘制热图并标注所有事件**
 
 # 设置绘图颜色范围
 vmin, vmax = -2, 2  # 控制颜色对比度
 
+# 创建图形和轴，减少默认边距
+fig = plt.figure(figsize=(70, 10))
+# 调整子图位置，减少边距
+plt.subplots_adjust(left=0.05, right=0.98, top=0.9, bottom=0.15)
+
 # 绘制热图
-plt.figure(figsize=(60, 15))
 ax = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)
 
-# 如果找到了 '放入CD1' 的时间点，绘制垂直线并标注
-for cd1_time in cd1_indices:
-    # 检查 cd1_time 是否在 sorted_day6_data 的索引中
-    if cd1_time in sorted_day6_data.index:
-        # 获取对应的绘图位置
-        cd1_position = sorted_day6_data.index.get_loc(cd1_time)
-        # 绘制垂直线，颜色为亮黄色，线宽加大
-        ax.axvline(x=cd1_position, color='white', linestyle='--', linewidth=3)
-        # 添加文本标签，调整位置避免遮挡
-        plt.text(cd1_position + 0.5, ax.get_ylim()[1] + 5, 'add CD1', color='yellow',
-                 rotation=90, verticalalignment='bottom', fontsize=12)
-        # 或者将标签放在图形顶部
-        # plt.text(cd1_position + 0.5, -0.5, '放入CD1', color='yellow', rotation=90,
-        #          verticalalignment='bottom', fontsize=12)
+# 颜色映射，为每种行为分配不同的颜色
+colors = plt.cm.tab20(np.linspace(0, 1, len(unique_behaviors)))
+color_map = {behavior: colors[i] for i, behavior in enumerate(unique_behaviors)}
+
+# 为每种行为绘制垂直线并标注
+for behavior, timestamps in behavior_indices.items():
+    for behavior_time in timestamps:
+        # 检查行为时间是否在排序后的数据索引中
+        if behavior_time in sorted_day6_data.index:
+            # 获取对应的绘图位置
+            position = sorted_day6_data.index.get_loc(behavior_time)
+            # 绘制垂直线，白色虚线
+            ax.axvline(x=position, color='white', linestyle='--', linewidth=2)
+            # 添加文本标签，放在热图外部并使用黑色字体
+            plt.text(position + 0.5, -5, behavior, 
+                    color='black', rotation=90, verticalalignment='top', fontsize=12, fontweight='bold')
 
 plt.title('EMtrace-heatmap', fontsize=16)
 plt.xlabel('stamp', fontsize=20)
@@ -71,5 +97,9 @@ ax.set_yticklabels(ax.get_yticklabels(), fontsize=14, fontweight='bold', rotatio
 # 修改X轴标签（时间戳）的字体大小和粗细
 ax.set_xticklabels(ax.get_xticklabels(), fontsize=14, fontweight='bold')
 
-plt.savefig('../../graph/heatmap_sort_EMtrace.png')
+# 应用紧凑布局
+plt.tight_layout()
+
+# 保存图像时使用紧凑边界设置
+plt.savefig('../../graph/heatmap_sort_EMtrace_plus.png', bbox_inches='tight', pad_inches=0.1, dpi=100)
 plt.close()
