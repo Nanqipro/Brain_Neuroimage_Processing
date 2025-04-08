@@ -43,7 +43,7 @@ cd1_indices = frame_lost[frame_lost == 'CD1'].index
 vmin, vmax = -2, 2  # 控制颜色对比度
 
 # 绘制热图
-plt.figure(figsize=(25, 15))
+plt.figure(figsize=(60, 15))
 ax = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)
 
 # 如果找到了 '放入CD1' 的时间点，绘制垂直线并标注
