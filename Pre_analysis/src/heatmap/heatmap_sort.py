@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # 加载数据
-day6_data = pd.read_excel('../../datasets/Day6_with_behavior_labels_filled.xlsx')
+day6_data = pd.read_excel('../../datasets/EMtrace.xlsx')
 
 # 将 'stamp' 列设置为索引
 day6_data = day6_data.set_index('stamp')
@@ -61,7 +61,7 @@ for cd1_time in cd1_indices:
         # plt.text(cd1_position + 0.5, -0.5, '放入CD1', color='yellow', rotation=90,
         #          verticalalignment='bottom', fontsize=12)
 
-plt.title('Day6-heatmap (add CD1)', fontsize=16)
+plt.title('EMtrace-heatmap (add CD1)', fontsize=16)
 plt.xlabel('stamp', fontsize=20)
 plt.ylabel('neuron', fontsize=20)
 
@@ -71,5 +71,5 @@ ax.set_yticklabels(ax.get_yticklabels(), fontsize=14, fontweight='bold')
 # 修改X轴标签（时间戳）的字体大小和粗细
 ax.set_xticklabels(ax.get_xticklabels(), fontsize=14, fontweight='bold')
 
-plt.savefig('../../graph/heatmap_sort_day6.png')
+plt.savefig('../../graph/heatmap_sort_EMtrace.png')
 plt.close()
