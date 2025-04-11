@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 from scipy.signal import find_peaks, peak_widths, savgol_filter
-from numpy import trapz
+from scipy.integrate import trapezoid
 import matplotlib.pyplot as plt
 import os
 import argparse
@@ -120,8 +120,11 @@ def integrate_multiple_datasets(data_files, neuron_columns_list=None, fs=1.0,
         try:
             # 创建包含多个sheet的Excel文件
             with pd.ExcelWriter(output_path) as writer:
-                integrated_df.to_excel(writer, sheet_name='All_Transients', index=False)
-                summary_df.to_excel(writer, sheet_name='Summary_Statistics', index=False)
+                # 保存详细数据，保留索引
+                integrated_df.to_excel(writer, sheet_name='All_Transients')
+                
+                # 保存摘要数据，保留索引
+                summary_df.to_excel(writer, sheet_name='Summary_Statistics')
                 
                 # 每个数据集一个sheet
                 for dataset_idx in range(len(data_files)):
@@ -130,7 +133,8 @@ def integrate_multiple_datasets(data_files, neuron_columns_list=None, fs=1.0,
                         dataset_name = dataset_data['dataset_name'].iloc[0]
                         # 确保sheet名称不超过31个字符（Excel限制）
                         sheet_name = f'Dataset_{dataset_name[:28]}'
-                        dataset_data.to_excel(writer, sheet_name=sheet_name, index=False)
+                        # 重置索引以避免MultiIndex问题
+                        dataset_data.reset_index(drop=True).to_excel(writer, sheet_name=sheet_name)
                         
             print(f"整合结果已保存至: {output_path}")
         except Exception as e:
@@ -237,7 +241,8 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
     if save_path:
         # 确保保存目录存在
         os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
-        all_transients_df.to_excel(save_path, index=False)
+        # 重置索引以避免MultiIndex问题
+        all_transients_df.reset_index(drop=True).to_excel(save_path, index=False)
         print(f"成功将所有钙爆发数据保存到: {save_path}")
     
     return all_transients_df
@@ -351,10 +356,10 @@ def process_multiple_neurons(data_df, neuron_columns, fs=1.0):
     
     return pd.DataFrame(results)
 
-def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
-                             peak_distance=30, baseline_percentile=20, max_duration=350,
-                             detect_subpeaks=True, subpeak_prominence=0.25, 
-                             subpeak_width=10, subpeak_distance=15, params=None):
+def detect_calcium_transients(data, fs=1.0, min_snr=3.0, min_duration=10, smooth_window=30, 
+                             peak_distance=20, baseline_percentile=15, max_duration=350,
+                             detect_subpeaks=True, subpeak_prominence=0.2, 
+                             subpeak_width=8, subpeak_distance=12, params=None):
     """
     检测神经元钙离子浓度时间序列中的钙爆发事件
     
@@ -365,25 +370,25 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     fs : float, 可选
         采样频率（Hz），默认为1.0
     min_snr : float, 可选
-        最小信噪比，默认为8.0
+        最小信噪比，默认为3.0
     min_duration : float, 可选
-        最小持续时间（秒），默认为20秒
+        最小持续时间（秒），默认为10秒
     smooth_window : int, 可选
-        平滑窗口大小，默认为50个点
+        平滑窗口大小，默认为30个点
     peak_distance : int, 可选
-        峰之间的最小距离，默认为30个点
+        峰之间的最小距离，默认为20个点
     baseline_percentile : int, 可选
-        用于计算基线的百分位数，默认为20
+        用于计算基线的百分位数，默认为15
     max_duration : float, 可选
         最大持续时间（秒），默认为350秒
     detect_subpeaks : bool, 可选
         是否检测子峰，默认为True
     subpeak_prominence : float, 可选
-        子峰突出度阈值，默认为0.25
+        子峰突出度阈值，默认为0.2
     subpeak_width : int, 可选
-        子峰最小宽度，默认为10个点
+        子峰最小宽度，默认为8个点
     subpeak_distance : int, 可选
-        子峰之间的最小距离，默认为15个点
+        子峰之间的最小距离，默认为12个点
     params : dict, 可选
         覆盖默认参数的字典，默认为None
         
@@ -461,7 +466,7 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         
         # 计算面积（曲线下面积，AUC）
         if left_base < right_base:
-            auc = np.trapz(smoothed_data[left_base:right_base+1] - baseline) / fs
+            auc = trapezoid(smoothed_data[left_base:right_base+1] - baseline) / fs
         else:
             auc = 0
         
@@ -520,7 +525,7 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
                     
                     # 计算子峰的面积
                     if sub_left_base < sub_right_base:
-                        sub_auc = np.trapz(smoothed_data[sub_left_base:sub_right_base+1] - baseline) / fs
+                        sub_auc = trapezoid(smoothed_data[sub_left_base:sub_right_base+1] - baseline) / fs
                     else:
                         sub_auc = 0
                     
