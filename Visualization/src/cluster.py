@@ -34,19 +34,21 @@ def load_data(file_path):
     print(f"成功加载数据，共{len(df)}行")
     return df
 
-def enhance_preprocess_data(df):
+def enhance_preprocess_data(df, feature_weights=None):
     """
-    增强版预处理功能，支持子峰分析和更多特征
+    增强版预处理功能，支持子峰分析和更多特征，并支持特征权重调整
     
     参数
     ----------
     df : pandas.DataFrame
         原始数据
+    feature_weights : dict, 可选
+        特征权重字典，键为特征名称，值为权重值，默认为None（所有特征权重相等）
         
     返回
     -------
     features_scaled : numpy.ndarray
-        标准化后的特征数据
+        标准化并应用权重后的特征数据
     feature_names : list
         特征名称列表
     """
@@ -76,6 +78,25 @@ def enhance_preprocess_data(df):
     # 特征标准化
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
+    
+    # 应用特征权重
+    if feature_weights is not None:
+        weights_array = np.ones(len(feature_names))
+        weight_info = []
+        
+        # 构建权重数组
+        for i, feature in enumerate(feature_names):
+            if feature in feature_weights:
+                weights_array[i] = feature_weights[feature]
+                weight_info.append(f"{feature}:{feature_weights[feature]:.2f}")
+            else:
+                weight_info.append(f"{feature}:1.00")
+        
+        # 应用权重
+        features_scaled = features_scaled * weights_array.reshape(1, -1)
+        print(f"应用特征权重: {', '.join(weight_info)}")
+    else:
+        print("未设置特征权重，所有特征权重相等")
     
     print(f"预处理完成，保留{len(df)}个有效样本，使用特征: {', '.join(feature_names)}")
     return features_scaled, feature_names, df
@@ -798,6 +819,7 @@ def main():
                         help='输入数据文件路径')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
+    parser.add_argument('--weights', type=str, help='特征权重，格式如"amplitude:1.2,duration:0.8"')
     args = parser.parse_args()
     
     # 根据输入文件名生成输出目录
@@ -827,7 +849,21 @@ def main():
     df = load_data(input_file)
     
     # 使用增强版预处理函数替换原预处理函数
-    features_scaled, feature_names, df_clean = enhance_preprocess_data(df)
+    feature_weights = None
+    if args.weights:
+        feature_weights = {
+            'amplitude': 1.5,
+            'duration':  1.5,
+            'rise_time': 0.6,
+            'decay_time': 0.6,
+            'snr': 1.0,
+            'fwhm':1.0
+        }
+        for pair in args.weights.split(','):
+            feature, weight = pair.split(':')
+            feature_weights[feature] = float(weight)
+    
+    features_scaled, feature_names, df_clean = enhance_preprocess_data(df, feature_weights=feature_weights)
     
     # 处理聚类数K
     if args.compare:
