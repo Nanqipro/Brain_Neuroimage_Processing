@@ -6,6 +6,7 @@ from numpy import trapezoid
 import matplotlib.pyplot as plt
 import os
 import argparse
+import glob
 
 def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
                              peak_distance=30, baseline_percentile=20, max_duration=350,
@@ -683,7 +684,7 @@ def estimate_neuron_params(neuron_data):
     
     return params
 
-def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None, adaptive_params=True):
+def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None, adaptive_params=True, start_id=1):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
     
@@ -697,14 +698,20 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         采样频率，默认为1.0Hz
     save_path : str, 可选
         Excel文件保存路径，默认为None（不保存）
+    adaptive_params : bool, 可选
+        是否为每个神经元使用自适应参数，默认为True
+    start_id : int, 可选
+        钙爆发ID的起始编号，默认为1
         
     返回
     -------
     all_transients_df : pandas.DataFrame
         包含所有神经元所有钙爆发特征的DataFrame
+    next_id : int
+        下一个可用的钙爆发ID
     """
     all_transients = []
-    transient_id = 1  # 起始ID
+    transient_id = start_id  # 使用传入的起始ID
     
     for neuron in neuron_columns:
         print(f"处理神经元 {neuron} 的钙爆发...")
@@ -729,7 +736,7 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
     # 如果没有检测到钙爆发，返回空DataFrame
     if len(all_transients) == 0:
         print("未检测到任何钙爆发")
-        return pd.DataFrame()
+        return pd.DataFrame(), transient_id
     
     # 创建DataFrame
     all_transients_df = pd.DataFrame(all_transients)
@@ -741,27 +748,62 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         all_transients_df.to_excel(save_path, index=False)
         print(f"成功将所有钙爆发数据保存到: {save_path}")
     
-    return all_transients_df
+    return all_transients_df, transient_id
 
 if __name__ == "__main__":
     """
-    从Excel文件加载神经元数据并进行特征提取的示例
+    从多个Excel文件加载神经元数据并进行特征提取
     """
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
-    parser.add_argument('--data', type=str, default='../datasets/processed_EMtrace.xlsx',
-                        help='数据文件路径，支持.xlsx格式')
-    parser.add_argument('--output', type=str, default=None,
-                        help='输出目录，不指定则根据数据集名称自动生成')
+    parser.add_argument('--data', type=str, nargs='+', default=['../datasets/processed_EMtrace.xlsx'],
+                        help='数据文件路径列表，支持.xlsx格式，可以指定多个文件')
+    parser.add_argument('--output_dir', type=str, default='../results',
+                        help='输出基础目录，结果将保存在此目录下对应的子文件夹中')
+    parser.add_argument('--combine', action='store_true',
+                        help='是否将所有文件的结果合并到一个总表中')
     args = parser.parse_args()
     
-    # 检查文件是否存在
-    if os.path.exists(args.data):
+    # 展开输入文件路径列表（支持通配符）
+    input_files = []
+    for path in args.data:
+        if os.path.isdir(path):
+            # 如果是目录，获取目录中的所有Excel文件
+            excel_files = glob.glob(os.path.join(path, "*.xlsx"))
+            input_files.extend(excel_files)
+        elif '*' in path:
+            # 如果包含通配符，展开匹配的文件
+            matched_files = glob.glob(path)
+            input_files.extend(matched_files)
+        elif os.path.exists(path):
+            # 单个文件
+            input_files.append(path)
+    
+    if not input_files:
+        print("错误: 未找到任何匹配的输入文件")
+        exit(1)
+    
+    print(f"共找到 {len(input_files)} 个输入文件:")
+    for file in input_files:
+        print(f"  - {file}")
+    
+    # 用于可能的合并结果
+    all_datasets_transients = []
+    
+    # 全局钙爆发ID计数器，确保唯一性
+    next_transient_id = 1
+    
+    # 处理每个输入文件
+    for input_file in input_files:
+        if not os.path.exists(input_file):
+            print(f"警告: 文件 '{input_file}' 不存在，跳过处理")
+            continue
+            
         try:
             # 从指定路径加载Excel数据
-            print(f"正在从 {args.data} 加载数据...")
-            df = pd.read_excel(args.data)
+            print(f"\n正在处理文件: {input_file}")
+            df = pd.read_excel(input_file)
             # 清理列名（去除可能的空格）
             df.columns = [col.strip() for col in df.columns]
             print(f"成功加载数据，共 {len(df)} 行")
@@ -770,27 +812,42 @@ if __name__ == "__main__":
             neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
             print(f"检测到 {len(neuron_columns)} 个神经元数据列")
             
-            # 根据数据文件名生成输出目录
-            if args.output is None:
-                # 提取数据文件名（不含扩展名）
-                data_basename = os.path.basename(args.data)
-                dataset_name = os.path.splitext(data_basename)[0]
-                output_dir = f"../results/{dataset_name}"
-                save_path = f"{output_dir}/all_neurons_transients.xlsx"
-            else:
-                output_dir = args.output
-                save_path = f"{output_dir}/all_neurons_transients.xlsx"
+            # 提取数据文件名（不含扩展名）
+            data_basename = os.path.basename(input_file)
+            dataset_name = os.path.splitext(data_basename)[0]
+            output_dir = os.path.join(args.output_dir, dataset_name)
+            save_path = os.path.join(output_dir, f"{dataset_name}_transients.xlsx")
             
             print(f"输出目录设置为: {output_dir}")
             
             # 确保保存目录存在
             os.makedirs(output_dir, exist_ok=True)
             
-            # 分析并保存所有钙爆发数据，启用自适应参数
-            all_transients = analyze_all_neurons_transients(df, neuron_columns, save_path=save_path, adaptive_params=True)
-            print(f"共检测到 {len(all_transients)} 个钙爆发")
+            # 分析并保存所有钙爆发数据，启用自适应参数，传递当前的ID计数器
+            transients_df, next_transient_id = analyze_all_neurons_transients(
+                df, neuron_columns, save_path=save_path, adaptive_params=True, start_id=next_transient_id
+            )
+            
+            if len(transients_df) > 0:
+                print(f"共检测到 {len(transients_df)} 个钙爆发，已保存到 {save_path}")
+                
+                # 添加数据集标识，用于合并结果
+                if args.combine and not transients_df.empty:
+                    transients_df['dataset'] = dataset_name
+                    all_datasets_transients.append(transients_df)
+            else:
+                print("未检测到任何钙爆发")
             
         except Exception as e:
-            print(f"加载或处理数据时出错: {str(e)}")
-    else:
-        print(f"错误: 找不到数据文件 '{args.data}'，请检查文件路径")
+            print(f"处理文件 '{input_file}' 时出错: {str(e)}")
+    
+    # 如果需要合并所有结果
+    if args.combine and all_datasets_transients:
+        try:
+            combined_df = pd.concat(all_datasets_transients, ignore_index=True)
+            combined_output_path = os.path.join(args.output_dir, "all_datasets_transients.xlsx")
+            combined_df.to_excel(combined_output_path, index=False)
+            print(f"\n已将所有数据集的钙爆发结果合并，共 {len(combined_df)} 条记录")
+            print(f"合并结果已保存到: {combined_output_path}")
+        except Exception as e:
+            print(f"合并结果时出错: {str(e)}")
