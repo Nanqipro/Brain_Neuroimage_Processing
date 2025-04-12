@@ -496,7 +496,11 @@ def visualize_wave_type_distribution(df, labels, output_dir='../results'):
     ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
     plt.savefig(f'{output_dir}/wave_type_distribution.png', dpi=300)
+    
     print(f"波形类型分布图已保存到: {output_dir}/wave_type_distribution.png")
 
 def analyze_subpeaks(df, labels, output_dir='../results'):
@@ -521,6 +525,9 @@ def analyze_subpeaks(df, labels, output_dir='../results'):
     # 将标签添加到数据框
     df_cluster = df.copy()
     df_cluster['cluster'] = labels
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
     
     # 绘制子峰数量箱线图 - 修复FutureWarning
     plt.figure(figsize=(10, 6))
@@ -560,6 +567,9 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     """
     print(f"正在比较不同K值的聚类效果: {k_values}...")
     
+    # 确保主输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    
     # 计算每个K值的轮廓系数
     silhouette_scores_dict = {}
     
@@ -569,12 +579,19 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
         axes = [axes]
     
     for i, k in enumerate(k_values):
+        # 为每个K值创建单独的输出目录
+        k_output_dir = os.path.join(output_dir, f'k{k}')
+        os.makedirs(k_output_dir, exist_ok=True)
+        
+        print(f"\n分析K={k}的聚类效果...")
+        
         # 执行K-means聚类
         labels = cluster_kmeans(features_scaled, k)
         
         # 计算轮廓系数
         sil_score = silhouette_score(features_scaled, labels)
         silhouette_scores_dict[k] = sil_score
+        print(f"K={k}的轮廓系数: {sil_score:.4f}")
         
         # 使用PCA降维可视化
         reducer = PCA(n_components=2, random_state=42)
@@ -594,26 +611,22 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
         axes[i].grid(True, alpha=0.3)
         
         # 保存该K值的结果
-        output_file = f'{output_dir}/all_neurons_transients_clustered_k{k}.xlsx'
-        add_cluster_to_excel(input_file, output_file, labels)
+        output_file = f'{output_dir}/transients_clustered_k{k}.xlsx'
+        add_cluster_to_excel(input_file, output_file, labels, df=df_clean)
         
         # 生成该K值的特征分布图
-        visualize_feature_distribution(df_clean, labels, output_dir=output_dir)
-        plt.savefig(f'{output_dir}/cluster_feature_distribution_k{k}.png', dpi=300)
+        visualize_feature_distribution(df_clean, labels, output_dir=k_output_dir)
         
         # 神经元簇分布
-        visualize_neuron_cluster_distribution(df_clean, labels, k_value=k, output_dir=output_dir)
+        visualize_neuron_cluster_distribution(df_clean, labels, k_value=k, output_dir=k_output_dir)
         
-        # 增加波形类型分析
-        visualize_wave_type_distribution(df_clean, labels, output_dir=f'{output_dir}/k{k}')
+        # 波形类型分析
+        visualize_wave_type_distribution(df_clean, labels, output_dir=k_output_dir)
         
-        # 增加子峰分析
-        analyze_subpeaks(df_clean, labels, output_dir=f'{output_dir}/k{k}')
+        # 子峰分析
+        analyze_subpeaks(df_clean, labels, output_dir=k_output_dir)
     
     plt.tight_layout()
-    
-    # 确保输出目录存在
-    os.makedirs(output_dir, exist_ok=True)
     plt.savefig(f'{output_dir}/k_comparison.png', dpi=300)
     
     # 绘制轮廓系数比较图
@@ -652,8 +665,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     """
     print("正在可视化不同聚类类别的平均钙爆发波形...")
     
-    # 设置时间窗口（采样点数）
-    time_window = 100
+    # 设置时间窗口（采样点数）- 减小窗口大小以提高匹配成功率
+    time_window = 50
     
     # 将标签添加到数据框
     df_cluster = df.copy()
@@ -681,7 +694,10 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
         try:
             print(f"加载原始数据从: {raw_data_path}")
             raw_data = pd.read_excel(raw_data_path)
-            raw_data_dict['default'] = raw_data
+            # 使用文件名作为数据集名称
+            dataset_name = os.path.splitext(os.path.basename(raw_data_path))[0]
+            raw_data_dict[dataset_name] = raw_data
+            print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
         except Exception as e:
             print(f"无法加载原始数据: {str(e)}")
             return
@@ -692,7 +708,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
             print(f"在目录{raw_data_dir}下找到{len(excel_files)}个Excel文件")
             
             for file in excel_files:
-                dataset_name = os.path.basename(os.path.dirname(file))
+                # 使用文件名作为数据集名称，而不是目录名
+                dataset_name = os.path.splitext(os.path.basename(file))[0]
                 try:
                     raw_data = pd.read_excel(file)
                     raw_data_dict[dataset_name] = raw_data
@@ -711,7 +728,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
             
             # 加载原始数据
             raw_data = pd.read_excel(raw_data_path)
-            raw_data_dict['default'] = raw_data
+            dataset_name = os.path.splitext(os.path.basename(raw_data_path))[0]
+            raw_data_dict[dataset_name] = raw_data
             print(f"成功加载原始数据，形状: {raw_data.shape}")
         except Exception as e:
             print(f"无法加载默认原始数据: {str(e)}")
@@ -742,6 +760,30 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
         print("未能加载任何原始数据，无法可视化波形")
         return
     
+    # 打印所有可用神经元列以供调试
+    print("原始数据中的神经元列：")
+    for dataset_name, data in raw_data_dict.items():
+        neuron_cols = [col for col in data.columns if col.startswith('n') and col[1:].isdigit()]
+        print(f"  数据集 {dataset_name}: {len(neuron_cols)} 个神经元列 - {neuron_cols[:5]}...")
+    
+    # 打印钙爆发数据中的神经元名称以供调试
+    unique_neurons = df_cluster['neuron'].unique()
+    print(f"钙爆发数据中的神经元: {len(unique_neurons)} 个 - {unique_neurons[:5]}...")
+    
+    # 创建神经元名称映射，处理可能的命名不一致问题
+    neuron_mapping = {}
+    for neuron_name in unique_neurons:
+        # 检查神经元名称是否以'n'开头，并且第二个字符是数字
+        if isinstance(neuron_name, str) and neuron_name.startswith('n') and neuron_name[1:].isdigit():
+            # 保持原名
+            neuron_mapping[neuron_name] = neuron_name
+        elif isinstance(neuron_name, (int, float)) or (isinstance(neuron_name, str) and neuron_name.isdigit()):
+            # 如果是纯数字，则转为"n数字"格式
+            formatted_name = f"n{int(float(neuron_name))}"
+            neuron_mapping[neuron_name] = formatted_name
+    
+    print(f"创建了 {len(neuron_mapping)} 个神经元名称映射")
+    
     # 创建颜色映射 - 修复弃用的get_cmap方法
     try:
         # 尝试使用新的推荐方法
@@ -768,62 +810,94 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
         time_points = np.arange(-time_window, time_window+1)
         
         # 对每个事件，提取波形
-        for _, event in cluster_events.iterrows():
+        for idx, event in cluster_events.iterrows():
             neuron_col = event['neuron']
             
+            # 应用神经元名称映射
+            if neuron_col in neuron_mapping:
+                neuron_col = neuron_mapping[neuron_col]
+            
             # 确定使用哪个原始数据集
-            if has_dataset_column and event['dataset'] in raw_data_dict:
+            raw_data = None
+            if has_dataset_column and 'dataset' in event and event['dataset'] in raw_data_dict:
                 # 如果事件有数据集标识且该数据集已加载
                 raw_data = raw_data_dict[event['dataset']]
-            elif 'default' in raw_data_dict:
-                # 使用默认数据集
-                raw_data = raw_data_dict['default']
-            elif len(raw_data_dict) == 1:
-                # 只有一个数据集时使用它
-                raw_data = list(raw_data_dict.values())[0]
             else:
-                # 尝试所有数据集
-                raw_data = None
-                for dataset_raw_data in raw_data_dict.values():
+                # 尝试所有数据集，查找包含此神经元的数据集
+                for dataset_name, dataset_raw_data in raw_data_dict.items():
                     if neuron_col in dataset_raw_data.columns:
                         raw_data = dataset_raw_data
                         break
             
             if raw_data is None or neuron_col not in raw_data.columns:
-                continue
-            
-            # 检查神经元列是否存在
-            if neuron_col not in raw_data.columns:
-                print(f"警告: 原始数据中找不到神经元列 {neuron_col}")
-                continue
+                # 如果还找不到，尝试其他命名方式
+                for dataset_name, dataset_raw_data in raw_data_dict.items():
+                    # 尝试格式如 "n3" 或 "3" 等
+                    if neuron_col.lstrip('n') in dataset_raw_data.columns:
+                        neuron_col = neuron_col.lstrip('n')
+                        raw_data = dataset_raw_data
+                        break
+                    elif f"n{neuron_col}" in dataset_raw_data.columns:
+                        neuron_col = f"n{neuron_col}"
+                        raw_data = dataset_raw_data
+                        break
+                
+                # 如果仍找不到，则跳过此事件
+                if raw_data is None or neuron_col not in raw_data.columns:
+                    continue
             
             # 提取中心在peak_idx的时间窗口数据
-            peak_idx = int(event['peak_idx'])
-            start = max(0, peak_idx - time_window)
-            end = min(len(raw_data), peak_idx + time_window + 1)
-            
-            # 如果提取的窗口不完整，跳过此事件
-            if end - start != 2 * time_window + 1:
+            try:
+                peak_idx = int(event['peak_idx'])
+                start = max(0, peak_idx - time_window)
+                end = min(len(raw_data), peak_idx + time_window + 1)
+                
+                # 如果提取的窗口不完整，尝试缩小窗口而不是完全跳过
+                if end - start < 2 * time_window + 1:
+                    actual_window = min(peak_idx, len(raw_data) - peak_idx - 1)
+                    if actual_window < 10:  # 如果窗口太小则跳过
+                        continue
+                    
+                    # 使用较小的窗口
+                    start = max(0, peak_idx - actual_window)
+                    end = min(len(raw_data), peak_idx + actual_window + 1)
+                    # 调整时间点以匹配新窗口
+                    time_points = np.arange(-actual_window, actual_window+1)
+                
+                # 提取波形
+                waveform = raw_data[neuron_col].values[start:end]
+                
+                # 确保波形长度与时间点匹配
+                if len(waveform) != len(time_points):
+                    # 修剪或填充波形以匹配时间点
+                    if len(waveform) > len(time_points):
+                        waveform = waveform[:len(time_points)]
+                    else:
+                        # 填充不足部分
+                        padding = np.full(len(time_points) - len(waveform), np.nan)
+                        waveform = np.concatenate([waveform, padding])
+                
+                # 归一化处理：减去基线并除以峰值振幅
+                # 忽略NaN值
+                valid_indices = ~np.isnan(waveform)
+                if np.sum(valid_indices) > 10:  # 确保有足够的有效点
+                    baseline = np.nanmin(waveform)
+                    amplitude = np.nanmax(waveform) - baseline
+                    if amplitude > 0:  # 避免除以零
+                        norm_waveform = (waveform - baseline) / amplitude
+                        all_waveforms.append(norm_waveform)
+            except Exception as e:
+                print(f"处理事件 {idx} 时出错: {str(e)}")
                 continue
-            
-            # 提取波形
-            waveform = raw_data[neuron_col].values[start:end]
-            
-            # 归一化处理：减去基线并除以峰值振幅
-            baseline = min(waveform)
-            amplitude = max(waveform) - baseline
-            if amplitude > 0:  # 避免除以零
-                norm_waveform = (waveform - baseline) / amplitude
-                all_waveforms.append(norm_waveform)
         
         # 如果没有有效波形，跳过此聚类
         if len(all_waveforms) == 0:
             print(f"警告: 聚类 {cluster_id+1} 没有有效波形")
             continue
         
-        # 计算平均波形
-        avg_waveform = np.mean(all_waveforms, axis=0)
-        std_waveform = np.std(all_waveforms, axis=0)
+        # 计算平均波形（忽略NaN值）
+        avg_waveform = np.nanmean(all_waveforms, axis=0)
+        std_waveform = np.nanstd(all_waveforms, axis=0)
         
         # 存储平均波形
         avg_waveforms[f"Cluster_{cluster_id+1}"] = {
@@ -845,6 +919,11 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
                          avg_waveform + std_waveform, 
                          color=cmap(cluster_id), 
                          alpha=0.2)
+    
+    # 检查是否有任何有效的聚类波形
+    if not avg_waveforms:
+        print("没有找到任何有效的波形数据，无法生成波形图")
+        return
     
     # 设置图表属性
     plt.axvline(x=0, color='grey', linestyle='--', alpha=0.7)  # Mark peak position
@@ -895,6 +974,7 @@ def main():
                        help='输出目录，不指定则根据数据集名称自动生成')
     parser.add_argument('--raw_data_dir', type=str, help='原始数据文件所在目录，用于波形可视化')
     parser.add_argument('--raw_data_path', type=str, help='单个原始数据文件路径，用于波形可视化')
+    parser.add_argument('--skip_waveform', action='store_true', help='跳过波形可视化步骤')
     args = parser.parse_args()
     
     # 处理输入文件路径
@@ -904,9 +984,15 @@ def main():
         # 如果提供了输入目录，搜索该目录下所有的transients.xlsx文件
         pattern = os.path.join(args.input_dir, "**", "*transients.xlsx")
         input_files = glob.glob(pattern, recursive=True)
+        if not input_files:
+            print(f"错误: 在目录{args.input_dir}下未找到任何匹配的transients.xlsx文件")
+            return
         print(f"在目录{args.input_dir}下找到{len(input_files)}个钙爆发数据文件")
     else:
         # 否则使用单个输入文件
+        if not os.path.exists(args.input):
+            print(f"错误: 输入文件 {args.input} 不存在")
+            return
         input_files = [args.input]
     
     # 如果需要合并多个输入文件
@@ -917,8 +1003,8 @@ def main():
         for file in input_files:
             try:
                 df = load_data(file)
-                # 添加数据源标识
-                dataset_name = os.path.basename(os.path.dirname(file))
+                # 添加数据源标识，使用文件名而非目录名
+                dataset_name = os.path.splitext(os.path.basename(file))[0]
                 df['dataset'] = dataset_name
                 all_data.append(df)
             except Exception as e:
@@ -940,7 +1026,11 @@ def main():
     else:
         # 使用单个输入文件
         input_file = input_files[0]
-        df = load_data(input_file)
+        try:
+            df = load_data(input_file)
+        except Exception as e:
+            print(f"加载文件{input_file}时出错: {str(e)}")
+            return
         
         # 根据输入文件名生成输出目录
         if args.output is None:
@@ -964,16 +1054,29 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     
     # 使用增强版预处理函数
-    features_scaled, feature_names, df_clean = enhance_preprocess_data(df)
+    try:
+        features_scaled, feature_names, df_clean = enhance_preprocess_data(df)
+    except Exception as e:
+        print(f"预处理数据时出错: {str(e)}")
+        return
+    
+    # 检查数据是否足够进行聚类
+    if len(df_clean) < 10:
+        print(f"错误: 有效数据不足(只有{len(df_clean)}行)，无法进行聚类分析")
+        return
     
     # 处理聚类数K
     if args.compare:
         # 如果需要比较多个K值
-        k_values = [int(k) for k in args.compare.split(',')]
-        best_k = compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir=output_dir)
-        print(f"在比较的K值中，K={best_k}的轮廓系数最高")
-        # 使用最佳K值进行后续分析
-        optimal_k = best_k
+        try:
+            k_values = [int(k) for k in args.compare.split(',')]
+            best_k = compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir=output_dir)
+            print(f"在比较的K值中，K={best_k}的轮廓系数最高")
+            # 使用最佳K值进行后续分析
+            optimal_k = best_k
+        except Exception as e:
+            print(f"比较K值时出错: {str(e)}")
+            return
     else:
         # 如果指定了K值，使用指定值
         if args.k:
@@ -981,48 +1084,85 @@ def main():
             print(f"使用指定的聚类数: K={optimal_k}")
         else:
             # 自动确定最佳聚类数
-            optimal_k = determine_optimal_k(features_scaled, output_dir=output_dir)
+            try:
+                optimal_k = determine_optimal_k(features_scaled, output_dir=output_dir)
+            except Exception as e:
+                print(f"确定最佳聚类数时出错: {str(e)}")
+                print("使用默认聚类数K=5")
+                optimal_k = 5
     
     # K均值聚类
-    kmeans_labels = cluster_kmeans(features_scaled, optimal_k)
+    try:
+        kmeans_labels = cluster_kmeans(features_scaled, optimal_k)
+    except Exception as e:
+        print(f"执行K-means聚类时出错: {str(e)}")
+        return
     
     # 可视化聚类结果
-    visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='pca', output_dir=output_dir)
-    visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='t-sne', output_dir=output_dir)
+    try:
+        visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='pca', output_dir=output_dir)
+        visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='t-sne', output_dir=output_dir)
+    except Exception as e:
+        print(f"可视化聚类结果时出错: {str(e)}")
     
     # 特征分布可视化
-    visualize_feature_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        visualize_feature_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"可视化特征分布时出错: {str(e)}")
     
     # 分析聚类结果
-    cluster_stats = analyze_clusters(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        cluster_stats = analyze_clusters(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"分析聚类结果时出错: {str(e)}")
+        cluster_stats = None
     
-    # 雷达图可视化
-    visualize_cluster_radar(cluster_stats, output_dir=output_dir)
+    # 如果有统计结果，则生成雷达图
+    if cluster_stats is not None:
+        try:
+            visualize_cluster_radar(cluster_stats, output_dir=output_dir)
+        except Exception as e:
+            print(f"生成雷达图时出错: {str(e)}")
     
     # 神经元簇分布
-    visualize_neuron_cluster_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        visualize_neuron_cluster_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"可视化神经元簇分布时出错: {str(e)}")
     
     # 添加波形类型分析
-    visualize_wave_type_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        visualize_wave_type_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"可视化波形类型分布时出错: {str(e)}")
     
     # 添加子峰分析
-    analyze_subpeaks(df_clean, kmeans_labels, output_dir=output_dir)
-    
-    # 尝试可视化不同聚类的平均钙爆发波形（如果原始数据可用）
     try:
-        visualize_cluster_waveforms(df_clean, kmeans_labels, output_dir=output_dir, 
-                                  raw_data_path=args.raw_data_path, raw_data_dir=args.raw_data_dir)
+        analyze_subpeaks(df_clean, kmeans_labels, output_dir=output_dir)
     except Exception as e:
-        print(f"无法可视化波形: {str(e)}")
+        print(f"分析子峰时出错: {str(e)}")
+    
+    # 尝试可视化不同聚类的平均钙爆发波形（如果原始数据可用且未指定跳过）
+    if not args.skip_waveform:
+        try:
+            visualize_cluster_waveforms(df_clean, kmeans_labels, output_dir=output_dir, 
+                                      raw_data_path=args.raw_data_path, raw_data_dir=args.raw_data_dir)
+        except Exception as e:
+            print(f"可视化波形时出错: {str(e)}")
+    else:
+        print("根据参数设置，跳过波形可视化")
     
     # 将聚类标签添加到Excel
-    output_file = f'{output_dir}/transients_clustered_k{optimal_k}.xlsx'
-    
-    # 如果是合并的数据，使用新文件名
-    if args.input_dir and args.combine and len(input_files) > 1:
-        add_cluster_to_excel("combined_data", output_file, kmeans_labels, df=df)
-    else:
-        add_cluster_to_excel(input_file, output_file, kmeans_labels, df=df)
+    try:
+        output_file = f'{output_dir}/transients_clustered_k{optimal_k}.xlsx'
+        if args.input_dir and args.combine and len(input_files) > 1:
+            add_cluster_to_excel("combined_data", output_file, kmeans_labels, df=df_clean)
+        else:
+            add_cluster_to_excel(input_file, output_file, kmeans_labels, df=df_clean)
+        print(f"聚类结果已保存到: {output_file}")
+    except Exception as e:
+        print(f"保存聚类结果时出错: {str(e)}")
     
     print("聚类分析完成!")
 
