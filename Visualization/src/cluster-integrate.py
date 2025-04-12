@@ -14,6 +14,7 @@ import os
 from matplotlib.colors import ListedColormap
 import matplotlib.cm as cm
 import argparse  # 导入命令行参数处理模块
+import glob  # 导入用于文件路径模式匹配的模块
 
 def load_data(file_path):
     """
@@ -370,28 +371,35 @@ def visualize_cluster_radar(cluster_stats, output_dir='../results'):
     os.makedirs(output_dir, exist_ok=True)
     plt.savefig(f'{output_dir}/cluster_radar.png', dpi=300)
 
-def add_cluster_to_excel(input_file, output_file, labels):
+def add_cluster_to_excel(input_file, output_file, labels, df=None):
     """
     将聚类标签添加到原始Excel文件
     
     参数
     ----------
     input_file : str
-        输入文件路径
+        输入文件路径，如果为"combined_data"则使用传入的df参数
     output_file : str
         输出文件路径
     labels : numpy.ndarray
         聚类标签
+    df : pandas.DataFrame, 可选
+        当input_file为"combined_data"时使用的数据框
     """
     print("将聚类标签添加到原始数据...")
-    # 读取原始数据
-    df = pd.read_excel(input_file)
+    
+    if input_file == "combined_data" and df is not None:
+        # 使用已有的数据框
+        df_output = df.copy()
+    else:
+        # 读取原始数据
+        df_output = pd.read_excel(input_file)
     
     # 添加聚类列
-    df['cluster'] = labels
+    df_output['cluster'] = labels
     
     # 保存到新的Excel文件
-    df.to_excel(output_file, index=False)
+    df_output.to_excel(output_file, index=False)
     print(f"聚类结果已保存到 {output_file}")
 
 def visualize_neuron_cluster_distribution(df, labels, k_value=None, output_dir='../results'):
@@ -625,7 +633,7 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
     return best_k
 
-def visualize_cluster_waveforms(df, labels, output_dir='../results'):
+def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, raw_data_dir=None):
     """
     可视化不同聚类类别的平均钙爆发波形
     
@@ -637,6 +645,10 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
         聚类标签
     output_dir : str, 可选
         输出目录路径，默认为'../results'
+    raw_data_path : str, 可选
+        单个原始数据文件路径
+    raw_data_dir : str, 可选
+        原始数据文件目录，用于查找多个数据文件
     """
     print("正在可视化不同聚类类别的平均钙爆发波形...")
     
@@ -659,16 +671,75 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
         n_clusters -= 1
     
     # 尝试加载原始数据
-    try:
-        # 直接指定原始数据路径
-        raw_data_path = "../datasets/Day6_with_behavior_labels_filled.xlsx"
-        print(f"加载原始数据从: {raw_data_path}")
-        
-        # 加载原始数据
-        raw_data = pd.read_excel(raw_data_path)
-        print(f"成功加载原始数据，形状: {raw_data.shape}")
-    except Exception as e:
-        print(f"无法加载原始数据: {str(e)}")
+    raw_data_dict = {}
+    
+    # 检查是否存在dataset列，表示合并了不同数据集
+    has_dataset_column = 'dataset' in df_cluster.columns
+    
+    if raw_data_path:
+        # 如果指定了单个原始数据文件路径
+        try:
+            print(f"加载原始数据从: {raw_data_path}")
+            raw_data = pd.read_excel(raw_data_path)
+            raw_data_dict['default'] = raw_data
+        except Exception as e:
+            print(f"无法加载原始数据: {str(e)}")
+            return
+    elif raw_data_dir:
+        # 如果指定了原始数据目录，查找所有Excel文件
+        try:
+            excel_files = glob.glob(os.path.join(raw_data_dir, "**/*.xlsx"), recursive=True)
+            print(f"在目录{raw_data_dir}下找到{len(excel_files)}个Excel文件")
+            
+            for file in excel_files:
+                dataset_name = os.path.basename(os.path.dirname(file))
+                try:
+                    raw_data = pd.read_excel(file)
+                    raw_data_dict[dataset_name] = raw_data
+                    print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                except Exception as e:
+                    print(f"  加载数据集{dataset_name}失败: {str(e)}")
+        except Exception as e:
+            print(f"搜索原始数据文件时出错: {str(e)}")
+            return
+    else:
+        # 尝试使用默认位置的原始数据
+        try:
+            # 直接指定原始数据路径
+            raw_data_path = "../datasets/processed_EMtrace.xlsx"
+            print(f"尝试加载默认原始数据从: {raw_data_path}")
+            
+            # 加载原始数据
+            raw_data = pd.read_excel(raw_data_path)
+            raw_data_dict['default'] = raw_data
+            print(f"成功加载原始数据，形状: {raw_data.shape}")
+        except Exception as e:
+            print(f"无法加载默认原始数据: {str(e)}")
+            print("尝试在../datasets目录下搜索原始数据...")
+            
+            try:
+                # 尝试搜索datasets目录下的所有Excel文件
+                datasets_dir = "../datasets"
+                excel_files = glob.glob(os.path.join(datasets_dir, "*.xlsx"))
+                
+                if excel_files:
+                    for file in excel_files:
+                        dataset_name = os.path.splitext(os.path.basename(file))[0]
+                        try:
+                            raw_data = pd.read_excel(file)
+                            raw_data_dict[dataset_name] = raw_data
+                            print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                        except Exception as e:
+                            print(f"  加载数据集{dataset_name}失败: {str(e)}")
+                else:
+                    print("在../datasets目录下未找到任何Excel文件")
+                    return
+            except Exception as e:
+                print(f"搜索原始数据时出错: {str(e)}")
+                return
+    
+    if not raw_data_dict:
+        print("未能加载任何原始数据，无法可视化波形")
         return
     
     # 创建颜色映射 - 修复弃用的get_cmap方法
@@ -699,6 +770,27 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
         # 对每个事件，提取波形
         for _, event in cluster_events.iterrows():
             neuron_col = event['neuron']
+            
+            # 确定使用哪个原始数据集
+            if has_dataset_column and event['dataset'] in raw_data_dict:
+                # 如果事件有数据集标识且该数据集已加载
+                raw_data = raw_data_dict[event['dataset']]
+            elif 'default' in raw_data_dict:
+                # 使用默认数据集
+                raw_data = raw_data_dict['default']
+            elif len(raw_data_dict) == 1:
+                # 只有一个数据集时使用它
+                raw_data = list(raw_data_dict.values())[0]
+            else:
+                # 尝试所有数据集
+                raw_data = None
+                for dataset_raw_data in raw_data_dict.values():
+                    if neuron_col in dataset_raw_data.columns:
+                        raw_data = dataset_raw_data
+                        break
+            
+            if raw_data is None or neuron_col not in raw_data.columns:
+                continue
             
             # 检查神经元列是否存在
             if neuron_col not in raw_data.columns:
@@ -794,39 +886,84 @@ def main():
     parser = argparse.ArgumentParser(description='钙爆发事件聚类分析工具')
     parser.add_argument('--k', type=int, help='指定聚类数K，不指定则自动确定最佳值')
     parser.add_argument('--compare', type=str, help='比较多个K值的效果，格式如"2,3,4,5"')
-    parser.add_argument('--input', type=str, default='../results/processed_Day6/all_neurons_transients.xlsx', 
-                        help='输入数据文件路径')
+    parser.add_argument('--input', type=str, default='../results/all_datasets_transients/all_datasets_transients.xlsx', 
+                       help='输入数据文件路径，可以是单个文件或合并后的文件')
+    parser.add_argument('--input_dir', type=str, help='输入数据目录，会处理该目录下所有的transients.xlsx文件')
+    parser.add_argument('--combine', action='store_true', 
+                       help='是否合并指定目录下的所有钙爆发数据再进行聚类（与--input_dir一起使用）')
     parser.add_argument('--output', type=str, default=None,
-                        help='输出目录，不指定则根据数据集名称自动生成')
+                       help='输出目录，不指定则根据数据集名称自动生成')
+    parser.add_argument('--raw_data_dir', type=str, help='原始数据文件所在目录，用于波形可视化')
+    parser.add_argument('--raw_data_path', type=str, help='单个原始数据文件路径，用于波形可视化')
     args = parser.parse_args()
     
-    # 根据输入文件名生成输出目录
-    if args.output is None:
-        # 提取输入文件目录
-        input_dir = os.path.dirname(args.input)
-        # 如果输入在datasets目录，则用文件名，否则用所在目录名
-        if 'datasets' in input_dir:
-            # 提取数据文件名（不含扩展名）
-            data_basename = os.path.basename(args.input)
-            dataset_name = os.path.splitext(data_basename)[0]
-            output_dir = f"../results/{dataset_name}"
-        else:
-            # 使用输入文件所在的目录名
-            dir_name = os.path.basename(input_dir)
-            output_dir = f"../results/{dir_name}"
+    # 处理输入文件路径
+    input_files = []
+    
+    if args.input_dir:
+        # 如果提供了输入目录，搜索该目录下所有的transients.xlsx文件
+        pattern = os.path.join(args.input_dir, "**", "*transients.xlsx")
+        input_files = glob.glob(pattern, recursive=True)
+        print(f"在目录{args.input_dir}下找到{len(input_files)}个钙爆发数据文件")
     else:
-        output_dir = args.output
+        # 否则使用单个输入文件
+        input_files = [args.input]
+    
+    # 如果需要合并多个输入文件
+    if args.input_dir and args.combine and len(input_files) > 1:
+        print("正在合并多个钙爆发数据文件...")
+        
+        all_data = []
+        for file in input_files:
+            try:
+                df = load_data(file)
+                # 添加数据源标识
+                dataset_name = os.path.basename(os.path.dirname(file))
+                df['dataset'] = dataset_name
+                all_data.append(df)
+            except Exception as e:
+                print(f"处理文件{file}时出错: {str(e)}")
+        
+        if all_data:
+            # 合并所有数据
+            df = pd.concat(all_data, ignore_index=True)
+            print(f"成功合并{len(all_data)}个数据文件，总共{len(df)}行数据")
+            
+            # 设置输出目录
+            if args.output is None:
+                output_dir = "../results/combined_transients_clustering"
+            else:
+                output_dir = args.output
+        else:
+            print("未能加载任何有效数据，请检查输入路径")
+            return
+    else:
+        # 使用单个输入文件
+        input_file = input_files[0]
+        df = load_data(input_file)
+        
+        # 根据输入文件名生成输出目录
+        if args.output is None:
+            # 提取输入文件目录
+            input_dir = os.path.dirname(input_file)
+            # 提取数据文件名（不含扩展名）
+            data_basename = os.path.basename(input_file)
+            dataset_name = os.path.splitext(data_basename)[0]
+            
+            # 如果是all_datasets_transients.xlsx这种合并文件，使用专门的输出目录
+            if dataset_name == "all_datasets_transients":
+                output_dir = "../results/all_datasets_clustering"
+            else:
+                output_dir = f"../results/{dataset_name}_clustering"
+        else:
+            output_dir = args.output
     
     print(f"输出目录设置为: {output_dir}")
     
     # 确保结果目录存在
     os.makedirs(output_dir, exist_ok=True)
     
-    # 加载数据
-    input_file = args.input
-    df = load_data(input_file)
-    
-    # 使用增强版预处理函数替换原预处理函数
+    # 使用增强版预处理函数
     features_scaled, feature_names, df_clean = enhance_preprocess_data(df)
     
     # 处理聚类数K
@@ -871,12 +1008,21 @@ def main():
     # 添加子峰分析
     analyze_subpeaks(df_clean, kmeans_labels, output_dir=output_dir)
     
-    # 可视化不同聚类的平均钙爆发波形
-    visualize_cluster_waveforms(df_clean, kmeans_labels, output_dir=output_dir)
+    # 尝试可视化不同聚类的平均钙爆发波形（如果原始数据可用）
+    try:
+        visualize_cluster_waveforms(df_clean, kmeans_labels, output_dir=output_dir, 
+                                  raw_data_path=args.raw_data_path, raw_data_dir=args.raw_data_dir)
+    except Exception as e:
+        print(f"无法可视化波形: {str(e)}")
     
     # 将聚类标签添加到Excel
-    output_file = f'{output_dir}/all_neurons_transients_clustered_k{optimal_k}.xlsx'
-    add_cluster_to_excel(input_file, output_file, kmeans_labels)
+    output_file = f'{output_dir}/transients_clustered_k{optimal_k}.xlsx'
+    
+    # 如果是合并的数据，使用新文件名
+    if args.input_dir and args.combine and len(input_files) > 1:
+        add_cluster_to_excel("combined_data", output_file, kmeans_labels, df=df)
+    else:
+        add_cluster_to_excel(input_file, output_file, kmeans_labels, df=df)
     
     print("聚类分析完成!")
 
