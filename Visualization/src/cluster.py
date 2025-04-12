@@ -646,7 +646,7 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
     return best_k
 
-def visualize_cluster_waveforms(df, labels, output_dir='../results'):
+def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, neuron_map_file=None):
     """
     可视化不同聚类类别的平均钙爆发波形
     
@@ -658,6 +658,10 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
         聚类标签
     output_dir : str, 可选
         输出目录路径，默认为'../results'
+    raw_data_path : str, 可选
+        原始数据文件路径，默认为None，将使用内置路径
+    neuron_map_file : str, 可选
+        神经元名称映射文件路径，默认为None
     """
     print("正在可视化不同聚类类别的平均钙爆发波形...")
     
@@ -681,13 +685,101 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
     
     # 尝试加载原始数据
     try:
-        # 直接指定原始数据路径
-        raw_data_path = "../datasets/Day6_with_behavior_labels_filled.xlsx"
+        # 设置默认原始数据路径（如果未提供）
+        if raw_data_path is None:
+            raw_data_path = "../datasets/Day6_with_behavior_labels_filled.xlsx"
+        
         print(f"加载原始数据从: {raw_data_path}")
         
         # 加载原始数据
         raw_data = pd.read_excel(raw_data_path)
         print(f"成功加载原始数据，形状: {raw_data.shape}")
+        
+        # 创建神经元列名映射字典
+        neuron_col_mapping = {}
+        
+        # 如果提供了神经元映射文件，加载映射关系
+        if neuron_map_file:
+            try:
+                print(f"从 {neuron_map_file} 加载神经元映射关系...")
+                # 尝试加载映射文件
+                if neuron_map_file.endswith('.csv'):
+                    neuron_map = pd.read_csv(neuron_map_file)
+                elif neuron_map_file.endswith('.xlsx') or neuron_map_file.endswith('.xls'):
+                    neuron_map = pd.read_excel(neuron_map_file)
+                else:
+                    raise ValueError("神经元映射文件必须是CSV或Excel格式")
+                
+                # 检查映射文件格式
+                if len(neuron_map.columns) < 2:
+                    raise ValueError("神经元映射文件必须至少包含两列：原名称和映射名称")
+                
+                # 创建映射字典
+                for _, row in neuron_map.iterrows():
+                    original_name = str(row.iloc[0])
+                    mapped_name = str(row.iloc[1])
+                    # 确保映射目标存在于原始数据中
+                    if mapped_name in raw_data.columns:
+                        neuron_col_mapping[original_name] = mapped_name
+                
+                print(f"从映射文件中加载了 {len(neuron_col_mapping)} 个神经元映射")
+            except Exception as e:
+                print(f"加载神经元映射文件时出错: {str(e)}")
+                print("将使用自动映射方式...")
+        
+        # 如果没有提供映射文件或映射文件加载失败，使用自动映射
+        if not neuron_col_mapping:
+            # 获取所有在df中出现的神经元名称
+            unique_neurons = df_cluster['neuron'].unique()
+            
+            # 初始化缺失的神经元集合，用于统计和报告
+            missing_neurons = set()
+            
+            # 尝试多种可能的命名模式
+            for neuron in unique_neurons:
+                # 尝试直接匹配
+                if neuron in raw_data.columns:
+                    neuron_col_mapping[neuron] = neuron
+                # 尝试不同格式 (比如 n11 -> neuron11, neuron_11, N11 等)
+                elif f"neuron{neuron[1:]}" in raw_data.columns:
+                    neuron_col_mapping[neuron] = f"neuron{neuron[1:]}"
+                elif f"neuron_{neuron[1:]}" in raw_data.columns:
+                    neuron_col_mapping[neuron] = f"neuron_{neuron[1:]}"
+                elif f"N{neuron[1:]}" in raw_data.columns:
+                    neuron_col_mapping[neuron] = f"N{neuron[1:]}"
+                elif neuron.upper() in raw_data.columns:
+                    neuron_col_mapping[neuron] = neuron.upper()
+                elif neuron.lower() in raw_data.columns:
+                    neuron_col_mapping[neuron] = neuron.lower()
+                else:
+                    # 记录找不到的神经元
+                    missing_neurons.add(neuron)
+            
+            # 报告神经元列映射情况
+            if missing_neurons:
+                print(f"警告: 以下神经元在原始数据中找不到匹配列: {', '.join(missing_neurons)}")
+                print(f"可用的列名: {', '.join(raw_data.columns[:10])}... 等")
+                
+                # 保存未匹配的神经元信息，以便用户创建映射
+                missing_df = pd.DataFrame({
+                    'original_name': list(missing_neurons),
+                    'mapped_name': [''] * len(missing_neurons)
+                })
+                missing_file = f"{output_dir}/missing_neurons.csv"
+                missing_df.to_csv(missing_file, index=False)
+                print(f"已将未匹配的神经元名称保存到 {missing_file}，您可以编辑此文件并通过--neuron-map参数提供映射")
+            
+            print(f"成功映射了 {len(neuron_col_mapping)} 个神经元列，缺失 {len(missing_neurons)} 个")
+        
+        # 保存映射结果，方便以后使用
+        mapping_result = pd.DataFrame({
+            'original_name': list(neuron_col_mapping.keys()),
+            'mapped_name': list(neuron_col_mapping.values())
+        })
+        mapping_file = f"{output_dir}/neuron_mapping_used.csv"
+        mapping_result.to_csv(mapping_file, index=False)
+        print(f"已将使用的神经元映射保存到 {mapping_file}")
+        
     except Exception as e:
         print(f"无法加载原始数据: {str(e)}")
         return
@@ -719,11 +811,13 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
         
         # 对每个事件，提取波形
         for _, event in cluster_events.iterrows():
-            neuron_col = event['neuron']
+            neuron_name = event['neuron']
             
-            # 检查神经元列是否存在
-            if neuron_col not in raw_data.columns:
-                print(f"警告: 原始数据中找不到神经元列 {neuron_col}")
+            # 使用映射字典查找对应的列名
+            if neuron_name in neuron_col_mapping:
+                neuron_col = neuron_col_mapping[neuron_name]
+            else:
+                # 如果映射中没有，跳过此事件
                 continue
             
             # 提取中心在peak_idx的时间窗口数据
@@ -820,6 +914,11 @@ def main():
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
     parser.add_argument('--weights', type=str, help='特征权重，格式如"amplitude:1.2,duration:0.8"')
+    # 添加原始数据路径参数和神经元映射参数
+    parser.add_argument('--raw-data', type=str, default='../datasets/Day6_with_behavior_labels_filled.xlsx',
+                        help='原始数据文件路径，用于波形可视化')
+    parser.add_argument('--neuron-map', type=str, 
+                        help='神经元名称映射CSV文件，格式为两列：原名称,映射名称')
     args = parser.parse_args()
     
     # 根据输入文件名生成输出目录
@@ -908,7 +1007,7 @@ def main():
     analyze_subpeaks(df_clean, kmeans_labels, output_dir=output_dir)
     
     # 可视化不同聚类的平均钙爆发波形
-    visualize_cluster_waveforms(df_clean, kmeans_labels, output_dir=output_dir)
+    visualize_cluster_waveforms(df_clean, kmeans_labels, output_dir=output_dir, raw_data_path=args.raw_data, neuron_map_file=args.neuron_map)
     
     # 将聚类标签添加到Excel
     output_file = f'{output_dir}/all_neurons_transients_clustered_k{optimal_k}.xlsx'
