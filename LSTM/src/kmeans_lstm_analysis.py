@@ -249,17 +249,130 @@ class NeuronDataProcessor:
         
         return kmeans, cluster_labels
 
+def time_aware_validation_split(X_scaled, y, config):
+    """
+    时间感知的验证集和测试集划分，保持时间序列的连续性
+    
+    参数:
+        X_scaled (numpy.ndarray): 标准化后的神经元数据
+        y (numpy.ndarray): 编码后的行为标签
+        config (AnalysisConfig): 配置对象
+    
+    返回:
+        tuple: 训练、验证和测试数据加载器
+    """
+    sequence_length = config.sequence_length
+    
+    # 计算有效样本数 (考虑序列长度)
+    n_samples = len(X_scaled) - sequence_length
+    
+    # 计算测试集和验证集大小
+    test_size = int(n_samples * 0.2)  # 20%用于测试
+    val_size = int(n_samples * 0.2)   # 20%用于验证
+    train_size = n_samples - test_size - val_size  # 剩余60%用于训练
+    
+    print(f"\n使用时间感知的数据集划分策略:")
+    print(f"训练集: {train_size} 样本 (前60%)")
+    print(f"验证集: {val_size} 样本 (中间20%)")
+    print(f"测试集: {test_size} 样本 (后20%)")
+    
+    # 使用连续的时间段划分
+    # 训练集: 前60%的数据
+    # 验证集: 中间20%的数据
+    # 测试集: 最后20%的数据
+    X_train = X_scaled[:train_size + sequence_length]
+    y_train = y[:train_size + sequence_length]
+    
+    X_val = X_scaled[train_size:train_size + val_size + sequence_length]
+    y_val = y[train_size:train_size + val_size + sequence_length]
+    
+    X_test = X_scaled[train_size + val_size:]
+    y_test = y[train_size + val_size:]
+    
+    # 创建序列数据集
+    train_dataset = NeuronDataset(X_train, y_train, sequence_length)
+    val_dataset = NeuronDataset(X_val, y_val, sequence_length)
+    test_dataset = NeuronDataset(X_test, y_test, sequence_length)
+    
+    # 创建数据加载器
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config.batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=config.batch_size)
+    
+    return train_loader, val_loader, test_loader
+
+def stratified_data_split(X_scaled, y, config):
+    """
+    分层抽样的数据集划分，确保各类别样本分布均衡
+    
+    参数:
+        X_scaled (numpy.ndarray): 标准化后的神经元数据
+        y (numpy.ndarray): 编码后的行为标签
+        config (AnalysisConfig): 配置对象
+    
+    返回:
+        tuple: 训练、验证和测试数据加载器
+    """
+    from sklearn.model_selection import train_test_split
+    
+    # 先分出测试集 (20%)
+    X_temp, X_test, y_temp, y_test = train_test_split(
+        X_scaled, y, test_size=0.2, random_state=config.random_seed, stratify=y
+    )
+    
+    # 再将剩余数据分为训练集 (75%) 和验证集 (25%)
+    # 这样总体比例为: 训练集 60%, 验证集 20%, 测试集 20%
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_temp, y_temp, test_size=0.25, random_state=config.random_seed, stratify=y_temp
+    )
+    
+    print(f"\n使用分层抽样的数据集划分策略:")
+    print(f"训练集: {len(X_train)} 样本 (60%)")
+    print(f"验证集: {len(X_val)} 样本 (20%)")
+    print(f"测试集: {len(X_test)} 样本 (20%)")
+    
+    # 创建序列数据集
+    train_dataset = NeuronDataset(X_train, y_train, config.sequence_length)
+    val_dataset = NeuronDataset(X_val, y_val, config.sequence_length)
+    test_dataset = NeuronDataset(X_test, y_test, config.sequence_length)
+    
+    # 创建数据加载器
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config.batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=config.batch_size)
+    
+    return train_loader, val_loader, test_loader
+
+def handle_class_imbalance(y):
+    """
+    处理类别不平衡问题，计算样本权重
+    
+    参数:
+        y (numpy.ndarray): 编码后的行为标签
+    
+    返回:
+        torch.Tensor: 类别权重张量
+    """
+    try:
+        # 使用neuron_lstm.py中的函数
+        from neuron_lstm import compute_class_weights
+        return compute_class_weights(y)
+    except Exception as e:
+        print(f"计算类别权重时出错: {str(e)}")
+        return None
+
 def main() -> None:
     """
-    主函数
+    主函数 (改进版)
     
     执行步骤:
     1. 初始化配置
     2. 数据预处理
     3. 聚类分析
-    4. 序列数据集创建
-    5. 模型训练
-    6. 结果可视化
+    4. 改进的数据集划分 (包括测试集)
+    5. 处理类别不平衡
+    6. 模型训练与评估
+    7. 结果可视化
     """
     # 初始化配置
     config = AnalysisConfig()
@@ -278,25 +391,33 @@ def main() -> None:
         # 聚类分析
         kmeans, cluster_labels = processor.apply_kmeans(X_scaled)
         
-        # 创建序列数据集
+        # 创建改进的序列数据集划分 (包括测试集)
         print(f"\n创建序列数据集 (序列长度: {config.sequence_length})")
-        dataset = NeuronDataset(X_scaled, y, config.sequence_length)
         
-        # 分割训练和验证集
-        dataset_size = len(dataset)
-        train_size = int(dataset_size * 0.8)
-        val_size = dataset_size - train_size
-        train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
-        
-        train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=config.batch_size)
-        
-        print(f"训练集大小: {train_size}")
-        print(f"验证集大小: {val_size}")
-        
-        # 确定设备
+        # 使用配置选择划分策略
+        if config.analysis_params.get('use_time_aware_split', True):
+            # 时间感知的划分 - 适合时间序列数据
+            train_loader, val_loader, test_loader = time_aware_validation_split(X_scaled, y, config)
+        else:
+            # 分层抽样的划分 - 确保类别分布一致
+            train_loader, val_loader, test_loader = stratified_data_split(X_scaled, y, config)
+            
+        # 确定计算设备
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"使用设备: {device}")
+        
+        # 处理类别不平衡问题
+        print("\n计算类别权重以处理不平衡数据...")
+        class_weights = handle_class_imbalance(y)
+        if class_weights is not None:
+            print(f"类别权重: {class_weights}")
+            # 将类别权重保存到配置中，传递给后续流程
+            config.class_weights = class_weights.to(device)
+        else:
+            config.class_weights = None
+            print("使用默认的均匀类别权重")
+        
+        # 设备已在前面定义
         
         # 初始化模型
         num_classes = len(set(y))
@@ -316,17 +437,21 @@ def main() -> None:
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
         
-        # 训练模型
+        # 训练并评估模型
         print(f"\n开始训练模型 (epochs: {config.num_epochs})")
+        
+        # 如果存在类别权重，使用加权损失函数
+        if config.class_weights is not None:
+            print("使用加权损失函数处理类别不平衡")
+            weighted_criterion = nn.CrossEntropyLoss(weight=config.class_weights)
+            criterion = weighted_criterion
+        
+        # 使用修改后的train_model函数，添加测试集参数
         model, metrics = train_model(
-            model, train_loader, val_loader, criterion, optimizer, device, 
-            config.num_epochs, config, early_stopping_enabled=config.early_stopping
+            model, train_loader, val_loader, test_loader, criterion, optimizer, device, 
+            config.num_epochs, config, class_weights=config.class_weights,
+            early_stopping_enabled=config.early_stopping
         )
-        
-        # 可视化训练结果
-        plot_training_metrics(metrics, config)
-        
-        print(f"\n训练完成! 最佳验证准确率: {metrics['best_val_acc']:.2f}%")
         
     except Exception as e:
         print(f"主函数执行错误: {str(e)}")

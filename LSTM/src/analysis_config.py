@@ -26,8 +26,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'EMtrace.xlsx')  # 原始数据文件
-        self.data_identifier = 'EMtrace'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'EMtrace_plus.xlsx')  # 原始数据文件
+        self.data_identifier = 'EMtrace_plus'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -103,7 +103,7 @@ class AnalysisConfig:
         self.batch_size: int = 64          # 批次大小：训练时的批量大小
         self.learning_rate: float = 0.001  # 学习率：模型训练的学习率
         self.num_epochs: int = 100         # 训练轮数：模型训练的总轮数
-        self.n_clusters: int = 5           # 聚类数量：K-means聚类的类别数
+        self.n_clusters: int = 3           # 聚类数量：K-means聚类的类别数
         self.test_size: float = 0.2        # 测试集比例：数据集中测试集的占比
         self.random_seed: int = 42         # 随机种子：确保结果可重复性
         
@@ -120,6 +120,7 @@ class AnalysisConfig:
         
         # 分析参数配置
         self.analysis_params: Dict[str, Any] = {
+            # 基本参数
             'min_samples_per_behavior': 10,  # 每种行为的最小样本数要求
             'correlation_windows': [10, 20, 50],  # 时间相关性分析的窗口大小列表
             'behavior_merge_threshold': 0.8,  # 行为合并的相似度阈值
@@ -130,6 +131,17 @@ class AnalysisConfig:
             'effect_size_threshold': 0.8,  # 效应量的显著性阈值
             'gradient_clip_norm': 1.0,  # 梯度裁剪的最大范数
             'weight_decay': 0.01,  # AdamW优化器的权重衰减系数
+            
+            # 新增数据集划分参数
+            'use_time_aware_split': True,  # 是否使用时间感知的数据集划分（适合时间序列）
+            'train_ratio': 0.6,  # 训练集比例
+            'val_ratio': 0.2,   # 验证集比例
+            'test_ratio': 0.2,  # 测试集比例
+            
+            # 类别不平衡处理参数
+            'handle_class_imbalance': True,  # 是否处理类别不平衡
+            'use_weighted_loss': True,  # 是否使用加权损失函数
+            'use_sampling_techniques': False,  # 是否使用重采样技术
             
             # 早停机制参数
             'early_stopping_enabled': False,  # 是否启用早停机制

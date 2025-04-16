@@ -436,7 +436,140 @@ class EnhancedNeuronLSTM(nn.Module):
             'trainable_params': trainable_params
         }
 
-def train_model(model, train_loader, val_loader, criterion, optimizer, device, num_epochs, config, early_stopping_enabled=False):
+def evaluate_model(model, test_loader, criterion, device):
+    """
+    在测试集上评估模型性能
+    
+    参数:
+        model (EnhancedNeuronLSTM): 待评估的模型
+        test_loader (DataLoader): 测试数据加载器
+        criterion (nn.Module): 损失函数
+        device (torch.device): 计算设备
+    
+    返回:
+        dict: 包含各项评估指标的字典
+    """
+    model.eval()
+    test_loss = 0
+    correct = 0
+    total = 0
+    
+    # 用于计算每个类别的性能
+    class_correct = {}
+    class_total = {}
+    
+    all_preds = []
+    all_targets = []
+    
+    with torch.no_grad():
+        for X, y in test_loader:
+            X, y = X.to(device), y.to(device)
+            outputs, _, _ = model(X)
+            loss = criterion(outputs, y)
+            
+            test_loss += loss.item() * X.size(0)
+            _, predicted = torch.max(outputs, 1)
+            total += y.size(0)
+            correct += (predicted == y).sum().item()
+            
+            # 记录每个样本的预测和真实标签
+            all_preds.extend(predicted.cpu().numpy())
+            all_targets.extend(y.cpu().numpy())
+            
+            # 统计每个类别的正确预测数和总样本数
+            for i in range(len(y)):
+                label = y[i].item()
+                if label not in class_correct:
+                    class_correct[label] = 0
+                    class_total[label] = 0
+                
+                class_total[label] += 1
+                if predicted[i] == y[i]:
+                    class_correct[label] += 1
+    
+    # 计算总体指标
+    avg_loss = test_loss / total
+    accuracy = 100 * correct / total
+    
+    # 计算每个类别的准确率
+    class_accuracies = {label: 100 * class_correct[label] / class_total[label] 
+                        for label in class_correct}
+    
+    # 计算额外评估指标 (F1, 精确率, 召回率)
+    try:
+        from sklearn.metrics import classification_report, confusion_matrix
+        report = classification_report(all_targets, all_preds, output_dict=True)
+        conf_matrix = confusion_matrix(all_targets, all_preds)
+    except Exception as e:
+        print(f"计算高级评估指标时出错: {str(e)}")
+        report = {}
+        conf_matrix = []
+    
+    return {
+        'test_loss': avg_loss,
+        'test_accuracy': accuracy,
+        'class_accuracies': class_accuracies,
+        'classification_report': report,
+        'confusion_matrix': conf_matrix
+    }
+
+def plot_confusion_matrix(cm, class_names, config):
+    """
+    绘制混淆矩阵
+    
+    参数:
+        cm (numpy.ndarray): 混淆矩阵
+        class_names (list): 类别名称列表
+        config (object): 配置对象
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    plt.title('混淆矩阵')
+    plt.ylabel('真实标签')
+    plt.xlabel('预测标签')
+    plt.tight_layout()
+    
+    # 保存混淆矩阵图
+    confusion_matrix_path = os.path.join(os.path.dirname(config.accuracy_plot), 'confusion_matrix.png')
+    plt.savefig(confusion_matrix_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"混淆矩阵已保存到: {confusion_matrix_path}")
+
+def compute_class_weights(y):
+    """
+    计算类别权重以处理类别不平衡问题
+    
+    参数:
+        y (numpy.ndarray): 标签数组
+    
+    返回:
+        torch.Tensor: 类别权重张量
+    """
+    try:
+        from sklearn.utils.class_weight import compute_class_weight
+        import numpy as np
+        
+        # 计算每个类别的权重
+        class_weights = compute_class_weight(
+            class_weight='balanced',
+            classes=np.unique(y),
+            y=y
+        )
+        
+        # 转换为张量
+        class_weights_tensor = torch.FloatTensor(class_weights)
+        return class_weights_tensor
+    except Exception as e:
+        print(f"计算类别权重时出错: {str(e)}")
+        # 返回均匀权重
+        classes = np.unique(y)
+        return torch.FloatTensor([1.0] * len(classes))
+
+def train_model(model, train_loader, val_loader, test_loader, criterion, optimizer, device, num_epochs, config, class_weights=None, early_stopping_enabled=False):
     """
     训练增强型神经元LSTM模型
     
@@ -444,11 +577,13 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         model (EnhancedNeuronLSTM): 待训练的模型
         train_loader (DataLoader): 训练数据加载器
         val_loader (DataLoader): 验证数据加载器
+        test_loader (DataLoader): 测试数据加载器
         criterion (nn.Module): 损失函数
         optimizer (torch.optim.Optimizer): 优化器
         device (torch.device): 计算设备
         num_epochs (int): 训练轮数
         config (object): 配置对象
+        class_weights (torch.Tensor, optional): 类别权重张量，用于处理类别不平衡
         early_stopping_enabled (bool): 是否启用早停机制，默认为False
     
     返回:
@@ -631,6 +766,28 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         with open(config.error_log, 'a') as f:
             f.write(f"保存模型失败 - {str(e)}\n")
     
+    # 在测试集上评估模型
+    print("\n在测试集上评估模型性能...")
+    if test_loader is not None:
+        test_metrics = evaluate_model(model, test_loader, criterion, device)
+        print(f"测试集损失: {test_metrics['test_loss']:.4f}, 测试集准确率: {test_metrics['test_accuracy']:.2f}%")
+        
+        # 打印每个类别的准确率
+        print("\n各类别准确率:")
+        for label, acc in test_metrics['class_accuracies'].items():
+            print(f"类别 {label}: {acc:.2f}%")
+        
+        # 如果有类别名称映射，绘制混淆矩阵
+        if hasattr(config, 'label_encoder') and hasattr(config.label_encoder, 'classes_'):
+            plot_confusion_matrix(
+                test_metrics['confusion_matrix'],
+                config.label_encoder.classes_,
+                config
+            )
+    else:
+        test_metrics = None
+        print("没有提供测试集，跳过测试评估")
+    
     # 返回训练结果
     metrics_dict = {
         'train_losses': train_losses,
@@ -641,7 +798,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         'reconstruction_losses': reconstruction_losses,
         'learning_rates': learning_rates,
         'attention_weights': last_attention_weights.detach().cpu().numpy() if last_attention_weights is not None else None,
-        'temporal_weights': last_temporal_weights.detach().cpu().numpy() if last_temporal_weights is not None else None
+        'temporal_weights': last_temporal_weights.detach().cpu().numpy() if last_temporal_weights is not None else None,
+        'test_metrics': test_metrics  # 添加测试指标
     }
     
     return model, metrics_dict
@@ -649,12 +807,17 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
 def plot_training_metrics(metrics, config):
     """
     绘制训练和验证指标的变化曲线
-    包括损失值和准确率
+    包括损失值、准确率和重构损失
     
     参数:
         metrics (dict): 包含训练指标的字典
         config (object): 配置对象，包含保存路径
     """
+    # 如果存在测试指标，添加类别性能的可视化
+    if metrics.get('test_metrics'):
+        plot_class_performance(metrics['test_metrics'], config)
+        
+
     plt.figure(figsize=(15, 5))
     
     # 绘制损失曲线
@@ -689,3 +852,46 @@ def plot_training_metrics(metrics, config):
     plt.tight_layout()
     plt.savefig(config.accuracy_plot, dpi=300, bbox_inches='tight')
     plt.close()
+
+def plot_class_performance(test_metrics, config):
+    """
+    绘制各类别性能指标
+    
+    参数:
+        test_metrics (dict): 测试指标字典
+        config (object): 配置对象
+    """
+    if not test_metrics or 'class_accuracies' not in test_metrics:
+        return
+    
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    # 设置图表大小
+    plt.figure(figsize=(12, 6))
+    
+    # 准备数据
+    labels = list(test_metrics['class_accuracies'].keys())
+    accs = list(test_metrics['class_accuracies'].values())
+    
+    # 绘制柱状图
+    x = np.arange(len(labels))
+    plt.bar(x, accs, width=0.6, color='skyblue')
+    
+    # 添加标签和标题
+    plt.xticks(x, labels, rotation=45)
+    plt.ylim(0, 100)
+    plt.title('各类别准确率')
+    plt.xlabel('类别')
+    plt.ylabel('准确率 (%)')
+    
+    # 在柱子上方显示准确率值
+    for i, v in enumerate(accs):
+        plt.text(i, v + 2, f"{v:.1f}%", ha='center')
+    
+    # 保存图表
+    class_perf_path = os.path.join(os.path.dirname(config.accuracy_plot), 'class_performance.png')
+    plt.tight_layout()
+    plt.savefig(class_perf_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"类别性能图表已保存到: {class_perf_path}")
