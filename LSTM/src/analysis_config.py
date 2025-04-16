@@ -133,7 +133,7 @@ class AnalysisConfig:
             'weight_decay': 0.01,  # AdamW优化器的权重衰减系数
             
             # 新增数据集划分参数
-            'use_time_aware_split': True,  # 是否使用时间感知的数据集划分（适合时间序列）
+            'use_time_aware_split': False,  # 是否使用时间感知的数据集划分（适合时间序列）
             'train_ratio': 0.6,  # 训练集比例
             'val_ratio': 0.2,   # 验证集比例
             'test_ratio': 0.2,  # 测试集比例

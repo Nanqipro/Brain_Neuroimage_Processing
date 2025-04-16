@@ -530,9 +530,9 @@ def plot_confusion_matrix(cm, class_names, config):
     
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-    plt.title('混淆矩阵')
-    plt.ylabel('真实标签')
-    plt.xlabel('预测标签')
+    plt.title('Confusion Matrix')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
     plt.tight_layout()
     
     # 保存混淆矩阵图
@@ -596,6 +596,8 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
     train_accuracies = []
     val_losses = []
     val_accuracies = []
+    test_losses = []         # 新增：记录测试损失
+    test_accuracies = []     # 新增：记录测试准确率
     reconstruction_losses = []
     learning_rates = []
     best_val_acc = 0.0
@@ -617,7 +619,7 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
     
     # 创建或截断训练指标日志文件
     with open(config.metrics_log, 'w') as f:
-        f.write('epoch,train_loss,train_acc,val_loss,val_acc,reconstruction_loss\n')
+        f.write('epoch,train_loss,train_acc,val_loss,val_acc,test_loss,test_acc,reconstruction_loss\n')  # 修改：添加test_loss和test_acc
     
     # 早停相关参数
     patience = config.analysis_params.get('early_stopping_patience', 20)
@@ -711,17 +713,30 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
         val_losses.append(avg_val_loss)
         val_accuracies.append(val_accuracy)
         
+        # 在每个epoch结束时在测试集上评估模型
+        if test_loader is not None:
+            test_results = evaluate_model(model, test_loader, criterion, device)
+            test_loss = test_results['test_loss']
+            test_accuracy = test_results['test_accuracy']
+            test_losses.append(test_loss)
+            test_accuracies.append(test_accuracy)
+        else:
+            test_loss = 0
+            test_accuracy = 0
+            test_losses.append(0)
+            test_accuracies.append(0)
+        
         # 记录学习率
         current_lr = optimizer.param_groups[0]['lr']
         learning_rates.append(current_lr)
         
-        # 打印训练信息
+        # 打印训练信息 - 修改为显示测试准确率而不是验证准确率
         if (epoch+1) % 10 == 0:
-            print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Train Acc: {train_accuracy:.2f}%, Val Loss: {avg_val_loss:.4f}, Val Acc: {val_accuracy:.2f}%, LR: {current_lr:.6f}")
+            print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Train Acc: {train_accuracy:.2f}%, Test Loss: {test_loss:.4f}, Test Acc: {test_accuracy:.2f}%, LR: {current_lr:.6f}")
         
-        # 记录指标到日志文件
+        # 记录指标到日志文件 - 修改为包含测试指标
         with open(config.metrics_log, 'a') as f:
-            f.write(f'{epoch+1},{avg_train_loss:.4f},{train_accuracy:.2f},{avg_val_loss:.4f},{val_accuracy:.2f},{avg_recon_loss:.4f}\n')
+            f.write(f'{epoch+1},{avg_train_loss:.4f},{train_accuracy:.2f},{avg_val_loss:.4f},{val_accuracy:.2f},{test_loss:.4f},{test_accuracy:.2f},{avg_recon_loss:.4f}\n')
         
         # 早停检查
         if early_stopping_enabled:
@@ -790,13 +805,16 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
         test_metrics = None
         print("没有提供测试集，跳过测试评估")
     
-    # 返回训练结果
+    # 返回训练结果 - 添加测试损失和准确率到结果字典
     metrics_dict = {
         'train_losses': train_losses,
         'train_accuracies': train_accuracies,
         'val_losses': val_losses,
         'val_accuracies': val_accuracies,
+        'test_losses': test_losses,           # 新增
+        'test_accuracies': test_accuracies,   # 新增
         'best_val_acc': max(val_accuracies) if val_accuracies else 0,
+        'best_test_acc': max(test_accuracies) if test_accuracies else 0,  # 新增
         'reconstruction_losses': reconstruction_losses,
         'learning_rates': learning_rates,
         'attention_weights': last_attention_weights.detach().cpu().numpy() if last_attention_weights is not None else None,
@@ -808,7 +826,7 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
 
 def plot_training_metrics(metrics, config):
     """
-    绘制训练和验证指标的变化曲线
+    绘制训练和测试指标的变化曲线
     包括损失值、准确率和重构损失
     
     参数:
@@ -819,30 +837,29 @@ def plot_training_metrics(metrics, config):
     if metrics.get('test_metrics'):
         plot_class_performance(metrics['test_metrics'], config)
         
-
     plt.figure(figsize=(15, 5))
     
-    # 绘制损失曲线
+    # Plot loss curves
     plt.subplot(1, 3, 1)
     plt.plot(metrics['train_losses'], label='Training Loss', linewidth=2)
-    plt.plot(metrics['val_losses'], label='Validation Loss', linewidth=2)
+    plt.plot(metrics['test_losses'], label='Test Loss', linewidth=2)  # Changed to test loss
     plt.title('Loss Curves')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
     plt.grid(True)
     
-    # 绘制准确率曲线
+    # Plot accuracy curves
     plt.subplot(1, 3, 2)
     plt.plot(metrics['train_accuracies'], label='Training Accuracy', linewidth=2)
-    plt.plot(metrics['val_accuracies'], label='Validation Accuracy', linewidth=2)
+    plt.plot(metrics['test_accuracies'], label='Test Accuracy', linewidth=2)  # Changed to test accuracy
     plt.title('Accuracy Curves')
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy (%)')
     plt.legend()
     plt.grid(True)
     
-    # 绘制重构损失曲线
+    # Plot reconstruction loss curve
     plt.subplot(1, 3, 3)
     plt.plot(metrics['reconstruction_losses'], label='Reconstruction Loss', linewidth=2)
     plt.title('Reconstruction Loss')
@@ -854,6 +871,23 @@ def plot_training_metrics(metrics, config):
     plt.tight_layout()
     plt.savefig(config.accuracy_plot, dpi=300, bbox_inches='tight')
     plt.close()
+    
+    # 添加一个额外的图表来显示验证准确率 vs 测试准确率
+    plt.figure(figsize=(10, 6))
+    plt.plot(metrics['val_accuracies'], label='Validation Accuracy', linewidth=2)
+    plt.plot(metrics['test_accuracies'], label='Test Accuracy', linewidth=2)
+    plt.title('Validation Accuracy vs Test Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy (%)')
+    plt.legend()
+    plt.grid(True)
+    
+    # 保存额外的图表
+    val_test_plot_path = os.path.join(os.path.dirname(config.accuracy_plot), 'val_test_comparison.png')
+    plt.tight_layout()
+    plt.savefig(val_test_plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"验证-测试比较图表已保存到: {val_test_plot_path}")
 
 def plot_class_performance(test_metrics, config):
     """

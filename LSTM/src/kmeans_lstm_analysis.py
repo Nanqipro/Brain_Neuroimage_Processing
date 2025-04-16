@@ -343,6 +343,60 @@ def stratified_data_split(X_scaled, y, config):
     
     return train_loader, val_loader, test_loader
 
+def filter_minority_classes(X, y, min_samples=2):
+    """
+    过滤掉样本数量少于指定阈值的类别，并重新编码标签
+    
+    参数:
+        X (numpy.ndarray): 特征数据
+        y (numpy.ndarray): 标签数据
+        min_samples (int): 每个类别最少样本数量阈值
+        
+    返回:
+        tuple: 过滤后的特征和标签数据
+    """
+    # 计算每个类别的样本数量
+    unique_classes, class_counts = np.unique(y, return_counts=True)
+    class_counts_dict = dict(zip(unique_classes, class_counts))
+    
+    # 输出每个类别的样本数量
+    print("\n各类别样本数量:")
+    for cls, count in class_counts_dict.items():
+        print(f"类别 {cls}: {count} 个样本")
+    
+    # 找出满足最小样本数要求的类别
+    valid_classes = [cls for cls, count in class_counts_dict.items() if count >= min_samples]
+    
+    # 如果有类别被过滤掉，输出提示信息
+    filtered_classes = set(unique_classes) - set(valid_classes)
+    if filtered_classes:
+        print(f"\n过滤掉样本数量少于 {min_samples} 的类别: {filtered_classes}")
+    
+    # 创建掩码，保留有效类别的样本
+    mask = np.isin(y, valid_classes)
+    
+    # 应用掩码
+    X_filtered = X[mask]
+    y_filtered = y[mask]
+    
+    print(f"过滤前: {len(y)} 个样本，过滤后: {len(y_filtered)} 个样本")
+    
+    # 重要：重新编码标签，确保标签值是从0开始连续的整数
+    if len(valid_classes) < len(unique_classes):
+        print("重新编码标签以确保连续性...")
+        old_to_new = {old_cls: new_idx for new_idx, old_cls in enumerate(sorted(valid_classes))}
+        y_remapped = np.array([old_to_new[cls] for cls in y_filtered])
+        
+        # 输出标签映射信息
+        print("标签重映射:")
+        for old_cls, new_cls in old_to_new.items():
+            count = np.sum(y_filtered == old_cls)
+            print(f"原标签 {old_cls} -> 新标签 {new_cls} (样本数: {count})")
+        
+        return X_filtered, y_remapped
+    
+    return X_filtered, y_filtered
+
 def handle_class_imbalance(y):
     """
     处理类别不平衡问题，计算样本权重
@@ -391,16 +445,19 @@ def main() -> None:
         # 聚类分析
         kmeans, cluster_labels = processor.apply_kmeans(X_scaled)
         
+        # 过滤掉样本数量过少的类别
+        X_filtered, y_filtered = filter_minority_classes(X_scaled, y, min_samples=2)
+        
         # 创建改进的序列数据集划分 (包括测试集)
         print(f"\n创建序列数据集 (序列长度: {config.sequence_length})")
         
         # 使用配置选择划分策略
         if config.analysis_params.get('use_time_aware_split', True):
             # 时间感知的划分 - 适合时间序列数据
-            train_loader, val_loader, test_loader = time_aware_validation_split(X_scaled, y, config)
+            train_loader, val_loader, test_loader = time_aware_validation_split(X_filtered, y_filtered, config)
         else:
             # 分层抽样的划分 - 确保类别分布一致
-            train_loader, val_loader, test_loader = stratified_data_split(X_scaled, y, config)
+            train_loader, val_loader, test_loader = stratified_data_split(X_filtered, y_filtered, config)
             
         # 确定计算设备
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -408,7 +465,7 @@ def main() -> None:
         
         # 处理类别不平衡问题
         print("\n计算类别权重以处理不平衡数据...")
-        class_weights = handle_class_imbalance(y)
+        class_weights = handle_class_imbalance(y_filtered)
         if class_weights is not None:
             print(f"类别权重: {class_weights}")
             # 将类别权重保存到配置中，传递给后续流程
@@ -420,7 +477,7 @@ def main() -> None:
         # 设备已在前面定义
         
         # 初始化模型
-        num_classes = len(set(y))
+        num_classes = len(set(y_filtered))
         model = EnhancedNeuronLSTM(
             input_size=X_scaled.shape[1],
             hidden_size=config.hidden_size,
