@@ -22,9 +22,9 @@ warnings.filterwarnings('ignore')
 from neuron_lstm import (
     set_random_seed, 
     NeuronDataset, 
-    NeuronAutoencoder, 
-    MultiHeadAttention, 
-    TemporalAttention, 
+    # NeuronAutoencoder, 
+    # MultiHeadAttention, 
+    # TemporalAttention, 
     EnhancedNeuronLSTM, 
     train_model, 
     plot_training_metrics
@@ -452,6 +452,10 @@ def main() -> None:
             config.num_epochs, config, class_weights=config.class_weights,
             early_stopping_enabled=config.early_stopping
         )
+        
+        # 可视化训练结果
+        print("\n生成训练过程可视化图表...")
+        plot_training_metrics(metrics, config)
         
     except Exception as e:
         print(f"主函数执行错误: {str(e)}")

@@ -449,14 +449,16 @@ def evaluate_model(model, test_loader, criterion, device):
     返回:
         dict: 包含各项评估指标的字典
     """
+    # 预先确定类别数量（基于模型输出层）
+    num_classes = model.num_classes
     model.eval()
     test_loss = 0
     correct = 0
     total = 0
     
     # 用于计算每个类别的性能
-    class_correct = {}
-    class_total = {}
+    class_correct = {i: 0 for i in range(num_classes)}
+    class_total = {i: 0 for i in range(num_classes)}
     
     all_preds = []
     all_targets = []
@@ -479,10 +481,6 @@ def evaluate_model(model, test_loader, criterion, device):
             # 统计每个类别的正确预测数和总样本数
             for i in range(len(y)):
                 label = y[i].item()
-                if label not in class_correct:
-                    class_correct[label] = 0
-                    class_total[label] = 0
-                
                 class_total[label] += 1
                 if predicted[i] == y[i]:
                     class_correct[label] += 1
@@ -492,8 +490,12 @@ def evaluate_model(model, test_loader, criterion, device):
     accuracy = 100 * correct / total
     
     # 计算每个类别的准确率
-    class_accuracies = {label: 100 * class_correct[label] / class_total[label] 
-                        for label in class_correct}
+    class_accuracies = {}
+    for label in range(num_classes):
+        if class_total[label] > 0:
+            class_accuracies[label] = 100 * class_correct[label] / class_total[label]
+        else:
+            class_accuracies[label] = 0.0  # 当测试集中没有该类别时设为0
     
     # 计算额外评估指标 (F1, 精确率, 召回率)
     try:
@@ -715,7 +717,7 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
         
         # 打印训练信息
         if (epoch+1) % 10 == 0:
-            print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Val Acc: {val_accuracy:.2f}%, LR: {current_lr:.6f}")
+            print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Train Acc: {train_accuracy:.2f}%, Val Loss: {avg_val_loss:.4f}, Val Acc: {val_accuracy:.2f}%, LR: {current_lr:.6f}")
         
         # 记录指标到日志文件
         with open(config.metrics_log, 'a') as f:
@@ -881,9 +883,9 @@ def plot_class_performance(test_metrics, config):
     # 添加标签和标题
     plt.xticks(x, labels, rotation=45)
     plt.ylim(0, 100)
-    plt.title('各类别准确率')
-    plt.xlabel('类别')
-    plt.ylabel('准确率 (%)')
+    plt.title('Accuracy by Class')
+    plt.xlabel('Class')
+    plt.ylabel('Accuracy (%)')
     
     # 在柱子上方显示准确率值
     for i, v in enumerate(accs):
