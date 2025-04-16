@@ -4,8 +4,12 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
+import os
+import sys
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvas
+import matplotlib.patches as patches
+from matplotlib.colors import to_rgba
 
 # 自定义参数配置
 # 可以根据需要修改默认值
@@ -40,6 +44,8 @@ if args.stamp_max is not None:
 
 # 加载数据
 day6_data = pd.read_excel(Config.INPUT_FILE)
+print(f"\n加载数据: {Config.INPUT_FILE}")
+print(f"数据列名: {day6_data.columns.tolist()}")
 
 # 将 'stamp' 列设置为索引
 day6_data = day6_data.set_index('stamp')
@@ -55,9 +61,26 @@ if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
 
 # 检查是否存在 'behavior' 列
 has_behavior = 'behavior' in day6_data.columns
+print(f"是否存在behavior列: {has_behavior}")
 
-# 分离 'behavior' 列（如果存在）
-if has_behavior:
+# 创建调试日志文件
+debug_log = open('../../debug_heatmap.log', 'w', encoding='utf-8')
+debug_log.write(f"数据列名: {day6_data.columns.tolist()}\n")
+debug_log.write(f"是否存在behavior列: {has_behavior}\n")
+
+# 如果没有behavior列，我们添加一个测试列以显示效果
+if not has_behavior:
+    debug_log.write("\n注意: 数据中没有behavior列，添加测试行为数据...\n")
+    # 创建一个示例行为列，每隔100个数据点切换一次行为
+    behaviors = ['A', 'B', 'C', 'D']
+    frame_lost = pd.Series(index=day6_data.index)
+    for i, idx in enumerate(day6_data.index):
+        behavior_idx = (i // 100) % len(behaviors)
+        frame_lost.loc[idx] = behaviors[behavior_idx]
+    has_behavior = True
+    debug_log.write("测试行为数据添加成功!\n")
+else:
+    # 分离 'behavior' 列
     frame_lost = day6_data['behavior']
     day6_data = day6_data.drop(columns=['behavior'])
 
@@ -110,35 +133,128 @@ if has_behavior:
 # 设置绘图颜色范围
 vmin, vmax = -2, 2  # 控制颜色对比度
 
-# 创建图形和轴，减少默认边距
-fig = plt.figure(figsize=(25, 15))
+# 创建图形和轴，增大图形尺寸并减少默认边距
+fig = plt.figure(figsize=(60, 15))  # 增大图形尺寸
 # 调整子图位置，减少边距
 plt.subplots_adjust(left=0.05, right=0.98, top=0.9, bottom=0.15)
 
 # 绘制热图
 ax = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)
 
-# 只有当behavior列存在时才添加行为标记
-if has_behavior and unique_behaviors:
+# 只有当behavior列存在时才添加行为标记和背景阴影
+if has_behavior and len(unique_behaviors) > 0:
     # 颜色映射，为每种行为分配不同的颜色
     colors = plt.cm.tab20(np.linspace(0, 1, len(unique_behaviors)))
     color_map = {behavior: colors[i] for i, behavior in enumerate(unique_behaviors)}
-
-    # 为每种行为绘制垂直线并标注
-    for behavior, timestamps in behavior_indices.items():
-        for behavior_time in timestamps:
-            # 检查行为时间是否在排序后的数据索引中
-            if behavior_time in sorted_day6_data.index:
-                # 获取对应的绘图位置
-                position = sorted_day6_data.index.get_loc(behavior_time)
-                # 绘制垂直线，白色虚线
-                ax.axvline(x=position, color='white', linestyle='--', linewidth=2)
-                # 添加文本标签，放在热图外部并使用黑色字体
-                plt.text(position + 0.5, -5, behavior, 
-                        color='black', rotation=90, verticalalignment='top', fontsize=12, fontweight='bold')
+    
+    # 背景颜色（浅色）
+    bg_colors = {
+        # 预设几种常见行为的浅色背景
+        'A': 'lightgray',
+        'B': 'mistyrose',
+        'C': 'honeydew',
+        'D': 'lavender',
+        'E': 'aliceblue',
+        'F': 'papayawhip',
+        'G': 'mintcream',
+        'H': 'seashell'
+        # 可根据实际行为标签进行调整
+    }
+    
+    # 默认背景颜色组合
+    default_bg_colors = [
+        'lightgray',    # 浅灰色
+        'mistyrose',    # 浅红色
+        'honeydew',     # 浅绿色
+        'lavender',     # 浅紫色
+        'aliceblue',    # 浅蓝色
+        'papayawhip',   # 浅黄色
+        'mintcream',    # 浅薄荷色
+        'seashell'      # 浅珊瑚色
+    ]
+    
+    # 创建区间映射和标记点
+    behavior_regions = {}
+    previous_behavior = None
+    region_start = None
+    
+    # 按时间顺序排列所有行为时间点
+    all_timestamps = []
+    for timestamps in behavior_indices.values():
+        all_timestamps.extend(timestamps)
+    all_timestamps = sorted(all_timestamps)
+    
+    debug_log.write(f"\n可用行为标签: {unique_behaviors}\n")
+    debug_log.write(f"行为时间点数量: {len(all_timestamps)}\n")
+    
+    # 处理行为区间
+    for i, timestamp in enumerate(all_timestamps):
+        behavior = None
+        # 找出当前时间戳对应的行为
+        for b, ts_list in behavior_indices.items():
+            if timestamp in ts_list:
+                behavior = b
+                break
+        
+        # 如果是新行为的开始点
+        if behavior != previous_behavior:
+            # 如果之前有行为，则记录其结束区间
+            if previous_behavior is not None and region_start is not None:
+                end_timestamp = timestamp
+                
+                # 确保时间戳在索引中
+                if region_start in sorted_day6_data.index and end_timestamp in sorted_day6_data.index:
+                    start_pos = sorted_day6_data.index.get_loc(region_start)
+                    end_pos = sorted_day6_data.index.get_loc(end_timestamp)
+                    
+                    # 添加到区间列表
+                    if previous_behavior not in behavior_regions:
+                        behavior_regions[previous_behavior] = []
+                    behavior_regions[previous_behavior].append((start_pos, end_pos))
+            
+            # 记录新行为的开始点
+            region_start = timestamp
+            previous_behavior = behavior
+    
+    # 处理最后一个行为区间
+    if previous_behavior is not None and region_start is not None:
+        # 最后一个区间使用数据的末尾作为结束点
+        end_timestamp = sorted_day6_data.index[-1]
+        
+        # 确保时间戳在索引中
+        if region_start in sorted_day6_data.index:
+            start_pos = sorted_day6_data.index.get_loc(region_start)
+            end_pos = len(sorted_day6_data.index) - 1
+            
+            # 添加到区间列表
+            if previous_behavior not in behavior_regions:
+                behavior_regions[previous_behavior] = []
+            behavior_regions[previous_behavior].append((start_pos, end_pos))
+    
+    # 输出识别到的行为区间
+    debug_log.write(f"\n识别到的行为区间:\n")
+    for behavior, regions in behavior_regions.items():
+        debug_log.write(f"{behavior}: {len(regions)}个区间\n")
+    
+    # 为每种行为绘制背景阴影和标记线
+    for i, (behavior, regions) in enumerate(behavior_regions.items()):
+        # 选择背景颜色
+        bg_color = bg_colors.get(behavior, default_bg_colors[i % len(default_bg_colors)])
+        debug_log.write(f"为行为 '{behavior}' 使用背景颜色: {bg_color}\n")
+        
+        # 为每个区间添加背景阴影
+        for start_pos, end_pos in regions:
+            # 添加背景阴影（使用更高的透明度和更高的z轴位置）
+            ax.axvspan(start_pos, end_pos, color=bg_color, alpha=0.7, zorder=0)
+            
+            # 在区间开始处添加标记线和文本
+            ax.axvline(x=start_pos, color='white', linestyle='--', linewidth=2)
+            plt.text(start_pos + 0.5, -5, behavior, 
+                    color='black', rotation=90, verticalalignment='top', 
+                    fontsize=12, fontweight='bold')
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = 'No.297920240925_104733trace-heatmap'
+title_text = 'EMtrace-heatmap'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -157,8 +273,11 @@ ax.set_xticklabels(ax.get_xticklabels(), fontsize=14, fontweight='bold')
 # 应用紧凑布局
 plt.tight_layout()
 
+# 关闭调试日志
+debug_log.close()
+
 # 构建输出文件名，包含时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}No.297920240925_104733trace"
+output_filename = f"{Config.OUTPUT_PREFIX}EMtrace"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -171,3 +290,4 @@ plt.close()
 
 # 输出保存信息
 print(f"热图已保存至: {output_filename}")
+print(f"调试日志已保存至: ../../debug_heatmap.log")
