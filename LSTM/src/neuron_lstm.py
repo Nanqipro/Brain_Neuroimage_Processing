@@ -720,13 +720,6 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
             test_accuracy = test_results['test_accuracy']
             test_losses.append(test_loss)
             test_accuracies.append(test_accuracy)
-            
-            # 保存测试 F1 Score 用于后续绘图
-            if 'classification_report' in test_results and 'weighted avg' in test_results['classification_report']:
-                test_f1 = test_results['classification_report']['weighted avg']['f1-score'] * 100
-                if not hasattr(model, 'test_f1_scores'):
-                    model.test_f1_scores = []
-                model.test_f1_scores.append(test_f1)
         else:
             test_loss = 0
             test_accuracy = 0
@@ -794,10 +787,7 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
     print("\n在测试集上评估模型性能...")
     if test_loader is not None:
         test_metrics = evaluate_model(model, test_loader, criterion, device)
-        weighted_f1 = 0
-        if 'classification_report' in test_metrics and 'weighted avg' in test_metrics['classification_report']:
-            weighted_f1 = test_metrics['classification_report']['weighted avg']['f1-score'] * 100
-        print(f"测试集损失: {test_metrics['test_loss']:.4f}, 测试集准确率: {test_metrics['test_accuracy']:.2f}%, 测试集 F1 Score: {weighted_f1:.2f}%")
+        print(f"测试集损失: {test_metrics['test_loss']:.4f}, 测试集准确率: {test_metrics['test_accuracy']:.2f}%")
         
         # 打印每个类别的准确率
         print("\n各类别准确率:")
@@ -815,24 +805,17 @@ def train_model(model, train_loader, val_loader, test_loader, criterion, optimiz
         test_metrics = None
         print("没有提供测试集，跳过测试评估")
     
-    # 记录每个 epoch 的测试 F1 Score
-    test_f1_scores = []
-    if test_metrics and 'classification_report' in test_metrics and 'weighted avg' in test_metrics['classification_report']:
-        weighted_f1 = test_metrics['classification_report']['weighted avg']['f1-score'] * 100
-        test_f1_scores.append(weighted_f1)
-    
-    # 返回训练结果 - 添加测试损失、准确率和 F1 Score 到结果字典
+    # 返回训练结果 - 添加测试损失和准确率到结果字典
     metrics_dict = {
         'train_losses': train_losses,
         'train_accuracies': train_accuracies,
         'val_losses': val_losses,
         'val_accuracies': val_accuracies,
-        'test_losses': test_losses,
-        'test_accuracies': test_accuracies,
+        'test_losses': test_losses,           # 新增
+        'test_accuracies': test_accuracies,   # 新增
         'best_val_acc': max(val_accuracies) if val_accuracies else 0,
-        'best_test_acc': max(test_accuracies) if test_accuracies else 0,
+        'best_test_acc': max(test_accuracies) if test_accuracies else 0,  # 新增
         'reconstruction_losses': reconstruction_losses,
-        'test_f1_scores': test_f1_scores,  # 新增: 测试 F1 Score
         'learning_rates': learning_rates,
         'attention_weights': last_attention_weights.detach().cpu().numpy() if last_attention_weights is not None else None,
         'temporal_weights': last_temporal_weights.detach().cpu().numpy() if last_temporal_weights is not None else None,
@@ -878,19 +861,10 @@ def plot_training_metrics(metrics, config):
     
     # Plot reconstruction loss curve
     plt.subplot(1, 3, 3)
-    # 提取测试集的 F1 Score
-    test_f1_scores = []
-    for epoch in range(len(metrics['test_accuracies'])):
-        if epoch < len(metrics['train_losses']) and 'test_metrics' in metrics and metrics['test_metrics'] is not None:
-            if 'classification_report' in metrics['test_metrics'] and 'weighted avg' in metrics['test_metrics']['classification_report']:
-                test_f1_scores.append(metrics['test_metrics']['classification_report']['weighted avg']['f1-score'] * 100)
-            else:
-                test_f1_scores.append(0)  # 没有 F1 Score 数据时用 0 填充
-    
-    plt.plot(test_f1_scores, label='测试 F1 Score', linewidth=2, color='green')
-    plt.title('测试 F1 Score')
-    plt.xlabel('轮次 (Epochs)')
-    plt.ylabel('F1 Score (%)')
+    plt.plot(metrics['reconstruction_losses'], label='Reconstruction Loss', linewidth=2)
+    plt.title('Reconstruction Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
     plt.legend()
     plt.grid(True)
     
