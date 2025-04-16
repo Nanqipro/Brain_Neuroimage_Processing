@@ -79,10 +79,11 @@ sorted_neurons = peak_times.sort_values().index
 # 根据排序后的神经元顺序重新排列 DataFrame 的列
 sorted_day6_data = day6_data_standardized[sorted_neurons]
 
-# **步骤4：找到所有行为标签的首次出现时间点**
+# **步骤4：处理行为标签数据**
 
 # 初始化行为标记变量
-behavior_indices = {}
+behavior_indices = {}  # 用于存储行为变化点的时间戳
+behavior_segments = []  # 用于存储行为持续区间的信息
 unique_behaviors = []
 
 # 只有当behavior列存在时才处理行为标签
@@ -90,75 +91,154 @@ if has_behavior:
     # 获取所有不同的行为标签
     unique_behaviors = frame_lost.dropna().unique()
     
-    # 对frame_lost进行处理，找出每种行为连续出现时的第一个时间点
+    # 对frame_lost进行处理，找出每种行为连续出现时的第一个时间点及区间
     previous_behavior = None
-    for timestamp, behavior in frame_lost.items():
+    segment_start = None
+    
+    # 为了确保捕获最后一个区间，添加一个额外处理
+    all_timestamps = list(frame_lost.index)
+    
+    for i, timestamp in enumerate(all_timestamps):
+        behavior = frame_lost.loc[timestamp]
+        
         # 跳过空值
         if pd.isna(behavior):
+            # 如果前一个行为不为空且当前为空，则添加一个区间终点
+            if previous_behavior is not None:
+                behavior_segments.append({
+                    'behavior': previous_behavior,
+                    'start': segment_start,
+                    'end': timestamp
+                })
+                previous_behavior = None
             continue
         
-        # 如果与前一个行为不同，则记录该时间点
+        # 如果是新的行为类型
         if behavior != previous_behavior:
+            # 如果前一个行为不为空，添加一个区间终点
+            if previous_behavior is not None:
+                behavior_segments.append({
+                    'behavior': previous_behavior,
+                    'start': segment_start,
+                    'end': timestamp
+                })
+                
+            # 记录行为变化点
             if behavior not in behavior_indices:
                 behavior_indices[behavior] = []
             behavior_indices[behavior].append(timestamp)
-        
-        previous_behavior = behavior
+            
+            # 开始新的区间
+            segment_start = timestamp
+            previous_behavior = behavior
+            
+        # 处理最后一个时间点
+        if i == len(all_timestamps) - 1 and previous_behavior is not None:
+            behavior_segments.append({
+                'behavior': previous_behavior,
+                'start': segment_start,
+                'end': timestamp  # 使用最后一个时间点作为结束
+            })
 
-# **步骤5：绘制热图并标注所有事件**
+# **步骤5：绘制热图并添加行为标签进度条**
 
 # 设置绘图颜色范围
 vmin, vmax = -2, 2  # 控制颜色对比度
 
-# 创建图形和轴，减少默认边距
-fig = plt.figure(figsize=(70, 15))
-# 调整子图位置，减少边距
-plt.subplots_adjust(left=0.05, right=0.98, top=0.9, bottom=0.15)
+# 创建图形，调整大小以容纳热图和行为标签进度条
+fig = plt.figure(figsize=(70, 20))
 
-# 绘制热图
-ax = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)
+# 创建两个子图：上方为行为标签进度条，下方为热图
+# 分配90%的空间给热图，10%的空间给行为标签进度条
+gs = plt.GridSpec(2, 1, height_ratios=[1, 9], hspace=0.05)
 
-# 只有当behavior列存在时才添加行为标记
-if has_behavior and unique_behaviors:
+# 上方子图：行为标签进度条
+ax_behavior = plt.subplot(gs[0])
+# 下方子图：热图
+ax_heatmap = plt.subplot(gs[1])
+
+# 在下方子图绘制热图
+sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, 
+           vmin=vmin, vmax=vmax, ax=ax_heatmap)
+
+# 只有当behavior列存在时才处理行为标签
+if has_behavior and len(unique_behaviors) > 0:
     # 颜色映射，为每种行为分配不同的颜色
     colors = plt.cm.tab20(np.linspace(0, 1, len(unique_behaviors)))
     color_map = {behavior: colors[i] for i, behavior in enumerate(unique_behaviors)}
-
-    # 为每种行为绘制垂直线并标注
+    
+    # 绘制行为标签进度条
+    # 先隐藏上方子图的刻度
+    ax_behavior.set_xticks([])
+    ax_behavior.set_yticks([])
+    
+    # 共享热图的x轴范围
+    ax_behavior.set_xlim(0, len(sorted_day6_data))
+    ax_behavior.set_ylim(0, 1)  # 进度条高度范围
+    
+    # 为每段行为区间填充对应颜色
+    for segment in behavior_segments:
+        behavior = segment['behavior']
+        start_time = segment['start']
+        end_time = segment['end']
+        
+        # 检查时间点是否在排序后的数据索引中
+        if start_time in sorted_day6_data.index and end_time in sorted_day6_data.index:
+            # 获取对应的绘图位置
+            start_pos = sorted_day6_data.index.get_loc(start_time)
+            end_pos = sorted_day6_data.index.get_loc(end_time)
+            
+            # 填充区间
+            ax_behavior.axvspan(start_pos, end_pos, 
+                               color=color_map[behavior], 
+                               alpha=0.7)
+            
+            # 在区间中间位置添加行为标签
+            mid_pos = (start_pos + end_pos) / 2
+            # 只有当区间足够宽时才添加标签
+            if end_pos - start_pos > len(sorted_day6_data) * 0.02:  # 区间宽度占总宽度的2%以上
+                ax_behavior.text(mid_pos, 0.5, behavior, 
+                               ha='center', va='center', 
+                               fontsize=14, fontweight='bold',
+                               color='black')
+    
+    # 为行为标签进度条添加标题
+    ax_behavior.set_title('Behavior Type Intervals', fontsize=16)
+    
+    # 在热图上添加行为变化点的垂直线标记
     for behavior, timestamps in behavior_indices.items():
         for behavior_time in timestamps:
             # 检查行为时间是否在排序后的数据索引中
             if behavior_time in sorted_day6_data.index:
                 # 获取对应的绘图位置
                 position = sorted_day6_data.index.get_loc(behavior_time)
-                # 绘制垂直线，白色虚线
-                ax.axvline(x=position, color='white', linestyle='--', linewidth=2)
-                # 添加文本标签，放在热图外部并使用黑色字体
-                plt.text(position + 0.5, -5, behavior, 
-                        color='black', rotation=90, verticalalignment='top', fontsize=12, fontweight='bold')
+                # 在热图上绘制垂直线，白色虚线
+                ax_heatmap.axvline(x=position, color='white', linestyle='--', linewidth=2)
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = 'No.297920240925_104733trace-heatmap'
+title_text = 'EMtrace-heatmap'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
     title_text += f' (Time: {min_stamp:.2f} to {max_stamp:.2f})'
 
-plt.title(title_text, fontsize=16)
-plt.xlabel('stamp', fontsize=20)
-plt.ylabel('neuron', fontsize=20)
+# 设置热图的标题和标签
+ax_heatmap.set_title(title_text, fontsize=16)
+ax_heatmap.set_xlabel('stamp', fontsize=20)
+ax_heatmap.set_ylabel('neuron', fontsize=20)
 
 # 修改Y轴标签（神经元标签）的字体大小和粗细，设置为水平方向
-ax.set_yticklabels(ax.get_yticklabels(), fontsize=14, fontweight='bold', rotation=0)
+ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontsize=14, fontweight='bold', rotation=0)
 
 # 修改X轴标签（时间戳）的字体大小和粗细
-ax.set_xticklabels(ax.get_xticklabels(), fontsize=14, fontweight='bold')
+ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=14, fontweight='bold')
 
-# 应用紧凑布局
-plt.tight_layout()
+# 手动调整图形布局而不是使用tight_layout
+# 这可以避免与复杂GridSpec结构不兼容的警告
+fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05, hspace=0.05)
 
 # 构建输出文件名，包含时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}No.297920240925_104733trace"
+output_filename = f"{Config.OUTPUT_PREFIX}EMtrace"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -168,6 +248,38 @@ output_filename += ".png"
 # 保存图像时使用紧凑边界设置
 plt.savefig(output_filename, bbox_inches='tight', pad_inches=0.1, dpi=100)
 plt.close()
+
+# 如果有行为数据，添加图例
+if has_behavior and len(unique_behaviors) > 0:
+    # 创建单独的图形用于生成图例
+    fig_legend = plt.figure(figsize=(10, 5))
+    ax_legend = fig_legend.add_subplot(111)
+    
+    # 隐藏坐标轴
+    ax_legend.axis('off')
+    
+    # 创建空列表用于添加图例元素
+    legend_patches = []
+    
+    # 为每种行为创建图例元素
+    for i, behavior in enumerate(unique_behaviors):
+        patch = plt.Rectangle((0, 0), 1, 1, color=color_map[behavior], alpha=0.7)
+        legend_patches.append(patch)
+    
+    # 添加图例
+    ax_legend.legend(legend_patches, unique_behaviors, 
+                    loc='center', fontsize=14, 
+                    title='Behavior Types Legend', title_fontsize=16)
+    
+    # 构建图例输出文件名
+    legend_filename = f"{Config.OUTPUT_PREFIX}EMtrace_legend.png"
+    
+    # 保存图例图像
+    fig_legend.savefig(legend_filename, bbox_inches='tight', dpi=100)
+    plt.close(fig_legend)
+    
+    # 输出保存信息
+    print(f"行为图例已保存至: {legend_filename}")
 
 # 输出保存信息
 print(f"热图已保存至: {output_filename}")
