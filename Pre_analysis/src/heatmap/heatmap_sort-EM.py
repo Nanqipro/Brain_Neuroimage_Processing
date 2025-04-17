@@ -150,7 +150,7 @@ fig = plt.figure(figsize=(70, 20))
 
 # 创建两个子图：上方为行为标签进度条，下方为热图
 # 分配90%的空间给热图，10%的空间给行为标签进度条
-gs = plt.GridSpec(2, 1, height_ratios=[1, 9], hspace=0.05)
+gs = plt.GridSpec(2, 1, height_ratios=[1, 9], hspace=0.05, wspace=0)
 
 # 上方子图：行为标签进度条
 ax_behavior = plt.subplot(gs[0])
@@ -172,8 +172,8 @@ if has_behavior and len(unique_behaviors) > 0:
     ax_behavior.set_xticks([])
     ax_behavior.set_yticks([])
     
-    # 共享热图的x轴范围
-    ax_behavior.set_xlim(0, len(sorted_day6_data))
+    # 共享热图的x轴，确保完全对齐
+    ax_behavior.sharex(ax_heatmap)
     ax_behavior.set_ylim(0, 1)  # 进度条高度范围
     
     # 为每段行为区间填充对应颜色
@@ -184,9 +184,13 @@ if has_behavior and len(unique_behaviors) > 0:
         
         # 检查时间点是否在排序后的数据索引中
         if start_time in sorted_day6_data.index and end_time in sorted_day6_data.index:
-            # 获取对应的绘图位置
-            start_pos = sorted_day6_data.index.get_loc(start_time)
-            end_pos = sorted_day6_data.index.get_loc(end_time)
+            # 获取时间索引列表，确保与热图使用相同的位置映射
+            time_indices = np.arange(len(sorted_day6_data.index))
+            idx_time_map = dict(zip(sorted_day6_data.index, time_indices))
+            
+            # 使用映射获取对应的绘图位置
+            start_pos = idx_time_map[start_time]
+            end_pos = idx_time_map[end_time]
             
             # 填充区间
             ax_behavior.axvspan(start_pos, end_pos, 
@@ -210,8 +214,10 @@ if has_behavior and len(unique_behaviors) > 0:
         for behavior_time in timestamps:
             # 检查行为时间是否在排序后的数据索引中
             if behavior_time in sorted_day6_data.index:
-                # 获取对应的绘图位置
-                position = sorted_day6_data.index.get_loc(behavior_time)
+                # 使用相同的索引映射获取位置
+                time_indices = np.arange(len(sorted_day6_data.index))
+                idx_time_map = dict(zip(sorted_day6_data.index, time_indices))
+                position = idx_time_map[behavior_time]
                 # 在热图上绘制垂直线，白色虚线
                 ax_heatmap.axvline(x=position, color='white', linestyle='--', linewidth=2)
 
