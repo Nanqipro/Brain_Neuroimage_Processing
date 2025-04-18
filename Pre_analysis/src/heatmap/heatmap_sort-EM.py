@@ -2,10 +2,12 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import numpy as np
 import argparse
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvas
+from matplotlib.colors import Normalize
 
 # 自定义参数配置
 # 可以根据需要修改默认值
@@ -133,39 +135,61 @@ if has_behavior:
 # 设置绘图颜色范围
 vmin, vmax = -2, 2  # 控制颜色对比度
 
-# 设置图形大小并创建图形对象
-fig = plt.figure(figsize=(70, 15))
+# 创建新的全景布局，采用垂直堆叠的可视化方案
+fig = plt.figure(figsize=(100, 15))
 
-# 创建多个子图，顶部用于行为标记，底部用于热图
-# 增加width_ratios确保两个子图的宽度完全一致
-grid = plt.GridSpec(2, 1, height_ratios=[1, 8], hspace=0.02)
+# 创建网格布局，指定高度比例和间距
+# 关键点：将hspace设置为0，确保子图之间无间隔
+grid = plt.GridSpec(2, 1, height_ratios=[1, 8], hspace=0.0, wspace=0.0)
 
-# 重新设计绘图方式，确保精确对齐
+# 采用完全新的方法绘制热图和行为区间，确保完美对齐
 
-# 计算数据长度和索引范围
-data_length = len(sorted_day6_data)
-
-# 先创建热图子图
+# 先创建下方热图
 ax_heatmap = fig.add_subplot(grid[1])
 
-# 绘制热图 - 特别设置参数来确保热图与原始数据索引对应
-heatmap = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax, ax=ax_heatmap, 
-                     xticklabels=len(sorted_day6_data)//10, yticklabels=sorted_day6_data.columns.tolist())
+# 计算数据点总数
+ndata = len(sorted_day6_data)
 
-# 创建行为标记子图
+# 使用原生的matplotlib imshow函数，而非seaborn heatmap
+# 关键点：设置extent参数为初始数据的域范围，对应到精确的像素坐标
+img = ax_heatmap.imshow(sorted_day6_data.T, 
+                       aspect='auto', 
+                       cmap='viridis', 
+                       vmin=vmin, vmax=vmax,
+                       interpolation='nearest',
+                       extent=[-0.5, ndata-0.5, -0.5, len(sorted_day6_data.columns)-0.5],
+                       origin='lower')
+
+# 为热图添加颜色条
+cbar = fig.colorbar(img, ax=ax_heatmap, shrink=0.8)
+
+# 设置x轴刻度 - 对于长度较大的数据，选择间隔显示
+xtick_step = max(len(sorted_day6_data) // 20, 1)  # 确保不过于拍数
+xtick_indices = range(0, len(sorted_day6_data), xtick_step)
+xtick_positions = np.array(list(xtick_indices))
+xtick_labels = [f"{sorted_day6_data.index[i]:.1f}" for i in xtick_indices]
+ax_heatmap.set_xticks(xtick_positions)
+ax_heatmap.set_xticklabels(xtick_labels, fontsize=10, rotation=45)
+
+# 设置y轴刻度 - 每个神经元一个刻度
+ax_heatmap.set_yticks(range(len(sorted_day6_data.columns)))
+ax_heatmap.set_yticklabels(sorted_day6_data.columns, fontsize=10)
+
+# 创建上方行为区间标记子图
+# 关键参数：sharex=ax_heatmap确保共享X轴
 ax_behavior = fig.add_subplot(grid[0], sharex=ax_heatmap)
 
-# 重要：获取热图的确切范围作为参考
-# seaborn热图的坐标系有特殊性，需要特别处理
-x_min, x_max = ax_heatmap.get_xlim()
-y_min, y_max = ax_heatmap.get_ylim()
+# 创建空白背景作为行为标记区域
+ax_behavior.imshow(np.zeros((1, ndata)), 
+                  aspect='auto', 
+                  cmap='Greys', 
+                  alpha=0,
+                  extent=[-0.5, ndata-0.5, 0, len(unique_behaviors)],
+                  origin='lower')
 
-# 设置相同范围，确保两个子图对齐
-ax_behavior.set_xlim(x_min, x_max)
-
-# 调整子图位置，减少边距，留出顶部空间
-# 注意调整right参数，留出空间给colorbar
-fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.15, hspace=0)
+# 调整全局布局，确保紧凑并有足够空间显示全部内容
+# 关键参数：hspace=0确保上下子图无间隔
+fig.subplots_adjust(left=0.06, right=0.94, top=0.9, bottom=0.15, hspace=0)
 
 # 只有当behavior列存在时才添加行为标记
 if has_behavior and len(unique_behaviors) > 0:
@@ -192,25 +216,22 @@ if has_behavior and len(unique_behaviors) > 0:
             # 检查时间点是否在排序后的数据索引中
             if start_time in sorted_day6_data.index and end_time in sorted_day6_data.index:
                 # 获取对应的索引位置
-                # 特别注意：在seaborn热图中，数据点的中心对应的是整数坐标
-                # 因此我们需要得到索引所在的数值位置
-                start_pos = sorted_day6_data.index.get_loc(start_time)
-                end_pos = sorted_day6_data.index.get_loc(end_time)
+                # 获取这个时间点在数据中的索引位置
+                start_idx = sorted_day6_data.index.get_loc(start_time)
+                end_idx = sorted_day6_data.index.get_loc(end_time)
                 
-                # 得到实际绘图时的像素位置
-                # 这里我们需要利用heatmap的特性，每个单元格的宽度是1.0
-                pixel_start_pos = start_pos
-                pixel_end_pos = end_pos
+                # 关键是使用完全相同的坐标系统在两个子图中绘制元素
                 
-                # 在行为标记子图中绘制区间
-                rect = plt.Rectangle((pixel_start_pos, y_positions[behavior] - 0.4), 
-                                    pixel_end_pos - pixel_start_pos, 0.8, 
-                                    color=behavior_color, alpha=0.7)
+                # 在行为区域绘制矩形
+                rect = patches.Rectangle((start_idx, y_positions[behavior] - 0.4), 
+                                       end_idx - start_idx, 0.8, 
+                                       color=behavior_color, alpha=0.7,
+                                       edgecolor=None, linewidth=0)
                 ax_behavior.add_patch(rect)
                 
-                # 在热图中添加区间边界垂直线 - 使用相同的像素位置
-                ax_heatmap.axvline(x=pixel_start_pos, color='white', linestyle='--', linewidth=1, alpha=0.5)
-                ax_heatmap.axvline(x=pixel_end_pos, color='white', linestyle='--', linewidth=1, alpha=0.5)
+                # 在热图中添加对应的垂直线
+                ax_heatmap.axvline(x=start_idx, color='white', linestyle='--', linewidth=1, alpha=0.5)
+                ax_heatmap.axvline(x=end_idx, color='white', linestyle='--', linewidth=1, alpha=0.5)
         
         # 添加到图例
         legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.7, label=behavior))
@@ -221,19 +242,18 @@ if has_behavior and len(unique_behaviors) > 0:
     ax_behavior.set_yticklabels(unique_behaviors, fontsize=12, fontweight='bold')
     ax_behavior.set_title('Behavior Intervals', fontsize=16, pad=10)
 
-    # 关键设置：移除x轴标签，并缩短分隔线
-    ax_behavior.set_xlabel('')  # Remove x-axis label, shared with the heatmap below
-    ax_behavior.xaxis.set_tick_params(labelbottom=False)
+    # 关键设置：隐藏行为图的x轴制作无缝过渡
+    ax_behavior.set_xticks([])
+    ax_behavior.set_xticklabels([])
+    ax_behavior.xaxis.set_visible(False)
 
-    # 去除行为子图所有边框，确保布局整洁
-    ax_behavior.spines['top'].set_visible(False)
-    ax_behavior.spines['right'].set_visible(False)
-    ax_behavior.spines['bottom'].set_visible(False)
-    ax_behavior.spines['left'].set_visible(False)
+    # 去除行为图所有边框以创建清晰的布局
+    for spine in ax_behavior.spines.values():
+        spine.set_visible(False)
 
-    # 设置所有刻度线不可见
+    # 关键设置：强制关闭所有刻度线
     ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-    ax_behavior.tick_params(axis='y', which='both', left=True, right=False, labelleft=True)
+    ax_behavior.tick_params(axis='y', which='both', left=True, right=False, labelleft=True, pad=5)
     
     # 添加图例
     legend = ax_behavior.legend(handles=legend_patches, loc='upper right', fontsize=12, 
@@ -251,11 +271,7 @@ ax_heatmap.set_title(title_text, fontsize=16)
 ax_heatmap.set_xlabel('stamp', fontsize=20)
 ax_heatmap.set_ylabel('neuron', fontsize=20)
 
-# 修改Y轴标签（神经元标签）的字体大小和粗细，设置为水平方向
-ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontsize=14, fontweight='bold', rotation=0)
-
-# 修改X轴标签（时间戳）的字体大小和粗细
-ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=14, fontweight='bold')
+# 注意：已在绘制imshow时设置了标签格式，这里不需要重复设置
 
 # 应用紧凑布局
 # 不使用tight_layout()，因为它与GridSpec布局不兼容
@@ -273,16 +289,22 @@ if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     output_filename += f"_time_{min_stamp:.2f}_to_{max_stamp:.2f}"
 output_filename += ".png"
 
-# 重要：在保存前确保图像重新绘制，以应用所有设置
+# 保存前的关键处理步骤
+
+# 1. 强制绘制以应用所有设置
 fig.canvas.draw()
 
-# 强制将热图和行为区间图的x轴对齐
-fig.align_xlabels([ax_heatmap, ax_behavior])
+# 2. 确保两个子图使用完全相同的x轴范围
+# 这是实现完美对齐的关键
+ax_behavior.set_xlim(ax_heatmap.get_xlim())
 
-# 保存图像，使用bbox_inches='tight'来尽可能减少空白边缘
+# 3. 再次确认对齐
+# 确保热图和行为图的轴对齐
+fig.align_xlabels([ax_heatmap])
+
+# 4. 保存图像
+# 使用紧凑边界模式保存，减少冗余空白
 plt.savefig(output_filename, bbox_inches='tight', pad_inches=0.1, dpi=100)
-
-# 关闭图形
 plt.close()
 
 # 输出保存信息
