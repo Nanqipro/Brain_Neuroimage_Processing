@@ -133,23 +133,33 @@ if has_behavior:
 # 设置绘图颜色范围
 vmin, vmax = -2, 2  # 控制颜色对比度
 
-# 创建图形和轴，减少默认边距
-fig = plt.figure(figsize=(70, 15))
-# 调整子图位置，减少边距，留出顶部空间用于行为标记
-# 使用更精确的子图调整以替代tight_layout()
-fig.subplots_adjust(left=0.05, right=0.98, top=0.85, bottom=0.15, wspace=0, hspace=0)
+# 创建图形和轴，使用更高的高度比例和精确调整来确保对齐
+fig = plt.figure(figsize=(100, 15))
 
-# 创建多个子图，顶部用于行为标记，底部用于热图
-# 减小子图之间的空隙，确保对齐
-grid = plt.GridSpec(2, 1, height_ratios=[1, 8], hspace=0.0)
+# 使用更精确的GridSpec布局系统
+# 通过更大的底部空间留出足够的标签空间
+from matplotlib.gridspec import GridSpec
+grid = GridSpec(2, 1, height_ratios=[1, 5], hspace=0.0, figure=fig)
 
 # 先创建热图子图
-ax_heatmap = plt.subplot(grid[1])
+ax_heatmap = fig.add_subplot(grid[1])
+
+# 为了确保对齐，我们首先定义X轴范围
+# 创建一个X轴数据点数组，这个数组将用于两个图表
+data_x_points = np.arange(len(sorted_day6_data.index))
+
 # 绘制热图
 heatmap = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax, ax=ax_heatmap)
 
-# 创建行为标记子图，严格共享热图的X轴
-ax_behavior = plt.subplot(grid[0], sharex=ax_heatmap)
+# 置空刻度位置，稍后设置
+# 设置热图的x轴范围为精确数据点范围
+ax_heatmap.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
+
+# 创建行为标记子图作为单独的子图
+ax_behavior = fig.add_subplot(grid[0])
+
+# 手动设置行为子图的X轴范围与热图完全相匹配
+ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
 
 # 只有当behavior列存在时才添加行为标记
 if has_behavior and len(unique_behaviors) > 0:
@@ -175,37 +185,50 @@ if has_behavior and len(unique_behaviors) > 0:
             # 检查时间点是否在排序后的数据索引中
             if start_time in sorted_day6_data.index and end_time in sorted_day6_data.index:
                 # 获取对应的绘图位置
-                start_pos = sorted_day6_data.index.get_loc(start_time)
-                end_pos = sorted_day6_data.index.get_loc(end_time)
+                start_idx = sorted_day6_data.index.get_loc(start_time)  # 获取索引位置
+                end_idx = sorted_day6_data.index.get_loc(end_time)
                 
-                # 定义短注，确保起止点对齐
-                if end_pos - start_pos > 0:  # 如果区间有宽度
-                    # 在行为标记子图中绘制区间
-                    rect = plt.Rectangle((start_pos, y_positions[behavior] - 0.4), 
+                # 在使用前转换为实际坐标位置 (对应网格)
+                start_pos = start_idx # 网格的中心是整数位置
+                end_pos = end_idx
+                
+                # 如果区间有宽度
+                if end_pos - start_pos > 0:  
+                    # 在行为标记子图中绘制区间，使用精确的数据点对齐方式
+                    rect = plt.Rectangle((start_pos - 0.5, y_positions[behavior] - 0.4), 
                                         end_pos - start_pos, 0.8, 
-                                        color=behavior_color, alpha=0.7)
+                                        color=behavior_color, alpha=0.7, 
+                                        ec='none')  # 去除边框以提高可见度
                     ax_behavior.add_patch(rect)
                     
-                    # 在热图中添加区间边界垂直线，精确定位到网格线
-                    ax_heatmap.axvline(x=start_pos, color='white', linestyle='--', linewidth=1, alpha=0.5)
-                    ax_heatmap.axvline(x=end_pos, color='white', linestyle='--', linewidth=1, alpha=0.5)
+                    # 在热图中添加区间边界垂直线
+                    # 使用与热图网格线一致的位置，确保对齐
+                    ax_heatmap.axvline(x=start_pos - 0.5, color='white', linestyle='--', linewidth=1, alpha=0.5)
+                    ax_heatmap.axvline(x=end_pos - 0.5, color='white', linestyle='--', linewidth=1, alpha=0.5)
         
         # 添加到图例
         legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.7, label=behavior))
     
-    # 确保热图的坐标轴范围与数据一致
-    ax_heatmap.set_xlim(0, len(sorted_day6_data.index))
-    # 确保行为子图也使用相同的范围
-    ax_behavior.set_xlim(0, len(sorted_day6_data.index))
+    # 再次确认两个坐标轴的对齐情况
+    # 唯一正确的做法是设置完全相同的范围
+    ax_heatmap.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
+    ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
     
     # 设置Y轴范围和刻度位置
     ax_behavior.set_ylim(0, max_position + 1)
     # 先设置刻度位置，再设置刻度标签，避免警告
     ax_behavior.set_yticks([y_positions[b] for b in unique_behaviors])
     ax_behavior.set_yticklabels(unique_behaviors, fontsize=12, fontweight='bold')
+    
+    # 特别重要：移除X轴刻度，让它只在热图上显示
+    ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
     ax_behavior.set_title('Behavior Intervals', fontsize=16, pad=10)
     ax_behavior.set_xlabel('')  # Remove x-axis label, shared with the heatmap below
+
+    # 更强制地隐藏X轴刻度和标签
     ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+    # 确保行为图和热图水平对齐
+    ax_behavior.set_anchor('SW')
     # 去除行为子图边框
     ax_behavior.spines['top'].set_visible(False)
     ax_behavior.spines['right'].set_visible(False)
@@ -246,11 +269,30 @@ if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     output_filename += f"_time_{min_stamp:.2f}_to_{max_stamp:.2f}"
 output_filename += ".png"
 
-# 在保存前再次确认两个轴对齐
-# 强制更新布局
+# 在保存前使用多重方法确保对齐
+
+# 1. 强制更新布局
 fig.canvas.draw()
 
-# 保存图像时使用紧凑边界设置
+# 2. 再次确认轴范围一致
+ax_heatmap.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
+ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
+
+# 3. 达到更精确的对齐
+# 获取热图的实际边界位置（像素单位）
+heatmap_bbox = ax_heatmap.get_position()
+behavior_bbox = ax_behavior.get_position()
+
+# 不能直接修改Bbox对象，需要创建新的
+# 使用Bbox的坐标创建新的位置，保持高度不变，但使用热图的宽度和水平位置
+from matplotlib.transforms import Bbox
+new_behavior_pos = Bbox([[heatmap_bbox.x0, behavior_bbox.y0], 
+                        [heatmap_bbox.x0 + heatmap_bbox.width, behavior_bbox.y0 + behavior_bbox.height]])
+
+# 设置新的位置
+ax_behavior.set_position(new_behavior_pos)
+
+# 4. 保存图像
 fig.savefig(output_filename, bbox_inches='tight', pad_inches=0.1, dpi=100)
 plt.close()
 
