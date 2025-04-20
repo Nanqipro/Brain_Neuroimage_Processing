@@ -77,7 +77,7 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) 
         raise ValueError(f"神经元ID {neuron_id} 在数据中不存在")
     
     # 创建图像
-    fig, ax = plt.subplots(figsize=(60, 10))
+    fig, ax = plt.subplots(figsize=(60, 15))
     
     # 绘制钙离子浓度变化曲线
     ax.plot(df['stamp'], df[neuron_id], linewidth=2, color='#1f77b4')
@@ -90,23 +90,25 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) 
                 label=f'Smooth Curve (Window={window_size})')
     
     # 设置图表样式和标题
-    ax.set_title(f'Neuron {neuron_id} Calcium Concentration Fluctuation', fontsize=16)
-    ax.set_xlabel('Timestamp (stamp)', fontsize=14)
-    ax.set_ylabel('Calcium Concentration', fontsize=14)
+    ax.set_title(f'Neuron {neuron_id} Calcium Concentration Fluctuation', fontsize=50)
+    ax.set_xlabel('Timestamp (stamp)', fontsize=48)
+    ax.set_ylabel('Calcium Concentration', fontsize=48)
     ax.grid(True, linestyle='--', alpha=0.7)
     
-    # 设置横坐标刻度，每50个stamp显示一个刻度
-    stamps = df['stamp'].values
-    min_stamp = stamps.min()
-    max_stamp = stamps.max()
-    step = 50  # 每50个stamp显示一个刻度
+    # 设置坐标轴刻度标签的字体大小
+    ax.tick_params(axis='both', which='major', labelsize=40)  # 可以根据需要调整字体大小
     
-    # 计算刻度位置，从最小值开始，以step为间隔
-    tick_positions = np.arange(min_stamp, max_stamp + step, step)
+    # 设置横坐标刻度，每100个stamp显示一个刻度，从0开始
+    stamps = df['stamp'].values
+    max_stamp = stamps.max()
+    step = 100  # 每100个stamp显示一个刻度
+    
+    # 计算刻度位置，从0开始，以step为间隔
+    tick_positions = np.arange(0, max_stamp + step, step)
     
     # 设置横坐标刻度
     ax.set_xticks(tick_positions)
-    ax.tick_params(axis='x', rotation=45)  # 旋转刻度标签以防重叠
+    ax.tick_params(axis='x', rotation=30)  # 旋转刻度标签以防重叠
     
     # 突出显示极值点
     max_val = df[neuron_id].max()
@@ -123,11 +125,11 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) 
     mean_val = df[neuron_id].mean()
     std_val = df[neuron_id].std()
     stats_text = f'Mean: {mean_val:.2f}\nStandard Deviation: {std_val:.2f}'
-    ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, 
+    ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, fontsize=50, 
             verticalalignment='top', bbox=dict(boxstyle='round', alpha=0.1))
     
     # 添加图例
-    ax.legend(loc='best')
+    ax.legend(loc='best', fontsize=30)  # 可以根据需要调整图例字体大小
     
     # 调整布局
     plt.tight_layout()
@@ -241,7 +243,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具')
-    parser.add_argument('--data', type=str, default='../datasets/Day6_with_behavior_labels_filled.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/processed_EMtrace.xlsx',
                         help='数据文件路径，支持.md, .csv, .xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='图像保存目录，不指定则根据数据集名称自动生成')
