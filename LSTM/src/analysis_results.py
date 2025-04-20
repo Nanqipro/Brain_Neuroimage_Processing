@@ -64,15 +64,7 @@ try:
     # 导入PyTorch Geometric的Data类
     from torch_geometric.data import Data
     # 导入GCN和基础GNN模块
-    import sys
-    import os
-    
-    # 确保当前目录在路径中，以便正确导入本地模块
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    if current_dir not in sys.path:
-        sys.path.append(current_dir)
-    
-    from neuron_gnn import GNNAnalyzer, NeuronGCN, TemporalGNN, ModuleGNN, ImprovedGCN
+    from neuron_gnn import GNNAnalyzer, NeuronGCN, TemporalGNN, ModuleGNN
     from neuron_gnn import train_gnn_model, plot_gnn_results, visualize_node_embeddings
     # 从独立的GAT模块导入
     from neuron_gat import NeuronGAT, visualize_gat_topology, visualize_gat_attention_weights
@@ -2130,27 +2122,16 @@ class ResultAnalyzer:
             early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
             
             # 训练模型   
-            try:
-                # 确保train_gnn_model函数在当前命名空间可用
-                from neuron_gnn import train_gnn_model
-                
-                trained_model, losses, accuracies = train_gnn_model(
-                    model=gcn_model,
-                    data=data,
-                    epochs=epochs,
-                    lr=lr,
-                    weight_decay=weight_decay,
-                    patience=patience,
-                    device=gnn_analyzer.device,
-                    early_stopping_enabled=early_stopping_enabled,
-                    batch_size=32  # 增加批处理大小参数
-                )
-            except Exception as e:
-                print(f"GCN行为预测模型训练出错: {e}")
-                print("错误详情:")
-                import traceback
-                traceback.print_exc()
-                return {"error": str(e), "status": "failed"}
+            trained_model, losses, accuracies = train_gnn_model(
+                model=gcn_model,
+                data=data,
+                epochs=epochs,
+                lr=lr,
+                weight_decay=weight_decay,
+                patience=patience,
+                device=gnn_analyzer.device,
+                early_stopping_enabled=early_stopping_enabled
+            )
             
             # 绘制训练曲线
             loss_plot_path = self.config.gcn_training_plot
@@ -2307,7 +2288,6 @@ class ResultAnalyzer:
             error_trace = traceback.format_exc()
             print(f"GCN行为预测模型训练出错: {str(e)}")
             print(f"错误详情:\n{error_trace}")
-            return {"error": str(e), "status": "failed"}
         
         # 2. 神经元模块识别GAT模型
         print("\n训练神经元模块识别GAT模型...")
@@ -2385,31 +2365,23 @@ class ResultAnalyzer:
                     early_stopping_enabled = self.config.analysis_params.get('gat_early_stopping_enabled', False)
                     
                     # 训练模型 - 使用新创建的gat_data
-                    try:
-                        from neuron_gnn import train_gnn_model
-                        trained_gat, gat_losses, gat_accuracies = train_gnn_model(
-                            model=gat_model,
-                            data=gat_data,
-                            epochs=epochs,
-                            lr=lr,
-                            weight_decay=weight_decay,
-                            patience=patience,
-                            device=gnn_analyzer.device,
-                            early_stopping_enabled=early_stopping_enabled,
-                            batch_size=32
-                        )
-                        
-                        # 绘制GAT训练曲线
-                        gat_loss_plot_path = self.config.gat_training_plot
-                        plot_gnn_results(gat_losses, gat_loss_plot_path)
-                        
-                        # 绘制GAT准确率曲线
-                        gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
-                    except Exception as e:
-                        print(f"GAT模型训练出错: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        return {"error": str(e), "status": "failed"}
+                    trained_gat, gat_losses, gat_accuracies = train_gnn_model(
+                        model=gat_model,
+                        data=gat_data,
+                        epochs=epochs,
+                        lr=lr,
+                        weight_decay=weight_decay,
+                        patience=patience,
+                        device=gnn_analyzer.device,
+                        early_stopping_enabled=early_stopping_enabled
+                    )
+                    
+                    # 绘制GAT训练曲线
+                    gat_loss_plot_path = self.config.gat_training_plot
+                    plot_gnn_results(gat_losses, gat_loss_plot_path)
+                    
+                    # 绘制GAT准确率曲线
+                    gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
                     gat_accuracy_plot_path = visualizer.plot_training_metrics(
                         gat_acc_epochs, 
                         gat_accuracies['train'], 
@@ -2985,7 +2957,7 @@ pip install torch-geometric torch-scatter torch-sparse
                     custom_print(f"更新的网络分析结果（包含GNN分析）已保存到 {config.network_analysis_file}")
                 except Exception as e:
                     custom_print(f"更新网络分析结果文件时出错: {str(e)}")
-        
+    
         # 将日志内容写入日志文件
         log_content = "".join(log_lines)
         with open(config.log_file, 'w', encoding='utf-8') as log_file:
