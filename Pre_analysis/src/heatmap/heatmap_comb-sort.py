@@ -99,22 +99,22 @@ plt.figure(figsize=(40, 10))
 # Day3 热图
 plt.subplot(1, 3, 1)
 ax1 = sns.heatmap(aligned_day3_df.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)  # 转置 DataFrame 以调换横纵坐标
-plt.title('Day3 (Sorted by Peak Time)', fontsize=16)
-plt.xlabel('stamp', fontsize=14)
-plt.ylabel('neuron', fontsize=14)
+plt.title('Day3 (Sorted by Peak Time)', fontsize=25)
+plt.xlabel('stamp', fontsize=25)
+plt.ylabel('neuron', fontsize=25)
 
 # Day6 热图
 plt.subplot(1, 3, 2)
 ax2 = sns.heatmap(aligned_day6_df.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)  # 转置 DataFrame 以调换横纵坐标
-plt.title('Day6 (Using Day3 Sorting)', fontsize=16)
-plt.xlabel('stamp', fontsize=14)
+plt.title('Day6 (Using Day3 Sorting)', fontsize=25)
+plt.xlabel('stamp', fontsize=25)
 plt.ylabel('')
 
 # Day9 热图
 plt.subplot(1, 3, 3)
 ax3 = sns.heatmap(aligned_day9_df.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)  # 转置 DataFrame 以调换横纵坐标
-plt.title('Day9 (Using Day3 Sorting)', fontsize=16)
-plt.xlabel('stamp', fontsize=14)
+plt.title('Day9 (Using Day3 Sorting)', fontsize=25)
+plt.xlabel('stamp', fontsize=25)
 plt.ylabel('')
 
 plt.tight_layout()

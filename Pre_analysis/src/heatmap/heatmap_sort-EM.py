@@ -163,9 +163,36 @@ ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
 
 # 只有当behavior列存在时才添加行为标记
 if has_behavior and len(unique_behaviors) > 0:
-    # 颜色映射，为每种行为分配不同的颜色
-    colors = plt.cm.tab20(np.linspace(0, 1, len(unique_behaviors)))
-    color_map = {behavior: colors[i] for i, behavior in enumerate(unique_behaviors)}
+    # 创建固定的行为颜色映射，确保相同行为始终使用相同颜色
+    # 预定义所有可能的行为及其固定颜色
+    fixed_color_map = {
+        'Open': '#ff7f0e',  # 橙色
+        'Close': '#1f77b4',  # 蓝色
+        'Middle': '#2ca02c',   # 绿色
+        'WI': '#d62728',   # 红色
+        'LVR': '#9467bd',  # 紫色
+        'FM': '#8c564b',   # 棕色
+        'GR': '#e377c2',   # 粉色
+        'ELT': '#7f7f7f',  # 灰色
+        'CM': '#bcbd22',   # 黄绿色
+        'CT': '#17becf',   # 海蓝色
+        'NI': '#aec7e8',   # 浅蓝色
+        'EM': '#98df8a',   # 浅绿色
+        'RF': '#ff9896',   # 浅红色
+        'RN': '#c5b0d5'    # 浅紫色
+    }
+    
+    # 为当前数据集中的行为创建颜色映射
+    color_map = {}
+    for i, behavior in enumerate(unique_behaviors):
+        if behavior in fixed_color_map:
+            # 使用预定义的颜色
+            color_map[behavior] = fixed_color_map[behavior]
+        else:
+            # 对于未预定义的行为，仍使用动态分配的颜色
+            # 但使用不同的颜色范围，避免与预定义的颜色冲突
+            colors = plt.cm.Set3(np.linspace(0, 1, len(unique_behaviors)*2))
+            color_map[behavior] = colors[i + len(fixed_color_map)]
     
     # 创建图例补丁列表
     legend_patches = []
@@ -203,8 +230,8 @@ if has_behavior and len(unique_behaviors) > 0:
                     
                     # 在热图中添加区间边界垂直线
                     # 使用与热图网格线一致的位置，确保对齐
-                    ax_heatmap.axvline(x=start_pos - 0.5, color='white', linestyle='--', linewidth=1, alpha=0.5)
-                    ax_heatmap.axvline(x=end_pos - 0.5, color='white', linestyle='--', linewidth=1, alpha=0.5)
+                    ax_heatmap.axvline(x=start_pos - 0.5, color='white', linestyle='--', linewidth=2, alpha=0.5)
+                    ax_heatmap.axvline(x=end_pos - 0.5, color='white', linestyle='--', linewidth=2, alpha=0.5)
         
         # 添加到图例
         legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.7, label=behavior))
@@ -247,9 +274,9 @@ if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     title_text += f' (Time: {min_stamp:.2f} to {max_stamp:.2f})'
 
 # 为热图添加标题和标签
-ax_heatmap.set_title(title_text, fontsize=16)
-ax_heatmap.set_xlabel('stamp', fontsize=20)
-ax_heatmap.set_ylabel('neuron', fontsize=20)
+ax_heatmap.set_title(title_text, fontsize=25)
+ax_heatmap.set_xlabel('stamp', fontsize=25)
+ax_heatmap.set_ylabel('neuron', fontsize=25)
 
 # 修改Y轴标签（神经元标签）的字体大小和粗细，设置为水平方向
 ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontsize=14, fontweight='bold', rotation=0)

@@ -11,7 +11,7 @@ from matplotlib.backends.backend_agg import FigureCanvas
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/No.297920240925_104733trace.xlsx'
+    INPUT_FILE = '../../datasets/Day9_with_behavior_labels_filled.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort_'
     # 时间戳区间默认值（None表示不限制）
@@ -119,14 +119,14 @@ plt.subplots_adjust(left=0.05, right=0.98, top=0.9, bottom=0.15)
 ax = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)
 
 # 只有当behavior列存在时才添加行为标记
-if has_behavior and unique_behaviors:
+if has_behavior and len(unique_behaviors) > 0:
     # 颜色映射，为每种行为分配不同的颜色
     colors = plt.cm.tab20(np.linspace(0, 1, len(unique_behaviors)))
     color_map = {behavior: colors[i] for i, behavior in enumerate(unique_behaviors)}
 
-    # 为每种行为绘制垂直线并标注
-    for behavior, timestamps in behavior_indices.items():
-        for behavior_time in timestamps:
+    # 只标注CD1行为
+    if 'CD1' in behavior_indices:
+        for behavior_time in behavior_indices['CD1']:
             # 检查行为时间是否在排序后的数据索引中
             if behavior_time in sorted_day6_data.index:
                 # 获取对应的绘图位置
@@ -134,31 +134,37 @@ if has_behavior and unique_behaviors:
                 # 绘制垂直线，白色虚线
                 ax.axvline(x=position, color='white', linestyle='--', linewidth=2)
                 # 添加文本标签，放在热图外部并使用黑色字体
-                plt.text(position + 0.5, -5, behavior, 
-                        color='black', rotation=90, verticalalignment='top', fontsize=12, fontweight='bold')
+                plt.text(position + 0.5, -5, 'CD1', 
+                        color='black', rotation=90, verticalalignment='top', fontsize=30, fontweight='bold')
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = 'No.297920240925_104733trace-heatmap'
+title_text = 'Day9_with_behavior_labels_filled'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
     title_text += f' (Time: {min_stamp:.2f} to {max_stamp:.2f})'
 
-plt.title(title_text, fontsize=16)
-plt.xlabel('stamp', fontsize=20)
-plt.ylabel('neuron', fontsize=20)
+plt.title(title_text, fontsize=30)
+plt.xlabel('stamp', fontsize=30)
+plt.ylabel('neuron', fontsize=30)
 
 # 修改Y轴标签（神经元标签）的字体大小和粗细，设置为水平方向
-ax.set_yticklabels(ax.get_yticklabels(), fontsize=14, fontweight='bold', rotation=0)
+ax.set_yticklabels(ax.get_yticklabels(), fontsize=20, rotation=0)
 
-# 修改X轴标签（时间戳）的字体大小和粗细
-ax.set_xticklabels(ax.get_xticklabels(), fontsize=14, fontweight='bold')
+# 设置X轴刻度，从0开始，以100为间隔
+numpoints = sorted_day6_data.shape[0]  # 获取数据点的总数
+xtick_positions = np.arange(0, numpoints, 100)  # 生成从0开始，间隔为100的刻度位置
+xtick_labels = xtick_positions  # 刻度标签就是位置值
+
+# 设置X轴刻度位置和标签
+ax.set_xticks(xtick_positions)
+ax.set_xticklabels(xtick_labels, fontsize=20)
 
 # 应用紧凑布局
 plt.tight_layout()
 
 # 构建输出文件名，包含时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}No.297920240925_104733trace"
+output_filename = f"{Config.OUTPUT_PREFIX}Day9_with_behavior_labels_filled"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()

@@ -753,11 +753,11 @@ class ResultAnalyzer:
                         ha='center', va='bottom', rotation=45,
                         fontsize=10)
         
-        plt.xlabel('Behavior', fontsize=12)
-        plt.ylabel('Effect Size', fontsize=12)
-        plt.title('Key Neurons for Each Behavior', fontsize=14)
-        plt.xticks(x_pos + width*2, self.behavior_labels, rotation=45, fontsize=11)
-        plt.legend(fontsize=11)
+        plt.xlabel('Behavior', fontsize=22)
+        plt.ylabel('Effect Size', fontsize=22)
+        plt.title('Key Neurons for Each Behavior', fontsize=20)
+        plt.xticks(x_pos + width*2, self.behavior_labels, rotation=45, fontsize=20)
+        plt.legend(fontsize=20)
         plt.tight_layout()
         plt.savefig(self.config.key_neurons_plot, dpi=300, bbox_inches='tight')
         plt.close()
