@@ -661,8 +661,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
     """
     print("正在可视化不同聚类类别的平均钙爆发波形...")
     
-    # 设置时间窗口（采样点数）
-    time_window = 100
+    # 设置时间窗口（采样点数）- 增大窗口以展示更完整的波形
+    time_window = 300  # 从100增大到250
     
     # 将标签添加到数据框
     df_cluster = df.copy()
@@ -682,7 +682,7 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
     # 尝试加载原始数据
     try:
         # 直接指定原始数据路径
-        raw_data_path = "../datasets/EMtrace.xlsx"
+        raw_data_path = "../datasets/processed_EMtrace.xlsx"
         print(f"加载原始数据从: {raw_data_path}")
         
         # 加载原始数据
