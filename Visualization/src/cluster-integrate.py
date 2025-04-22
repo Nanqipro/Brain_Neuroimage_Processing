@@ -928,18 +928,18 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
             "n_samples": len(all_waveforms)
         }
         
-        # 绘制平均波形及其标准差范围
+        # 绘制平均波形 - 移除标准差范围，仅绘制平均曲线
         plt.plot(time_points, avg_waveform, 
                  color=cmap(cluster_id), 
-                 linewidth=2, 
+                 linewidth=2.5,  # 增加线宽使曲线更突出
                  label=f'Cluster {cluster_id+1} (n={len(all_waveforms)})')
         
-        # 添加标准差范围
-        plt.fill_between(time_points, 
-                         avg_waveform - std_waveform, 
-                         avg_waveform + std_waveform, 
-                         color=cmap(cluster_id), 
-                         alpha=0.2)
+        # 移除标准差范围的绘制
+        # plt.fill_between(time_points, 
+        #                  avg_waveform - std_waveform, 
+        #                  avg_waveform + std_waveform, 
+        #                  color=cmap(cluster_id), 
+        #                  alpha=0.2)
     
     # 检查是否有任何有效的聚类波形
     if not avg_waveforms:
@@ -947,10 +947,10 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
         return
     
     # 设置图表属性
-    plt.axvline(x=0, color='grey', linestyle='--', alpha=0.7)  # Mark peak position
-    plt.title('Average Calcium Transient Waveforms for Different Clusters', fontsize=14)
-    plt.xlabel('Time Points Relative to Peak', fontsize=12)
-    plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)
+    plt.axvline(x=0, color='grey', linestyle='--', alpha=0.7)  # 标记峰值位置
+    plt.title('典型钙波形状对比 (各聚类平均波形)', fontsize=14)  # 修改标题为中文
+    plt.xlabel('峰值相对时间点', fontsize=12)  # 修改X轴标签为中文
+    plt.ylabel('归一化荧光强度 (F/F0)', fontsize=12)  # 修改Y轴标签为中文
     plt.grid(True, alpha=0.3)
     plt.legend(loc='upper right')
     

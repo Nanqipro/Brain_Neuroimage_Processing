@@ -682,7 +682,7 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
     # 尝试加载原始数据
     try:
         # 直接指定原始数据路径
-        raw_data_path = "../datasets/processed_EMtrace.xlsx"
+        raw_data_path = "../datasets/EMtrace.xlsx"
         print(f"加载原始数据从: {raw_data_path}")
         
         # 加载原始数据
@@ -762,24 +762,24 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results'):
             "n_samples": len(all_waveforms)
         }
         
-        # 绘制平均波形及其标准差范围
+        # 绘制平均波形 - 移除标准差范围，仅绘制平均曲线
         plt.plot(time_points, avg_waveform, 
                  color=cmap(cluster_id), 
-                 linewidth=2, 
+                 linewidth=2.5,  # 增加线宽使曲线更突出
                  label=f'Cluster {cluster_id+1} (n={len(all_waveforms)})')
         
-        # 添加标准差范围
-        plt.fill_between(time_points, 
-                         avg_waveform - std_waveform, 
-                         avg_waveform + std_waveform, 
-                         color=cmap(cluster_id), 
-                         alpha=0.2)
+        # 移除标准差范围的绘制
+        # plt.fill_between(time_points, 
+        #                  avg_waveform - std_waveform, 
+        #                  avg_waveform + std_waveform, 
+        #                  color=cmap(cluster_id), 
+        #                  alpha=0.2)
     
     # 设置图表属性
     plt.axvline(x=0, color='grey', linestyle='--', alpha=0.7)  # Mark peak position
-    plt.title('Average Calcium Transient Waveforms for Different Clusters', fontsize=14)
-    plt.xlabel('Time Points Relative to Peak', fontsize=12)
-    plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)
+    plt.title('Typical Calcium Wave Shape Comparison (Average Waveforms of Clusters)', fontsize=14)  # Change title to English
+    plt.xlabel('Relative Time to Peak', fontsize=12)  # Change X-axis label to English
+    plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)  # Change Y-axis label to English
     plt.grid(True, alpha=0.3)
     plt.legend(loc='upper right')
     
