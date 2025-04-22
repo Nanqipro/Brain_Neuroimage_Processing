@@ -759,7 +759,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
     parser.add_argument('--data', type=str, nargs='+', default=['../datasets/processed_EMtrace.xlsx'],
                         help='数据文件路径列表，支持.xlsx格式，可以指定多个文件')
-    parser.add_argument('--output_dir', type=str, default='../results/all_datasets_transients',
+    parser.add_argument('--output_dir', type=str, default='../results/all_datasets_transients_noCD1',
                         help='输出基础目录，结果将保存在此目录下对应的子文件夹中')
     parser.add_argument('--combine', action='store_true',
                         help='是否将所有文件的结果合并到一个总表中')
