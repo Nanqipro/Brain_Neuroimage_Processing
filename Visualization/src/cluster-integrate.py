@@ -35,19 +35,21 @@ def load_data(file_path):
     print(f"成功加载数据，共{len(df)}行")
     return df
 
-def enhance_preprocess_data(df):
+def enhance_preprocess_data(df, feature_weights=None):
     """
-    增强版预处理功能，支持子峰分析和更多特征
+    增强版预处理功能，支持子峰分析和更多特征，并支持特征权重调整
     
     参数
     ----------
     df : pandas.DataFrame
         原始数据
+    feature_weights : dict, 可选
+        特征权重字典，键为特征名称，值为权重值，默认为None（所有特征权重相等）
         
     返回
     -------
     features_scaled : numpy.ndarray
-        标准化后的特征数据
+        标准化并应用权重后的特征数据
     feature_names : list
         特征名称列表
     """
@@ -77,6 +79,25 @@ def enhance_preprocess_data(df):
     # 特征标准化
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
+    
+    # 应用特征权重
+    if feature_weights is not None:
+        weights_array = np.ones(len(feature_names))
+        weight_info = []
+        
+        # 构建权重数组
+        for i, feature in enumerate(feature_names):
+            if feature in feature_weights:
+                weights_array[i] = feature_weights[feature]
+                weight_info.append(f"{feature}:{feature_weights[feature]:.2f}")
+            else:
+                weight_info.append(f"{feature}:1.00")
+        
+        # 应用权重
+        features_scaled = features_scaled * weights_array.reshape(1, -1)
+        print(f"应用特征权重: {', '.join(weight_info)}")
+    else:
+        print("未设置特征权重，所有特征权重相等")
     
     print(f"预处理完成，保留{len(df)}个有效样本，使用特征: {', '.join(feature_names)}")
     return features_scaled, feature_names, df
@@ -975,6 +996,7 @@ def main():
     parser.add_argument('--raw_data_dir', type=str, help='原始数据文件所在目录，用于波形可视化')
     parser.add_argument('--raw_data_path', type=str, help='单个原始数据文件路径，用于波形可视化')
     parser.add_argument('--skip_waveform', action='store_true', help='跳过波形可视化步骤')
+    parser.add_argument('--weights', type=str, help='特征权重，格式如"amplitude:1.2,duration:0.8"')
     args = parser.parse_args()
     
     # 处理输入文件路径
@@ -1055,7 +1077,23 @@ def main():
     
     # 使用增强版预处理函数
     try:
-        features_scaled, feature_names, df_clean = enhance_preprocess_data(df)
+        # 添加特征权重设置
+        feature_weights = None
+        if args.weights:
+            feature_weights = {
+                'amplitude': 1.5,  # 振幅权重更高
+                'duration': 1.5,   # 持续时间权重更高
+                'rise_time': 0.6,  # 上升时间权重较低
+                'decay_time': 0.6, # 衰减时间权重较低
+                'snr': 1.0,        # 信噪比正常权重
+                'fwhm': 1.0        # 半高宽正常权重
+            }
+            # 解析用户指定的权重
+            for pair in args.weights.split(','):
+                feature, weight = pair.split(':')
+                feature_weights[feature] = float(weight)
+        
+        features_scaled, feature_names, df_clean = enhance_preprocess_data(df, feature_weights=feature_weights)
     except Exception as e:
         print(f"预处理数据时出错: {str(e)}")
         return
