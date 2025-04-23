@@ -684,7 +684,8 @@ def estimate_neuron_params(neuron_data):
     
     return params
 
-def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None, adaptive_params=True, start_id=1):
+def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None, adaptive_params=True, start_id=1, 
+                            file_info=None):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
     
@@ -702,6 +703,8 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         是否为每个神经元使用自适应参数，默认为True
     start_id : int, 可选
         钙爆发ID的起始编号，默认为1
+    file_info : dict, 可选
+        原始文件的信息，包含绝对路径、相对路径和文件名
         
     返回
     -------
@@ -730,6 +733,13 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         for t in transients:
             t['neuron'] = neuron
             t['transient_id'] = transient_id
+            
+            # 添加原始文件信息（如果提供）
+            if file_info:
+                t['source_file'] = file_info['filename']
+                t['source_path'] = file_info['rel_path']
+                t['source_abs_path'] = file_info['abs_path']
+                
             all_transients.append(t)
             transient_id += 1
     
@@ -763,7 +773,18 @@ if __name__ == "__main__":
                         help='输出基础目录，结果将保存在此目录下对应的子文件夹中')
     parser.add_argument('--combine', action='store_true',
                         help='是否将所有文件的结果合并到一个总表中')
+    parser.add_argument('--root_dir', type=str, default=None,
+                        help='项目根目录，用于生成相对路径，默认为当前工作目录的上一级')
     args = parser.parse_args()
+    
+    # 设置项目根目录，用于计算相对路径
+    if args.root_dir:
+        root_dir = args.root_dir
+    else:
+        # 默认使用当前工作目录的上一级
+        root_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
+    
+    print(f"使用项目根目录: {root_dir}")
     
     # 展开输入文件路径列表（支持通配符）
     input_files = []
@@ -823,9 +844,30 @@ if __name__ == "__main__":
             # 确保保存目录存在
             os.makedirs(output_dir, exist_ok=True)
             
-            # 分析并保存所有钙爆发数据，启用自适应参数，传递当前的ID计数器
+            # 准备文件信息字典
+            abs_path = os.path.abspath(input_file)
+            try:
+                # 计算相对路径
+                rel_path = os.path.relpath(abs_path, root_dir)
+            except ValueError:
+                # 如果无法计算相对路径，使用绝对路径
+                rel_path = abs_path
+            
+            file_info = {
+                'filename': data_basename,
+                'abs_path': abs_path,
+                'rel_path': rel_path
+            }
+            
+            print(f"原始文件路径信息:")
+            print(f"  - 文件名: {file_info['filename']}")
+            print(f"  - 相对路径: {file_info['rel_path']}")
+            print(f"  - 绝对路径: {file_info['abs_path']}")
+            
+            # 分析并保存所有钙爆发数据，启用自适应参数，传递当前的ID计数器和文件信息
             transients_df, next_transient_id = analyze_all_neurons_transients(
-                df, neuron_columns, save_path=save_path, adaptive_params=True, start_id=next_transient_id
+                df, neuron_columns, save_path=save_path, adaptive_params=True, 
+                start_id=next_transient_id, file_info=file_info
             )
             
             if len(transients_df) > 0:
@@ -846,8 +888,26 @@ if __name__ == "__main__":
         try:
             combined_df = pd.concat(all_datasets_transients, ignore_index=True)
             combined_output_path = os.path.join(args.output_dir, "all_datasets_transients.xlsx")
+            
+            # 确认源文件路径列已经包含
+            if 'source_file' not in combined_df.columns:
+                print("警告: 合并结果中未包含 'source_file' 列")
+            if 'source_path' not in combined_df.columns:
+                print("警告: 合并结果中未包含 'source_path' 列")
+            if 'source_abs_path' not in combined_df.columns:
+                print("警告: 合并结果中未包含 'source_abs_path' 列")
+                
+            # 可选：添加索引列，方便查找
+            combined_df['index'] = range(1, len(combined_df) + 1)
+            
+            # 保存合并结果
             combined_df.to_excel(combined_output_path, index=False)
             print(f"\n已将所有数据集的钙爆发结果合并，共 {len(combined_df)} 条记录")
             print(f"合并结果已保存到: {combined_output_path}")
+            
+            # 输出列信息以便确认路径信息已正确包含
+            print(f"合并表包含以下列:")
+            for col in combined_df.columns:
+                print(f"  - {col}")
         except Exception as e:
             print(f"合并结果时出错: {str(e)}")

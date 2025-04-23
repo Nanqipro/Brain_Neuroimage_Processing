@@ -710,6 +710,11 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     # 检查是否存在dataset列，表示合并了不同数据集
     has_dataset_column = 'dataset' in df_cluster.columns
     
+    # 检查是否包含源文件信息
+    has_source_info = all(col in df_cluster.columns for col in ['source_file', 'source_path', 'source_abs_path'])
+    if has_source_info:
+        print("检测到源文件路径信息，将优先使用这些信息加载原始数据")
+    
     if raw_data_path:
         # 如果指定了单个原始数据文件路径
         try:
@@ -741,41 +746,72 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
             print(f"搜索原始数据文件时出错: {str(e)}")
             return
     else:
-        # 尝试使用默认位置的原始数据
-        try:
-            # 直接指定原始数据路径
-            raw_data_path = "../datasets/processed_EMtrace.xlsx"
-            print(f"尝试加载默认原始数据从: {raw_data_path}")
+        # 使用源文件信息加载原始数据（如果可用）
+        if has_source_info:
+            # 获取不同的源文件
+            unique_source_files = df_cluster['source_path'].unique()
+            print(f"从事件数据中检测到 {len(unique_source_files)} 个不同的源文件")
             
-            # 加载原始数据
-            raw_data = pd.read_excel(raw_data_path)
-            dataset_name = os.path.splitext(os.path.basename(raw_data_path))[0]
-            raw_data_dict[dataset_name] = raw_data
-            print(f"成功加载原始数据，形状: {raw_data.shape}")
-        except Exception as e:
-            print(f"无法加载默认原始数据: {str(e)}")
-            print("尝试在../datasets目录下搜索原始数据...")
+            # 使用项目根目录（通常是工作目录的上一级）作为基础
+            root_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
+            print(f"使用项目根目录: {root_dir}")
             
+            # 加载每个源文件
+            for source_path in unique_source_files:
+                try:
+                    # 构建绝对路径
+                    if os.path.isabs(source_path):
+                        abs_path = source_path
+                    else:
+                        abs_path = os.path.join(root_dir, source_path)
+                    
+                    if os.path.exists(abs_path):
+                        print(f"加载源文件: {abs_path}")
+                        raw_data = pd.read_excel(abs_path)
+                        dataset_name = os.path.splitext(os.path.basename(abs_path))[0]
+                        raw_data_dict[dataset_name] = raw_data
+                        print(f"  成功加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                    else:
+                        print(f"  源文件不存在: {abs_path}")
+                except Exception as e:
+                    print(f"  加载源文件 {source_path} 失败: {str(e)}")
+        
+        # 如果无法使用源文件信息或未找到任何文件，尝试使用默认位置
+        if not raw_data_dict:
             try:
-                # 尝试搜索datasets目录下的所有Excel文件
-                datasets_dir = "../datasets"
-                excel_files = glob.glob(os.path.join(datasets_dir, "*.xlsx"))
+                # 直接指定原始数据路径
+                raw_data_path = "../datasets/processed_EMtrace.xlsx"
+                print(f"尝试加载默认原始数据从: {raw_data_path}")
                 
-                if excel_files:
-                    for file in excel_files:
-                        dataset_name = os.path.splitext(os.path.basename(file))[0]
-                        try:
-                            raw_data = pd.read_excel(file)
-                            raw_data_dict[dataset_name] = raw_data
-                            print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
-                        except Exception as e:
-                            print(f"  加载数据集{dataset_name}失败: {str(e)}")
-                else:
-                    print("在../datasets目录下未找到任何Excel文件")
-                    return
+                # 加载原始数据
+                raw_data = pd.read_excel(raw_data_path)
+                dataset_name = os.path.splitext(os.path.basename(raw_data_path))[0]
+                raw_data_dict[dataset_name] = raw_data
+                print(f"成功加载原始数据，形状: {raw_data.shape}")
             except Exception as e:
-                print(f"搜索原始数据时出错: {str(e)}")
-                return
+                print(f"无法加载默认原始数据: {str(e)}")
+                print("尝试在../datasets目录下搜索原始数据...")
+                
+                try:
+                    # 尝试搜索datasets目录下的所有Excel文件
+                    datasets_dir = "../datasets"
+                    excel_files = glob.glob(os.path.join(datasets_dir, "*.xlsx"))
+                    
+                    if excel_files:
+                        for file in excel_files:
+                            dataset_name = os.path.splitext(os.path.basename(file))[0]
+                            try:
+                                raw_data = pd.read_excel(file)
+                                raw_data_dict[dataset_name] = raw_data
+                                print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                            except Exception as e:
+                                print(f"  加载数据集{dataset_name}失败: {str(e)}")
+                    else:
+                        print("在../datasets目录下未找到任何Excel文件")
+                        return
+                except Exception as e:
+                    print(f"搜索原始数据时出错: {str(e)}")
+                    return
     
     if not raw_data_dict:
         print("未能加载任何原始数据，无法可视化波形")
@@ -840,10 +876,25 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
             
             # 确定使用哪个原始数据集
             raw_data = None
-            if has_dataset_column and 'dataset' in event and event['dataset'] in raw_data_dict:
+            
+            # 1. 优先使用源文件信息精确匹配
+            if has_source_info and 'source_file' in event:
+                source_file = event['source_file']
+                # 提取不带扩展名的文件名作为数据集名称
+                source_dataset = os.path.splitext(source_file)[0]
+                if source_dataset in raw_data_dict:
+                    raw_data = raw_data_dict[source_dataset]
+                    # 只对每个聚类的第一个事件显示此消息，避免输出过多
+                    if idx == cluster_events.index[0]:
+                        print(f"聚类 {cluster_id+1}: 使用源文件信息匹配原始数据")
+            
+            # 2. 如果无法通过源文件匹配，尝试使用dataset列
+            if raw_data is None and has_dataset_column and 'dataset' in event and event['dataset'] in raw_data_dict:
                 # 如果事件有数据集标识且该数据集已加载
                 raw_data = raw_data_dict[event['dataset']]
-            else:
+            
+            # 3. 如果前两种方法都失败，尝试所有数据集进行列名匹配
+            if raw_data is None or neuron_col not in raw_data.columns:
                 # 尝试所有数据集，查找包含此神经元的数据集
                 for dataset_name, dataset_raw_data in raw_data_dict.items():
                     if neuron_col in dataset_raw_data.columns:
