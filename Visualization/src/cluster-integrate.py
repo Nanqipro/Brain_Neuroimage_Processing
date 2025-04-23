@@ -687,7 +687,7 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     print("正在可视化不同聚类类别的平均钙爆发波形...")
     
     # 设置时间窗口（采样点数）- 减小窗口大小以提高匹配成功率
-    time_window = 50
+    time_window = 200
     
     # 将标签添加到数据框
     df_cluster = df.copy()
@@ -862,9 +862,11 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
         if len(cluster_events) == 0:
             continue
         
-        # 收集所有波形
+        # 收集所有波形，指定固定长度
         all_waveforms = []
-        time_points = np.arange(-time_window, time_window+1)
+        fixed_length = 2 * time_window + 1  # 固定长度：前后各time_window个点，加上峰值点
+        time_points = np.linspace(-time_window, time_window, fixed_length)
+        print(f"聚类 {cluster_id+1}: 使用固定长度{fixed_length}处理波形...")
         
         # 对每个事件，提取波形
         for idx, event in cluster_events.iterrows():
@@ -934,20 +936,25 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
                     start = max(0, peak_idx - actual_window)
                     end = min(len(raw_data), peak_idx + actual_window + 1)
                     # 调整时间点以匹配新窗口
-                    time_points = np.arange(-actual_window, actual_window+1)
+                    fixed_length = 2 * actual_window + 1
+                    time_points = np.linspace(-actual_window, actual_window, fixed_length)
                 
                 # 提取波形
                 waveform = raw_data[neuron_col].values[start:end]
                 
                 # 确保波形长度与时间点匹配
                 if len(waveform) != len(time_points):
-                    # 修剪或填充波形以匹配时间点
-                    if len(waveform) > len(time_points):
-                        waveform = waveform[:len(time_points)]
+                    # 重新生成一个固定长度的时间点数组，确保所有波形使用相同的时间轴
+                    fixed_length = 2 * time_window + 1  # 固定长度：前后各time_window个点，加上峰值点
+                    # 修剪或填充波形以匹配固定长度
+                    if len(waveform) > fixed_length:
+                        waveform = waveform[:fixed_length]
                     else:
                         # 填充不足部分
-                        padding = np.full(len(time_points) - len(waveform), np.nan)
+                        padding = np.full(fixed_length - len(waveform), np.nan)
                         waveform = np.concatenate([waveform, padding])
+                    # 重置时间点数组为固定长度
+                    time_points = np.linspace(-time_window, time_window, fixed_length)
                 
                 # 归一化处理：减去基线并除以峰值振幅
                 # 忽略NaN值
@@ -967,9 +974,28 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
             print(f"警告: 聚类 {cluster_id+1} 没有有效波形")
             continue
         
+        # 预处理所有波形，确保长度一致
+        # 转换为统一长度的波形数组之前，先确认所有波形长度是否已一致
+        wave_lengths = [len(w) for w in all_waveforms]
+        if len(set(wave_lengths)) > 1:
+            # 存在长度不一致的情况，调整为统一长度
+            max_len = max(wave_lengths)
+            standardized_waveforms = []
+            for w in all_waveforms:
+                if len(w) < max_len:
+                    padding = np.full(max_len - len(w), np.nan)
+                    std_w = np.concatenate([w, padding])
+                else:
+                    std_w = w
+                standardized_waveforms.append(std_w)
+            all_waveforms = standardized_waveforms
+            # 调整时间点以匹配
+            time_points = np.linspace(-time_window, time_window, max_len)
+            
         # 计算平均波形（忽略NaN值）
-        avg_waveform = np.nanmean(all_waveforms, axis=0)
-        std_waveform = np.nanstd(all_waveforms, axis=0)
+        all_waveforms_array = np.array(all_waveforms)
+        avg_waveform = np.nanmean(all_waveforms_array, axis=0)
+        std_waveform = np.nanstd(all_waveforms_array, axis=0)
         
         # 存储平均波形
         avg_waveforms[f"Cluster_{cluster_id+1}"] = {
@@ -998,13 +1024,12 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
         return
     
     # 设置图表属性
-    plt.axvline(x=0, color='grey', linestyle='--', alpha=0.7)  # 标记峰值位置
-    plt.title('典型钙波形状对比 (各聚类平均波形)', fontsize=14)  # 修改标题为中文
-    plt.xlabel('峰值相对时间点', fontsize=12)  # 修改X轴标签为中文
-    plt.ylabel('归一化荧光强度 (F/F0)', fontsize=12)  # 修改Y轴标签为中文
+    plt.axvline(x=0, color='grey', linestyle='--', alpha=0.7)  # Mark peak position
+    plt.title('Typical Calcium Wave Shape Comparison (Average Waveforms of Clusters)', fontsize=14)  # Change title to English
+    plt.xlabel('Relative Time to Peak', fontsize=12)  # Change X-axis label to English
+    plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)  # Change Y-axis label to English
     plt.grid(True, alpha=0.3)
     plt.legend(loc='upper right')
-    
     # 保存图表
     os.makedirs(output_dir, exist_ok=True)
     plt.tight_layout()
