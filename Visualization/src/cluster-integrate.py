@@ -15,10 +15,6 @@ from matplotlib.colors import ListedColormap
 import matplotlib.cm as cm
 import argparse  # 导入命令行参数处理模块
 import glob  # 导入用于文件路径模式匹配的模块
-import json
-import pickle
-from datetime import datetime
-from scipy.spatial.distance import cdist
 
 def load_data(file_path):
     """
@@ -203,132 +199,7 @@ def cluster_dbscan(features_scaled):
     labels = dbscan.fit_predict(features_scaled)
     return labels
 
-def assign_wave_colors(cluster_centers, feature_names=None, color_map='tab10', persistent_file=None):
-    """
-    基于波形特征为聚类分配一致的颜色
-    
-    参数
-    ----------
-    cluster_centers : numpy.ndarray
-        聚类中心点，每一行代表一个聚类的特征向量
-    feature_names : list, 可选
-        特征名称，用于确定哪些特征权重更高
-    color_map : str, 可选
-        使用的颜色映射名称，默认为'tab10'
-    persistent_file : str, 可选
-        保存颜色映射的文件路径，用于在不同运行之间保持一致
-        
-    返回
-    -------
-    color_indices : numpy.ndarray
-        每个聚类对应的颜色索引，可用于cmap(color_indices[i])
-    color_map_obj : matplotlib.colors.Colormap
-        颜色映射对象
-    """
-    # 1. 归一化特征，使不同量纲的特征可比较
-    scaler = StandardScaler()
-    scaled_centers = scaler.fit_transform(cluster_centers)
-    
-    # 2. 特征加权（可选）
-    # 如果提供了特征名称，根据特征重要性调整权重
-    if feature_names:
-        # 默认权重
-        weights = np.ones(len(feature_names))
-        
-        # 增加重要特征的权重 - 提高波形特征权重
-        important_features = ['amplitude', 'duration', 'fwhm', 'rise_time', 'decay_time']
-        for i, feature in enumerate(feature_names):
-            if feature in important_features:
-                weights[i] = 2.0  # 增加权重，从1.5提高到2.0
-        
-        # 应用权重
-        scaled_centers = scaled_centers * weights
-        print(f"应用了特征权重，增强了波形形态特征的影响")
-    
-    # 3. 应用降维，将特征压缩到一维或二维
-    if scaled_centers.shape[1] > 2:
-        pca = PCA(n_components=2) # 改为使用2个主成分提供更好的聚类区分度
-        reduced_features = pca.fit_transform(scaled_centers)
-        # 合并两个主成分，但给第一个主成分更高的权重
-        reduced_features = reduced_features[:, 0] * 0.8 + reduced_features[:, 1] * 0.2
-    else:
-        reduced_features = scaled_centers.mean(axis=1)
-    
-    # 4. 排序并分配颜色索引
-    # 特征值越相似的聚类，颜色索引也越接近
-    sorted_indices = np.argsort(reduced_features)
-    n_clusters = len(cluster_centers)
-    
-    # 5. 创建颜色映射 - 使用更鲜明的颜色图
-    colormap_choices = ['tab10', 'Set1', 'Dark2', 'hsv']
-    try:
-        # 尝试使用新的推荐方法
-        cmap = plt.colormaps[color_map]
-    except (AttributeError, KeyError):
-        # 如果失败，回退到旧方法
-        cmap = plt.cm.get_cmap(color_map, n_clusters)
-    
-    # 6. 将排序后的索引映射到颜色范围 [0, 1]，并增加颜色区分度
-    # 先创建一个同样长度的原始索引数组
-    original_indices = np.arange(n_clusters)
-    # 然后计算每个原始索引在排序后的位置（反向映射）
-    inverse_mapping = np.zeros_like(original_indices)
-    for i, idx in enumerate(sorted_indices):
-        inverse_mapping[idx] = i
-    
-    # 归一化到 [0, 1] 区间，但避免颜色太接近，增加区分度
-    if n_clusters > 1:
-        # 使用非线性映射增加颜色间隔
-        color_indices = (inverse_mapping / (n_clusters - 1)) * 0.8 + 0.1
-    else:
-        color_indices = np.array([0.5])  # 单个聚类使用中间颜色
-    
-    # 7. 尝试保存/加载持久化的颜色映射
-    if persistent_file:
-        # 如果提供了持久化文件，尝试加载或保存
-        try:
-            if os.path.exists(persistent_file):
-                # 加载已有的持久化颜色映射
-                with open(persistent_file, 'rb') as f:
-                    saved_data = pickle.load(f)
-                    saved_features = saved_data.get('features', [])
-                    saved_colors = saved_data.get('colors', [])
-                    
-                    if len(saved_features) > 0 and len(saved_colors) > 0:
-                        # 如果有历史数据，尝试匹配当前聚类中心与历史中心
-                        # 计算距离矩阵
-                        current_features = scaled_centers
-                        distance_matrix = cdist(current_features, saved_features)
-                        
-                        # 为每个当前聚类中心找到最接近的历史中心
-                        new_color_indices = np.zeros_like(color_indices)
-                        for i in range(len(current_features)):
-                            closest_idx = np.argmin(distance_matrix[i])
-                            new_color_indices[i] = saved_colors[closest_idx]
-                        
-                        # 如果成功匹配，使用历史颜色
-                        if len(new_color_indices) == len(color_indices):
-                            print(f"从持久化文件加载颜色映射并匹配当前聚类: {persistent_file}")
-                            color_indices = new_color_indices
-            
-            # 更新并保存当前颜色映射到持久化文件
-            with open(persistent_file, 'wb') as f:
-                # 保存缩放后的特征和颜色，供后续匹配使用
-                data_to_save = {
-                    'features': scaled_centers,
-                    'colors': color_indices,
-                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'n_clusters': n_clusters,
-                    'feature_names': feature_names
-                }
-                pickle.dump(data_to_save, f)
-                print(f"颜色映射已保存到: {persistent_file}")
-        except Exception as e:
-            print(f"处理持久化颜色映射时出错: {e}")
-    
-    return color_indices, cmap
-
-def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca', output_dir='../results', color_indices=None):
+def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca', output_dir='../results'):
     """
     使用降维方法可视化聚类结果
     
@@ -344,56 +215,41 @@ def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca', 
         降维方法，'pca'或't-sne'，默认为'pca'
     output_dir : str, 可选
         输出目录路径，默认为'../results'
-    color_indices : numpy.ndarray, 可选
-        每个聚类的颜色索引，如果提供则使用这些颜色
     """
     n_clusters = len(np.unique(labels))
     if -1 in np.unique(labels):  # DBSCAN可能有噪声点标记为-1
         n_clusters -= 1
     
-    # 创建颜色映射
-    try:
-        # 尝试使用新的推荐方法
-        cmap = plt.colormaps['tab10']
-    except (AttributeError, KeyError):
-        # 如果失败，回退到旧方法
-        cmap = plt.cm.get_cmap('tab10', n_clusters)
+    # 创建随机颜色映射
+    cmap = ListedColormap(plt.cm.tab10(np.linspace(0, 1, n_clusters+1)))
     
     # 降维到2D
     if method == 'pca':
         print("使用PCA降维可视化...")
         reducer = PCA(n_components=2, random_state=42)
         embedding = reducer.fit_transform(features_scaled)
-        title = 'PCA降维聚类可视化'
+        title = 'PCA Dimensionality Reduction Cluster Visualization'
         filename = f'{output_dir}/cluster_visualization_pca.png'
     else:  # t-SNE
         print("使用t-SNE降维可视化...")
         reducer = TSNE(n_components=2, random_state=42)
         embedding = reducer.fit_transform(features_scaled)
-        title = 't-SNE降维聚类可视化'
+        title = 't-SNE Dimensionality Reduction Cluster Visualization'
         filename = f'{output_dir}/cluster_visualization_tsne.png'
     
     # 创建散点图
     plt.figure(figsize=(10, 8))
-    
-    # 使用预先计算的颜色索引（如果提供）
     for i in np.unique(labels):
-        if i == -1:  # DBSCAN噪声点
+        if i == -1:  # DBSCAN noise points
             plt.scatter(embedding[labels==i, 0], embedding[labels==i, 1], 
-                       c='black', marker='x', label='噪声')
+                       c='black', marker='x', label='Noise')
         else:
-            if color_indices is not None:
-                cluster_color = cmap(color_indices[i])
-            else:
-                # 使用默认颜色分配
-                cluster_color = cmap(i / n_clusters if n_clusters > 1 else 0)
-            
             plt.scatter(embedding[labels==i, 0], embedding[labels==i, 1], 
-                       color=cluster_color, marker='o', label=f'聚类 {i+1}')
+                       c=[cmap(i)], marker='o', label=f'Cluster {i+1}')
     
-    plt.title(title, fontsize=14)
-    plt.xlabel(f"{method.upper()} 维度 1", fontsize=12)
-    plt.ylabel(f"{method.upper()} 维度 2", fontsize=12)
+    plt.title(title)
+    plt.xlabel(f"{method.upper()} Dimension 1")
+    plt.ylabel(f"{method.upper()} Dimension 2")
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -401,8 +257,6 @@ def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca', 
     # 确保输出目录存在
     os.makedirs(output_dir, exist_ok=True)
     plt.savefig(filename, dpi=300)
-    
-    return embedding
 
 def visualize_feature_distribution(df, labels, output_dir='../results'):
     """
@@ -813,172 +667,392 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
     return best_k
 
-def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, raw_data_dir=None, color_indices=None):
+def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, raw_data_dir=None):
     """
-    可视化不同聚类的平均钙瞬变波形。
+    可视化不同聚类类别的平均钙爆发波形
     
-    Parameters
+    参数
     ----------
     df : pandas.DataFrame
-        包含计算的波形特征的数据帧
+        包含钙爆发特征的数据框，必须包含start_idx, peak_idx, end_idx和neuron字段
     labels : numpy.ndarray
         聚类标签
-    output_dir : str, optional
-        输出目录路径
-    raw_data_path : str, optional
-        原始数据文件路径，用于读取完整钙瞬变数据
-    raw_data_dir : str, optional
-        原始数据目录路径，用于读取多个钙瞬变数据文件
-    color_indices : numpy.ndarray, optional
-        颜色索引，用于一致的颜色映射
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
+    raw_data_path : str, 可选
+        单个原始数据文件路径
+    raw_data_dir : str, 可选
+        原始数据文件目录，用于查找多个数据文件
     """
-    # 检查df中是否存在必要的字段
-    required_fields = ['trace_id', 'raw_data_file', 'event_start_idx', 'event_end_idx', 'rise_start_idx', 'peak_idx', 'decay_end_idx']
-    missing_fields = [field for field in required_fields if field not in df.columns]
+    print("正在可视化不同聚类类别的平均钙爆发波形...")
     
-    # 确保输出目录存在
-    os.makedirs(output_dir, exist_ok=True)
+    # 设置时间窗口（采样点数）- 减小窗口大小以提高匹配成功率
+    time_window = 200
     
-    print(f"开始钙瞬变波形可视化...")
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
     
-    # 将裁剪的数据帧与标签一起保存
-    if len(missing_fields) == 0:
-        # 检查是否有原始数据路径
-        if raw_data_path is not None:
-            print(f"从单个文件加载原始钙数据: {raw_data_path}")
+    # 检查必要的字段
+    required_fields = ['start_idx', 'peak_idx', 'end_idx', 'neuron']
+    if not all(field in df_cluster.columns for field in required_fields):
+        print("错误: 数据中缺少必要字段(start_idx, peak_idx, end_idx, neuron)，无法绘制波形")
+        return
+    
+    # 获取聚类的数量
+    n_clusters = len(np.unique(labels))
+    if -1 in np.unique(labels):  # DBSCAN可能有噪声点标记为-1
+        n_clusters -= 1
+    
+    # 尝试加载原始数据
+    raw_data_dict = {}
+    
+    # 检查是否存在dataset列，表示合并了不同数据集
+    has_dataset_column = 'dataset' in df_cluster.columns
+    
+    # 检查是否包含源文件信息
+    has_source_info = all(col in df_cluster.columns for col in ['source_file', 'source_path', 'source_abs_path'])
+    if has_source_info:
+        print("检测到源文件路径信息，将优先使用这些信息加载原始数据")
+    
+    if raw_data_path:
+        # 如果指定了单个原始数据文件路径
+        try:
+            print(f"加载原始数据从: {raw_data_path}")
             raw_data = pd.read_excel(raw_data_path)
-            plot_waveforms_from_raw(df, labels, raw_data, output_dir, color_indices)
+            # 使用文件名作为数据集名称
+            dataset_name = os.path.splitext(os.path.basename(raw_data_path))[0]
+            raw_data_dict[dataset_name] = raw_data
+            print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+        except Exception as e:
+            print(f"无法加载原始数据: {str(e)}")
+            return
+    elif raw_data_dir:
+        # 如果指定了原始数据目录，查找所有Excel文件
+        try:
+            excel_files = glob.glob(os.path.join(raw_data_dir, "**/*.xlsx"), recursive=True)
+            print(f"在目录{raw_data_dir}下找到{len(excel_files)}个Excel文件")
             
-        elif raw_data_dir is not None:
-            print(f"从目录加载原始钙数据: {raw_data_dir}")
-            # 收集原始数据文件列表
-            raw_data_files = {}
-            for file in os.listdir(raw_data_dir):
-                if file.endswith('.xlsx') or file.endswith('.xls'):
-                    full_path = os.path.join(raw_data_dir, file)
-                    raw_data_files[file] = full_path
-            
-            if not raw_data_files:
-                print(f"警告: 在目录 {raw_data_dir} 中未找到Excel文件")
-                return
-            
-            # 按文件分组数据
-            grouped_data = df.groupby('raw_data_file')
-            
-            # 对每个文件组执行波形处理
-            all_mean_waves = []
-            all_cluster_info = []
-            
-            for file_name, group in grouped_data:
-                file_path = raw_data_files.get(file_name)
-                if file_path and os.path.exists(file_path):
-                    # 加载原始数据
-                    print(f"处理文件: {file_name}")
-                    raw_data = pd.read_excel(file_path)
-                    
-                    # 从此文件中获取标签
-                    group_indices = group.index
-                    group_labels = labels[group_indices]
-                    
-                    # 画波形并获取平均波形数据
-                    mean_waves, cluster_info = plot_waveforms_from_raw(
-                        group, group_labels, raw_data, 
-                        os.path.join(output_dir, f"waveforms_{os.path.splitext(file_name)[0]}"),
-                        color_indices
-                    )
-                    
-                    # 收集所有平均波形
-                    all_mean_waves.append(mean_waves)
-                    all_cluster_info.append(cluster_info)
-                else:
-                    print(f"警告: 找不到文件 {file_name} 或文件路径 {file_path}")
-            
-            # 合并所有平均波形并创建总体图
-            if all_mean_waves:
-                # 找出所有数据集中的所有聚类
-                all_clusters = set()
-                for info in all_cluster_info:
-                    all_clusters.update(info.keys())
-                
-                # 为每个聚类合并数据
-                merged_waves = {}
-                for cluster in all_clusters:
-                    cluster_waves = []
-                    for mean_wave, info in zip(all_mean_waves, all_cluster_info):
-                        if cluster in info:
-                            wave_data = mean_wave.get(cluster)
-                            if wave_data is not None and len(wave_data) > 0:
-                                # 确保有数据
-                                cluster_waves.append(wave_data)
-                    
-                    if cluster_waves:
-                        # 标准化波形长度
-                        max_len = max(len(w) for w in cluster_waves)
-                        norm_waves = []
-                        for wave in cluster_waves:
-                            # 如果波形太短，使用零填充
-                            if len(wave) < max_len:
-                                padded = np.zeros(max_len)
-                                padded[:len(wave)] = wave
-                                norm_waves.append(padded)
-                            else:
-                                norm_waves.append(wave[:max_len])
-                        
-                        # 计算平均波形
-                        merged_waves[cluster] = np.mean(norm_waves, axis=0)
-                
-                # 创建整体波形图，带有一致的颜色映射
-                plot_merged_waveforms(merged_waves, os.path.join(output_dir, "merged_waveforms"), color_indices)
-        else:
-            print("警告: 未提供原始数据路径，无法可视化波形")
+            for file in excel_files:
+                # 使用文件名作为数据集名称，而不是目录名
+                dataset_name = os.path.splitext(os.path.basename(file))[0]
+                try:
+                    raw_data = pd.read_excel(file)
+                    raw_data_dict[dataset_name] = raw_data
+                    print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                except Exception as e:
+                    print(f"  加载数据集{dataset_name}失败: {str(e)}")
+        except Exception as e:
+            print(f"搜索原始数据文件时出错: {str(e)}")
+            return
     else:
-        print(f"警告: 缺少波形可视化所需的字段: {missing_fields}")
-
-def plot_merged_waveforms(merged_waves, output_path, color_indices=None):
-    """
-    绘制合并后的所有聚类平均波形。
+        # 使用源文件信息加载原始数据（如果可用）
+        if has_source_info:
+            # 获取不同的源文件
+            unique_source_files = df_cluster['source_path'].unique()
+            print(f"从事件数据中检测到 {len(unique_source_files)} 个不同的源文件")
+            
+            # 使用项目根目录（通常是工作目录的上一级）作为基础
+            root_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
+            print(f"使用项目根目录: {root_dir}")
+            
+            # 加载每个源文件
+            for source_path in unique_source_files:
+                try:
+                    # 构建绝对路径
+                    if os.path.isabs(source_path):
+                        abs_path = source_path
+                    else:
+                        abs_path = os.path.join(root_dir, source_path)
+                    
+                    if os.path.exists(abs_path):
+                        print(f"加载源文件: {abs_path}")
+                        raw_data = pd.read_excel(abs_path)
+                        dataset_name = os.path.splitext(os.path.basename(abs_path))[0]
+                        raw_data_dict[dataset_name] = raw_data
+                        print(f"  成功加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                    else:
+                        print(f"  源文件不存在: {abs_path}")
+                except Exception as e:
+                    print(f"  加载源文件 {source_path} 失败: {str(e)}")
+        
+        # 如果无法使用源文件信息或未找到任何文件，尝试使用默认位置
+        if not raw_data_dict:
+            try:
+                # 直接指定原始数据路径
+                raw_data_path = "../datasets/processed_EMtrace.xlsx"
+                print(f"尝试加载默认原始数据从: {raw_data_path}")
+                
+                # 加载原始数据
+                raw_data = pd.read_excel(raw_data_path)
+                dataset_name = os.path.splitext(os.path.basename(raw_data_path))[0]
+                raw_data_dict[dataset_name] = raw_data
+                print(f"成功加载原始数据，形状: {raw_data.shape}")
+            except Exception as e:
+                print(f"无法加载默认原始数据: {str(e)}")
+                print("尝试在../datasets目录下搜索原始数据...")
+                
+                try:
+                    # 尝试搜索datasets目录下的所有Excel文件
+                    datasets_dir = "../datasets"
+                    excel_files = glob.glob(os.path.join(datasets_dir, "*.xlsx"))
+                    
+                    if excel_files:
+                        for file in excel_files:
+                            dataset_name = os.path.splitext(os.path.basename(file))[0]
+                            try:
+                                raw_data = pd.read_excel(file)
+                                raw_data_dict[dataset_name] = raw_data
+                                print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                            except Exception as e:
+                                print(f"  加载数据集{dataset_name}失败: {str(e)}")
+                    else:
+                        print("在../datasets目录下未找到任何Excel文件")
+                        return
+                except Exception as e:
+                    print(f"搜索原始数据时出错: {str(e)}")
+                    return
     
-    Parameters
-    ----------
-    merged_waves : dict
-        每个聚类的平均波形数据
-    output_path : str
-        输出文件路径（不带扩展名）
-    color_indices : numpy.ndarray, optional
-        颜色索引，用于一致的颜色映射
-    """
+    if not raw_data_dict:
+        print("未能加载任何原始数据，无法可视化波形")
+        return
+    
+    # 打印所有可用神经元列以供调试
+    print("原始数据中的神经元列：")
+    for dataset_name, data in raw_data_dict.items():
+        neuron_cols = [col for col in data.columns if col.startswith('n') and col[1:].isdigit()]
+        print(f"  数据集 {dataset_name}: {len(neuron_cols)} 个神经元列 - {neuron_cols[:5]}...")
+    
+    # 打印钙爆发数据中的神经元名称以供调试
+    unique_neurons = df_cluster['neuron'].unique()
+    print(f"钙爆发数据中的神经元: {len(unique_neurons)} 个 - {unique_neurons[:5]}...")
+    
+    # 创建神经元名称映射，处理可能的命名不一致问题
+    neuron_mapping = {}
+    for neuron_name in unique_neurons:
+        # 检查神经元名称是否以'n'开头，并且第二个字符是数字
+        if isinstance(neuron_name, str) and neuron_name.startswith('n') and neuron_name[1:].isdigit():
+            # 保持原名
+            neuron_mapping[neuron_name] = neuron_name
+        elif isinstance(neuron_name, (int, float)) or (isinstance(neuron_name, str) and neuron_name.isdigit()):
+            # 如果是纯数字，则转为"n数字"格式
+            formatted_name = f"n{int(float(neuron_name))}"
+            neuron_mapping[neuron_name] = formatted_name
+    
+    print(f"创建了 {len(neuron_mapping)} 个神经元名称映射")
+    
+    # 创建颜色映射 - 修复弃用的get_cmap方法
+    try:
+        # 尝试使用新的推荐方法
+        cmap = plt.colormaps['tab10']
+    except (AttributeError, KeyError):
+        # 如果失败，回退到旧方法
+        cmap = plt.cm.get_cmap('tab10', n_clusters)
+    
+    # 为每个聚类提取和平均波形
     plt.figure(figsize=(12, 8))
     
-    clusters = sorted(merged_waves.keys())
-    n_clusters = len(clusters)
+    # 记录不同聚类的平均波形数据，用于保存
+    avg_waveforms = {}
     
-    # 确定颜色映射
-    if color_indices is not None:
-        # 使用提供的颜色索引
-        cmap = plt.cm.get_cmap('tab10', n_clusters)
-        colors = [cmap(color_indices[cluster]) if cluster < len(color_indices) else cmap(cluster % n_clusters) 
-                for cluster in clusters]
-    else:
-        # 使用默认颜色循环
-        colors = plt.cm.tab10(np.linspace(0, 1, n_clusters))
+    for cluster_id in range(n_clusters):
+        # 获取当前聚类的所有钙爆发事件
+        cluster_events = df_cluster[df_cluster['cluster'] == cluster_id]
+        
+        if len(cluster_events) == 0:
+            continue
+        
+        # 收集所有波形，指定固定长度
+        all_waveforms = []
+        fixed_length = 2 * time_window + 1  # 固定长度：前后各time_window个点，加上峰值点
+        time_points = np.linspace(-time_window, time_window, fixed_length)
+        print(f"聚类 {cluster_id+1}: 使用固定长度{fixed_length}处理波形...")
+        
+        # 对每个事件，提取波形
+        for idx, event in cluster_events.iterrows():
+            neuron_col = event['neuron']
+            
+            # 应用神经元名称映射
+            if neuron_col in neuron_mapping:
+                neuron_col = neuron_mapping[neuron_col]
+            
+            # 确定使用哪个原始数据集
+            raw_data = None
+            
+            # 1. 优先使用源文件信息精确匹配
+            if has_source_info and 'source_file' in event:
+                source_file = event['source_file']
+                # 提取不带扩展名的文件名作为数据集名称
+                source_dataset = os.path.splitext(source_file)[0]
+                if source_dataset in raw_data_dict:
+                    raw_data = raw_data_dict[source_dataset]
+                    # 只对每个聚类的第一个事件显示此消息，避免输出过多
+                    if idx == cluster_events.index[0]:
+                        print(f"聚类 {cluster_id+1}: 使用源文件信息匹配原始数据")
+            
+            # 2. 如果无法通过源文件匹配，尝试使用dataset列
+            if raw_data is None and has_dataset_column and 'dataset' in event and event['dataset'] in raw_data_dict:
+                # 如果事件有数据集标识且该数据集已加载
+                raw_data = raw_data_dict[event['dataset']]
+            
+            # 3. 如果前两种方法都失败，尝试所有数据集进行列名匹配
+            if raw_data is None or neuron_col not in raw_data.columns:
+                # 尝试所有数据集，查找包含此神经元的数据集
+                for dataset_name, dataset_raw_data in raw_data_dict.items():
+                    if neuron_col in dataset_raw_data.columns:
+                        raw_data = dataset_raw_data
+                        break
+            
+            if raw_data is None or neuron_col not in raw_data.columns:
+                # 如果还找不到，尝试其他命名方式
+                for dataset_name, dataset_raw_data in raw_data_dict.items():
+                    # 尝试格式如 "n3" 或 "3" 等
+                    if neuron_col.lstrip('n') in dataset_raw_data.columns:
+                        neuron_col = neuron_col.lstrip('n')
+                        raw_data = dataset_raw_data
+                        break
+                    elif f"n{neuron_col}" in dataset_raw_data.columns:
+                        neuron_col = f"n{neuron_col}"
+                        raw_data = dataset_raw_data
+                        break
+                
+                # 如果仍找不到，则跳过此事件
+                if raw_data is None or neuron_col not in raw_data.columns:
+                    continue
+            
+            # 提取中心在peak_idx的时间窗口数据
+            try:
+                peak_idx = int(event['peak_idx'])
+                start = max(0, peak_idx - time_window)
+                end = min(len(raw_data), peak_idx + time_window + 1)
+                
+                # 如果提取的窗口不完整，尝试缩小窗口而不是完全跳过
+                if end - start < 2 * time_window + 1:
+                    actual_window = min(peak_idx, len(raw_data) - peak_idx - 1)
+                    if actual_window < 10:  # 如果窗口太小则跳过
+                        continue
+                    
+                    # 使用较小的窗口
+                    start = max(0, peak_idx - actual_window)
+                    end = min(len(raw_data), peak_idx + actual_window + 1)
+                    # 调整时间点以匹配新窗口
+                    fixed_length = 2 * actual_window + 1
+                    time_points = np.linspace(-actual_window, actual_window, fixed_length)
+                
+                # 提取波形
+                waveform = raw_data[neuron_col].values[start:end]
+                
+                # 确保波形长度与时间点匹配
+                if len(waveform) != len(time_points):
+                    # 重新生成一个固定长度的时间点数组，确保所有波形使用相同的时间轴
+                    fixed_length = 2 * time_window + 1  # 固定长度：前后各time_window个点，加上峰值点
+                    # 修剪或填充波形以匹配固定长度
+                    if len(waveform) > fixed_length:
+                        waveform = waveform[:fixed_length]
+                    else:
+                        # 填充不足部分
+                        padding = np.full(fixed_length - len(waveform), np.nan)
+                        waveform = np.concatenate([waveform, padding])
+                    # 重置时间点数组为固定长度
+                    time_points = np.linspace(-time_window, time_window, fixed_length)
+                
+                # 归一化处理：减去基线并除以峰值振幅
+                # 忽略NaN值
+                valid_indices = ~np.isnan(waveform)
+                if np.sum(valid_indices) > 10:  # 确保有足够的有效点
+                    baseline = np.nanmin(waveform)
+                    amplitude = np.nanmax(waveform) - baseline
+                    if amplitude > 0:  # 避免除以零
+                        norm_waveform = (waveform - baseline) / amplitude
+                        all_waveforms.append(norm_waveform)
+            except Exception as e:
+                print(f"处理事件 {idx} 时出错: {str(e)}")
+                continue
+        
+        # 如果没有有效波形，跳过此聚类
+        if len(all_waveforms) == 0:
+            print(f"警告: 聚类 {cluster_id+1} 没有有效波形")
+            continue
+        
+        # 预处理所有波形，确保长度一致
+        # 转换为统一长度的波形数组之前，先确认所有波形长度是否已一致
+        wave_lengths = [len(w) for w in all_waveforms]
+        if len(set(wave_lengths)) > 1:
+            # 存在长度不一致的情况，调整为统一长度
+            max_len = max(wave_lengths)
+            standardized_waveforms = []
+            for w in all_waveforms:
+                if len(w) < max_len:
+                    padding = np.full(max_len - len(w), np.nan)
+                    std_w = np.concatenate([w, padding])
+                else:
+                    std_w = w
+                standardized_waveforms.append(std_w)
+            all_waveforms = standardized_waveforms
+            # 调整时间点以匹配
+            time_points = np.linspace(-time_window, time_window, max_len)
+            
+        # 计算平均波形（忽略NaN值）
+        all_waveforms_array = np.array(all_waveforms)
+        avg_waveform = np.nanmean(all_waveforms_array, axis=0)
+        std_waveform = np.nanstd(all_waveforms_array, axis=0)
+        
+        # 存储平均波形
+        avg_waveforms[f"Cluster_{cluster_id+1}"] = {
+            "time": time_points,
+            "mean": avg_waveform,
+            "std": std_waveform,
+            "n_samples": len(all_waveforms)
+        }
+        
+        # 绘制平均波形 - 移除标准差范围，仅绘制平均曲线
+        plt.plot(time_points, avg_waveform, 
+                 color=cmap(cluster_id), 
+                 linewidth=2.5,  # 增加线宽使曲线更突出
+                 label=f'Cluster {cluster_id+1} (n={len(all_waveforms)})')
+        
+        # 移除标准差范围的绘制
+        # plt.fill_between(time_points, 
+        #                  avg_waveform - std_waveform, 
+        #                  avg_waveform + std_waveform, 
+        #                  color=cmap(cluster_id), 
+        #                  alpha=0.2)
     
-    # 绘制每个聚类的平均波形
-    for i, cluster in enumerate(clusters):
-        wave = merged_waves[cluster]
-        x = np.arange(len(wave))
-        plt.plot(x, wave, label=f'聚类 {cluster}', color=colors[i], linewidth=2)
+    # 检查是否有任何有效的聚类波形
+    if not avg_waveforms:
+        print("没有找到任何有效的波形数据，无法生成波形图")
+        return
     
-    plt.title('所有聚类的平均钙瞬变波形')
-    plt.xlabel('时间点')
-    plt.ylabel('荧光强度 (归一化)')
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend()
-    
-    # 保存图像
+    # 设置图表属性
+    plt.axvline(x=0, color='grey', linestyle='--', alpha=0.7)  # Mark peak position
+    plt.title('Typical Calcium Wave Shape Comparison (Average Waveforms of Clusters)', fontsize=14)  # Change title to English
+    plt.xlabel('Relative Time to Peak', fontsize=12)  # Change X-axis label to English
+    plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)  # Change Y-axis label to English
+    plt.grid(True, alpha=0.3)
+    plt.legend(loc='upper right')
+    # 保存图表
+    os.makedirs(output_dir, exist_ok=True)
     plt.tight_layout()
-    plt.savefig(f"{output_path}.png", dpi=300)
-    plt.savefig(f"{output_path}.svg", format='svg')
-    plt.close()
+    plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
+    
+    # 保存平均波形数据 - 修复append方法已弃用的问题
+    waveform_data = []
+    for cluster_name, waveform_data_dict in avg_waveforms.items():
+        for i, t in enumerate(waveform_data_dict["time"]):
+            waveform_data.append({
+                "cluster": cluster_name,
+                "time_point": t,
+                "mean_intensity": waveform_data_dict["mean"][i],
+                "std_intensity": waveform_data_dict["std"][i],
+                "n_samples": waveform_data_dict["n_samples"]
+            })
+    
+    # 创建DataFrame
+    waveform_df = pd.DataFrame(waveform_data)
+    waveform_df.to_csv(f'{output_dir}/cluster_average_waveforms.csv', index=False)
+    
+    print(f"平均钙爆发波形可视化已保存到 {output_dir}/cluster_average_waveforms.png")
+    print(f"波形数据已保存到 {output_dir}/cluster_average_waveforms.csv")
 
 def main():
     """
@@ -999,8 +1073,6 @@ def main():
     parser.add_argument('--raw_data_path', type=str, help='单个原始数据文件路径，用于波形可视化')
     parser.add_argument('--skip_waveform', action='store_true', help='跳过波形可视化步骤')
     parser.add_argument('--weights', type=str, help='特征权重，格式如"amplitude:1.2,duration:0.8"')
-    parser.add_argument('--color_mapping', type=str, default=None, 
-                       help='颜色映射文件路径，用于保持不同运行之间聚类颜色的一致性')
     args = parser.parse_args()
     
     # 处理输入文件路径
@@ -1140,66 +1212,71 @@ def main():
         print(f"执行K-means聚类时出错: {str(e)}")
         return
     
-    # 计算聚类中心点，用于颜色分配
-    kmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
-    kmeans.fit(features_scaled)
-    cluster_centers = kmeans.cluster_centers_
-    
-    # 分配基于波形特征的一致颜色
-    persistent_color_file = None
-    if args.color_mapping:
-        # 用户指定的文件
-        persistent_color_file = args.color_mapping
-    elif args.output:
-        # 默认使用输出目录下的颜色映射文件
-        persistent_color_file = f"{args.output}/cluster_color_mapping.json"
-    else:
-        # 如果没有指定输出目录，使用通用位置
-        persistent_color_file = "../results/cluster_color_mapping.json"
-    
-    # 计算颜色映射
-    color_indices, _ = assign_wave_colors(
-        cluster_centers, 
-        feature_names=feature_names,
-        persistent_file=persistent_color_file
-    )
-    
-    # 可视化聚类结果，使用一致的颜色
-    visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, 
-                          method='pca', output_dir=output_dir, color_indices=color_indices)
-    visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, 
-                          method='t-sne', output_dir=output_dir, color_indices=color_indices)
+    # 可视化聚类结果
+    try:
+        visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='pca', output_dir=output_dir)
+        visualize_clusters_2d(features_scaled, kmeans_labels, feature_names, method='t-sne', output_dir=output_dir)
+    except Exception as e:
+        print(f"可视化聚类结果时出错: {str(e)}")
     
     # 特征分布可视化
-    visualize_feature_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        visualize_feature_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"可视化特征分布时出错: {str(e)}")
     
     # 分析聚类结果
-    cluster_stats = analyze_clusters(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        cluster_stats = analyze_clusters(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"分析聚类结果时出错: {str(e)}")
+        cluster_stats = None
     
-    # 雷达图可视化
-    visualize_cluster_radar(cluster_stats, output_dir=output_dir)
+    # 如果有统计结果，则生成雷达图
+    if cluster_stats is not None:
+        try:
+            visualize_cluster_radar(cluster_stats, output_dir=output_dir)
+        except Exception as e:
+            print(f"生成雷达图时出错: {str(e)}")
     
     # 神经元簇分布
-    visualize_neuron_cluster_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        visualize_neuron_cluster_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"可视化神经元簇分布时出错: {str(e)}")
     
     # 添加波形类型分析
-    visualize_wave_type_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        visualize_wave_type_distribution(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"可视化波形类型分布时出错: {str(e)}")
     
     # 添加子峰分析
-    analyze_subpeaks(df_clean, kmeans_labels, output_dir=output_dir)
+    try:
+        analyze_subpeaks(df_clean, kmeans_labels, output_dir=output_dir)
+    except Exception as e:
+        print(f"分析子峰时出错: {str(e)}")
     
-    # 可视化不同聚类的平均钙瞬变波形，使用一致的颜色
+    # 尝试可视化不同聚类的平均钙爆发波形（如果原始数据可用且未指定跳过）
     if not args.skip_waveform:
-        visualize_cluster_waveforms(df_clean, kmeans_labels, 
-                                   output_dir=output_dir, 
-                                   raw_data_path=args.raw_data_path, 
-                                   raw_data_dir=args.raw_data_dir,
-                                   color_indices=color_indices)
+        try:
+            visualize_cluster_waveforms(df_clean, kmeans_labels, output_dir=output_dir, 
+                                      raw_data_path=args.raw_data_path, raw_data_dir=args.raw_data_dir)
+        except Exception as e:
+            print(f"可视化波形时出错: {str(e)}")
+    else:
+        print("根据参数设置，跳过波形可视化")
     
     # 将聚类标签添加到Excel
-    output_file = f'{output_dir}/transients_clustered_k{optimal_k}.xlsx'
-    add_cluster_to_excel(input_file, output_file, kmeans_labels)
-    print(f"聚类结果已保存到: {output_file}")
+    try:
+        output_file = f'{output_dir}/transients_clustered_k{optimal_k}.xlsx'
+        if args.input_dir and args.combine and len(input_files) > 1:
+            add_cluster_to_excel("combined_data", output_file, kmeans_labels, df=df_clean)
+        else:
+            add_cluster_to_excel(input_file, output_file, kmeans_labels, df=df_clean)
+        print(f"聚类结果已保存到: {output_file}")
+    except Exception as e:
+        print(f"保存聚类结果时出错: {str(e)}")
     
     print("聚类分析完成!")
 
