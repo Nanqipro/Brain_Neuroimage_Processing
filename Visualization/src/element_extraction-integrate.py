@@ -7,13 +7,15 @@ import matplotlib.pyplot as plt
 import os
 import argparse
 import glob
+from scipy import stats
 
-def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
-                             peak_distance=30, baseline_percentile=20, max_duration=350,
-                             detect_subpeaks=True, subpeak_prominence=0.25, 
-                             subpeak_width=10, subpeak_distance=15, params=None):
+def detect_calcium_transients(data, fs=1.0, min_snr=10.0, min_duration=25, smooth_window=65, 
+                             peak_distance=35, baseline_percentile=15, max_duration=350,
+                             detect_subpeaks=True, subpeak_prominence=0.3, 
+                             subpeak_width=15, subpeak_distance=20, min_amplitude=0.1,
+                             consistency_threshold=0.6, detrend_data=True, params=None):
     """
-    检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
+    检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动，增强噪声过滤
     
     参数
     ----------
@@ -22,25 +24,31 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     fs : float, 可选
         采样频率，默认为1.0Hz
     min_snr : float, 可选
-        最小信噪比阈值，默认为8.0
+        最小信噪比阈值，默认为10.0（提高了阈值）
     min_duration : int, 可选
-        最小持续时间（采样点数），默认为20
+        最小持续时间（采样点数），默认为25（增加了持续时间要求）
     smooth_window : int, 可选
-        平滑窗口大小，默认为50
+        平滑窗口大小，默认为65（增加了平滑强度）
     peak_distance : int, 可选
-        峰值间最小距离，默认为30
+        峰值间最小距离，默认为35（增加了距离要求）
     baseline_percentile : int, 可选
-        用于估计基线的百分位数，默认为20
+        用于估计基线的百分位数，默认为15
     max_duration : int, 可选
         钙爆发最大持续时间（采样点数），默认为350
     detect_subpeaks : bool, 可选
         是否检测大波中的小波峰，默认为True
     subpeak_prominence : float, 可选
-        子峰的相对突出度（主峰振幅的比例），默认为0.25
+        子峰的相对突出度（主峰振幅的比例），默认为0.3（提高了要求）
     subpeak_width : int, 可选
-        子峰的最小宽度，默认为10
+        子峰的最小宽度，默认为15（增加了宽度要求）
     subpeak_distance : int, 可选
-        子峰间的最小距离，默认为15
+        子峰间的最小距离，默认为20（增加了距离要求）
+    min_amplitude : float, 可选
+        最小绝对振幅阈值，默认为0.1（新增参数）
+    consistency_threshold : float, 可选
+        波形一致性阈值，用于过滤不规则波形，默认为0.6（新增参数）
+    detrend_data : bool, 可选
+        是否去除数据趋势，默认为True（新增参数）
         
     返回
     -------
@@ -60,23 +68,76 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         subpeak_prominence = params.get('subpeak_prominence', subpeak_prominence)
         subpeak_width = params.get('subpeak_width', subpeak_width)
         subpeak_distance = params.get('subpeak_distance', subpeak_distance)
+        min_amplitude = params.get('min_amplitude', min_amplitude)
+        consistency_threshold = params.get('consistency_threshold', consistency_threshold)
+        detrend_data = params.get('detrend_data', detrend_data)
+    
+    # 0. 去除数据趋势（如果启用）
+    if detrend_data:
+        from scipy import signal
+        # 使用高通滤波去除慢变化趋势
+        b, a = signal.butter(2, 0.05, 'highpass')
+        detrended_data = signal.filtfilt(b, a, data)
+        # 但保留原始数据的平均值
+        detrended_data = detrended_data + np.mean(data)
+        data_for_analysis = detrended_data
+    else:
+        data_for_analysis = data.copy()
     
     # 1. 应用平滑滤波器
     if smooth_window > 1:
         # 确保smooth_window是奇数
         if smooth_window % 2 == 0:
             smooth_window += 1
-        smoothed_data = signal.savgol_filter(data, smooth_window, 3)
+        smoothed_data = signal.savgol_filter(data_for_analysis, smooth_window, 3)
+        
+        # 添加中值滤波以进一步减少噪声
+        from scipy.signal import medfilt
+        med_window = min(25, smooth_window // 3)
+        if med_window % 2 == 0:
+            med_window += 1
+        smoothed_data = medfilt(smoothed_data, med_window)
     else:
-        smoothed_data = data.copy()
+        smoothed_data = data_for_analysis.copy()
     
     # 2. 估计基线和噪声水平
-    baseline = np.percentile(smoothed_data, baseline_percentile)
-    noise_level = np.std(smoothed_data[smoothed_data < np.percentile(smoothed_data, 50)])
+    # 使用更稳健的基线估计方法
+    from sklearn.neighbors import LocalOutlierFactor
+    try:
+        # 使用局部离群因子识别可能的钙事件点
+        lof = LocalOutlierFactor(n_neighbors=min(50, len(smoothed_data)//10 if len(smoothed_data) > 100 else 5), 
+                                contamination=0.2)
+        lof.fit_predict(smoothed_data.reshape(-1, 1))
+        # 负离群分数，越小表示越可能是离群点
+        outlier_scores = -lof.negative_outlier_factor_
+        # 找出非离群点的数据（可能是基线）
+        potential_baseline_points = smoothed_data[outlier_scores < np.percentile(outlier_scores, 70)]
+        # 使用这些点计算基线
+        if len(potential_baseline_points) > 10:
+            baseline = np.percentile(potential_baseline_points, baseline_percentile)
+        else:
+            # 回退到传统方法
+            baseline = np.percentile(smoothed_data, baseline_percentile)
+    except:
+        # 如果LOF方法失败，回退到传统方法
+        baseline = np.percentile(smoothed_data, baseline_percentile)
     
-    # 3. 检测主要峰值
+    # 计算更稳健的噪声水平
+    # 使用中位数绝对偏差(MAD)方法估计噪声
+    median_val = np.median(smoothed_data[smoothed_data < np.percentile(smoothed_data, 60)])
+    mad = np.median(np.abs(smoothed_data[smoothed_data < np.percentile(smoothed_data, 60)] - median_val))
+    noise_level = mad * 1.4826  # 转换MAD为标准差等效值
+    
+    # 如果MAD方法得到的噪声水平为0或非常小，则使用传统方法
+    if noise_level < 1e-6:
+        noise_level = np.std(smoothed_data[smoothed_data < np.percentile(smoothed_data, 50)])
+    
+    # 3. 检测主要峰值（使用更严格的条件）
     threshold = baseline + min_snr * noise_level
-    peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance)
+    # 增加prominence参数确保峰值显著性
+    min_prominence = min_snr * noise_level * 0.75
+    peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance, 
+                                  prominence=min_prominence)
     
     # 如果没有检测到峰值，返回空列表
     if len(peaks) == 0:
@@ -137,6 +198,10 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         peak_value = smoothed_data[peak_idx]
         amplitude = peak_value - baseline
         
+        # 检查振幅是否达到最小阈值（新增检查）
+        if amplitude < min_amplitude:
+            continue
+        
         # 计算半高宽 (FWHM)
         half_max = baseline + amplitude / 2
         widths, width_heights, left_ips, right_ips = peak_widths(smoothed_data, [peak_idx], rel_height=0.5)
@@ -145,6 +210,37 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         # 上升和衰减时间
         rise_time = (peak_idx - start_idx) / fs
         decay_time = (end_idx - peak_idx) / fs
+        
+        # 计算波形一致性（新增检查）
+        # 获取标准钙波形状和实际波形进行相关性比较
+        wave_segment = smoothed_data[start_idx:end_idx+1] - baseline
+        
+        # 标准化为单位高度便于比较
+        if np.max(wave_segment) > 0:
+            wave_segment = wave_segment / np.max(wave_segment)
+            
+            # 生成理想钙波模板（快速上升，慢速指数衰减）
+            t = np.linspace(0, 1, len(wave_segment))
+            peak_pos_rel = (peak_idx - start_idx) / (end_idx - start_idx)
+            ideal_wave = np.zeros_like(t)
+            # 上升段
+            ideal_wave[t <= peak_pos_rel] = t[t <= peak_pos_rel] / peak_pos_rel
+            # 衰减段
+            ideal_wave[t > peak_pos_rel] = np.exp(-(t[t > peak_pos_rel] - peak_pos_rel) / (1 - peak_pos_rel) * 3)
+            
+            # 计算波形一致性（相关系数）
+            try:
+                consistency = np.corrcoef(wave_segment, ideal_wave)[0, 1]
+                if np.isnan(consistency):
+                    consistency = 0
+            except:
+                consistency = 0
+                
+            # 筛选掉形状不一致的波形
+            if consistency < consistency_threshold:
+                continue
+        else:
+            continue  # 如果波段最大值为0，跳过
         
         # 计算峰面积 (AUC)
         segment = smoothed_data[start_idx:end_idx+1] - baseline
@@ -251,7 +347,8 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
             'snr': amplitude / noise_level,
             'wave_type': wave_type,
             'subpeaks_count': subpeaks_count,
-            'subpeaks': subpeaks
+            'subpeaks': subpeaks,
+            'consistency': consistency if 'consistency' in locals() else None
         }
         
         transients.append(transient)
@@ -552,6 +649,17 @@ def estimate_neuron_params(neuron_data):
     lower_percentile = np.percentile(neuron_data, 20)  # 使用较低百分位估计基线
     peak_intensity = (upper_percentile - lower_percentile) / data_std if data_std > 0 else 0
     
+    # 计算数据的偏度，用于评估信号分布特性
+    skewness = stats.skew(neuron_data)
+    
+    # 计算时间序列自相关，评估信号周期性和趋势
+    try:
+        from statsmodels.tsa.stattools import acf
+        autocorr = acf(neuron_data, nlags=min(100, len(neuron_data)//10), fft=True)
+        has_trend = np.mean(np.abs(autocorr[1:10])) > 0.5
+    except:
+        has_trend = False
+    
     # 进行初步峰值检测来评估信号特征
     # 使用一个保守的参数集来尝试检测峰值
     from scipy.signal import find_peaks
@@ -568,25 +676,23 @@ def estimate_neuron_params(neuron_data):
         params['min_snr'] = 2.5
     elif num_tentative_peaks < 3:  # 只检测到很少的峰值
         # 降低阈值，以便能够检测更多可能的峰值
-        params['min_snr'] = 3.0
+        params['min_snr'] = 4.0
     else:
         # 根据信噪比使用更细致的调整
         if signal_noise_ratio < 2:
-            params['min_snr'] = 2.5
-        elif signal_noise_ratio < 3:
-            params['min_snr'] = 3.0
-        elif signal_noise_ratio < 4:
-            params['min_snr'] = 3.5
-        elif signal_noise_ratio < 5:
             params['min_snr'] = 4.0
-        elif signal_noise_ratio < 7:
+        elif signal_noise_ratio < 3:
             params['min_snr'] = 5.0
-        elif signal_noise_ratio < 10:
+        elif signal_noise_ratio < 5:
             params['min_snr'] = 6.0
-        elif signal_noise_ratio < 15:
+        elif signal_noise_ratio < 7:
             params['min_snr'] = 7.0
-        else:
+        elif signal_noise_ratio < 10:
             params['min_snr'] = 8.0
+        elif signal_noise_ratio < 15:
+            params['min_snr'] = 9.0
+        else:
+            params['min_snr'] = 10.0
     
     # 2. 根据基线波动调整baseline_percentile
     # 对于信号差异大的神经元，降低基线百分位以减少漏检
@@ -600,72 +706,72 @@ def estimate_neuron_params(neuron_data):
         params['baseline_percentile'] = 10
     elif baseline_variability < 0.1:
         # 基线稳定，可以使用更高的百分位数
-        params['baseline_percentile'] = 25
+        params['baseline_percentile'] = 15
     else:
         # 默认值
-        params['baseline_percentile'] = 15
+        params['baseline_percentile'] = 12
     
     # 3. 根据信号特性调整平滑窗口
     # 对于信号弱的神经元，减小平滑窗口以保留微弱信号
     if num_tentative_peaks == 0 or num_tentative_peaks < 3:
         # 对于难以检测到峰值的神经元，减小平滑窗口
-        params['smooth_window'] = 21  # 确保是奇数
+        params['smooth_window'] = 35  # 确保是奇数
     elif baseline_variability > 0.3:
         # 噪声很大的信号需要更大的平滑窗口
         params['smooth_window'] = 101
     elif baseline_variability > 0.25:
         # 噪声大的信号需要更大的平滑窗口
-        params['smooth_window'] = 75
+        params['smooth_window'] = 85
     elif baseline_variability < 0.1:
         # 干净的信号可以使用更小的平滑窗口
-        params['smooth_window'] = 25
+        params['smooth_window'] = 51
     else:
         # 默认值
-        params['smooth_window'] = 51  # 确保是奇数
+        params['smooth_window'] = 65  # 确保是奇数
     
     # 4. 根据峰值强度调整peak_distance
     # 减小peak_distance以检测更密集的峰值
     if num_tentative_peaks == 0 or num_tentative_peaks < 3:
         # 对于检测不到或很少峰值的神经元，使用非常小的距离阈值
-        params['peak_distance'] = 15
+        params['peak_distance'] = 25
     elif peak_intensity < 2:
         # 弱峰值可能需要更小的距离
-        params['peak_distance'] = 20
+        params['peak_distance'] = 30
     elif peak_intensity > 5:
         # 强峰值通常间隔更大
-        params['peak_distance'] = 35
+        params['peak_distance'] = 45
     else:
         # 默认值
-        params['peak_distance'] = 25
+        params['peak_distance'] = 35
     
     # 5. 根据信号特性调整min_duration
     # 减小min_duration以检测更短的事件
     if num_tentative_peaks == 0 or num_tentative_peaks < 3:
         # 对于检测难度大的神经元，减小最小持续时间阈值
-        params['min_duration'] = 10
+        params['min_duration'] = 15
     elif baseline_variability > 0.3:
         # 非常嘈杂的信号，要求更长的持续时间以避免假阳性
-        params['min_duration'] = 30
+        params['min_duration'] = 35
     elif baseline_variability > 0.2:
         # 更嘈杂的信号，要求更长的持续时间以避免假阳性
-        params['min_duration'] = 25
+        params['min_duration'] = 30
     elif baseline_variability < 0.1:
         # 干净的信号可以检测更短的事件
-        params['min_duration'] = 15
+        params['min_duration'] = 20
     else:
         # 默认值
-        params['min_duration'] = 18
+        params['min_duration'] = 25
         
     # 6. 子峰检测参数调整
     if num_tentative_peaks == 0 or num_tentative_peaks < 3:
         # 对于难以检测的神经元，降低子峰突出度要求
-        params['subpeak_prominence'] = 0.15
+        params['subpeak_prominence'] = 0.2
     elif peak_intensity > 4:
         # 强峰值信号的子峰可能更明显
-        params['subpeak_prominence'] = 0.3
+        params['subpeak_prominence'] = 0.35
     else:
         # 弱峰值信号需要更低的子峰阈值
-        params['subpeak_prominence'] = 0.2
+        params['subpeak_prominence'] = 0.3
         
     # 7. 调整最大持续时间参数，以便适应不同类型的信号模式
     if num_tentative_peaks < 3:
@@ -678,9 +784,36 @@ def estimate_neuron_params(neuron_data):
         # 默认值
         params['max_duration'] = 350
         
-    # 8. 打印当前神经元的自适应参数，便于调试
+    # 8. 新增参数 - 最小振幅阈值
+    # 根据信噪比和基线波动调整
+    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
+        # 对于难以检测的数据，降低振幅阈值
+        params['min_amplitude'] = 0.05
+    elif signal_noise_ratio > 10:
+        # 高信噪比信号可以使用更高的振幅阈值
+        params['min_amplitude'] = 0.15
+    else:
+        params['min_amplitude'] = 0.1
+        
+    # 9. 新增参数 - 波形一致性阈值
+    # 根据信号质量调整一致性阈值
+    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
+        # 对于难以检测的数据，降低一致性要求
+        params['consistency_threshold'] = 0.4
+    elif signal_noise_ratio > 10:
+        # 高信噪比信号可以要求更高的一致性
+        params['consistency_threshold'] = 0.7
+    else:
+        params['consistency_threshold'] = 0.6
+        
+    # 10. 新增参数 - 数据去趋势
+    # 根据信号的自相关特性决定是否去除趋势
+    params['detrend_data'] = has_trend if 'has_trend' in locals() else True
+        
+    # 11. 打印当前神经元的自适应参数，便于调试
     print(f"  - 自适应参数: SNR={signal_noise_ratio:.2f}, min_snr={params['min_snr']}, "  
-          f"baseline={params['baseline_percentile']}, peaks={num_tentative_peaks}")
+          f"baseline={params['baseline_percentile']}, peaks={num_tentative_peaks}, "
+          f"consistency={params['consistency_threshold']:.2f}")
     
     return params
 
