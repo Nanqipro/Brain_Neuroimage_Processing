@@ -753,7 +753,7 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
             print(f"从事件数据中检测到 {len(unique_source_files)} 个不同的源文件")
             
             # 使用项目根目录（通常是工作目录的上一级）作为基础
-            root_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
+            root_dir = os.path.abspath(os.path.join(os.getcwd(), '../..'))
             print(f"使用项目根目录: {root_dir}")
             
             # 加载每个源文件

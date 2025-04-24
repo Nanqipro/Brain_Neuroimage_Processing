@@ -247,10 +247,10 @@ def visualize_traces(
 
 def main():
     """主函数入口"""
-    # 配置参数
-    input_file = '../../datasets/EM2Trace.xlsx'
-    output_file = '../../datasets/processed_EM2Trace.xlsx'
-    output_graph = '../../graph/smooth_traces_amplitude_EM2Trace.png'
+    # 配置参数No.29790930NORhabitituteCellVedio22024-12-04202145trace
+    input_file = '../../datasets/2979数据/No.297920240925homecagefamilarmice2024-12-07095919trace.xlsx'
+    output_file = '../../datasets/2979数据/processed_No.297920240925homecagefamilarmice2024-12-07095919trace.xlsx'
+    output_graph = '../../graph/smooth_traces_amplitude_No.297920240925homecagefamilarmice2024-12-07095919trace.png'
     
     params = {
         'moving_avg_window': 3,
