@@ -14,6 +14,7 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
                              subpeak_width=10, subpeak_distance=15, params=None):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
+    增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
     
     参数
     ----------
@@ -150,6 +151,111 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         segment = smoothed_data[start_idx:end_idx+1] - baseline
         auc = trapezoid(segment, dx=1.0/fs)
         
+        # 新增：计算典型钙波形态特征评分
+        # 1. 上升期陡峭、下降期缓慢的特征 - 钙波通常上升快，下降慢
+        rise_decay_ratio = rise_time / decay_time if decay_time > 0 else float('inf')
+        
+        # 2. 计算波形对称性 - 钙波通常是非对称的（快速上升，缓慢下降）
+        # 理想钙波的对称性应该较低
+        left_half = smoothed_data[start_idx:peak_idx+1] - baseline
+        right_half = smoothed_data[peak_idx:end_idx+1] - baseline
+        
+        # 对齐左右两侧长度
+        min_half_len = min(len(left_half), len(right_half))
+        if min_half_len > 3:  # 确保有足够的点来计算
+            left_half_resampled = np.interp(
+                np.linspace(0, 1, min_half_len),
+                np.linspace(0, 1, len(left_half)),
+                left_half
+            )
+            right_half_resampled = np.interp(
+                np.linspace(0, 1, min_half_len),
+                np.linspace(0, 1, len(right_half)),
+                right_half[::-1]  # 反转右半部分
+            )
+            
+            # 计算两侧差异作为非对称度量
+            asymmetry = np.sum(np.abs(left_half_resampled - right_half_resampled)) / np.sum(left_half_resampled)
+        else:
+            # 如果半峰太短，则使用默认值
+            asymmetry = 0
+            
+        # 3. 计算上升沿的平滑性和单调性
+        if peak_idx > start_idx + 2:
+            # 使用一阶差分评估平滑性
+            rise_segment = smoothed_data[start_idx:peak_idx+1]
+            rise_diff = np.diff(rise_segment)
+            
+            # 负值比例表示非单调上升的程度
+            non_monotonic_ratio = np.sum(rise_diff < 0) / len(rise_diff) if len(rise_diff) > 0 else 1
+            
+            # 计算一阶差分的波动性 - 平滑的上升沿应有较小的波动
+            rise_smoothness = np.std(rise_diff) / np.mean(rise_diff) if np.mean(rise_diff) > 0 else float('inf')
+        else:
+            non_monotonic_ratio = 1
+            rise_smoothness = float('inf')
+            
+        # 4. 下降沿的指数衰减特性
+        if end_idx > peak_idx + 3:
+            # 提取衰减部分并归一化
+            decay_segment = smoothed_data[peak_idx:end_idx+1] - baseline
+            decay_segment = decay_segment / decay_segment[0]  # 归一化
+            
+            # 对数变换后应近似线性 - 测量对数变换后的线性度
+            log_decay = np.log(decay_segment + 1e-10)  # 防止log(0)
+            
+            # 使用线性拟合，计算拟合度
+            x = np.arange(len(log_decay))
+            if len(x) > 1:  # 确保有足够的点拟合
+                try:
+                    slope, intercept = np.polyfit(x, log_decay, 1)
+                    # 计算R²作为衰减指数特性指标
+                    y_pred = slope * x + intercept
+                    ss_tot = np.sum((log_decay - np.mean(log_decay))**2)
+                    ss_res = np.sum((log_decay - y_pred)**2)
+                    exp_decay_score = 1 - ss_res/ss_tot if ss_tot > 0 else 0
+                except:
+                    exp_decay_score = 0
+            else:
+                exp_decay_score = 0
+        else:
+            exp_decay_score = 0
+            
+        # 5. 钙爆发持续时间/宽度比例 - 钙爆发通常有一定的形态比例
+        duration_width_ratio = duration / fwhm if fwhm > 0 else 0
+        
+        # 组合计算一个形态评分：0-1之间，越高表示越符合典型钙波特征
+        # 理想情况下：rise_decay_ratio应该小，asymmetry应该大，
+        # non_monotonic_ratio应该小，rise_smoothness应该小，
+        # exp_decay_score应该大，duration_width_ratio在适当范围
+        
+        # 定义理想的参数范围
+        ideal_rise_decay_ratio = 0.3  # 理想的上升/衰减时间比例
+        min_asymmetry = 0.2  # 最小非对称度
+        max_non_monotonic = 0.3  # 上升沿非单调性最大允许值
+        ideal_duration_width_ratio = 2.5  # 理想的持续时间/宽度比
+        
+        # 计算各指标的评分
+        rise_decay_score = np.exp(-2 * abs(rise_decay_ratio - ideal_rise_decay_ratio)) if rise_decay_ratio < 1 else 0
+        asymmetry_score = min(asymmetry / min_asymmetry, 1) if min_asymmetry > 0 else 0
+        monotonic_score = 1 - min(non_monotonic_ratio / max_non_monotonic, 1)
+        duration_ratio_score = np.exp(-0.5 * abs(duration_width_ratio - ideal_duration_width_ratio))
+        
+        # 综合形态评分 (0-1)，权重可根据重要性调整
+        morphology_score = (
+            0.25 * rise_decay_score + 
+            0.2 * asymmetry_score + 
+            0.2 * monotonic_score + 
+            0.2 * exp_decay_score + 
+            0.15 * duration_ratio_score
+        )
+        
+        # 设置形态评分阈值，过滤不符合典型钙波形态的峰值
+        min_morphology_score = 0.4  # 可调整此阈值
+        
+        if morphology_score < min_morphology_score:
+            continue  # 跳过此峰值，因为形态不符合典型钙波特征
+        
         # 检测波形的子峰值（如果启用）
         subpeaks = []
         if detect_subpeaks and (end_idx - start_idx) > 3 * subpeak_width:
@@ -251,7 +357,11 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
             'snr': amplitude / noise_level,
             'wave_type': wave_type,
             'subpeaks_count': subpeaks_count,
-            'subpeaks': subpeaks
+            'subpeaks': subpeaks,
+            'morphology_score': morphology_score,  # 添加形态评分
+            'rise_decay_ratio': rise_decay_ratio,
+            'asymmetry': asymmetry,
+            'exp_decay_score': exp_decay_score
         }
         
         transients.append(transient)
@@ -356,7 +466,7 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpea
 
 def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
     """
-    可视化钙离子浓度数据和检测到的钙爆发
+    可视化钙离子浓度数据和检测到的钙爆发，包括形态评分信息
     
     参数
     ----------
@@ -370,48 +480,69 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
         采样频率，默认为1.0Hz
     """
     time = np.arange(len(raw_data)) / fs
-    plt.figure(figsize=(14, 8))
+    plt.figure(figsize=(14, 10))
     
-    # 创建两个子图：原始数据和放大的波峰
-    ax1 = plt.subplot(2, 1, 1)
+    # 创建三个子图：原始数据、放大的波峰和形态评分分布
+    ax1 = plt.subplot(3, 1, 1)
     ax1.plot(time, raw_data, 'k-', alpha=0.4, label='Raw data')
     ax1.plot(time, smoothed_data, 'b-', label='Smoothed data')
     
+    # 用颜色梯度表示形态评分
+    import matplotlib.cm as cm
+    from matplotlib.colors import Normalize
+    
+    # 获取所有形态评分
+    scores = [t.get('morphology_score', 0.5) for t in transients]
+    norm = Normalize(vmin=0.4, vmax=1.0)  # 评分范围从0.4到1.0
+    cmap = cm.viridis
+    
     # 标记钙爆发
     for i, t in enumerate(transients):
-        # 使用不同的颜色标记简单波和复杂波
-        color = 'green' if t['wave_type'] == 'simple' else 'red'
-        marker_size = 8 if t['wave_type'] == 'simple' else 10
+        # 使用形态评分来确定颜色，评分越高颜色越亮
+        morphology_score = t.get('morphology_score', 0.5)
+        color = cmap(norm(morphology_score))
+        marker_size = 8 + morphology_score * 5  # 根据评分调整标记大小
         
         # 标记主峰值
         ax1.plot(t['peak_idx']/fs, t['peak_value'], 'o', color=color, markersize=marker_size)
         
         # 标记开始和结束
-        ax1.axvline(x=t['start_idx']/fs, color='g', linestyle='--', alpha=0.5)
-        ax1.axvline(x=t['end_idx']/fs, color='r', linestyle='--', alpha=0.5)
+        ax1.axvline(x=t['start_idx']/fs, color=color, linestyle='--', alpha=0.5)
+        ax1.axvline(x=t['end_idx']/fs, color=color, linestyle='--', alpha=0.5)
         
-        # 添加编号
-        ax1.text(t['peak_idx']/fs, t['peak_value']*1.05, f"{i+1}", 
-                 horizontalalignment='center', verticalalignment='bottom')
+        # 添加编号和评分
+        ax1.text(t['peak_idx']/fs, t['peak_value']*1.05, 
+                 f"{i+1}\n{morphology_score:.2f}", 
+                 horizontalalignment='center', verticalalignment='bottom',
+                 fontsize=8)
         
         # 标记子峰（如果有）
         if 'subpeaks' in t and t['subpeaks']:
             for sp in t['subpeaks']:
                 ax1.plot(sp['index']/fs, sp['value'], '*', color='magenta', markersize=8)
     
+    # 添加颜色条以显示形态评分范围
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax1, orientation='vertical', pad=0.01)
+    cbar.set_label('形态评分')
+    
     ax1.set_xlabel('Time (seconds)')
     ax1.set_ylabel('Calcium Signal Intensity')
     ax1.set_title(f'Detected {len(transients)} calcium transient events')
-    ax1.legend()
+    ax1.legend(loc='upper right')
     ax1.grid(True, alpha=0.3)
     
-    # 选择一个复杂波形进行放大显示
-    complex_waves = [t for t in transients if t['wave_type'] == 'complex']
-    if complex_waves:
-        ax2 = plt.subplot(2, 1, 2)
+    # 选择一个高形态评分的波形进行放大显示
+    if transients:
+        ax2 = plt.subplot(3, 1, 2)
         
-        # 选择子峰数最多的复杂波
-        t = max(complex_waves, key=lambda x: x['subpeaks_count'])
+        # 尝试选择形态评分最高的波形
+        if 'morphology_score' in transients[0]:
+            t = max(transients, key=lambda x: x.get('morphology_score', 0))
+        else:
+            # 如果没有形态评分，则选择最大振幅的波形
+            t = max(transients, key=lambda x: x['amplitude'])
         
         # 计算放大区域
         margin = 20  # 左右额外显示的点数
@@ -423,21 +554,97 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
         ax2.plot(zoom_time, raw_data[zoom_start:zoom_end], 'k-', alpha=0.4, label='Raw data')
         ax2.plot(zoom_time, smoothed_data[zoom_start:zoom_end], 'b-', label='Smoothed data')
         
+        # 计算高度百分比标记点
+        peak_val = t['peak_value']
+        baseline = t['baseline']
+        amplitude = peak_val - baseline
+        heights = [0.25, 0.5, 0.75]  # 25%, 50%, 75%的高度
+        
         # 标记主峰
-        ax2.plot(t['peak_idx']/fs, t['peak_value'], 'o', color='red', markersize=10, label='Main peak')
+        ms = t.get('morphology_score', 0.5)
+        color = cmap(norm(ms))
+        ax2.plot(t['peak_idx']/fs, peak_val, 'o', color=color, markersize=10, 
+                label=f'Peak (Score: {ms:.2f})')
+        
+        # 标记不同高度百分比
+        for h in heights:
+            h_val = baseline + h * amplitude
+            ax2.axhline(y=h_val, color='gray', linestyle=':', alpha=0.5)
+            ax2.text(zoom_time[0], h_val, f'{int(h*100)}%', 
+                    verticalalignment='center', fontsize=8)
+        
+        # 标记基线
+        ax2.axhline(y=baseline, color='r', linestyle='-', alpha=0.5, label='Baseline')
+        
+        # 添加关键特征标注
+        rise_time = t['rise_time']
+        decay_time = t['decay_time']
+        fwhm = t['fwhm']
+        ratio = t.get('rise_decay_ratio', 0)
+        asymm = t.get('asymmetry', 0)
+        
+        # 在图上标记这些特征
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        feature_text = (f"Rise: {rise_time:.2f}s\nDecay: {decay_time:.2f}s\n"
+                        f"FWHM: {fwhm:.2f}s\nRise/Decay: {ratio:.2f}\n"
+                        f"Asymmetry: {asymm:.2f}")
+        ax2.text(0.05, 0.95, feature_text, transform=ax2.transAxes, 
+                fontsize=9, verticalalignment='top', bbox=props)
         
         # 标记子峰
-        for sp in t['subpeaks']:
-            ax2.plot(sp['index']/fs, sp['value'], '*', color='magenta', markersize=8)
-            # 标记子峰边界
-            ax2.axvline(x=sp['start_idx']/fs, color='c', linestyle=':', alpha=0.7)
-            ax2.axvline(x=sp['end_idx']/fs, color='m', linestyle=':', alpha=0.7)
+        if 'subpeaks' in t and t['subpeaks']:
+            for sp in t['subpeaks']:
+                ax2.plot(sp['index']/fs, sp['value'], '*', color='magenta', markersize=8)
+                # 标记子峰边界
+                ax2.axvline(x=sp['start_idx']/fs, color='c', linestyle=':', alpha=0.7)
+                ax2.axvline(x=sp['end_idx']/fs, color='m', linestyle=':', alpha=0.7)
         
         ax2.set_xlabel('Time (seconds)')
         ax2.set_ylabel('Calcium Signal Intensity')
-        ax2.set_title(f'Complex wave with {len(t["subpeaks"])} subpeaks')
+        ax2.set_title(f'High-quality calcium wave (Score: {ms:.2f})')
         ax2.legend(loc='upper right')
         ax2.grid(True, alpha=0.3)
+        
+        # 第三个子图：形态评分分布直方图
+        ax3 = plt.subplot(3, 1, 3)
+        
+        # 提取所有波形的形态特征
+        if 'morphology_score' in transients[0]:
+            morphology_scores = [t.get('morphology_score', 0) for t in transients]
+            rise_decay_ratios = [t.get('rise_decay_ratio', 0) for t in transients]
+            asymmetries = [t.get('asymmetry', 0) for t in transients]
+            
+            # 绘制形态评分直方图
+            ax3.hist(morphology_scores, bins=15, alpha=0.7, color='skyblue', 
+                    label='Morphology Scores')
+            ax3.set_xlabel('Morphology Score')
+            ax3.set_ylabel('Frequency')
+            ax3.set_title('Distribution of Calcium Wave Morphology Scores')
+            
+            # 添加中位数标记
+            median_score = np.median(morphology_scores)
+            ax3.axvline(x=median_score, color='r', linestyle='--', label=f'Median: {median_score:.2f}')
+            
+            # 添加统计信息文本框
+            stats_text = (f"Total waves: {len(transients)}\n"
+                        f"Median score: {median_score:.2f}\n"
+                        f"Mean rise/decay ratio: {np.mean(rise_decay_ratios):.2f}\n"
+                        f"Mean asymmetry: {np.mean(asymmetries):.2f}")
+            ax3.text(0.95, 0.95, stats_text, transform=ax3.transAxes, 
+                    fontsize=9, horizontalalignment='right', 
+                    verticalalignment='top', bbox=props)
+            
+            ax3.legend()
+            ax3.grid(True, alpha=0.3)
+        else:
+            # 如果没有形态评分，则显示振幅分布
+            amplitudes = [t['amplitude'] for t in transients]
+            ax3.hist(amplitudes, bins=15, alpha=0.7, color='skyblue', 
+                    label='Amplitude Distribution')
+            ax3.set_xlabel('Amplitude')
+            ax3.set_ylabel('Frequency')
+            ax3.set_title('Distribution of Calcium Wave Amplitudes')
+            ax3.grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.show()
@@ -510,7 +717,7 @@ def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='be
 
 def estimate_neuron_params(neuron_data):
     """
-    根据神经元数据特性估计最优检测参数
+    根据神经元数据特性估计最优检测参数，强化过滤条件以减少噪声
     
     参数
     ----------
@@ -520,7 +727,7 @@ def estimate_neuron_params(neuron_data):
     返回
     -------
     params : dict
-        自适应参数字典
+        强化过滤的自适应参数字典
     """
     # 计算基本统计量
     data_mean = np.mean(neuron_data)
@@ -530,157 +737,138 @@ def estimate_neuron_params(neuron_data):
     data_range = data_max - data_min
     
     # 更稳健的信噪比计算
-    # 使用最高10%和最低10%的数据来计算信号差异
-    upper_10_percentile = np.percentile(neuron_data, 90)
-    lower_10_percentile = np.percentile(neuron_data, 10)
-    robust_range = upper_10_percentile - lower_10_percentile
+    # 使用最高5%和最低5%的数据来计算信号差异，更严格的信号范围判断
+    upper_percentile = np.percentile(neuron_data, 95)
+    lower_percentile = np.percentile(neuron_data, 5)
+    robust_range = upper_percentile - lower_percentile
     
-    # 使用中位数绝对偏差(MAD)作为噪声度量，比标准差更稳健
+    # 使用中位数绝对偏差(MAD)作为噪声度量
     median_val = np.median(neuron_data)
     mad = np.median(np.abs(neuron_data - median_val))
     
-    # 更稳健的信噪比计算
-    signal_noise_ratio = robust_range / (mad * 1.4826) if mad > 0 else 0  # 1.4826是使MAD与正态分布的标准差对应的系数
+    # 更严格的信噪比计算
+    signal_noise_ratio = robust_range / (mad * 1.4826) if mad > 0 else 0
     
-    # 评估数据的基线波动
+    # 评估数据的基线稳定性
     sorted_data = np.sort(neuron_data)
-    lower_half = sorted_data[:len(sorted_data)//2]
+    lower_half = sorted_data[:len(sorted_data)//3]  # 使用下三分之一作为基线估计
     baseline_variability = np.std(lower_half) / np.mean(lower_half) if np.mean(lower_half) > 0 else 0
     
     # 评估峰值特性
-    upper_percentile = np.percentile(neuron_data, 95)
-    lower_percentile = np.percentile(neuron_data, 20)  # 使用较低百分位估计基线
+    upper_percentile = np.percentile(neuron_data, 98)  # 更严格地只考虑最高的2%
+    lower_percentile = np.percentile(neuron_data, 15)  # 使用较低百分位估计基线
     peak_intensity = (upper_percentile - lower_percentile) / data_std if data_std > 0 else 0
     
     # 进行初步峰值检测来评估信号特征
-    # 使用一个保守的参数集来尝试检测峰值
+    # 使用更严格的参数进行初步检测
     from scipy.signal import find_peaks
-    peaks, _ = find_peaks(neuron_data, distance=20, prominence=data_std*1.5)
+    peaks, _ = find_peaks(neuron_data, distance=25, prominence=data_std*2.0)
     num_tentative_peaks = len(peaks)
     
-    # 自适应参数配置
+    # 自适应参数配置，提高门槛以过滤更多噪声
     params = {}
     
-    # 1. 使用更灵活的min_snr调整策略
-    # 针对不同情况做特殊处理
-    if num_tentative_peaks == 0:  # 使用初步检测没发现任何峰值
-        # 大幅降低阈值以尝试检测微弱信号
-        params['min_snr'] = 2.5
-    elif num_tentative_peaks < 3:  # 只检测到很少的峰值
-        # 降低阈值，以便能够检测更多可能的峰值
-        params['min_snr'] = 3.0
+    # 1. 显著提高信噪比阈值
+    if num_tentative_peaks == 0:  
+        # 即使没有检测到峰值，也提高最低阈值，避免误检
+        params['min_snr'] = 3.5  # 提高最低阈值
+    elif num_tentative_peaks < 3: 
+        params['min_snr'] = 4.0  # 提高小峰值的检测阈值
     else:
-        # 根据信噪比使用更细致的调整
+        # 根据信噪比使用更严格的调整
         if signal_noise_ratio < 2:
-            params['min_snr'] = 2.5
+            params['min_snr'] = 4.0  # 显著提高
         elif signal_noise_ratio < 3:
-            params['min_snr'] = 3.0
+            params['min_snr'] = 4.5
         elif signal_noise_ratio < 4:
-            params['min_snr'] = 3.5
-        elif signal_noise_ratio < 5:
-            params['min_snr'] = 4.0
-        elif signal_noise_ratio < 7:
             params['min_snr'] = 5.0
+        elif signal_noise_ratio < 5:
+            params['min_snr'] = 5.5
+        elif signal_noise_ratio < 7:
+            params['min_snr'] = 6.5
         elif signal_noise_ratio < 10:
-            params['min_snr'] = 6.0
-        elif signal_noise_ratio < 15:
-            params['min_snr'] = 7.0
-        else:
             params['min_snr'] = 8.0
+        elif signal_noise_ratio < 15:
+            params['min_snr'] = 9.0
+        else:
+            params['min_snr'] = 10.0  # 进一步提高高信噪比情况下的阈值
     
-    # 2. 根据基线波动调整baseline_percentile
-    # 对于信号差异大的神经元，降低基线百分位以减少漏检
-    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 如果初步检测到的峰值很少或没有，使用更低的百分位数以减少漏检
-        params['baseline_percentile'] = 5
-    elif baseline_variability > 0.3:
-        # 基线不稳定，使用更低的百分位数
-        params['baseline_percentile'] = 8
-    elif baseline_variability > 0.2:
+    # 2. 调整baseline_percentile，更准确地估计基线
+    if baseline_variability > 0.3:
+        # 对于基线不稳定的信号，使用更低的百分位以更准确地捕获真实基线
         params['baseline_percentile'] = 10
+    elif baseline_variability > 0.2:
+        params['baseline_percentile'] = 12
     elif baseline_variability < 0.1:
-        # 基线稳定，可以使用更高的百分位数
-        params['baseline_percentile'] = 25
+        # 基线稳定时，可以使用更高的百分位数，避免误将低振幅波动视为信号
+        params['baseline_percentile'] = 30
     else:
-        # 默认值
-        params['baseline_percentile'] = 15
+        params['baseline_percentile'] = 20
     
-    # 3. 根据信号特性调整平滑窗口
-    # 对于信号弱的神经元，减小平滑窗口以保留微弱信号
-    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 对于难以检测到峰值的神经元，减小平滑窗口
-        params['smooth_window'] = 21  # 确保是奇数
-    elif baseline_variability > 0.3:
-        # 噪声很大的信号需要更大的平滑窗口
-        params['smooth_window'] = 101
+    # 3. 增大平滑窗口以减少噪声影响
+    if baseline_variability > 0.35:
+        # 极度嘈杂的信号需要更大的平滑窗口
+        params['smooth_window'] = 121
     elif baseline_variability > 0.25:
-        # 噪声大的信号需要更大的平滑窗口
+        params['smooth_window'] = 101
+    elif baseline_variability > 0.15:
         params['smooth_window'] = 75
     elif baseline_variability < 0.1:
-        # 干净的信号可以使用更小的平滑窗口
-        params['smooth_window'] = 25
+        # 即使对于干净的信号，也保持一定的平滑以提高一致性
+        params['smooth_window'] = 41
     else:
-        # 默认值
-        params['smooth_window'] = 51  # 确保是奇数
+        params['smooth_window'] = 61  # 提高默认平滑窗口大小
     
-    # 4. 根据峰值强度调整peak_distance
-    # 减小peak_distance以检测更密集的峰值
-    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 对于检测不到或很少峰值的神经元，使用非常小的距离阈值
-        params['peak_distance'] = 15
-    elif peak_intensity < 2:
-        # 弱峰值可能需要更小的距离
-        params['peak_distance'] = 20
+    # 4. 提高peak_distance以减少近距离的多重检测
+    if peak_intensity > 8:
+        # 强峰值信号通常间隔更大，增加距离以避免多次检测同一事件
+        params['peak_distance'] = 45
     elif peak_intensity > 5:
-        # 强峰值通常间隔更大
+        params['peak_distance'] = 40
+    elif peak_intensity > 3:
         params['peak_distance'] = 35
     else:
-        # 默认值
-        params['peak_distance'] = 25
+        # 提高默认距离，减少相邻事件的虚假检测
+        params['peak_distance'] = 30
     
-    # 5. 根据信号特性调整min_duration
-    # 减小min_duration以检测更短的事件
-    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 对于检测难度大的神经元，减小最小持续时间阈值
-        params['min_duration'] = 10
-    elif baseline_variability > 0.3:
-        # 非常嘈杂的信号，要求更长的持续时间以避免假阳性
-        params['min_duration'] = 30
+    # 5. 提高最小持续时间，避免检测短暂噪声
+    if baseline_variability > 0.3:
+        # 嘈杂信号需要更长的持续时间以区分真实信号和噪声
+        params['min_duration'] = 40
     elif baseline_variability > 0.2:
-        # 更嘈杂的信号，要求更长的持续时间以避免假阳性
+        params['min_duration'] = 35
+    elif baseline_variability > 0.1:
+        params['min_duration'] = 30
+    else:
+        # 即使对于干净的信号，也提高时间阈值
         params['min_duration'] = 25
-    elif baseline_variability < 0.1:
-        # 干净的信号可以检测更短的事件
-        params['min_duration'] = 15
-    else:
-        # 默认值
-        params['min_duration'] = 18
         
-    # 6. 子峰检测参数调整
-    if num_tentative_peaks == 0 or num_tentative_peaks < 3:
-        # 对于难以检测的神经元，降低子峰突出度要求
-        params['subpeak_prominence'] = 0.15
+    # 6. 提高子峰检测的突出度要求
+    if peak_intensity > 6:
+        # 强信号中的子峰需要更明显才能被认为是有效子峰
+        params['subpeak_prominence'] = 0.4
     elif peak_intensity > 4:
-        # 强峰值信号的子峰可能更明显
-        params['subpeak_prominence'] = 0.3
+        params['subpeak_prominence'] = 0.35
     else:
-        # 弱峰值信号需要更低的子峰阈值
-        params['subpeak_prominence'] = 0.2
+        # 增加默认阈值，减少误检
+        params['subpeak_prominence'] = 0.3
         
-    # 7. 调整最大持续时间参数，以便适应不同类型的信号模式
-    if num_tentative_peaks < 3:
-        # 对于峰值少的数据，增加最大持续时间以捕获较长的事件
-        params['max_duration'] = 400
-    elif signal_noise_ratio > 10:
+    # 7. 子峰宽度和距离要求增强
+    params['subpeak_width'] = 15  # 增加子峰最小宽度
+    params['subpeak_distance'] = 20  # 增加子峰间最小距离
+        
+    # 8. 调整最大持续时间参数
+    if signal_noise_ratio > 10:
         # 高信噪比的信号可能有较短的事件
         params['max_duration'] = 300
     else:
-        # 默认值
+        # 保持原有的最大持续时间
         params['max_duration'] = 350
         
-    # 8. 打印当前神经元的自适应参数，便于调试
-    print(f"  - 自适应参数: SNR={signal_noise_ratio:.2f}, min_snr={params['min_snr']}, "  
-          f"baseline={params['baseline_percentile']}, peaks={num_tentative_peaks}")
+    # 9. 打印当前神经元的自适应参数，便于调试
+    print(f"  - 强化过滤参数: SNR={signal_noise_ratio:.2f}, min_snr={params['min_snr']}, "  
+          f"baseline={params['baseline_percentile']}, min_duration={params['min_duration']}, "
+          f"smooth={params['smooth_window']}, peaks={num_tentative_peaks}")
     
     return params
 
