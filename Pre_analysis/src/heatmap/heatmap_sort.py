@@ -11,9 +11,9 @@ from matplotlib.backends.backend_agg import FigureCanvas
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/Day9_with_behavior_labels_filled.xlsx'
+    INPUT_FILE = '../../datasets/3096数据/NO3096241016day8openfield_Trace.xlsx'
     # 输出文件名前缀
-    OUTPUT_PREFIX = '../../graph/heatmap_sort_'
+    OUTPUT_PREFIX = '../../graph/3096/heatmap_sort_'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
@@ -138,7 +138,7 @@ if has_behavior and len(unique_behaviors) > 0:
                         color='black', rotation=90, verticalalignment='top', fontsize=30, fontweight='bold')
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = 'Day9_with_behavior_labels_filled'
+title_text = 'NO3096241016day8openfield_Trace'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -164,7 +164,7 @@ ax.set_xticklabels(xtick_labels, fontsize=20)
 plt.tight_layout()
 
 # 构建输出文件名，包含时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}Day9_with_behavior_labels_filled"
+output_filename = f"{Config.OUTPUT_PREFIX}NO3096241016day8openfield_Trace"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
