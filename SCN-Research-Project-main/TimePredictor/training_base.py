@@ -1,3 +1,9 @@
+"""
+时间预测器基础训练脚本
+
+该脚本用于训练神经网络模型，预测神经元数据中的时间信息。
+使用方法: python training_base.py <数据文件> <随机种子> <神经元数量>
+"""
 
 import numpy as np
 import pickle, sys, os
@@ -13,12 +19,15 @@ from src.dataset import TrainDataset, TestDataset
 from scipy.io import loadmat
 from sklearn.model_selection import train_test_split
 
+# 从命令行参数读取数据文件名
 filename = sys.argv[1]
+# 加载神经元活动数据
 data = loadmat(filename, variable_names=['dff_set'])['dff_set']
 _data = list()
 label = list()
 time_class = data.shape[1]
 num_neuron = data.shape[0]
+# 重组数据结构
 for i in range(data.shape[0]): 
     for j in range(data.shape[1]):
         _data.append(data[i, j])
@@ -27,10 +36,12 @@ data = np.concatenate(_data, axis=0).reshape(num_neuron, time_class, -1).astype(
 label = np.array(label).reshape(num_neuron, time_class).astype(np.int64)
 time_len = data.shape[-1]
 
+# 设置随机种子
 seed = int(sys.argv[2])
 np.random.seed(seed)
 torch.manual_seed(seed)
 
+# 训练参数设置
 batch_size = 32
 train_size = int(data.shape[0] * 0.6)
 val_size = int(data.shape[0] * 0.1)
@@ -43,20 +54,22 @@ test_acc_list = list()
 criterion = nn.CrossEntropyLoss()
 cuda = torch.cuda.is_available()
 
-
+# 从命令行读取使用的神经元数量
 num_neuron = int(sys.argv[3])
 
-
+# 数据集划分为训练集、验证集和测试集
 X_train_val, X_test, y_train_val, y_test = train_test_split(data, label, test_size=0.3, random_state=74)
 X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=1/7, random_state=74)
 train_dataloader = DataLoader(TrainDataset(X_train.reshape(-1, time_len), y_train.reshape(-1), num_neuron), batch_size=batch_size, shuffle=True)
 val_dataloader = DataLoader(TrainDataset(X_val.reshape(-1, time_len), y_val.reshape(-1), num_neuron), batch_size=batch_size, num_workers=4, shuffle=True)
 test_dataloader = DataLoader(TestDataset(X_test, y_test, num_neuron), batch_size=batch_size, shuffle=True)
 
+# 初始化CNN模型
 cnn = CNN(time_len, num_neuron, label.max()+1)
 if cuda:
     cnn.cuda()
 
+# 设置优化器和学习率调度器
 optimizer = optim.Adam(cnn.parameters(), lr=0.0001)
 scheduler = CosineLrUpdater(optimizer, 
                                 periods=[100],
@@ -69,9 +82,12 @@ scheduler = CosineLrUpdater(optimizer,
                                 min_lr=[1e-7],
                                 min_lr_ratio=None)
 
+# 创建日志目录
 os.makedirs('./training_log', exist_ok=True)
 save_filename = os.path.join('training_log', f"{os.path.basename(filename).split('_SCNProject')[0]}_log_num_neuron{num_neuron}_seed{seed}.pkl")
 start_iter = 0
+
+# 尝试加载之前的训练状态（断点续训）
 try:
     with open(save_filename, 'rb') as f:
         res = pickle.load(f)
@@ -85,6 +101,7 @@ try:
     optimizer.load_state_dict(res['optimizer'])
     start_iter=res['step']
 except FileNotFoundError:
+    # 初始化训练日志列表
     train_acc_list.append(list())
     train_loss_list.append(list())
     val_loss_list.append(list())
@@ -92,16 +109,21 @@ except FileNotFoundError:
     test_acc_list.append(list())
     st = 0
 
-no_improve = 10
+# 训练参数
+no_improve = 10  # 早停计数器
 last_val_loss = 1e8
 epoch = 100
 current_iters=start_iter
 scheduler.before_run()
+
+# 开始训练循环
 for current_epoch in range(st, epoch):  
     scheduler.before_train_epoch(train_size, current_epoch, current_iters)        
     cnn.train()
     train_loss = 0.0
     train_acc = 0.0
+    
+    # 训练数据批处理
     for i, (x, y) in enumerate(train_dataloader):
         scheduler.before_train_iter(current_epoch, current_iters)
 
@@ -118,8 +140,12 @@ for current_epoch in range(st, epoch):
         train_loss += loss.item() * x.shape[0]
         pred = torch.argmax(outputs, dim=1).cpu().numpy()
         train_acc += (y.cpu().numpy() == pred).sum()
+    
+    # 计算平均训练损失和准确率
     train_loss /= train_size * 24
     train_acc /= train_size * 24
+    
+    # 验证集评估（当神经元数量小于验证集大小时）
     if num_neuron < val_size:
         cnn.eval()
         val_loss = 0.
@@ -134,6 +160,7 @@ for current_epoch in range(st, epoch):
     else:
         val_loss = 0.
 
+    # 测试集评估
     test_loss = 0.
     test_acc = 0.
     with torch.no_grad():
@@ -151,18 +178,21 @@ for current_epoch in range(st, epoch):
     test_loss /= test_size * 24
     test_acc /= test_size * 24
     
+    # 打印训练进度
     if current_epoch % 20 == 0:
         if num_neuron < val_size:
             print(f'epoch {current_epoch} train_loss: {np.round(train_loss, 5)}; train_acc: {np.round(train_acc, 5)}; val_loss: {np.round(val_loss, 5)}; test_loss: {np.round(test_loss, 5)}; test_acc: {np.round(test_acc, 3)}')
         else:
             print(f'epoch {current_epoch} train_loss: {np.round(train_loss, 5)}; train_acc: {np.round(train_acc, 5)}; test_loss: {np.round(test_loss, 5)}; test_acc: {np.round(test_acc, 3)}')
+    
+    # 记录训练指标
     train_acc_list[-1].append(train_acc)
     train_loss_list[-1].append(train_loss)
     val_loss_list[-1].append(val_loss)
     test_loss_list[-1].append(test_loss)
     test_acc_list[-1].append(test_acc)
 
-    # earlystopping
+    # 早停检查
     if num_neuron < val_size:
         if val_loss > last_val_loss:
             no_improve += 1
@@ -172,6 +202,7 @@ for current_epoch in range(st, epoch):
         else:
             no_improve = 0
 
+    # 保存模型和训练状态
     pickle.dump({
         'train_loss_list': train_loss_list,
         'train_acc_list': train_acc_list,

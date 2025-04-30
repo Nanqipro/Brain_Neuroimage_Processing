@@ -8,10 +8,11 @@ import os
 import argparse
 import glob
 
-def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
-                             peak_distance=30, baseline_percentile=20, max_duration=350,
-                             detect_subpeaks=True, subpeak_prominence=0.25, 
-                             subpeak_width=10, subpeak_distance=15, params=None):
+def detect_calcium_transients(data, fs=1.0, min_snr=9.0, min_duration=30, smooth_window=80, 
+                             peak_distance=35, baseline_percentile=15, max_duration=350,
+                             detect_subpeaks=True, subpeak_prominence=0.35, 
+                             subpeak_width=15, subpeak_distance=20, params=None, 
+                             min_morphology_score=0.5, min_exp_decay_score=0.3):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
@@ -23,25 +24,31 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     fs : float, 可选
         采样频率，默认为1.0Hz
     min_snr : float, 可选
-        最小信噪比阈值，默认为8.0
+        最小信噪比阈值，默认为9.0
     min_duration : int, 可选
-        最小持续时间（采样点数），默认为20
+        最小持续时间（采样点数），默认为30
     smooth_window : int, 可选
-        平滑窗口大小，默认为50
+        平滑窗口大小，默认为80
     peak_distance : int, 可选
-        峰值间最小距离，默认为30
+        峰值间最小距离，默认为35
     baseline_percentile : int, 可选
-        用于估计基线的百分位数，默认为20
+        用于估计基线的百分位数，默认为15
     max_duration : int, 可选
         钙爆发最大持续时间（采样点数），默认为350
     detect_subpeaks : bool, 可选
         是否检测大波中的小波峰，默认为True
     subpeak_prominence : float, 可选
-        子峰的相对突出度（主峰振幅的比例），默认为0.25
+        子峰的相对突出度（主峰振幅的比例），默认为0.35
     subpeak_width : int, 可选
-        子峰的最小宽度，默认为10
+        子峰的最小宽度，默认为15
     subpeak_distance : int, 可选
-        子峰间的最小距离，默认为15
+        子峰间的最小距离，默认为20
+    params : dict, 可选
+        自定义参数字典
+    min_morphology_score : float, 可选
+        最小形态评分要求，默认为0.5
+    min_exp_decay_score : float, 可选
+        最小指数衰减评分，默认为0.3
         
     返回
     -------
@@ -61,6 +68,9 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         subpeak_prominence = params.get('subpeak_prominence', subpeak_prominence)
         subpeak_width = params.get('subpeak_width', subpeak_width)
         subpeak_distance = params.get('subpeak_distance', subpeak_distance)
+        # 添加形态评分相关参数
+        min_morphology_score = params.get('min_morphology_score', min_morphology_score)
+        min_exp_decay_score = params.get('min_exp_decay_score', min_exp_decay_score)
     
     # 1. 应用平滑滤波器
     if smooth_window > 1:
@@ -75,9 +85,17 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     baseline = np.percentile(smoothed_data, baseline_percentile)
     noise_level = np.std(smoothed_data[smoothed_data < np.percentile(smoothed_data, 50)])
     
-    # 3. 检测主要峰值
+    # 3. 检测主要峰值 - 使用更强的峰值筛选条件
     threshold = baseline + min_snr * noise_level
-    peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance)
+    
+    # 增加prominence参数来要求峰值必须明显突出于背景
+    prominence_threshold = noise_level * 2.5  # 要求峰值至少是噪声水平的2.5倍
+    
+    # 增加width参数来过滤太窄的峰值（可能是尖刺噪声）
+    min_width = min_duration // 3  # 至少要有最小持续时间的1/3宽度
+    
+    peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance,
+                                  prominence=prominence_threshold, width=min_width)
     
     # 如果没有检测到峰值，返回空列表
     if len(peaks) == 0:
@@ -134,6 +152,20 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         if (end_idx - start_idx) < min_duration:
             continue
             
+        # 验证峰值形状 - 在信号尖峰处添加额外验证
+        # 计算峰值前后区域的斜率变化，检查是否符合典型钙爆发特征
+        peak_region_start = max(start_idx, peak_idx - 5)
+        peak_region_end = min(end_idx, peak_idx + 5)
+        
+        # 检查峰值前后的斜率变化，真实钙爆发通常在峰值处有明显的斜率变化
+        if peak_region_start < peak_idx and peak_idx < peak_region_end:
+            pre_slope = np.mean(np.diff(smoothed_data[peak_region_start:peak_idx+1]))
+            post_slope = np.mean(np.diff(smoothed_data[peak_idx:peak_region_end+1]))
+            
+            # 前斜率应为正（上升），后斜率应为负（下降）
+            if pre_slope <= 0 or post_slope >= 0:
+                continue  # 峰值前后斜率不符合预期，可能是噪声
+                
         # 计算特征
         peak_value = smoothed_data[peak_idx]
         amplitude = peak_value - baseline
@@ -229,11 +261,12 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         # non_monotonic_ratio应该小，rise_smoothness应该小，
         # exp_decay_score应该大，duration_width_ratio在适当范围
         
-        # 定义理想的参数范围
-        ideal_rise_decay_ratio = 0.3  # 理想的上升/衰减时间比例
-        min_asymmetry = 0.2  # 最小非对称度
-        max_non_monotonic = 0.3  # 上升沿非单调性最大允许值
-        ideal_duration_width_ratio = 2.5  # 理想的持续时间/宽度比
+        # 定义理想的参数范围（更严格的标准）
+        ideal_rise_decay_ratio = 0.25  # 理想的上升/衰减时间比例（更低，要求上升更快）
+        min_asymmetry = 0.25  # 最小非对称度（提高要求）
+        max_non_monotonic = 0.2  # 上升沿非单调性最大允许值（降低阈值，要求更光滑的上升沿）
+        ideal_duration_width_ratio = 2.8  # 理想的持续时间/宽度比（提高标准）
+        min_exp_decay_score = 0.3  # 最小指数衰减评分（新增）
         
         # 计算各指标的评分
         rise_decay_score = np.exp(-2 * abs(rise_decay_ratio - ideal_rise_decay_ratio)) if rise_decay_ratio < 1 else 0
@@ -241,21 +274,32 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         monotonic_score = 1 - min(non_monotonic_ratio / max_non_monotonic, 1)
         duration_ratio_score = np.exp(-0.5 * abs(duration_width_ratio - ideal_duration_width_ratio))
         
-        # 综合形态评分 (0-1)，权重可根据重要性调整
+        # 综合形态评分 (0-1)，调整权重，强调更重要的形态特征
         morphology_score = (
-            0.25 * rise_decay_score + 
-            0.2 * asymmetry_score + 
-            0.2 * monotonic_score + 
-            0.2 * exp_decay_score + 
-            0.15 * duration_ratio_score
+            0.3 * rise_decay_score +     # 提高上升/衰减比例的权重
+            0.2 * asymmetry_score +      # 保持非对称性的权重
+            0.15 * monotonic_score +     # 稍微降低单调性的权重
+            0.25 * exp_decay_score +     # 提高指数衰减特性的权重
+            0.1 * duration_ratio_score   # 降低持续时间比例的权重
         )
         
-        # 设置形态评分阈值，过滤不符合典型钙波形态的峰值
-        min_morphology_score = 0.4  # 可调整此阈值
+        # 设置更严格的形态评分阈值，过滤不符合典型钙波形态的峰值
+        min_morphology_score = 0.5  # 提高最低形态评分要求
         
+        # 不仅考虑总体形态评分，还增加对关键特征的单独检查
         if morphology_score < min_morphology_score:
-            continue  # 跳过此峰值，因为形态不符合典型钙波特征
+            continue  # 跳过此峰值，因为总体形态不符合典型钙波特征
         
+        # 添加单个关键特征的否决条件，即使总评分够高，关键特征不达标也拒绝
+        if exp_decay_score < min_exp_decay_score:  # 指数衰减特性是钙波的关键特征
+            continue  # 跳过指数衰减不明显的峰值
+            
+        if rise_decay_ratio > 0.7:  # 上升时间不应超过衰减时间的70%
+            continue  # 跳过上升过慢的峰值
+            
+        if non_monotonic_ratio > 0.4:  # 允许40%的非单调性作为上限
+            continue  # 跳过上升沿过于不规则的峰值
+            
         # 检测波形的子峰值（如果启用）
         subpeaks = []
         if detect_subpeaks and (end_idx - start_idx) > 3 * subpeak_width:
@@ -768,30 +812,30 @@ def estimate_neuron_params(neuron_data):
     # 自适应参数配置，提高门槛以过滤更多噪声
     params = {}
     
-    # 1. 显著提高信噪比阈值
+    # 1. 大幅提高信噪比阈值，更严格地过滤噪声
     if num_tentative_peaks == 0:  
         # 即使没有检测到峰值，也提高最低阈值，避免误检
-        params['min_snr'] = 3.5  # 提高最低阈值
+        params['min_snr'] = 4.5  # 显著提高最低阈值
     elif num_tentative_peaks < 3: 
-        params['min_snr'] = 4.0  # 提高小峰值的检测阈值
+        params['min_snr'] = 5.0  # 大幅提高小峰值的检测阈值
     else:
-        # 根据信噪比使用更严格的调整
+        # 根据信噪比使用极其严格的调整
         if signal_noise_ratio < 2:
-            params['min_snr'] = 4.0  # 显著提高
+            params['min_snr'] = 5.0  # 极度提高
         elif signal_noise_ratio < 3:
-            params['min_snr'] = 4.5
-        elif signal_noise_ratio < 4:
-            params['min_snr'] = 5.0
-        elif signal_noise_ratio < 5:
             params['min_snr'] = 5.5
-        elif signal_noise_ratio < 7:
+        elif signal_noise_ratio < 4:
+            params['min_snr'] = 6.0
+        elif signal_noise_ratio < 5:
             params['min_snr'] = 6.5
+        elif signal_noise_ratio < 7:
+            params['min_snr'] = 7.5
         elif signal_noise_ratio < 10:
-            params['min_snr'] = 8.0
-        elif signal_noise_ratio < 15:
             params['min_snr'] = 9.0
+        elif signal_noise_ratio < 15:
+            params['min_snr'] = 10.0
         else:
-            params['min_snr'] = 10.0  # 进一步提高高信噪比情况下的阈值
+            params['min_snr'] = 12.0  # 极大幅度提高高信噪比情况下的阈值
     
     # 2. 调整baseline_percentile，更准确地估计基线
     if baseline_variability > 0.3:
@@ -805,19 +849,19 @@ def estimate_neuron_params(neuron_data):
     else:
         params['baseline_percentile'] = 20
     
-    # 3. 增大平滑窗口以减少噪声影响
+    # 3. 大幅增大平滑窗口以进一步减少噪声影响
     if baseline_variability > 0.35:
         # 极度嘈杂的信号需要更大的平滑窗口
-        params['smooth_window'] = 121
+        params['smooth_window'] = 151  # 增加窗口大小
     elif baseline_variability > 0.25:
-        params['smooth_window'] = 101
+        params['smooth_window'] = 131
     elif baseline_variability > 0.15:
-        params['smooth_window'] = 75
+        params['smooth_window'] = 101
     elif baseline_variability < 0.1:
-        # 即使对于干净的信号，也保持一定的平滑以提高一致性
-        params['smooth_window'] = 41
+        # 即使对于干净的信号，也增加平滑以保持一致性
+        params['smooth_window'] = 61
     else:
-        params['smooth_window'] = 61  # 提高默认平滑窗口大小
+        params['smooth_window'] = 81  # 大幅提高默认平滑窗口大小
     
     # 4. 提高peak_distance以减少近距离的多重检测
     if peak_intensity > 8:
@@ -831,31 +875,35 @@ def estimate_neuron_params(neuron_data):
         # 提高默认距离，减少相邻事件的虚假检测
         params['peak_distance'] = 30
     
-    # 5. 提高最小持续时间，避免检测短暂噪声
+    # 5. 大幅提高最小持续时间，严格避免检测短暂噪声
     if baseline_variability > 0.3:
         # 嘈杂信号需要更长的持续时间以区分真实信号和噪声
-        params['min_duration'] = 40
+        params['min_duration'] = 50  # 增加持续时间要求
     elif baseline_variability > 0.2:
-        params['min_duration'] = 35
+        params['min_duration'] = 45
     elif baseline_variability > 0.1:
-        params['min_duration'] = 30
+        params['min_duration'] = 40
     else:
-        # 即使对于干净的信号，也提高时间阈值
-        params['min_duration'] = 25
+        # 即使对于干净的信号，也大幅提高时间阈值
+        params['min_duration'] = 35
         
-    # 6. 提高子峰检测的突出度要求
+    # 6. 大幅提高子峰检测的突出度要求
     if peak_intensity > 6:
         # 强信号中的子峰需要更明显才能被认为是有效子峰
-        params['subpeak_prominence'] = 0.4
+        params['subpeak_prominence'] = 0.5  # 提高要求
     elif peak_intensity > 4:
-        params['subpeak_prominence'] = 0.35
+        params['subpeak_prominence'] = 0.45
     else:
         # 增加默认阈值，减少误检
-        params['subpeak_prominence'] = 0.3
+        params['subpeak_prominence'] = 0.4
         
-    # 7. 子峰宽度和距离要求增强
-    params['subpeak_width'] = 15  # 增加子峰最小宽度
-    params['subpeak_distance'] = 20  # 增加子峰间最小距离
+    # 7. 更严格的子峰宽度和距离要求
+    params['subpeak_width'] = 20  # 大幅增加子峰最小宽度
+    params['subpeak_distance'] = 25  # 大幅增加子峰间最小距离
+    
+    # 10. 新增参数：形态评分阈值，用于过滤质量差的钙爆发
+    params['min_morphology_score'] = 0.5  # 最小形态评分要求
+    params['min_exp_decay_score'] = 0.3  # 最小指数衰减评分
         
     # 8. 调整最大持续时间参数
     if signal_noise_ratio > 10:

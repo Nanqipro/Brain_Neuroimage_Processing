@@ -3,6 +3,20 @@ import numpy as np
 
 
 class TrainDataset(Dataset):
+    """
+    训练数据集类
+    
+    用于加载和处理训练神经网络的数据，支持随机采样神经元
+    
+    参数
+    ----------
+    x : numpy.ndarray
+        输入特征数据
+    y : numpy.ndarray
+        标签数据
+    num_neuron : int
+        要采样的神经元数量
+    """
     def __init__(self, x, y, num_neuron):
         super(TrainDataset, self).__init__()
         idx = np.arange(x.shape[0])
@@ -10,10 +24,27 @@ class TrainDataset(Dataset):
         self.x = x[idx]
         self.y = y[idx]
         self.num_neuron = num_neuron
+        # 按标签将数据索引分组
         self.location = [
                 np.argwhere(self.y == label)[..., 0] for label in range(self.y.max()+1)
         ]
+        
     def __getitem__(self, index):
+        """
+        获取数据项
+        
+        从同一时间标签的数据中随机选择指定数量的神经元
+        
+        参数
+        ----------
+        index : int
+            数据索引
+            
+        返回值
+        ----------
+        tuple
+            (选择的神经元数据, 标签)
+        """
         label = self.y[index]
         if self.num_neuron >= self.x.shape[0]:
             self.num_neuron = self.x.shape[0] -1 
@@ -21,9 +52,31 @@ class TrainDataset(Dataset):
         return self.x[random_idx], label
     
     def __len__(self):
+        """
+        返回数据集长度
+        
+        返回值
+        ----------
+        int
+            数据集中样本数量
+        """
         return self.x.shape[0]
 
 class TestDataset(Dataset):
+    """
+    测试数据集类
+    
+    用于加载和处理测试神经网络的数据，支持随机采样神经元
+    
+    参数
+    ----------
+    x : numpy.ndarray
+        输入特征数据
+    y : numpy.ndarray
+        标签数据
+    num_neuron : int
+        要采样的神经元数量
+    """
     def __init__(self, x, y, num_neuron):
         super(TestDataset, self).__init__()
         self.x = x
@@ -31,6 +84,21 @@ class TestDataset(Dataset):
         self.num_neuron = num_neuron
 
     def __getitem__(self, index):
+        """
+        获取数据项
+        
+        从所有数据中随机选择指定数量的神经元
+        
+        参数
+        ----------
+        index : int
+            数据索引
+            
+        返回值
+        ----------
+        tuple
+            (选择的神经元数据, 标签)
+        """
         label = self.y[index]
         if self.num_neuron >= self.x.shape[0]:
             self.num_neuron = self.x.shape[0] -1 
@@ -38,4 +106,12 @@ class TestDataset(Dataset):
         return self.x[random_idx], label
 
     def __len__(self):
+        """
+        返回数据集长度
+        
+        返回值
+        ----------
+        int
+            数据集中样本数量
+        """
         return self.x.shape[0]

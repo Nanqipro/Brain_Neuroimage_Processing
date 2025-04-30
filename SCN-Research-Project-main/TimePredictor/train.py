@@ -1,5 +1,12 @@
+"""
+时间预测器批量训练脚本
+
+该脚本用于在多个数据集上批量训练时间预测模型，支持并行GPU训练
+"""
+
 import subprocess
 
+# 定义数据集文件列表
 filename_list = [
         '../SCNData/Dataset1_SCNProject.mat',
         '../SCNData/Dataset2_SCNProject.mat',
@@ -9,22 +16,26 @@ filename_list = [
         '../SCNData/Dataset6_SCNProject.mat',
         ]
         
+# GPU设置
 cuda_id = 0
 job_list = list()
 cuda_id_list = list()
-gpu_num=8
-# for training general time predictor
+gpu_num = 8
+
+# 批量训练通用时间预测器
 for filename in filename_list:
     for seed in range(5):
-        
+        # 使用不同数量的神经元进行训练
         num_neuron_list = [1, 10, 30, 50, 100, 300, 500, 600,  700,  750,  800,  850,  900,  950, 1000, 1500]
         for num_neuron in num_neuron_list:
+            # 构建命令并分配到不同GPU
             cmd = f'CUDA_VISIBLE_DEVICES={cuda_id%gpu_num} python training_base.py {filename} {seed} {num_neuron}'
             print(cmd)
             cuda_id += 1
             job = subprocess.Popen(cmd, shell=True)
             job_list.append(job)
             cuda_id_list.append(cuda_id)
+            # 当任务数达到GPU数量时等待任务完成
             while len(job_list) >= gpu_num:
                 for i, job in enumerate(job_list):
                     try:
@@ -36,17 +47,20 @@ for filename in filename_list:
                     except subprocess.TimeoutExpired as e:
                         continue
 
-# for the general time predictor test on the testing tests with 5 submodules.
-# we take 'Dataset1_SCNProject.mat' as example.               
+# 在测试集的5个子模块上测试通用时间预测器
+# 以Dataset1_SCNProject.mat为例
 for seed in range(5):
+    # 使用特定数量的神经元进行测试
     num_neuron_list = [143-1, 238-1, 400-1, 448-1, 586-1]
     for num_neuron in num_neuron_list:
+        # 构建命令并分配到不同GPU
         cmd = f'CUDA_VISIBLE_DEVICES={cuda_id%gpu_num} python training_base.py "../SCNData/Dataset1_SCNProject.mat" {seed} {num_neuron}'
         print(cmd)
         cuda_id += 1
         job = subprocess.Popen(cmd, shell=True)
         job_list.append(job)
         cuda_id_list.append(cuda_id)
+        # 当任务数达到GPU数量时等待任务完成
         while len(job_list) >= gpu_num:
             for i, job in enumerate(job_list):
                 try:
