@@ -12,7 +12,58 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
                              peak_distance=30, baseline_percentile=18, max_duration=350,
                              detect_subpeaks=True, subpeak_prominence=0.3, 
                              subpeak_width=12, subpeak_distance=18, params=None, 
-                             min_morphology_score=0.45, min_exp_decay_score=0.25):
+                             min_morphology_score=0.45, min_exp_decay_score=0.25,
+                             filter_strength=1.0):
+    """
+    检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
+    增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
+    
+    参数:
+        data: 神经元荧光数据
+        fs: 采样频率，默认为1.0
+        min_snr: 最小信噪比阈值，默认为8.5
+        min_duration: 最小持续时间(采样点数)，默认为25
+        smooth_window: 平滑窗口大小，默认为65
+        peak_distance: 峰值之间的最小距离，默认为30
+        baseline_percentile: 用于估计基线的百分位数，默认为18
+        max_duration: 最大持续时间(采样点数)，默认为350
+        detect_subpeaks: 是否检测子峰，默认为True
+        subpeak_prominence: 子峰突出度阈值，默认为0.3
+        subpeak_width: 子峰最小宽度，默认为12
+        subpeak_distance: 子峰之间的最小距离，默认为18
+        params: 手动指定的参数字典，如果提供则覆盖默认参数
+        min_morphology_score: 最小形态评分阈值，默认为0.45
+        min_exp_decay_score: 最小指数衰减评分阈值，默认为0.25
+        filter_strength: 过滤强度系数(0.5-2.0)，控制所有阈值的整体强度，1.0为默认强度
+                         <1.0: 降低所有阈值，检测更多潜在信号
+                         >1.0: 提高所有阈值，更严格地过滤噪声
+                         
+    返回:
+        transients: 检测到的钙爆发列表，每个元素包含开始、峰值、结束时间以及其他特征
+    """
+    
+    # 根据filter_strength调整所有阈值参数
+    if filter_strength != 1.0:
+        # 调整与信号门槛相关的参数（高filter_strength时提高阈值）
+        min_snr *= filter_strength
+        min_morphology_score = min(0.9, min_morphology_score * filter_strength)
+        min_exp_decay_score = min(0.9, min_exp_decay_score * filter_strength)
+        
+        # 调整与信号特征相关的参数（高filter_strength时更严格）
+        if filter_strength > 1.0:
+            min_duration = int(min_duration * (1 + (filter_strength - 1) * 0.5))
+            smooth_window = int(smooth_window * (1 + (filter_strength - 1) * 0.3))
+            peak_distance = int(peak_distance * (1 + (filter_strength - 1) * 0.2))
+            subpeak_prominence *= filter_strength
+            subpeak_width = int(subpeak_width * filter_strength)
+            subpeak_distance = int(subpeak_distance * filter_strength)
+        else:  # filter_strength < 1.0
+            min_duration = max(10, int(min_duration * filter_strength))
+            smooth_window = max(21, int(smooth_window * (1 - (1 - filter_strength) * 0.3)))
+            peak_distance = max(15, int(peak_distance * filter_strength))
+            subpeak_prominence = max(0.1, subpeak_prominence * filter_strength)
+            subpeak_width = max(5, int(subpeak_width * filter_strength))
+            subpeak_distance = max(8, int(subpeak_distance * filter_strength))
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
@@ -89,7 +140,9 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
     threshold = baseline + min_snr * noise_level
     
     # 增加prominence参数来要求峰值必须明显突出于背景
-    prominence_threshold = noise_level * 2.0  # 要求峰值至少是噪声水平的2.0倍
+    # 调整prominence_threshold，随filter_strength变化
+    prominence_factor = 2.0 * filter_strength
+    prominence_threshold = noise_level * prominence_factor
     
     # 增加width参数来过滤太窄的峰值（可能是尖刺噪声）
     min_width = min_duration // 4  # 至少要有最小持续时间的1/4宽度
@@ -427,7 +480,7 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
     
     return transients, smoothed_data
 
-def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpeaks=True, params=None):
+def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpeaks=True, params=None, filter_strength=1.0):
     """
     从钙离子浓度数据中提取关键特征
     
@@ -441,6 +494,10 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpea
         是否可视化结果，默认为False
     detect_subpeaks : bool, 可选
         是否检测大波中的小波峰，默认为True
+    params : dict, 可选
+        自定义参数字典
+    filter_strength : float, 可选
+        过滤强度系数(0.5-2.0)，控制所有阈值的整体强度，1.0为默认强度
         
     返回
     -------
@@ -455,7 +512,7 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpea
         data = neuron_data
     
     # 检测钙爆发
-    transients, smoothed_data = detect_calcium_transients(data, fs=fs, detect_subpeaks=detect_subpeaks, params=params)
+    transients, smoothed_data = detect_calcium_transients(data, fs=fs, detect_subpeaks=detect_subpeaks, params=params, filter_strength=filter_strength)
     
     # 如果没有检测到钙爆发，返回空特征
     if len(transients) == 0:
@@ -602,7 +659,58 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
         peak_val = t['peak_value']
         baseline = t['baseline']
         amplitude = peak_val - baseline
-        heights = [0.25, 0.5, 0.75]  # 25%, 50%, 75%的高度
+        
+        # 子峰的半高宽特性
+        try:
+            sp_widths, _, sp_left_ips, sp_right_ips = peak_widths(
+                smoothed_data, [t['peak_idx']], rel_height=0.5
+            )
+            sp_fwhm = sp_widths[0] / fs
+            
+            # 找出子峰的边界（局部最小值点）
+            # 向左寻找局部最小值
+            sp_start = t['peak_idx']
+            left_search_limit = max(t['start_idx'], t['peak_idx'] - max_duration//2)
+            while sp_start > left_search_limit:
+                if sp_start == left_search_limit + 1 or smoothed_data[sp_start] <= smoothed_data[sp_start-1]:
+                    break
+                sp_start -= 1
+            
+            # 向右寻找局部最小值
+            sp_end = t['peak_idx']
+            right_search_limit = min(t['end_idx'], t['peak_idx'] + max_duration//2)
+            while sp_end < right_search_limit:
+                if sp_end == right_search_limit - 1 or smoothed_data[sp_end] <= smoothed_data[sp_end+1]:
+                    break
+                sp_end += 1
+            
+            # 子峰持续时间
+            sp_duration = (sp_end - sp_start) / fs
+            
+            # 上升和衰减时间
+            sp_rise_time = (t['peak_idx'] - sp_start) / fs
+            sp_decay_time = (sp_end - t['peak_idx']) / fs
+            
+            # 计算子峰面积
+            sp_segment = smoothed_data[sp_start:sp_end+1] - baseline
+            sp_auc = trapezoid(sp_segment, dx=1.0/fs)
+            
+            # 添加子峰信息
+            subpeaks = [{
+                'index': t['peak_idx'],
+                'value': t['peak_value'],
+                'amplitude': amplitude,
+                'start_idx': sp_start,
+                'end_idx': sp_end,
+                'duration': sp_duration,
+                'fwhm': sp_fwhm,
+                'rise_time': sp_rise_time,
+                'decay_time': sp_decay_time,
+                'auc': sp_auc
+            }]
+        except Exception as e:
+            # 子峰分析失败，跳过该子峰
+            pass
         
         # 标记主峰
         ms = t.get('morphology_score', 0.5)
@@ -611,11 +719,7 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
                 label=f'Peak (Score: {ms:.2f})')
         
         # 标记不同高度百分比
-        for h in heights:
-            h_val = baseline + h * amplitude
-            ax2.axhline(y=h_val, color='gray', linestyle=':', alpha=0.5)
-            ax2.text(zoom_time[0], h_val, f'{int(h*100)}%', 
-                    verticalalignment='center', fontsize=8)
+        heights = [0.25, 0.5, 0.75]  # 25%, 50%, 75%的高度
         
         # 标记基线
         ax2.axhline(y=baseline, color='r', linestyle='-', alpha=0.5, label='Baseline')
@@ -759,7 +863,19 @@ def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='be
     
     return pd.DataFrame(results)
 
-def estimate_neuron_params(neuron_data):
+def estimate_neuron_params(neuron_data, filter_strength=1.0):
+    """
+    估计神经元数据的最佳参数配置
+    
+    参数:
+        neuron_data: 神经元荧光数据
+        filter_strength: 过滤强度系数(0.5-2.0)，控制所有阈值的整体强度
+                        <1.0: 降低阈值，更宽松的标准
+                        >1.0: 提高阈值，更严格的标准
+    
+    返回:
+        params: 参数字典
+    """
     """
     根据神经元数据特性估计最优检测参数，强化过滤条件以减少噪声
     
@@ -812,30 +928,35 @@ def estimate_neuron_params(neuron_data):
     # 自适应参数配置，提高门槛以过滤更多噪声
     params = {}
     
-    # 1. 适度提高信噪比阈值，在过滤噪声和保留信号间取得平衡
+    # 1. 根据filter_strength调整信噪比阈值，平衡过滤噪声和保留信号
+    base_snr = 0.0  # 基础信噪比阈值
+    
     if num_tentative_peaks == 0:  
         # 即使没有检测到峰值，也提高最低阈值，避免误检
-        params['min_snr'] = 4.0  # 适度提高最低阈值
+        base_snr = 4.0
     elif num_tentative_peaks < 3: 
-        params['min_snr'] = 4.5  # 适度提高小峰值的检测阈值
+        base_snr = 4.5
     else:
         # 根据信噪比使用折中的调整
         if signal_noise_ratio < 2:
-            params['min_snr'] = 4.5  # 适度提高
+            base_snr = 4.5
         elif signal_noise_ratio < 3:
-            params['min_snr'] = 5.0
+            base_snr = 5.0
         elif signal_noise_ratio < 4:
-            params['min_snr'] = 5.5
+            base_snr = 5.5
         elif signal_noise_ratio < 5:
-            params['min_snr'] = 6.0
+            base_snr = 6.0
         elif signal_noise_ratio < 7:
-            params['min_snr'] = 7.0
+            base_snr = 7.0
         elif signal_noise_ratio < 10:
-            params['min_snr'] = 8.0
+            base_snr = 8.0
         elif signal_noise_ratio < 15:
-            params['min_snr'] = 8.5
+            base_snr = 8.5
         else:
-            params['min_snr'] = 9.0  # 适度提高高信噪比情况下的阈值
+            base_snr = 9.0
+    
+    # 根据filter_strength调整最终SNR阈值
+    params['min_snr'] = base_snr * filter_strength
     
     # 2. 调整baseline_percentile，更准确地估计基线
     if baseline_variability > 0.3:
@@ -849,19 +970,27 @@ def estimate_neuron_params(neuron_data):
     else:
         params['baseline_percentile'] = 20
     
-    # 3. 适度增大平滑窗口以减少噪声影响
+    # 3. 根据filter_strength和baseline_variability调整平滑窗口
+    base_window = 0  # 基础窗口大小
+    
     if baseline_variability > 0.35:
-        # 极度嘈杂的信号需要更大的平滑窗口
-        params['smooth_window'] = 121  # 适度增加窗口大小
+        base_window = 121
     elif baseline_variability > 0.25:
-        params['smooth_window'] = 101
+        base_window = 101
     elif baseline_variability > 0.15:
-        params['smooth_window'] = 81
+        base_window = 81
     elif baseline_variability < 0.1:
-        # 即使对于干净的信号，也适度增加平滑以保持一致性
-        params['smooth_window'] = 51
+        base_window = 51
     else:
-        params['smooth_window'] = 65  # 适度提高默认平滑窗口大小
+        base_window = 65
+    
+    # 根据filter_strength调整窗口大小
+    if filter_strength > 1.0:
+        window_adjustment = int(base_window * (filter_strength - 1) * 0.5)
+        params['smooth_window'] = base_window + window_adjustment
+    elif filter_strength < 1.0:
+        window_adjustment = int(base_window * (1 - filter_strength) * 0.3)
+        params['smooth_window'] = max(21, base_window - window_adjustment)
     
     # 4. 提高peak_distance以减少近距离的多重检测
     if peak_intensity > 8:
@@ -875,17 +1004,25 @@ def estimate_neuron_params(neuron_data):
         # 提高默认距离，减少相邻事件的虚假检测
         params['peak_distance'] = 30
     
-    # 5. 适度提高最小持续时间，避免检测短暂噪声
+    # 5. 根据filter_strength和baseline_variability调整最小持续时间
+    base_duration = 0  # 基础持续时间
+    
     if baseline_variability > 0.3:
-        # 嘈杂信号需要更长的持续时间以区分真实信号和噪声
-        params['min_duration'] = 35  # 适度增加持续时间要求
+        base_duration = 35
     elif baseline_variability > 0.2:
-        params['min_duration'] = 30
+        base_duration = 30
     elif baseline_variability > 0.1:
-        params['min_duration'] = 28
+        base_duration = 28
     else:
-        # 即使对于干净的信号，也适度提高时间阈值
-        params['min_duration'] = 25
+        base_duration = 25
+    
+    # 根据filter_strength调整最小持续时间
+    if filter_strength > 1.0:
+        duration_adjustment = int(base_duration * (filter_strength - 1) * 0.6)
+        params['min_duration'] = base_duration + duration_adjustment
+    elif filter_strength < 1.0:
+        duration_adjustment = int(base_duration * (1 - filter_strength) * 0.4)
+        params['min_duration'] = max(10, base_duration - duration_adjustment)
         
     # 6. 适度提高子峰检测的突出度要求
     if peak_intensity > 6:
@@ -901,9 +1038,13 @@ def estimate_neuron_params(neuron_data):
     params['subpeak_width'] = 15  # 适度增加子峰最小宽度
     params['subpeak_distance'] = 18  # 适度增加子峰间最小距离
     
-    # 10. 新增参数：形态评分阈值，设置折中值
-    params['min_morphology_score'] = 0.45  # 折中的最小形态评分要求
-    params['min_exp_decay_score'] = 0.25  # 折中的最小指数衰减评分
+    # 10. 新增参数：形态评分阈值，根据filter_strength进行调整
+    base_morphology_score = 0.45
+    base_exp_decay_score = 0.25
+    
+    # 调整评分阈值
+    params['min_morphology_score'] = min(0.9, base_morphology_score * filter_strength)
+    params['min_exp_decay_score'] = min(0.9, base_exp_decay_score * filter_strength)
         
     # 8. 调整最大持续时间参数
     if signal_noise_ratio > 10:
@@ -921,7 +1062,7 @@ def estimate_neuron_params(neuron_data):
     return params
 
 def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=None, adaptive_params=True, start_id=1, 
-                            file_info=None):
+                            file_info=None, filter_strength=1.0):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
     
@@ -941,6 +1082,8 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         钙爆发ID的起始编号，默认为1
     file_info : dict, 可选
         原始文件的信息，包含绝对路径、相对路径和文件名
+    filter_strength : float, 可选
+        过滤强度系数(0.5-2.0)，控制所有阈值的整体强度，1.0为默认强度
         
     返回
     -------
@@ -960,10 +1103,10 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
         custom_params = None
         if adaptive_params:
             print(f"  估计神经元 {neuron} 的最优参数...")
-            custom_params = estimate_neuron_params(neuron_data)
+            custom_params = estimate_neuron_params(neuron_data, filter_strength)
         
         # 检测钙爆发
-        transients, smoothed_data = detect_calcium_transients(neuron_data, fs=fs, params=custom_params)
+        transients, smoothed_data = detect_calcium_transients(neuron_data, fs=fs, params=custom_params, filter_strength=filter_strength)
         
         # 为该神经元的每个钙爆发分配ID并添加到列表
         for t in transients:
@@ -1009,6 +1152,8 @@ if __name__ == "__main__":
                         help='输出基础目录，结果将保存在此目录下对应的子文件夹中')
     parser.add_argument('--combine', action='store_true',
                         help='是否将所有文件的结果合并到一个总表中')
+    parser.add_argument('--filter_strength', type=float, default=1.0,
+                        help='过滤强度系数(0.5-2.0)。<1.0更宽松，>1.0更严格。默认为1.0')
     parser.add_argument('--root_dir', type=str, default=None,
                         help='项目根目录，用于生成相对路径，默认为当前工作目录的上一级')
     args = parser.parse_args()
@@ -1103,7 +1248,8 @@ if __name__ == "__main__":
             # 分析并保存所有钙爆发数据，启用自适应参数，传递当前的ID计数器和文件信息
             transients_df, next_transient_id = analyze_all_neurons_transients(
                 df, neuron_columns, save_path=save_path, adaptive_params=True, 
-                start_id=next_transient_id, file_info=file_info
+                start_id=next_transient_id, file_info=file_info,
+                filter_strength=args.filter_strength
             )
             
             if len(transients_df) > 0:
