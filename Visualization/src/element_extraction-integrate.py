@@ -645,81 +645,39 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
             # 如果没有形态评分，则选择最大振幅的波形
             t = max(transients, key=lambda x: x['amplitude'])
         
-        # 计算放大区域
-        margin = 20  # 左右额外显示的点数
-        zoom_start = max(0, t['start_idx'] - margin)
-        zoom_end = min(len(raw_data), t['end_idx'] + margin)
+        # 计算放大区域：以钙波开始为原点，向右延伸200个时间戳
+        zoom_start = t['start_idx']
+        zoom_end = min(len(raw_data), t['start_idx'] + 200)  # 限制在数据范围内
         
-        # 绘制放大区域
-        zoom_time = time[zoom_start:zoom_end]
-        ax2.plot(zoom_time, raw_data[zoom_start:zoom_end], 'k-', alpha=0.4, label='Raw data')
-        ax2.plot(zoom_time, smoothed_data[zoom_start:zoom_end], 'b-', label='Smoothed data')
+        # 提取显示区间的时间和数据
+        zoom_time = np.arange(0, zoom_end - zoom_start) / fs  # 从0开始的相对时间
+        zoom_raw_data = raw_data[zoom_start:zoom_end]
+        zoom_smoothed_data = smoothed_data[zoom_start:zoom_end]
+        
+        # 绘制放大区域（使用相对时间）
+        ax2.plot(zoom_time, zoom_raw_data, 'k-', alpha=0.4, label='Raw data')
+        ax2.plot(zoom_time, zoom_smoothed_data, 'b-', label='Smoothed data')
         
         # 计算高度百分比标记点
         peak_val = t['peak_value']
         baseline = t['baseline']
         amplitude = peak_val - baseline
         
-        # 子峰的半高宽特性
-        try:
-            sp_widths, _, sp_left_ips, sp_right_ips = peak_widths(
-                smoothed_data, [t['peak_idx']], rel_height=0.5
-            )
-            sp_fwhm = sp_widths[0] / fs
-            
-            # 找出子峰的边界（局部最小值点）
-            # 向左寻找局部最小值
-            sp_start = t['peak_idx']
-            left_search_limit = max(t['start_idx'], t['peak_idx'] - max_duration//2)
-            while sp_start > left_search_limit:
-                if sp_start == left_search_limit + 1 or smoothed_data[sp_start] <= smoothed_data[sp_start-1]:
-                    break
-                sp_start -= 1
-            
-            # 向右寻找局部最小值
-            sp_end = t['peak_idx']
-            right_search_limit = min(t['end_idx'], t['peak_idx'] + max_duration//2)
-            while sp_end < right_search_limit:
-                if sp_end == right_search_limit - 1 or smoothed_data[sp_end] <= smoothed_data[sp_end+1]:
-                    break
-                sp_end += 1
-            
-            # 子峰持续时间
-            sp_duration = (sp_end - sp_start) / fs
-            
-            # 上升和衰减时间
-            sp_rise_time = (t['peak_idx'] - sp_start) / fs
-            sp_decay_time = (sp_end - t['peak_idx']) / fs
-            
-            # 计算子峰面积
-            sp_segment = smoothed_data[sp_start:sp_end+1] - baseline
-            sp_auc = trapezoid(sp_segment, dx=1.0/fs)
-            
-            # 添加子峰信息
-            subpeaks = [{
-                'index': t['peak_idx'],
-                'value': t['peak_value'],
-                'amplitude': amplitude,
-                'start_idx': sp_start,
-                'end_idx': sp_end,
-                'duration': sp_duration,
-                'fwhm': sp_fwhm,
-                'rise_time': sp_rise_time,
-                'decay_time': sp_decay_time,
-                'auc': sp_auc
-            }]
-        except Exception as e:
-            # 子峰分析失败，跳过该子峰
-            pass
-        
-        # 标记主峰
+        # 标记主峰（使用相对时间）
         ms = t.get('morphology_score', 0.5)
         color = cmap(norm(ms))
-        ax2.plot(t['peak_idx']/fs, peak_val, 'o', color=color, markersize=10, 
+        peak_relative_time = (t['peak_idx'] - zoom_start) / fs
+        ax2.plot(peak_relative_time, peak_val, 'o', color=color, markersize=10, 
                 label=f'Peak (Score: {ms:.2f})')
         
-        # 标记不同高度百分比
-        heights = [0.25, 0.5, 0.75]  # 25%, 50%, 75%的高度
+        # 标记起始点和结束点（如果在可见范围内）
+        # 起始点现在在相对时间0处
+        ax2.axvline(x=0, color='g', linestyle='-', alpha=0.7, label='Start')
+        
+        # 结束点如果在可见范围内
+        if t['end_idx'] < zoom_end:
+            end_relative_time = (t['end_idx'] - zoom_start) / fs
+            ax2.axvline(x=end_relative_time, color='r', linestyle='-', alpha=0.7, label='End')
         
         # 标记基线
         ax2.axhline(y=baseline, color='r', linestyle='-', alpha=0.5, label='Baseline')
@@ -739,17 +697,28 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
         ax2.text(0.05, 0.95, feature_text, transform=ax2.transAxes, 
                 fontsize=9, verticalalignment='top', bbox=props)
         
-        # 标记子峰
+        # 标记子峰（如果有且在可见范围内，使用相对时间）
         if 'subpeaks' in t and t['subpeaks']:
             for sp in t['subpeaks']:
-                ax2.plot(sp['index']/fs, sp['value'], '*', color='magenta', markersize=8)
-                # 标记子峰边界
-                ax2.axvline(x=sp['start_idx']/fs, color='c', linestyle=':', alpha=0.7)
-                ax2.axvline(x=sp['end_idx']/fs, color='m', linestyle=':', alpha=0.7)
+                if zoom_start <= sp['index'] < zoom_end:
+                    sp_relative_time = (sp['index'] - zoom_start) / fs
+                    ax2.plot(sp_relative_time, sp['value'], '*', color='magenta', markersize=8)
+                    
+                    # 标记子峰边界（如果在可见范围内）
+                    if zoom_start <= sp['start_idx'] < zoom_end:
+                        sp_start_relative = (sp['start_idx'] - zoom_start) / fs
+                        ax2.axvline(x=sp_start_relative, color='c', linestyle=':', alpha=0.7)
+                    if zoom_start <= sp['end_idx'] < zoom_end:
+                        sp_end_relative = (sp['end_idx'] - zoom_start) / fs
+                        ax2.axvline(x=sp_end_relative, color='m', linestyle=':', alpha=0.7)
         
-        ax2.set_xlabel('Time (seconds)')
+        # 设置X轴范围从0开始
+        ax2.set_xlim(0, (zoom_end - zoom_start) / fs)
+        
+        # 更新标题和标签以反映新的视角
+        ax2.set_xlabel('Time (seconds, 0 = event start)')
         ax2.set_ylabel('Calcium Signal Intensity')
-        ax2.set_title(f'High-quality calcium wave (Score: {ms:.2f})')
+        ax2.set_title(f'典型钙波 (从开始点延伸200个时间步，评分: {ms:.2f})')
         ax2.legend(loc='upper right')
         ax2.grid(True, alpha=0.3)
         
