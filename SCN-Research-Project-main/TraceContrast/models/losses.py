@@ -3,6 +3,27 @@ from torch import nn
 import torch.nn.functional as F
 
 def hierarchical_contrastive_loss(z1, z2, alpha=0.5, temporal_unit=0):
+    """
+    计算层次化对比损失，结合实例级对比损失和时间级对比损失。
+    
+    该函数通过递归下采样的方式，在多个尺度上计算对比损失。
+    
+    Parameters
+    ----------
+    z1 : torch.Tensor
+        第一个特征表示张量，形状为 [batch_size, seq_len, feature_dim]
+    z2 : torch.Tensor
+        第二个特征表示张量，形状为 [batch_size, seq_len, feature_dim]
+    alpha : float, 可选
+        实例级对比损失的权重，默认为0.5
+    temporal_unit : int, 可选
+        开始计算时间级对比损失的层级，默认为0
+        
+    Returns
+    -------
+    torch.Tensor
+        计算得到的层次化对比损失值，标量
+    """
     loss = torch.tensor(0., device=z1.device)
     d = 0
     while z1.size(1) > 1:
@@ -21,6 +42,23 @@ def hierarchical_contrastive_loss(z1, z2, alpha=0.5, temporal_unit=0):
     return loss / d
 
 def instance_contrastive_loss(z1, z2):
+    """
+    计算实例级对比损失，用于区分不同批次样本的表示。
+    
+    该损失鼓励来自同一样本的两种表示相似，而来自不同样本的表示不同。
+    
+    Parameters
+    ----------
+    z1 : torch.Tensor
+        第一个特征表示张量，形状为 [batch_size, seq_len, feature_dim]
+    z2 : torch.Tensor
+        第二个特征表示张量，形状为 [batch_size, seq_len, feature_dim]
+        
+    Returns
+    -------
+    torch.Tensor
+        计算得到的实例级对比损失值，标量
+    """
     B, T = z1.size(0), z1.size(1)
     if B == 1:
         return z1.new_tensor(0.)
@@ -36,6 +74,23 @@ def instance_contrastive_loss(z1, z2):
     return loss
 
 def temporal_contrastive_loss(z1, z2):
+    """
+    计算时间级对比损失，用于区分序列中不同时间点的表示。
+    
+    该损失鼓励同一时间点的两种表示相似，而不同时间点的表示不同。
+    
+    Parameters
+    ----------
+    z1 : torch.Tensor
+        第一个特征表示张量，形状为 [batch_size, seq_len, feature_dim]
+    z2 : torch.Tensor
+        第二个特征表示张量，形状为 [batch_size, seq_len, feature_dim]
+        
+    Returns
+    -------
+    torch.Tensor
+        计算得到的时间级对比损失值，标量
+    """
     B, T = z1.size(0), z1.size(1)
     if T == 1:
         return z1.new_tensor(0.)
