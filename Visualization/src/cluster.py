@@ -15,8 +15,60 @@ from matplotlib.colors import ListedColormap
 import matplotlib.cm as cm
 import argparse  # 导入命令行参数处理模块
 import glob
+import logging
+import datetime
+import sys
 
-def load_data(file_path):
+# 初始化日志记录器
+def setup_logger(output_dir=None, prefix="cluster"):
+    """
+    设置日志记录器，将日志消息输出到控制台和文件
+    
+    参数:
+        output_dir: 日志文件输出目录，默认为输出到当前脚本所在目录的logs文件夹
+        prefix: 日志文件名称前缀
+    
+    返回:
+        logger: 已配置好的日志记录器
+    """
+    # 创建日志记录器
+    logger = logging.getLogger(prefix)
+    logger.setLevel(logging.INFO)
+    
+    # 清除现有的处理器，避免重复添加
+    if logger.handlers:
+        for handler in logger.handlers:
+            logger.removeHandler(handler)
+    
+    # 创建格式化器
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # 添加控制台处理器
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # 如果指定了输出目录，则添加文件处理器
+    if output_dir is None:
+        # 默认在当前脚本目录下创建 logs 文件夹
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 创建日志文件名，包含时间戳
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_file = os.path.join(output_dir, f"{prefix}_{timestamp}.log")
+    
+    # 添加文件处理器
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    logger.info(f"日志文件创建于: {log_file}")
+    return logger
+
+def load_data(file_path, logger=None):
     """
     加载钙爆发数据
     
@@ -24,15 +76,21 @@ def load_data(file_path):
     ----------
     file_path : str
         数据文件路径
+    logger : logging.Logger, 可选
+        日志记录器实例，默认为None
         
     返回
     -------
     df : pandas.DataFrame
         加载的数据
     """
-    print(f"正在从{file_path}加载数据...")
+    # 如果未提供日志记录器，创建一个默认的
+    if logger is None:
+        logger = setup_logger()
+    
+    logger.info(f"正在从{file_path}加载数据...")
     df = pd.read_excel(file_path)
-    print(f"成功加载数据，共{len(df)}行")
+    logger.info(f"成功加载数据，共{len(df)}行")
     return df
 
 def enhance_preprocess_data(df, feature_weights=None):
@@ -647,7 +705,7 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
     return best_k
 
-def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, raw_data_dir=None):
+def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, raw_data_dir=None, logger=None):
     """
     可视化不同聚类类别的平均钙爆发波形
     
@@ -1000,7 +1058,11 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     
     # 检查是否有任何有效的聚类波形
     if not avg_waveforms:
-        print("没有找到任何有效的波形数据，无法生成波形图")
+        # 如果函数被传入了logger参数，则使用它，否则创建一个新的logger
+        if 'logger' in locals() and logger is not None:
+            logger.warning("没有找到任何有效的波形数据，无法生成波形图")
+        else:
+            print("没有找到任何有效的波形数据，无法生成波形图")
         return
     
     # 设置图表属性
@@ -1032,8 +1094,13 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     waveform_df = pd.DataFrame(waveform_data)
     waveform_df.to_csv(f'{output_dir}/cluster_average_waveforms.csv', index=False)
     
-    print(f"平均钙爆发波形可视化已保存到 {output_dir}/cluster_average_waveforms.png")
-    print(f"波形数据已保存到 {output_dir}/cluster_average_waveforms.csv")
+    # 如果函数被传入了logger参数，则使用它，否则创建一个新的logger
+    if 'logger' in locals() and logger is not None:
+        logger.info(f"平均钙爆发波形可视化已保存到 {output_dir}/cluster_average_waveforms.png")
+        logger.info(f"波形数据已保存到 {output_dir}/cluster_average_waveforms.csv")
+    else:
+        print(f"平均钙爆发波形可视化已保存到 {output_dir}/cluster_average_waveforms.png")
+        print(f"波形数据已保存到 {output_dir}/cluster_average_waveforms.csv")
 
 def main():
     """
@@ -1051,6 +1118,7 @@ def main():
     parser.add_argument('--raw_data_path', type=str, help='单个原始数据文件路径，用于波形可视化')
     parser.add_argument('--raw_data_dir', type=str, help='原始数据文件目录，用于波形可视化')
     parser.add_argument('--skip_waveform', action='store_true', help='跳过波形可视化步骤')
+    parser.add_argument('--log_dir', type=str, default=None, help='日志文件保存目录，默认为输出目录下的logs文件夹')
     args = parser.parse_args()
     
     # 根据输入文件名生成输出目录
@@ -1070,14 +1138,23 @@ def main():
     else:
         output_dir = args.output
     
-    print(f"输出目录设置为: {output_dir}")
+    # 设置日志目录
+    log_dir = args.log_dir
+    if log_dir is None:
+        log_dir = os.path.join(output_dir, 'logs')
+    
+    # 初始化日志记录器
+    logger = setup_logger(log_dir, "cluster")
+    logger.info(f"开始钙爆发聚类分析任务")
+    logger.info(f"输出目录设置为: {output_dir}")
     
     # 确保结果目录存在
     os.makedirs(output_dir, exist_ok=True)
     
     # 加载数据
     input_file = args.input
-    df = load_data(input_file)
+    logger.info(f"开始加载数据文件: {input_file}")
+    df = load_data(input_file, logger=logger)
     
     # 使用增强版预处理函数替换原预处理函数 - 修改为无条件应用默认权重
     feature_weights = {
@@ -1097,25 +1174,30 @@ def main():
             feature, weight = pair.split(':')
             feature_weights[feature] = float(weight)
     
-    print("使用权重设置进行聚类分析")
+    logger.info("使用权重设置进行聚类分析")
+    logger.info(f"使用的特征权重: {feature_weights}")
     features_scaled, feature_names, df_clean = enhance_preprocess_data(df, feature_weights=feature_weights)
+    logger.info(f"提取的特征名称: {feature_names}")
     
     # 处理聚类数K
     if args.compare:
         # 如果需要比较多个K值
         k_values = [int(k) for k in args.compare.split(',')]
+        logger.info(f"比较不同K值的聚类效果: {k_values}")
         best_k = compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir=output_dir)
-        print(f"在比较的K值中，K={best_k}的轮廓系数最高")
+        logger.info(f"在比较的K值中，K={best_k}的轮廓系数最高")
         # 使用最佳K值进行后续分析
         optimal_k = best_k
     else:
         # 如果指定了K值，使用指定值
         if args.k:
             optimal_k = args.k
-            print(f"使用指定的聚类数: K={optimal_k}")
+            logger.info(f"使用指定的聚类数: K={optimal_k}")
         else:
             # 自动确定最佳聚类数
+            logger.info("自动确定最佳聚类数...")
             optimal_k = determine_optimal_k(features_scaled, output_dir=output_dir)
+            logger.info(f"确定的最佳聚类数: K={optimal_k}")
     
     # K均值聚类
     kmeans_labels = cluster_kmeans(features_scaled, optimal_k)
@@ -1144,16 +1226,25 @@ def main():
     
     # 可视化不同聚类的平均钙爆发波形
     if not args.skip_waveform:
+        logger.info("开始可视化各聚类的平均钙爆发波形...")
         visualize_cluster_waveforms(df_clean, kmeans_labels, output_dir=output_dir, 
-                                   raw_data_path=args.raw_data_path, raw_data_dir=args.raw_data_dir)
+                                    raw_data_path=args.raw_data_path, raw_data_dir=args.raw_data_dir,
+                                    logger=logger)
     else:
-        print("跳过波形可视化步骤")
+        logger.info("跳过波形可视化步骤")
     
     # 将聚类标签添加到Excel
     output_file = f'{output_dir}/all_neurons_transients_clustered_k{optimal_k}.xlsx'
     add_cluster_to_excel(input_file, output_file, kmeans_labels)
     
-    print("聚类分析完成!")
+    logger.info("聚类分析完成!")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # 设置应急日志
+        error_logger = setup_logger(None, "cluster-error")
+        error_logger.error(f"程序运行时出错: {str(e)}", exc_info=True)
+        print(f"程序运行时出错: {str(e)}")
+        raise

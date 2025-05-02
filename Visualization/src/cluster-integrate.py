@@ -15,6 +15,53 @@ from matplotlib.colors import ListedColormap
 import matplotlib.cm as cm
 import argparse  # 导入命令行参数处理模块
 import glob  # 导入用于文件路径模式匹配的模块
+import logging
+import datetime
+import sys
+
+# 初始化日志记录器
+def setup_logger(output_dir=None, prefix="cluster-integrate"):
+    """
+    设置日志记录器，将日志消息输出到控制台和文件
+    
+    参数:
+        output_dir: 日志文件输出目录，默认为输出到当前脚本所在目录的logs文件夹
+        prefix: 日志文件名称前缀
+    
+    返回:
+        logger: 已配置好的日志记录器
+    """
+    # 创建日志记录器
+    logger = logging.getLogger(prefix)
+    logger.setLevel(logging.INFO)
+    
+    # 创建格式化器
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # 添加控制台处理器
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # 如果指定了输出目录，则添加文件处理器
+    if output_dir is None:
+        # 默认在当前脚本目录下创建 logs 文件夹
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 创建日志文件名，包含时间戳
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_file = os.path.join(output_dir, f"{prefix}_{timestamp}.log")
+    
+    # 添加文件处理器
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    logger.info(f"日志文件创建于: {log_file}")
+    return logger
 
 def load_data(file_path):
     """
@@ -1073,7 +1120,30 @@ def main():
     parser.add_argument('--raw_data_path', type=str, help='单个原始数据文件路径，用于波形可视化')
     parser.add_argument('--skip_waveform', action='store_true', help='跳过波形可视化步骤')
     parser.add_argument('--weights', type=str, help='特征权重，格式如"amplitude:1.2,duration:0.8"')
+    parser.add_argument('--log_dir', type=str, default=None, help='日志文件保存目录，默认为输出目录下的logs文件夹')
     args = parser.parse_args()
+    
+    # 设置输出目录
+    output_dir = args.output
+    if output_dir is None:
+        # 自动生成输出目录
+        if args.input_dir and args.combine:
+            # 如果是合并多个文件，使用输入目录名
+            input_dir_name = os.path.basename(os.path.normpath(args.input_dir))
+            output_dir = f"../results/cluster_results_{input_dir_name}_combined"
+        else:
+            # 否则使用输入文件名
+            input_basename = os.path.basename(args.input)
+            output_dir = f"../results/cluster_results_{os.path.splitext(input_basename)[0]}"
+    
+    # 设置日志目录
+    log_dir = args.log_dir
+    if log_dir is None:
+        log_dir = os.path.join(output_dir, 'logs')
+    
+    # 初始化日志记录器
+    logger = setup_logger(log_dir, "cluster-integrate")
+    logger.info(f"开始钙爆发聚类分析，输出目录: {output_dir}")
     
     # 处理输入文件路径
     input_files = []
@@ -1083,19 +1153,20 @@ def main():
         pattern = os.path.join(args.input_dir, "**", "*transients.xlsx")
         input_files = glob.glob(pattern, recursive=True)
         if not input_files:
-            print(f"错误: 在目录{args.input_dir}下未找到任何匹配的transients.xlsx文件")
+            logger.error(f"错误: 在目录{args.input_dir}下未找到任何匹配的transients.xlsx文件")
             return
-        print(f"在目录{args.input_dir}下找到{len(input_files)}个钙爆发数据文件")
+        logger.info(f"在目录{args.input_dir}下找到{len(input_files)}个钙爆发数据文件")
     else:
         # 否则使用单个输入文件
         if not os.path.exists(args.input):
-            print(f"错误: 输入文件 {args.input} 不存在")
+            logger.error(f"错误: 输入文件 {args.input} 不存在")
             return
         input_files = [args.input]
+        logger.info(f"使用输入文件: {args.input}")
     
     # 如果需要合并多个输入文件
     if args.input_dir and args.combine and len(input_files) > 1:
-        print("正在合并多个钙爆发数据文件...")
+        logger.info("正在合并多个钙爆发数据文件...")
         
         all_data = []
         for file in input_files:
@@ -1284,4 +1355,11 @@ def main():
     print("聚类分析完成!")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # 设置应急日志
+        logger = setup_logger(None, "cluster-integrate-error")
+        logger.error(f"程序运行时出错: {str(e)}", exc_info=True)
+        print(f"程序运行时出错: {str(e)}")
+        raise

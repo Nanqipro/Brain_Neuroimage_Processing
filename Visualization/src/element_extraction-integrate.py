@@ -7,6 +7,53 @@ import matplotlib.pyplot as plt
 import os
 import argparse
 import glob
+import logging
+import datetime
+import sys
+
+# 初始化日志记录器
+def setup_logger(output_dir=None, prefix="element_extraction-integrate"):
+    """
+    设置日志记录器，将日志消息输出到控制台和文件
+    
+    参数:
+        output_dir: 日志文件输出目录，默认为输出到当前脚本所在目录的logs文件夹
+        prefix: 日志文件名称前缀
+    
+    返回:
+        logger: 已配置好的日志记录器
+    """
+    # 创建日志记录器
+    logger = logging.getLogger(prefix)
+    logger.setLevel(logging.INFO)
+    
+    # 创建格式化器
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # 添加控制台处理器
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # 如果指定了输出目录，则添加文件处理器
+    if output_dir is None:
+        # 默认在当前脚本目录下创建 logs 文件夹
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 创建日志文件名，包含时间戳
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_file = os.path.join(output_dir, f"{prefix}_{timestamp}.log")
+    
+    # 添加文件处理器
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    logger.info(f"日志文件创建于: {log_file}")
+    return logger
 
 def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth_window=65, 
                              peak_distance=30, baseline_percentile=18, max_duration=350,
@@ -1184,7 +1231,17 @@ if __name__ == "__main__":
                         help='过滤强度系数(0.5-2.0)。<1.0更宽松，>1.0更严格。默认为1.0')
     parser.add_argument('--root_dir', type=str, default=None,
                         help='项目根目录，用于生成相对路径，默认为当前工作目录的上一级')
+    parser.add_argument('--log_dir', type=str, default=None,
+                        help='日志文件保存目录，默认为输出目录下的logs文件夹')
     args = parser.parse_args()
+    
+    # 设置日志输出目录
+    log_dir = args.log_dir
+    if log_dir is None:
+        log_dir = os.path.join(args.output_dir, 'logs')
+    
+    # 初始化日志记录器
+    logger = setup_logger(log_dir, "element_extraction-integrate")
     
     # 设置项目根目录，用于计算相对路径
     if args.root_dir:
@@ -1193,7 +1250,7 @@ if __name__ == "__main__":
         # 默认使用当前工作目录的上一级
         root_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
     
-    print(f"使用项目根目录: {root_dir}")
+    logger.info(f"使用项目根目录: {root_dir}")
     
     # 展开输入文件路径列表（支持通配符）
     input_files = []
