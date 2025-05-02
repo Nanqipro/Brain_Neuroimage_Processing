@@ -539,9 +539,21 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
             print(error_msg)
         return
     
-    # 设置统一线条粗细
-    line_width = 5  # 使用统一的线条粗细
-    df_cluster['line_width'] = line_width
+    # 检查是否有振幅信息用于线条粗细
+    has_amplitude = 'amplitude' in df_cluster.columns
+    if has_amplitude:
+        if logger:
+            logger.info("检测到振幅信息，线条粗细将与钙波振幅成比例")
+        else:
+            print("检测到振幅信息，线条粗细将与钙波振幅成比例")
+        
+        # 归一化振幅到合理的线宽范围(2-10)
+        amplitude_min = df_cluster['amplitude'].min()
+        amplitude_max = df_cluster['amplitude'].max()
+        df_cluster['line_width'] = 2 + 8 * (df_cluster['amplitude'] - amplitude_min) / (amplitude_max - amplitude_min)
+    else:
+        # 使用默认线宽
+        df_cluster['line_width'] = 4
     
     # 检查是否使用时间戳模式
     has_timestamp = 'timestamp' in df_cluster.columns
@@ -616,10 +628,10 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
                     
                     # 准备悬停信息
                     hover_text = f"神经元: {neuron}<br>聚类: {cluster_id+1}<br>开始: {start_time:.2f}<br>结束: {end_time:.2f}"
-                    if 'amplitude' in event:
+                    if has_amplitude:
                         hover_text += f"<br>振幅: {event['amplitude']:.2f}"
                     
-                    # 绘制水平线段，使用统一线宽
+                    # 绘制水平线段
                     fig.add_trace(
                         go.Scatter(
                             x=[start_time, end_time],
@@ -627,7 +639,7 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
                             mode='lines',
                             line=dict(
                                 color=cluster_color,
-                                width=line_width
+                                width=event['line_width']
                             ),
                             name=f'Cluster {cluster_id+1}',
                             legendgroup=f'Cluster {cluster_id+1}',
@@ -651,8 +663,8 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
                     bgcolor="white",
                     font_size=12
                 ),
-                height=800,  # 调整高度
-                width=1500    # 调整宽度
+                height=600,
+                width=1000
             )
             
             # 保存交互式图表为HTML文件
@@ -675,8 +687,8 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
     
     # 如果不使用交互式或者plotly导入失败，使用matplotlib绘制
     if not interactive:
-        # 创建图形 - 调整比例为15:8
-        plt.figure(figsize=(15, 8))
+        # 创建图形
+        plt.figure(figsize=(15, 10))
         
         # 按聚类绘制时间线，确保颜色对应聚类
         for cluster_id in range(n_clusters):
@@ -703,9 +715,9 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
                     start_time = event['start_idx']
                     end_time = start_time + event['duration']
                 
-                # 在对应神经元的位置上绘制代表钙波事件的水平线段，使用统一线宽
+                # 在对应神经元的位置上绘制代表钙波事件的水平线段
                 plt.hlines(y=y_position, xmin=start_time, xmax=end_time, 
-                          linewidth=line_width, color=cluster_color, alpha=0.7)
+                          linewidth=event['line_width'], color=cluster_color, alpha=0.7)
         
         # 设置Y轴刻度和标签
         plt.yticks(list(neuron_to_y.values()), list(neuron_to_y.keys()))
@@ -1577,6 +1589,433 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     # 返回轮廓系数最高的K值
     best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
     return best_k
+
+def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, raw_data_dir=None, logger=None, sampling_freq=4.8):
+    """
+    可视化不同聚类类别的平均钙爆发波形，以钙波开始时间为原点，只展示X轴正半轴部分
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含钙爆发特征的数据框，必须包含start_idx, peak_idx, end_idx和neuron字段
+    labels : numpy.ndarray
+        聚类标签
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
+    raw_data_path : str, 可选
+        单个原始数据文件路径
+    raw_data_dir : str, 可选
+        原始数据文件目录，用于查找多个数据文件
+    logger : logging.Logger, 可选
+        日志记录器实例，默认为None
+    sampling_freq : float, 可选
+        采样频率，单位Hz，默认为4.8Hz，用于将数据点转换为以秒为单位
+    """
+    print("正在可视化不同聚类类别的平均钙爆发波形...")
+    
+    # 设置时间窗口（采样点数）- 减小窗口大小以提高匹配成功率
+    time_window = 200
+    
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
+    
+    # 检查必要的字段
+    required_fields = ['start_idx', 'peak_idx', 'end_idx', 'neuron']
+    if not all(field in df_cluster.columns for field in required_fields):
+        print("错误: 数据中缺少必要字段(start_idx, peak_idx, end_idx, neuron)，无法绘制波形")
+        return
+    
+    # 获取聚类的数量
+    n_clusters = len(np.unique(labels))
+    if -1 in np.unique(labels):  # DBSCAN可能有噪声点标记为-1
+        n_clusters -= 1
+    
+    # 尝试加载原始数据
+    raw_data_dict = {}
+    
+    # 检查是否存在dataset列，表示合并了不同数据集
+    has_dataset_column = 'dataset' in df_cluster.columns
+    
+    # 检查是否包含源文件信息
+    has_source_info = all(col in df_cluster.columns for col in ['source_file', 'source_path', 'source_abs_path'])
+    if has_source_info:
+        print("检测到源文件路径信息，将优先使用这些信息加载原始数据")
+    
+    if raw_data_path:
+        # 如果指定了单个原始数据文件路径
+        try:
+            print(f"加载原始数据从: {raw_data_path}")
+            raw_data = pd.read_excel(raw_data_path)
+            # 使用文件名作为数据集名称
+            dataset_name = os.path.splitext(os.path.basename(raw_data_path))[0]
+            raw_data_dict[dataset_name] = raw_data
+            print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+        except Exception as e:
+            print(f"无法加载原始数据: {str(e)}")
+            return
+    elif raw_data_dir:
+        # 如果指定了原始数据目录，查找所有Excel文件
+        try:
+            excel_files = glob.glob(os.path.join(raw_data_dir, "**/*.xlsx"), recursive=True)
+            print(f"在目录{raw_data_dir}下找到{len(excel_files)}个Excel文件")
+            
+            for file in excel_files:
+                # 使用文件名作为数据集名称，而不是目录名
+                dataset_name = os.path.splitext(os.path.basename(file))[0]
+                try:
+                    raw_data = pd.read_excel(file)
+                    raw_data_dict[dataset_name] = raw_data
+                    print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                except Exception as e:
+                    print(f"  加载数据集{dataset_name}失败: {str(e)}")
+        except Exception as e:
+            print(f"搜索原始数据文件时出错: {str(e)}")
+            return
+    else:
+        # 使用源文件信息加载原始数据（如果可用）
+        if has_source_info:
+            # 获取不同的源文件
+            unique_source_files = df_cluster['source_path'].unique()
+            print(f"从事件数据中检测到 {len(unique_source_files)} 个不同的源文件")
+            
+            # 使用项目根目录（通常是工作目录的上一级）作为基础
+            root_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
+            print(f"使用项目根目录: {root_dir}")
+            
+            # 加载每个源文件
+            for source_path in unique_source_files:
+                try:
+                    # 构建绝对路径
+                    if os.path.isabs(source_path):
+                        abs_path = source_path
+                    else:
+                        abs_path = os.path.join(root_dir, source_path)
+                    
+                    if os.path.exists(abs_path):
+                        print(f"加载源文件: {abs_path}")
+                        raw_data = pd.read_excel(abs_path)
+                        dataset_name = os.path.splitext(os.path.basename(abs_path))[0]
+                        raw_data_dict[dataset_name] = raw_data
+                        print(f"  成功加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                    else:
+                        print(f"  源文件不存在: {abs_path}")
+                except Exception as e:
+                    print(f"  加载源文件 {source_path} 失败: {str(e)}")
+        
+        # 如果无法使用源文件信息或未找到任何文件，尝试使用默认位置
+        if not raw_data_dict:
+            try:
+                # 直接指定原始数据路径
+                raw_data_path = "../datasets/processed_EMtrace.xlsx"
+                print(f"尝试加载默认原始数据从: {raw_data_path}")
+                
+                # 加载原始数据
+                raw_data = pd.read_excel(raw_data_path)
+                dataset_name = os.path.splitext(os.path.basename(raw_data_path))[0]
+                raw_data_dict[dataset_name] = raw_data
+                print(f"成功加载原始数据，形状: {raw_data.shape}")
+            except Exception as e:
+                print(f"无法加载默认原始数据: {str(e)}")
+                print("尝试在../datasets目录下搜索原始数据...")
+                
+                try:
+                    # 尝试搜索datasets目录下的所有Excel文件
+                    datasets_dir = "../datasets"
+                    excel_files = glob.glob(os.path.join(datasets_dir, "*.xlsx"))
+                    
+                    if excel_files:
+                        for file in excel_files:
+                            dataset_name = os.path.splitext(os.path.basename(file))[0]
+                            try:
+                                raw_data = pd.read_excel(file)
+                                raw_data_dict[dataset_name] = raw_data
+                                print(f"  已加载数据集: {dataset_name}, 形状: {raw_data.shape}")
+                            except Exception as e:
+                                print(f"  加载数据集{dataset_name}失败: {str(e)}")
+                    else:
+                        print("在../datasets目录下未找到任何Excel文件")
+                        return
+                except Exception as e:
+                    print(f"搜索原始数据时出错: {str(e)}")
+                    return
+    
+    if not raw_data_dict:
+        print("未能加载任何原始数据，无法可视化波形")
+        return
+    
+    # 打印所有可用神经元列以供调试
+    print("原始数据中的神经元列：")
+    for dataset_name, data in raw_data_dict.items():
+        neuron_cols = [col for col in data.columns if col.startswith('n') and col[1:].isdigit()]
+        print(f"  数据集 {dataset_name}: {len(neuron_cols)} 个神经元列 - {neuron_cols[:5]}...")
+    
+    # 打印钙爆发数据中的神经元名称以供调试
+    unique_neurons = df_cluster['neuron'].unique()
+    print(f"钙爆发数据中的神经元: {len(unique_neurons)} 个 - {unique_neurons[:5]}...")
+    
+    # 创建神经元名称映射，处理可能的命名不一致问题
+    neuron_mapping = {}
+    for neuron_name in unique_neurons:
+        # 检查神经元名称是否以'n'开头，并且第二个字符是数字
+        if isinstance(neuron_name, str) and neuron_name.startswith('n') and neuron_name[1:].isdigit():
+            # 保持原名
+            neuron_mapping[neuron_name] = neuron_name
+        elif isinstance(neuron_name, (int, float)) or (isinstance(neuron_name, str) and neuron_name.isdigit()):
+            # 如果是纯数字，则转为"n数字"格式
+            formatted_name = f"n{int(float(neuron_name))}"
+            neuron_mapping[neuron_name] = formatted_name
+    
+    print(f"创建了 {len(neuron_mapping)} 个神经元名称映射")
+    
+    # 创建颜色映射 - 修复弃用的get_cmap方法
+    try:
+        # 尝试使用新的推荐方法
+        cmap = plt.colormaps['tab10']
+    except (AttributeError, KeyError):
+        # 如果失败，回退到旧方法
+        cmap = plt.cm.get_cmap('tab10', n_clusters)
+    
+    # 为每个聚类提取和平均波形
+    plt.figure(figsize=(12, 8))
+    
+    # 记录不同聚类的平均波形数据，用于保存
+    avg_waveforms = {}
+    
+    for cluster_id in range(n_clusters):
+        # 获取当前聚类的所有钙爆发事件
+        cluster_events = df_cluster[df_cluster['cluster'] == cluster_id]
+        
+        if len(cluster_events) == 0:
+            continue
+        
+        # 收集所有波形，指定从start开始的固定长度
+        all_waveforms = []
+        fixed_length = time_window * 2  # 固定长度：足够长以显示完整钙波
+        print(f"聚类 {cluster_id+1}: 使用从起始点开始的固定长度{fixed_length}处理波形...")
+        
+        # 对每个事件，提取波形
+        for idx, event in cluster_events.iterrows():
+            neuron_col = event['neuron']
+            
+            # 应用神经元名称映射
+            if neuron_col in neuron_mapping:
+                neuron_col = neuron_mapping[neuron_col]
+            
+            # 确定使用哪个原始数据集
+            raw_data = None
+            
+            # 1. 优先使用源文件信息精确匹配
+            if has_source_info and 'source_file' in event:
+                source_file = event['source_file']
+                # 提取不带扩展名的文件名作为数据集名称
+                source_dataset = os.path.splitext(source_file)[0]
+                if source_dataset in raw_data_dict:
+                    raw_data = raw_data_dict[source_dataset]
+                    # 只对每个聚类的第一个事件显示此消息，避免输出过多
+                    if idx == cluster_events.index[0]:
+                        print(f"聚类 {cluster_id+1}: 使用源文件信息匹配原始数据")
+            
+            # 2. 如果无法通过源文件匹配，尝试使用dataset列
+            if raw_data is None and has_dataset_column and 'dataset' in event and event['dataset'] in raw_data_dict:
+                # 如果事件有数据集标识且该数据集已加载
+                raw_data = raw_data_dict[event['dataset']]
+            
+            # 3. 如果前两种方法都失败，尝试所有数据集进行列名匹配
+            if raw_data is None or neuron_col not in raw_data.columns:
+                # 尝试所有数据集，查找包含此神经元的数据集
+                for dataset_name, dataset_raw_data in raw_data_dict.items():
+                    if neuron_col in dataset_raw_data.columns:
+                        raw_data = dataset_raw_data
+                        break
+            
+            if raw_data is None or neuron_col not in raw_data.columns:
+                # 如果还找不到，尝试其他命名方式
+                for dataset_name, dataset_raw_data in raw_data_dict.items():
+                    # 尝试格式如 "n3" 或 "3" 等
+                    if neuron_col.lstrip('n') in dataset_raw_data.columns:
+                        neuron_col = neuron_col.lstrip('n')
+                        raw_data = dataset_raw_data
+                        break
+                    elif f"n{neuron_col}" in dataset_raw_data.columns:
+                        neuron_col = f"n{neuron_col}"
+                        raw_data = dataset_raw_data
+                        break
+                
+                # 如果仍找不到，则跳过此事件
+                if raw_data is None or neuron_col not in raw_data.columns:
+                    continue
+            
+            # 提取以start_idx为起点的时间窗口数据
+            try:
+                # 获取起始点和峰值点
+                start_idx = int(event['start_idx'])
+                peak_idx = int(event['peak_idx'])
+                
+                # 计算从起始点到峰值点的距离
+                peak_offset = peak_idx - start_idx
+                
+                # 设置新的窗口大小，以起始点为原点，只展示正半轴
+                window_end = time_window * 2  # 扩大窗口以确保能看到完整的钙波
+                
+                # 确定提取的起始点和结束点
+                start = max(0, start_idx)  # 从起始点开始
+                end = min(len(raw_data), start_idx + window_end + 1)  # 到足够长的时间展示完整波形
+                
+                # 如果提取的窗口不够长，进行调整
+                if end - start < window_end:
+                    # 如果窗口太小则跳过
+                    if end - start < 20:
+                        continue
+                    window_end = end - start
+                
+                # 提取波形
+                waveform = raw_data[neuron_col].values[start:end]
+                
+                # 创建相对于start_idx的时间点数组（单位为秒）
+                time_points = np.arange(0, len(waveform)) / sampling_freq
+                
+                # 计算peak位置相对于start的偏移（用于后续标记）
+                peak_relative_pos = peak_idx - start
+                
+                # 确保所有波形长度统一，便于后续平均计算
+                fixed_length = window_end  # 使用固定长度
+                if len(waveform) != fixed_length:
+                    # 修剪或填充波形以匹配固定长度
+                    if len(waveform) > fixed_length:
+                        waveform = waveform[:fixed_length]
+                    else:
+                        # 填充不足部分
+                        padding = np.full(fixed_length - len(waveform), np.nan)
+                        waveform = np.concatenate([waveform, padding])
+                    
+                    # 重置时间点数组为固定长度（单位为秒）
+                    time_points = np.arange(fixed_length) / sampling_freq
+                
+                # 归一化处理：减去基线并除以峰值振幅
+                # 忽略NaN值
+                valid_indices = ~np.isnan(waveform)
+                if np.sum(valid_indices) > 10:  # 确保有足够的有效点
+                    baseline = np.nanmin(waveform)
+                    amplitude = np.nanmax(waveform) - baseline
+                    if amplitude > 0:  # 避免除以零
+                        norm_waveform = (waveform - baseline) / amplitude
+                        all_waveforms.append(norm_waveform)
+            except Exception as e:
+                print(f"处理事件 {idx} 时出错: {str(e)}")
+                continue
+        
+        # 如果没有有效波形，跳过此聚类
+        if len(all_waveforms) == 0:
+            print(f"警告: 聚类 {cluster_id+1} 没有有效波形")
+            continue
+        
+        # 预处理所有波形，确保长度一致
+        # 转换为统一长度的波形数组之前，先确认所有波形长度是否已一致
+        wave_lengths = [len(w) for w in all_waveforms]
+        if len(set(wave_lengths)) > 1:
+            # 存在长度不一致的情况，调整为统一长度
+            max_len = max(wave_lengths)
+            standardized_waveforms = []
+            for w in all_waveforms:
+                if len(w) < max_len:
+                    padding = np.full(max_len - len(w), np.nan)
+                    std_w = np.concatenate([w, padding])
+                else:
+                    std_w = w
+                standardized_waveforms.append(std_w)
+            all_waveforms = standardized_waveforms
+            # 调整时间点以匹配，使用从0开始的时间点（单位为秒）
+            time_points = np.arange(max_len) / sampling_freq
+            
+        # 计算平均波形（忽略NaN值）
+        all_waveforms_array = np.array(all_waveforms)
+        avg_waveform = np.nanmean(all_waveforms_array, axis=0)
+        std_waveform = np.nanstd(all_waveforms_array, axis=0)
+        
+        # 存储平均波形
+        avg_waveforms[f"Cluster_{cluster_id+1}"] = {
+            "time": time_points,
+            "mean": avg_waveform,
+            "std": std_waveform,
+            "n_samples": len(all_waveforms)
+        }
+        
+        # 绘制平均波形 - 移除标准差范围，仅绘制平均曲线
+        plt.plot(time_points, avg_waveform, 
+                 color=cmap(cluster_id), 
+                 linewidth=2.5,  # 增加线宽使曲线更突出
+                 label=f'Cluster {cluster_id+1} (n={len(all_waveforms)})')
+        
+        # 移除标准差范围的绘制
+        # plt.fill_between(time_points, 
+        #                  avg_waveform - std_waveform, 
+        #                  avg_waveform + std_waveform, 
+        #                  color=cmap(cluster_id), 
+        #                  alpha=0.2)
+    
+    # 检查是否有任何有效的聚类波形
+    if not avg_waveforms:
+        # 如果函数被传入了logger参数，则使用它，否则创建一个新的logger
+        if 'logger' in locals() and logger is not None:
+            logger.warning("没有找到任何有效的波形数据，无法生成波形图")
+        else:
+            print("没有找到任何有效的波形数据，无法生成波形图")
+        return
+    
+    # 设置图表属性
+    # 标记峰值位置（如果有记录）- 使用平均峰值位置
+    peak_positions = [np.argmax(avg_waveforms[f"Cluster_{i+1}"]["mean"]) for i in range(n_clusters) if f"Cluster_{i+1}" in avg_waveforms]
+    if peak_positions:
+        avg_peak_position = int(np.mean(peak_positions))
+        # 将数据点转换为秒
+        avg_peak_position_sec = avg_peak_position / sampling_freq
+        plt.axvline(x=avg_peak_position_sec, color='grey', linestyle='--', alpha=0.7, label='Average Peak Position')
+    
+    plt.title('Typical Calcium Wave Morphology Comparison (Cluster Averages)', fontsize=14)
+    plt.xlabel('Time Relative to Start Point (seconds)', fontsize=12)
+    plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)
+    plt.grid(True, alpha=0.3)
+    plt.legend(loc='upper right')
+    # 设置X轴只显示正半轴部分
+    plt.xlim(left=0)  # 从0开始显示X轴
+    
+    # 添加额外标注说明X轴起点为钙波起始位置
+    # 添加合适的标注位置，考虑到现在横坐标是秒
+    annotation_x = 0.2  # 秒
+    plt.annotate('Calcium Wave Start Point', xy=(0, 0), xytext=(annotation_x, 0.1), 
+                 arrowprops=dict(facecolor='black', shrink=0.05, width=1.5, headwidth=8, alpha=0.7))
+    
+    # 保存图表
+    os.makedirs(output_dir, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
+    # 保存第二个版本，文件名表明是以起始点为起点的可视化
+    plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
+    
+    # 保存平均波形数据 - 修复append方法已弃用的问题
+    waveform_data = []
+    for cluster_name, waveform_data_dict in avg_waveforms.items():
+        for i, t in enumerate(waveform_data_dict["time"]):
+            waveform_data.append({
+                "cluster": cluster_name,
+                "time_point": t,
+                "mean_intensity": waveform_data_dict["mean"][i],
+                "std_intensity": waveform_data_dict["std"][i],
+                "n_samples": waveform_data_dict["n_samples"]
+            })
+    
+    # 创建DataFrame
+    waveform_df = pd.DataFrame(waveform_data)
+    waveform_df.to_csv(f'{output_dir}/cluster_average_waveforms.csv', index=False)
+    
+    # 如果函数被传入了logger参数，则使用它，否则创建一个新的logger
+    if 'logger' in locals() and logger is not None:
+        logger.info(f"平均钙爆发波形可视化已保存到 {output_dir}/cluster_average_waveforms.png")
+        logger.info(f"波形数据已保存到 {output_dir}/cluster_average_waveforms.csv")
+    else:
+        print(f"平均钙爆发波形可视化已保存到 {output_dir}/cluster_average_waveforms.png")
+        print(f"波形数据已保存到 {output_dir}/cluster_average_waveforms.csv")
 
 def main():
     """
