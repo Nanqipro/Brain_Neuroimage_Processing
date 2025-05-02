@@ -732,7 +732,7 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
     return best_k
 
-def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, raw_data_dir=None, logger=None):
+def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_path=None, raw_data_dir=None, logger=None, sampling_freq=4.8):
     """
     可视化不同聚类类别的平均钙爆发波形，以钙波开始时间为原点，只展示X轴正半轴部分
     
@@ -750,6 +750,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
         原始数据文件目录，用于查找多个数据文件
     logger : logging.Logger, 可选
         日志记录器实例，默认为None
+    sampling_freq : float, 可选
+        采样频率，单位Hz，默认为4.8Hz，用于将数据点转换为以秒为单位
     """
     print("正在可视化不同聚类类别的平均钙爆发波形...")
     
@@ -1012,8 +1014,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
                 # 提取波形
                 waveform = raw_data[neuron_col].values[start:end]
                 
-                # 创建相对于start_idx的时间点数组（单位为数据点）
-                time_points = np.arange(0, len(waveform))
+                # 创建相对于start_idx的时间点数组（单位为秒）
+                time_points = np.arange(0, len(waveform)) / sampling_freq
                 
                 # 计算peak位置相对于start的偏移（用于后续标记）
                 peak_relative_pos = peak_idx - start
@@ -1029,8 +1031,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
                         padding = np.full(fixed_length - len(waveform), np.nan)
                         waveform = np.concatenate([waveform, padding])
                     
-                    # 重置时间点数组为固定长度
-                    time_points = np.arange(fixed_length)
+                    # 重置时间点数组为固定长度（单位为秒）
+                    time_points = np.arange(fixed_length) / sampling_freq
                 
                 # 归一化处理：减去基线并除以峰值振幅
                 # 忽略NaN值
@@ -1065,8 +1067,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
                     std_w = w
                 standardized_waveforms.append(std_w)
             all_waveforms = standardized_waveforms
-            # 调整时间点以匹配，使用从0开始的时间点
-            time_points = np.arange(max_len)
+            # 调整时间点以匹配，使用从0开始的时间点（单位为秒）
+            time_points = np.arange(max_len) / sampling_freq
             
         # 计算平均波形（忽略NaN值）
         all_waveforms_array = np.array(all_waveforms)
@@ -1108,10 +1110,12 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     peak_positions = [np.argmax(avg_waveforms[f"Cluster_{i+1}"]["mean"]) for i in range(n_clusters) if f"Cluster_{i+1}" in avg_waveforms]
     if peak_positions:
         avg_peak_position = int(np.mean(peak_positions))
-        plt.axvline(x=avg_peak_position, color='grey', linestyle='--', alpha=0.7, label='Average Peak Position')
+        # 将数据点转换为秒
+        avg_peak_position_sec = avg_peak_position / sampling_freq
+        plt.axvline(x=avg_peak_position_sec, color='grey', linestyle='--', alpha=0.7, label='Average Peak Position')
     
     plt.title('Typical Calcium Wave Morphology Comparison (Cluster Averages)', fontsize=14)
-    plt.xlabel('Time Relative to Start Point (Data Points)', fontsize=12)
+    plt.xlabel('Time Relative to Start Point (seconds)', fontsize=12)
     plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)
     plt.grid(True, alpha=0.3)
     plt.legend(loc='upper right')
@@ -1119,7 +1123,9 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     plt.xlim(left=0)  # 从0开始显示X轴
     
     # 添加额外标注说明X轴起点为钙波起始位置
-    plt.annotate('Calcium Wave Start Point', xy=(0, 0), xytext=(5, 0.1), 
+    # 添加合适的标注位置，考虑到现在横坐标是秒
+    annotation_x = 0.2  # 秒
+    plt.annotate('Calcium Wave Start Point', xy=(0, 0), xytext=(annotation_x, 0.1), 
                  arrowprops=dict(facecolor='black', shrink=0.05, width=1.5, headwidth=8, alpha=0.7))
     
     # 保存图表
