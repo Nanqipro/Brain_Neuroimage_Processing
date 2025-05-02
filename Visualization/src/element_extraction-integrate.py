@@ -88,7 +88,7 @@ def setup_logger(output_dir=None, prefix="element_extraction-integrate", capture
     return logger
 
 def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth_window=65, 
-                             peak_distance=30, baseline_percentile=18, max_duration=350,
+                             peak_distance=20, baseline_percentile=18, max_duration=800,
                              detect_subpeaks=True, subpeak_prominence=0.3, 
                              subpeak_width=12, subpeak_distance=18, params=None, 
                              min_morphology_score=0.45, min_exp_decay_score=0.25,
@@ -103,7 +103,7 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
         min_snr: 最小信噪比阈值，默认为8.5
         min_duration: 最小持续时间(采样点数)，默认为25
         smooth_window: 平滑窗口大小，默认为65
-        peak_distance: 峰值之间的最小距离，默认为30
+        peak_distance: 峰值之间的最小距离，默认为20（已降低以更好地检测相邻钙波）
         baseline_percentile: 用于估计基线的百分位数，默认为18
         max_duration: 最大持续时间(采样点数)，默认为350
         detect_subpeaks: 是否检测子峰，默认为True
@@ -139,54 +139,11 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
         else:  # filter_strength < 1.0
             min_duration = max(10, int(min_duration * filter_strength))
             smooth_window = max(21, int(smooth_window * (1 - (1 - filter_strength) * 0.3)))
-            peak_distance = max(15, int(peak_distance * filter_strength))
+            peak_distance = max(10, int(peak_distance * filter_strength))  # 降低下限至10，更好地检测相邻钙波
             subpeak_prominence = max(0.1, subpeak_prominence * filter_strength)
             subpeak_width = max(5, int(subpeak_width * filter_strength))
             subpeak_distance = max(8, int(subpeak_distance * filter_strength))
-    """
-    检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
-    增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
     
-    参数
-    ----------
-    data : numpy.ndarray
-        钙离子浓度时间序列数据
-    fs : float, 可选
-        采样频率，默认为1.0Hz
-    min_snr : float, 可选
-        最小信噪比阈值，默认为9.0
-    min_duration : int, 可选
-        最小持续时间（采样点数），默认为30
-    smooth_window : int, 可选
-        平滑窗口大小，默认为80
-    peak_distance : int, 可选
-        峰值间最小距离，默认为35
-    baseline_percentile : int, 可选
-        用于估计基线的百分位数，默认为15
-    max_duration : int, 可选
-        钙爆发最大持续时间（采样点数），默认为350
-    detect_subpeaks : bool, 可选
-        是否检测大波中的小波峰，默认为True
-    subpeak_prominence : float, 可选
-        子峰的相对突出度（主峰振幅的比例），默认为0.35
-    subpeak_width : int, 可选
-        子峰的最小宽度，默认为15
-    subpeak_distance : int, 可选
-        子峰间的最小距离，默认为20
-    params : dict, 可选
-        自定义参数字典
-    min_morphology_score : float, 可选
-        最小形态评分要求，默认为0.5
-    min_exp_decay_score : float, 可选
-        最小指数衰减评分，默认为0.3
-        
-    返回
-    -------
-    transients : list of dict
-        每个钙爆发的特征参数字典列表
-    smoothed_data : numpy.ndarray
-        平滑后的数据
-    """
     # 如果提供了自定义参数，覆盖默认参数
     # 确保params是字典类型
     if params is None:
@@ -236,16 +193,60 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
     
     # 增加prominence参数来要求峰值必须明显突出于背景
     # 调整prominence_threshold，随filter_strength变化
-    prominence_factor = 2.0 * filter_strength
+    prominence_factor = 1.8 * filter_strength  # 降低默认的prominence_factor以更好地捕获相邻峰值
     prominence_threshold = noise_level * prominence_factor
     
     # 增加width参数来过滤太窄的峰值（可能是尖刺噪声）
-    min_width = min_duration // 4  # 至少要有最小持续时间的1/4宽度
+    min_width = min_duration // 5  # 稍微降低最小宽度要求，改为1/5而不是1/4
     
-    peaks, peak_props = find_peaks(smoothed_data, height=threshold, distance=peak_distance,
-                                  prominence=prominence_threshold, width=min_width)
+    # 首次检测所有可能的峰值，使用较低的distance要求
+    initial_peaks, peak_props = find_peaks(smoothed_data, height=threshold, 
+                                          prominence=prominence_threshold, width=min_width)
     
+    # 对找到的峰值使用更智能的选择策略，而不是简单地应用固定距离
     # 如果没有检测到峰值，返回空列表
+    if len(initial_peaks) == 0:
+        return [], smoothed_data
+    
+    # 通过检查峰值之间的谷值深度来决定是否保留相邻峰值
+    peaks = []
+    for i, peak_idx in enumerate(initial_peaks):
+        # 第一个峰值总是保留
+        if i == 0:
+            peaks.append(peak_idx)
+            continue
+            
+        # 检查与之前添加的最后一个峰的距离
+        last_peak = peaks[-1]
+        if peak_idx - last_peak < peak_distance:
+            # 如果距离太近，检查两个峰之间的谷值深度
+            valley_idx = last_peak + np.argmin(smoothed_data[last_peak:peak_idx+1])
+            valley_value = smoothed_data[valley_idx]
+            
+            # 计算谷值相对于两个峰的深度
+            left_peak_height = smoothed_data[last_peak] - baseline
+            right_peak_height = smoothed_data[peak_idx] - baseline
+            min_peak_height = min(left_peak_height, right_peak_height)
+            
+            # 计算谷值深度占峰值高度的比例
+            valley_depth = smoothed_data[valley_idx] - baseline
+            valley_depth_ratio = valley_depth / min_peak_height if min_peak_height > 0 else 1.0
+            
+            # 如果谷值足够深（低于峰值高度的70%），则认为是两个独立的钙波，保留当前峰值
+            # 否则，只保留较高的一个峰值
+            if valley_depth_ratio < 0.7:
+                peaks.append(peak_idx)
+            elif smoothed_data[peak_idx] > smoothed_data[last_peak]:
+                # 如果当前峰更高，替换上一个峰
+                peaks[-1] = peak_idx
+        else:
+            # 距离足够远，保留当前峰
+            peaks.append(peak_idx)
+    
+    # 转换为numpy数组
+    peaks = np.array(peaks)
+    
+    # 如果没有剩余的峰值，返回空列表
     if len(peaks) == 0:
         return [], smoothed_data
     
