@@ -660,7 +660,7 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpea
     
     return features, transients
 
-def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
+def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0, max_duration=350):
     """
     可视化钙离子浓度数据和检测到的钙爆发，包括形态评分信息
     
@@ -674,6 +674,8 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0):
         检测到的钙爆发特征列表
     fs : float, 可选
         采样频率，默认为1.0Hz
+    max_duration : int, 可选
+        钙爆发最大持续时间（采样点数），默认为350
     """
     time = np.arange(len(raw_data)) / fs
     plt.figure(figsize=(14, 10))
