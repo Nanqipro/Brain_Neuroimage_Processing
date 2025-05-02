@@ -1,0 +1,169 @@
+2025-05-02 13:32:18,968 - cluster-integrate - INFO - 日志文件创建于: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\logs\2979_analysis\cluster-integrate_20250502-133218.log
+2025-05-02 13:32:18,968 - cluster-integrate - INFO - 开始钙爆发聚类分析，输出目录: ../results/processed_2979_all_datasets_analysis
+2025-05-02 13:32:18,969 - cluster-integrate - INFO - 使用输入文件: ../results/processed_2979_all_datasets_analysis/all_datasets_transients.xlsx
+2025-05-02 13:32:18,969 - cluster-integrate - INFO - OUTPUT: 正在从../results/processed_2979_all_datasets_analysis/all_datasets_transients.xlsx加载数据...
+2025-05-02 13:32:19,519 - cluster-integrate - INFO - OUTPUT: 成功加载数据，共1985行
+2025-05-02 13:32:19,521 - cluster-integrate - INFO - OUTPUT: 输出目录设置为: ../results/processed_2979_all_datasets_analysis
+2025-05-02 13:32:19,521 - cluster-integrate - INFO - OUTPUT: 使用权重设置进行聚类分析
+2025-05-02 13:32:19,524 - cluster-integrate - INFO - OUTPUT: 应用特征权重: amplitude:1.50, duration:1.50, fwhm:1.00, rise_time:0.60, decay_time:0.60, auc:1.00, snr:1.00, is_complex:1.00, subpeaks_count:1.00
+2025-05-02 13:32:19,525 - cluster-integrate - INFO - OUTPUT: 预处理完成，保留1985个有效样本，使用特征: amplitude, duration, fwhm, rise_time, decay_time, auc, snr, is_complex, subpeaks_count
+2025-05-02 13:32:19,525 - cluster-integrate - INFO - OUTPUT: 使用指定的聚类数: K=5
+2025-05-02 13:32:19,525 - cluster-integrate - INFO - OUTPUT: 使用K均值聚类算法，聚类数=5...
+2025-05-02 13:32:19,722 - cluster-integrate - INFO - OUTPUT: 使用PCA降维可视化...
+2025-05-02 13:32:20,486 - cluster-integrate - INFO - OUTPUT: 使用t-SNE降维可视化...
+2025-05-02 13:32:23,793 - cluster-integrate - INFO - OUTPUT: 可视化各个簇的特征分布...
+2025-05-02 13:32:25,404 - cluster-integrate - INFO - OUTPUT: 分析各个簇的特征统计信息...
+2025-05-02 13:32:25,409 - cluster-integrate - INFO - OUTPUT: 聚类统计信息已保存到 '../results/processed_2979_all_datasets_analysis/cluster_statistics.csv'
+2025-05-02 13:32:25,409 - cluster-integrate - INFO - OUTPUT: 使用雷达图可视化各簇的特征...
+2025-05-02 13:32:25,848 - cluster-integrate - INFO - OUTPUT: 可视化不同神经元的聚类分布...
+2025-05-02 13:32:26,412 - cluster-integrate - INFO - OUTPUT: 神经元聚类分布图已保存到: ../results/processed_2979_all_datasets_analysis/neuron_cluster_distribution.png
+2025-05-02 13:32:26,412 - cluster-integrate - INFO - OUTPUT: 可视化不同波形类型在各聚类中的分布...
+2025-05-02 13:32:26,822 - cluster-integrate - INFO - OUTPUT: 波形类型分布图已保存到: ../results/processed_2979_all_datasets_analysis/wave_type_distribution.png
+2025-05-02 13:32:26,822 - cluster-integrate - INFO - OUTPUT: 分析各聚类中的子峰特征...
+2025-05-02 13:32:27,111 - cluster-integrate - INFO - OUTPUT: 子峰统计信息已保存到 ../results/processed_2979_all_datasets_analysis/subpeaks_statistics.csv
+2025-05-02 13:32:27,112 - cluster-integrate - INFO - OUTPUT: 正在可视化不同聚类类别的平均钙爆发波形...
+2025-05-02 13:32:27,112 - cluster-integrate - INFO - OUTPUT: 检测到源文件路径信息，将优先使用这些信息加载原始数据
+2025-05-02 13:32:27,113 - cluster-integrate - INFO - OUTPUT: 从事件数据中检测到 25 个不同的源文件
+2025-05-02 13:32:27,113 - cluster-integrate - INFO - OUTPUT: 使用项目根目录: D:\GitHub_local\Brain_Neuroimage_Processing
+2025-05-02 13:32:27,113 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday3\processed_29791011csdsDAY3EMCellVedio22024-12-05194348trace.xlsx
+2025-05-02 13:32:27,750 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_29791011csdsDAY3EMCellVedio22024-12-05194348trace, 形状: (2999, 37)
+2025-05-02 13:32:27,751 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday3\processed_29791011csdsDAY3Openfield2024-12-06171458trace.xlsx
+2025-05-02 13:32:27,857 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_29791011csdsDAY3Openfield2024-12-06171458trace, 形状: (388, 49)
+2025-05-02 13:32:27,858 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday6\processed_2979241014CSDSDay6EM2024-12-05214309trace.xlsx
+2025-05-02 13:32:28,471 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_2979241014CSDSDay6EM2024-12-05214309trace, 形状: (2999, 35)
+2025-05-02 13:32:28,471 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday6\processed_2979241014CSDSDay6openfield2024-12-06200757trace.xlsx
+2025-05-02 13:32:29,282 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_2979241014CSDSDay6openfield2024-12-06200757trace, 形状: (2999, 50)
+2025-05-02 13:32:29,283 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday8\processed_2979241016csdsday8em2024-12-05220607trace.xlsx
+2025-05-02 13:32:30,090 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_2979241016csdsday8em2024-12-05220607trace, 形状: (2999, 48)
+2025-05-02 13:32:30,091 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday8\processed_2979241016csdsday8homecage2024-12-06210721trace.xlsx
+2025-05-02 13:32:31,094 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_2979241016csdsday8homecage2024-12-06210721trace, 形状: (4265, 42)
+2025-05-02 13:32:31,095 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday9\processed_No.2979241017CSDSDAY9homecage2024-12-06212712trace.xlsx
+2025-05-02 13:32:31,126 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.2979241017CSDSDAY9homecage2024-12-06212712trace, 形状: (169, 26)
+2025-05-02 13:32:31,126 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday9\processed_No.2979241017CSDSDAY9homecage22024-12-06214123trace.xlsx
+2025-05-02 13:32:31,826 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.2979241017CSDSDAY9homecage22024-12-06214123trace, 形状: (3531, 35)
+2025-05-02 13:32:31,827 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday9\processed_No.2979241017CSDSDAY9xuanwei2024-12-06215049trace.xlsx
+2025-05-02 13:32:32,311 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.2979241017CSDSDAY9xuanwei2024-12-06215049trace, 形状: (2005, 46)
+2025-05-02 13:32:32,311 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\csdsday9\processed_No.2979241017CSDSDAY9ymaze2024-12-0622032trace1.xlsx
+2025-05-02 13:32:33,058 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.2979241017CSDSDAY9ymaze2024-12-0622032trace1, 形状: (2999, 44)
+2025-05-02 13:32:33,058 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_240924EMtrace.xlsx
+2025-05-02 13:32:33,756 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_240924EMtrace, 形状: (2999, 44)
+2025-05-02 13:32:33,757 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_240924openfieldtrace.xlsx
+2025-05-02 13:32:34,440 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_240924openfieldtrace, 形状: (2999, 39)
+2025-05-02 13:32:34,440 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_29792409EM2Trace.xlsx
+2025-05-02 13:32:34,683 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_29792409EM2Trace, 形状: (1184, 39)
+2025-05-02 13:32:34,684 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_EMNO2979241011csdsday3CellVideo22024-10-1111-41-59trace.xlsx
+2025-05-02 13:32:34,847 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_EMNO2979241011csdsday3CellVideo22024-10-1111-41-59trace, 形状: (1026, 28)
+2025-05-02 13:32:34,848 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.29790930NORhabitituteCellVedio22024-12-04202145trace.xlsx
+2025-05-02 13:32:35,478 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.29790930NORhabitituteCellVedio22024-12-04202145trace, 形状: (1828, 61)
+2025-05-02 13:32:35,478 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.29790930NORtestCellVedio2CellVedio22024-12-04200410trace.xlsx
+2025-05-02 13:32:35,939 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.29790930NORtestCellVedio2CellVedio22024-12-04200410trace, 形状: (1599, 53)
+2025-05-02 13:32:35,940 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.29790930tangsuiCellVedio22024-12-04210940trace.xlsx
+2025-05-02 13:32:36,765 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.29790930tangsuiCellVedio22024-12-04210940trace, 形状: (2650, 54)
+2025-05-02 13:32:36,766 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.29790930tangsuitiewangCellVedio22024-12-04214328trace.xlsx
+2025-05-02 13:32:37,667 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.29790930tangsuitiewangCellVedio22024-12-04214328trace, 形状: (2999, 52)
+2025-05-02 13:32:37,668 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.29790930xuanweiCellVedio22024-12-05182322trace.xlsx
+2025-05-02 13:32:38,054 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.29790930xuanweiCellVedio22024-12-05182322trace, 形状: (1599, 45)
+2025-05-02 13:32:38,054 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.2979240926social22024-12-05202642trace.xlsx
+2025-05-02 13:32:38,707 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.2979240926social22024-12-05202642trace, 形状: (2999, 37)
+2025-05-02 13:32:38,707 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.2979240926social32024-12-07121733trace.xlsx
+2025-05-02 13:32:39,296 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.2979240926social32024-12-07121733trace, 形状: (2999, 36)
+2025-05-02 13:32:39,296 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.2979240926ymaze2024-12-06180137trace.xlsx
+2025-05-02 13:32:39,995 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.2979240926ymaze2024-12-06180137trace, 形状: (2999, 41)
+2025-05-02 13:32:39,995 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.2979240929ts2024-12-05212947trace.xlsx
+2025-05-02 13:32:40,849 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.2979240929ts2024-12-05212947trace, 形状: (2999, 52)
+2025-05-02 13:32:40,849 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.297920240925homecagecellvedio22024-12-07104733trace.xlsx
+2025-05-02 13:32:41,708 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.297920240925homecagecellvedio22024-12-07104733trace, 形状: (4266, 34)
+2025-05-02 13:32:41,708 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\2979数据\processed_No.297920240925homecagefamilarmice2024-12-07095919trace.xlsx
+2025-05-02 13:32:42,197 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: processed_No.297920240925homecagefamilarmice2024-12-07095919trace, 形状: (1999, 41)
+2025-05-02 13:32:42,198 - cluster-integrate - INFO - OUTPUT: 原始数据中的神经元列：
+2025-05-02 13:32:42,198 - cluster-integrate - INFO - OUTPUT:   数据集 processed_29791011csdsDAY3EMCellVedio22024-12-05194348trace: 36 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,199 - cluster-integrate - INFO - OUTPUT:   数据集 processed_29791011csdsDAY3Openfield2024-12-06171458trace: 48 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,199 - cluster-integrate - INFO - OUTPUT:   数据集 processed_2979241014CSDSDay6EM2024-12-05214309trace: 34 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,199 - cluster-integrate - INFO - OUTPUT:   数据集 processed_2979241014CSDSDay6openfield2024-12-06200757trace: 49 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,199 - cluster-integrate - INFO - OUTPUT:   数据集 processed_2979241016csdsday8em2024-12-05220607trace: 47 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,199 - cluster-integrate - INFO - OUTPUT:   数据集 processed_2979241016csdsday8homecage2024-12-06210721trace: 41 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,199 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.2979241017CSDSDAY9homecage2024-12-06212712trace: 25 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,200 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.2979241017CSDSDAY9homecage22024-12-06214123trace: 34 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,200 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.2979241017CSDSDAY9xuanwei2024-12-06215049trace: 45 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,201 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.2979241017CSDSDAY9ymaze2024-12-0622032trace1: 43 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,201 - cluster-integrate - INFO - OUTPUT:   数据集 processed_240924EMtrace: 43 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,201 - cluster-integrate - INFO - OUTPUT:   数据集 processed_240924openfieldtrace: 38 个神经元列 - ['n1', 'n3', 'n4', 'n5', 'n6']...
+2025-05-02 13:32:42,201 - cluster-integrate - INFO - OUTPUT:   数据集 processed_29792409EM2Trace: 38 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,202 - cluster-integrate - INFO - OUTPUT:   数据集 processed_EMNO2979241011csdsday3CellVideo22024-10-1111-41-59trace: 27 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,202 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.29790930NORhabitituteCellVedio22024-12-04202145trace: 60 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,202 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.29790930NORtestCellVedio2CellVedio22024-12-04200410trace: 52 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,202 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.29790930tangsuiCellVedio22024-12-04210940trace: 53 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,203 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.29790930tangsuitiewangCellVedio22024-12-04214328trace: 51 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,203 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.29790930xuanweiCellVedio22024-12-05182322trace: 44 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,204 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.2979240926social22024-12-05202642trace: 36 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,204 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.2979240926social32024-12-07121733trace: 35 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,204 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.2979240926ymaze2024-12-06180137trace: 40 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,204 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.2979240929ts2024-12-05212947trace: 51 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,205 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.297920240925homecagecellvedio22024-12-07104733trace: 33 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,205 - cluster-integrate - INFO - OUTPUT:   数据集 processed_No.297920240925homecagefamilarmice2024-12-07095919trace: 40 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-02 13:32:42,205 - cluster-integrate - INFO - OUTPUT: 钙爆发数据中的神经元: 59 个 - ['n2' 'n3' 'n4' 'n5' 'n6']...
+2025-05-02 13:32:42,206 - cluster-integrate - INFO - OUTPUT: 创建了 59 个神经元名称映射
+2025-05-02 13:32:42,259 - cluster-integrate - INFO - OUTPUT: 聚类 1: 使用从起始点开始的固定长度400处理波形...
+2025-05-02 13:32:42,259 - cluster-integrate - INFO - OUTPUT: 聚类 1: 使用源文件信息匹配原始数据
+2025-05-02 13:32:42,286 - cluster-integrate - INFO - OUTPUT: 聚类 2: 使用从起始点开始的固定长度400处理波形...
+2025-05-02 13:32:42,287 - cluster-integrate - INFO - OUTPUT: 聚类 2: 使用源文件信息匹配原始数据
+2025-05-02 13:32:42,347 - cluster-integrate - INFO - OUTPUT: 聚类 3: 使用从起始点开始的固定长度400处理波形...
+2025-05-02 13:32:42,348 - cluster-integrate - INFO - OUTPUT: 聚类 3: 使用源文件信息匹配原始数据
+2025-05-02 13:32:42,410 - cluster-integrate - INFO - OUTPUT: 聚类 4: 使用从起始点开始的固定长度400处理波形...
+2025-05-02 13:32:42,411 - cluster-integrate - INFO - OUTPUT: 聚类 4: 使用源文件信息匹配原始数据
+2025-05-02 13:32:42,416 - cluster-integrate - INFO - OUTPUT: 聚类 5: 使用从起始点开始的固定长度400处理波形...
+2025-05-02 13:32:42,416 - cluster-integrate - INFO - OUTPUT: 聚类 5: 使用源文件信息匹配原始数据
+2025-05-02 13:32:42,472 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1152: UserWarning: Glyph 24179 (\N{CJK UNIFIED IDEOGRAPH-5E73}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,472 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1152: UserWarning: Glyph 22343 (\N{CJK UNIFIED IDEOGRAPH-5747}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1152: UserWarning: Glyph 23792 (\N{CJK UNIFIED IDEOGRAPH-5CF0}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1152: UserWarning: Glyph 20540 (\N{CJK UNIFIED IDEOGRAPH-503C}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1152: UserWarning: Glyph 20301 (\N{CJK UNIFIED IDEOGRAPH-4F4D}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1152: UserWarning: Glyph 32622 (\N{CJK UNIFIED IDEOGRAPH-7F6E}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,473 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-02 13:32:42,509 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1153: UserWarning: Glyph 24179 (\N{CJK UNIFIED IDEOGRAPH-5E73}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,510 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
+2025-05-02 13:32:42,510 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1153: UserWarning: Glyph 22343 (\N{CJK UNIFIED IDEOGRAPH-5747}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,510 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
+2025-05-02 13:32:42,510 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1153: UserWarning: Glyph 23792 (\N{CJK UNIFIED IDEOGRAPH-5CF0}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,510 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
+2025-05-02 13:32:42,511 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1153: UserWarning: Glyph 20540 (\N{CJK UNIFIED IDEOGRAPH-503C}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,511 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
+2025-05-02 13:32:42,511 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1153: UserWarning: Glyph 20301 (\N{CJK UNIFIED IDEOGRAPH-4F4D}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,511 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
+2025-05-02 13:32:42,511 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1153: UserWarning: Glyph 32622 (\N{CJK UNIFIED IDEOGRAPH-7F6E}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,511 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
+2025-05-02 13:32:42,910 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1155: UserWarning: Glyph 24179 (\N{CJK UNIFIED IDEOGRAPH-5E73}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,910 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
+2025-05-02 13:32:42,911 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1155: UserWarning: Glyph 22343 (\N{CJK UNIFIED IDEOGRAPH-5747}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,912 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
+2025-05-02 13:32:42,912 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1155: UserWarning: Glyph 23792 (\N{CJK UNIFIED IDEOGRAPH-5CF0}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,912 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
+2025-05-02 13:32:42,912 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1155: UserWarning: Glyph 20540 (\N{CJK UNIFIED IDEOGRAPH-503C}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,913 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
+2025-05-02 13:32:42,913 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1155: UserWarning: Glyph 20301 (\N{CJK UNIFIED IDEOGRAPH-4F4D}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,913 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
+2025-05-02 13:32:42,913 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1155: UserWarning: Glyph 32622 (\N{CJK UNIFIED IDEOGRAPH-7F6E}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:42,914 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
+2025-05-02 13:32:43,436 - cluster-integrate - INFO - OUTPUT: 平均钙爆发波形可视化已保存到 ../results/processed_2979_all_datasets_analysis/cluster_average_waveforms.png
+2025-05-02 13:32:43,437 - cluster-integrate - INFO - OUTPUT: 波形数据已保存到 ../results/processed_2979_all_datasets_analysis/cluster_average_waveforms.csv
+2025-05-02 13:32:43,440 - cluster-integrate - INFO - OUTPUT: 将聚类标签添加到原始数据...
+2025-05-02 13:32:44,740 - cluster-integrate - INFO - OUTPUT: 聚类结果已保存到 ../results/processed_2979_all_datasets_analysis/transients_clustered_k5.xlsx
+2025-05-02 13:32:44,740 - cluster-integrate - INFO - OUTPUT: 聚类结果已保存到: ../results/processed_2979_all_datasets_analysis/transients_clustered_k5.xlsx
+2025-05-02 13:32:44,740 - cluster-integrate - INFO - OUTPUT: 聚类分析完成!
+2025-05-02 13:32:45,223 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 24179 (\N{CJK UNIFIED IDEOGRAPH-5E73}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:45,223 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-02 13:32:45,223 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 22343 (\N{CJK UNIFIED IDEOGRAPH-5747}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:45,223 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-02 13:32:45,223 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 23792 (\N{CJK UNIFIED IDEOGRAPH-5CF0}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:45,223 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-02 13:32:45,223 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 20540 (\N{CJK UNIFIED IDEOGRAPH-503C}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:45,223 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-02 13:32:45,224 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 20301 (\N{CJK UNIFIED IDEOGRAPH-4F4D}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:45,224 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-02 13:32:45,224 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 32622 (\N{CJK UNIFIED IDEOGRAPH-7F6E}) missing from font(s) DejaVu Sans.
+2025-05-02 13:32:45,224 - cluster-integrate - ERROR - OUTPUT:   func(*args)
