@@ -239,14 +239,16 @@ def generate_summary_report(df: pd.DataFrame, save_path: str = None) -> None:
 def main():
     """
     主函数，用于处理命令行参数并执行可视化
+    支持批量处理多个文件
     """
     import argparse
     
     parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具')
-    parser.add_argument('--data', type=str, default='../datasets/2979数据/csdsday3/29791011csdsDAY3EMCellVedio22024-12-05194348trace.xlsx',
-                        help='数据文件路径，支持.md, .csv, .xlsx格式')
+    parser.add_argument('--data', type=str, nargs='+', 
+                        default=['../datasets/2979数据/csdsday3/processed_29791011csdsDAY3Openfield2024-12-06171458trace.xlsx'],
+                        help='数据文件路径列表，支持.md, .csv, .xlsx格式，可提供多个文件路径')
     parser.add_argument('--output', type=str, default=None,
-                        help='图像保存目录，不指定则根据数据集名称自动生成')
+                        help='图像保存根目录，不指定则使用../results/')
     parser.add_argument('--neuron', type=str, default=None,
                         help='指定要可视化的神经元ID，不指定则处理所有神经元')
     parser.add_argument('--report', action='store_true',
@@ -254,38 +256,49 @@ def main():
     
     args = parser.parse_args()
     
-    # 加载数据
-    print(f"正在加载数据文件: {args.data}")
-    df = load_data(args.data)
-    print(f"数据加载完成，共有 {len(df)} 条记录和 {len(df.columns)} 个列")
+    # 设置输出根目录
+    output_root = args.output if args.output else "../results"
     
-    # 根据数据文件名生成输出目录
-    if args.output is None:
-        # 提取数据文件名（不含扩展名）
-        data_basename = os.path.basename(args.data)
-        dataset_name = os.path.splitext(data_basename)[0]
-        output_dir = f"../results/{dataset_name}/calcium_waves"
-    else:
-        output_dir = args.output
+    # 对每个数据文件进行处理
+    for data_file in args.data:
+        print(f"\n开始处理文件: {data_file}")
+        
+        try:
+            # 加载数据
+            print(f"正在加载数据文件: {data_file}")
+            df = load_data(data_file)
+            print(f"数据加载完成，共有 {len(df)} 条记录和 {len(df.columns)} 个列")
+            
+            # 根据数据文件名生成输出目录
+            # 提取数据文件名（不含扩展名）
+            data_basename = os.path.basename(data_file)
+            dataset_name = os.path.splitext(data_basename)[0]
+            output_dir = os.path.join(output_root, dataset_name, "calcium_waves")
+            
+            print(f"输出目录设置为: {output_dir}")
+            
+            # 根据参数执行可视化
+            if args.neuron:
+                print(f"正在为神经元 {args.neuron} 生成图像...")
+                plot_neuron_calcium(df, args.neuron, output_dir)
+            else:
+                print("正在为所有神经元生成图像...")
+                plot_all_neurons(df, output_dir)
+            
+            # 生成报告（如果需要）
+            if args.report:
+                print("正在生成统计摘要报告...")
+                report_dir = os.path.dirname(output_dir)
+                report_path = os.path.join(report_dir, f'{dataset_name}_summary.html')
+                generate_summary_report(df, report_path)
+                
+            print(f"文件 {data_file} 处理完成!")
+            
+        except Exception as e:
+            print(f"处理文件 {data_file} 时发生错误: {e}")
+            print("继续处理下一个文件...")
     
-    print(f"输出目录设置为: {output_dir}")
-    
-    # 根据参数执行可视化
-    if args.neuron:
-        print(f"正在为神经元 {args.neuron} 生成图像...")
-        plot_neuron_calcium(df, args.neuron, output_dir)
-    else:
-        print("正在为所有神经元生成图像...")
-        plot_all_neurons(df, output_dir)
-    
-    # 生成报告（如果需要）
-    if args.report:
-        print("正在生成统计摘要报告...")
-        report_dir = os.path.dirname(output_dir)
-        report_path = os.path.join(report_dir, 'neuron_summary.html')
-        generate_summary_report(df, report_path)
-    
-    print("处理完成!")
+    print("\n所有文件处理完成!")
 
 if __name__ == "__main__":
     main()
