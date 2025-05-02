@@ -20,13 +20,14 @@ import datetime
 import sys
 
 # 初始化日志记录器
-def setup_logger(output_dir=None, prefix="cluster-integrate"):
+def setup_logger(output_dir=None, prefix="cluster-integrate", capture_all_output=True):
     """
     设置日志记录器，将日志消息输出到控制台和文件
     
     参数:
         output_dir: 日志文件输出目录，默认为输出到当前脚本所在目录的logs文件夹
         prefix: 日志文件名称前缀
+        capture_all_output: 是否捕获所有标准输出到日志文件
     
     返回:
         logger: 已配置好的日志记录器
@@ -34,6 +35,11 @@ def setup_logger(output_dir=None, prefix="cluster-integrate"):
     # 创建日志记录器
     logger = logging.getLogger(prefix)
     logger.setLevel(logging.INFO)
+    
+    # 清除现有的处理器，避免重复添加
+    if logger.handlers:
+        for handler in logger.handlers:
+            logger.removeHandler(handler)
     
     # 创建格式化器
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -59,6 +65,32 @@ def setup_logger(output_dir=None, prefix="cluster-integrate"):
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
+    
+    # 创建输出重定向类，捕获所有的标准输出和错误输出
+    class OutputRedirector:
+        def __init__(self, original_stream, logger, level=logging.INFO):
+            self.original_stream = original_stream
+            self.logger = logger
+            self.level = level
+            self.buffer = ''
+        
+        def write(self, buf):
+            self.original_stream.write(buf)
+            self.buffer += buf
+            if '\n' in buf:
+                self.flush()
+        
+        def flush(self):
+            if self.buffer.strip():
+                for line in self.buffer.rstrip().split('\n'):
+                    if line.strip():  # 只记录非空行
+                        self.logger.log(self.level, f"OUTPUT: {line.rstrip()}")
+            self.buffer = ''
+    
+    # 重定向标准输出和错误输出到日志文件
+    if capture_all_output:
+        sys.stdout = OutputRedirector(sys.stdout, logger, logging.INFO)
+        sys.stderr = OutputRedirector(sys.stderr, logger, logging.ERROR)
     
     logger.info(f"日志文件创建于: {log_file}")
     return logger
