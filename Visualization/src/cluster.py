@@ -501,7 +501,7 @@ def add_cluster_to_excel(input_file, output_file, labels):
     df.to_excel(output_file, index=False)
     print(f"聚类结果已保存到 {output_file}")
 
-def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, use_timestamp=False, interactive=False):
+def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, use_timestamp=False, interactive=False, sampling_freq=4.8):
     """
     可视化不同神经元的钙爆发时间线，横坐标为时间戳或帧索引，纵坐标为神经元编号
     
@@ -554,7 +554,7 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
             print("使用时间戳作为X轴...")
     else:
         time_mode = "frame"
-        x_label = "Time (Frames)"
+        x_label = "Time (Seconds)"
         if use_timestamp and not has_timestamp:
             if logger:
                 logger.warning("数据中没有timestamp字段，将使用帧索引作为替代...")
@@ -611,8 +611,10 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
                         start_time = event['timestamp']
                         end_time = start_time + event['duration']
                     else:
-                        start_time = event['start_idx']
-                        end_time = start_time + event['duration']
+                        # 将帧索引转换为秒
+                        start_time = event['start_idx'] / sampling_freq
+                        # 注意：duration在帧索引下是帧数，需要转换为秒
+                        end_time = start_time + (event['duration'] / sampling_freq)
                     
                     # 准备悬停信息
                     hover_text = f"神经元: {neuron}<br>聚类: {cluster_id+1}<br>开始: {start_time:.2f}<br>结束: {end_time:.2f}"
@@ -700,8 +702,10 @@ def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, 
                     start_time = event['timestamp']
                     end_time = start_time + event['duration']
                 else:
-                    start_time = event['start_idx']
-                    end_time = start_time + event['duration']
+                    # 将帧索引转换为秒
+                    start_time = event['start_idx'] / sampling_freq
+                    # 注意：duration在帧索引下是帧数，需要转换为秒
+                    end_time = start_time + (event['duration'] / sampling_freq)
                 
                 # 在对应神经元的位置上绘制代表钙波事件的水平线段，使用统一线宽
                 plt.hlines(y=y_position, xmin=start_time, xmax=end_time, 
