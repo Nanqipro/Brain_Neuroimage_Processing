@@ -1153,22 +1153,25 @@ def main():
     
     # 使用增强版预处理函数
     try:
-        # 添加特征权重设置
-        feature_weights = None
+        # 添加特征权重设置 - 修改为无条件应用默认权重
+        feature_weights = {
+            'amplitude': 1.5,  # 振幅权重更高
+            'duration': 1.5,   # 持续时间权重更高
+            'rise_time': 0.6,  # 上升时间权重较低
+            'decay_time': 0.6, # 衰减时间权重较低
+            'snr': 1.0,        # 信噪比正常权重
+            'fwhm': 1.0,       # 半高宽正常权重
+            'auc': 1.0         # 曲线下面积正常权重
+        }
+        
+        # 如果用户指定了权重，则覆盖默认值
         if args.weights:
-            feature_weights = {
-                'amplitude': 1.5,  # 振幅权重更高
-                'duration': 1.5,   # 持续时间权重更高
-                'rise_time': 0.6,  # 上升时间权重较低
-                'decay_time': 0.6, # 衰减时间权重较低
-                'snr': 1.0,        # 信噪比正常权重
-                'fwhm': 1.0        # 半高宽正常权重
-            }
             # 解析用户指定的权重
             for pair in args.weights.split(','):
                 feature, weight = pair.split(':')
                 feature_weights[feature] = float(weight)
         
+        print("使用权重设置进行聚类分析")
         features_scaled, feature_names, df_clean = enhance_preprocess_data(df, feature_weights=feature_weights)
     except Exception as e:
         print(f"预处理数据时出错: {str(e)}")
