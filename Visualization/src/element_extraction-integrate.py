@@ -109,19 +109,35 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
         平滑后的数据
     """
     # 如果提供了自定义参数，覆盖默认参数
-    if params is not None:
-        min_snr = params.get('min_snr', min_snr)
-        min_duration = params.get('min_duration', min_duration)
-        smooth_window = params.get('smooth_window', smooth_window)
-        peak_distance = params.get('peak_distance', peak_distance)
-        baseline_percentile = params.get('baseline_percentile', baseline_percentile)
-        max_duration = params.get('max_duration', max_duration)
-        subpeak_prominence = params.get('subpeak_prominence', subpeak_prominence)
-        subpeak_width = params.get('subpeak_width', subpeak_width)
-        subpeak_distance = params.get('subpeak_distance', subpeak_distance)
-        # 添加形态评分相关参数
-        min_morphology_score = params.get('min_morphology_score', min_morphology_score)
-        min_exp_decay_score = params.get('min_exp_decay_score', min_exp_decay_score)
+    # 确保params是字典类型
+    if params is None:
+        params = {}
+    
+    # 使用自定义参数覆盖默认值，确保所有必要参数都存在
+    params['min_snr'] = params.get('min_snr', min_snr)
+    params['min_duration'] = params.get('min_duration', min_duration)
+    params['smooth_window'] = params.get('smooth_window', smooth_window)
+    params['peak_distance'] = params.get('peak_distance', peak_distance)
+    params['baseline_percentile'] = params.get('baseline_percentile', baseline_percentile)
+    params['max_duration'] = params.get('max_duration', max_duration)
+    params['subpeak_prominence'] = params.get('subpeak_prominence', subpeak_prominence)
+    params['subpeak_width'] = params.get('subpeak_width', subpeak_width)
+    params['subpeak_distance'] = params.get('subpeak_distance', subpeak_distance)
+    params['min_morphology_score'] = params.get('min_morphology_score', min_morphology_score)
+    params['min_exp_decay_score'] = params.get('min_exp_decay_score', min_exp_decay_score)
+    
+    # 从参数字典中提取值，以确保我们使用更新后的值
+    min_snr = params['min_snr']
+    min_duration = params['min_duration']
+    smooth_window = params['smooth_window']
+    peak_distance = params['peak_distance']
+    baseline_percentile = params['baseline_percentile']
+    max_duration = params['max_duration']
+    subpeak_prominence = params['subpeak_prominence']
+    subpeak_width = params['subpeak_width']
+    subpeak_distance = params['subpeak_distance']
+    min_morphology_score = params['min_morphology_score']
+    min_exp_decay_score = params['min_exp_decay_score']
     
     # 1. 应用平滑滤波器
     if smooth_window > 1:
@@ -925,8 +941,20 @@ def estimate_neuron_params(neuron_data, filter_strength=1.0):
     peaks, _ = find_peaks(neuron_data, distance=25, prominence=data_std*2.0)
     num_tentative_peaks = len(peaks)
     
-    # 自适应参数配置，提高门槛以过滤更多噪声
-    params = {}
+    # 自适应参数配置，预先设置所有可能需要的默认参数，避免遗漏
+    params = {
+        'min_snr': 8.5,
+        'min_duration': 25,
+        'smooth_window': 65,
+        'peak_distance': 30,
+        'baseline_percentile': 18,
+        'max_duration': 350,
+        'subpeak_prominence': 0.3,
+        'subpeak_width': 12,
+        'subpeak_distance': 18,
+        'min_morphology_score': 0.45,
+        'min_exp_decay_score': 0.25
+    }
     
     # 1. 根据filter_strength调整信噪比阈值，平衡过滤噪声和保留信号
     base_snr = 0.0  # 基础信噪比阈值
