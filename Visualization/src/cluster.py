@@ -501,50 +501,238 @@ def add_cluster_to_excel(input_file, output_file, labels):
     df.to_excel(output_file, index=False)
     print(f"聚类结果已保存到 {output_file}")
 
-def visualize_neuron_cluster_distribution(df, labels, k_value=None, output_dir='../results'):
+def visualize_neuron_timeline(df, labels, output_dir='../results', logger=None, use_timestamp=False, interactive=False):
     """
-    可视化不同神经元的聚类分布
+    可视化不同神经元的钙爆发时间线，横坐标为时间戳或帧索引，纵坐标为神经元编号
     
     参数
     ----------
     df : pandas.DataFrame
-        原始数据
+        包含钙爆发特征的数据框，必须包含start_idx, end_idx, neuron和duration字段
     labels : numpy.ndarray
         聚类标签
-    k_value : int, 可选
-        当前使用的K值，用于文件命名
     output_dir : str, 可选
         输出目录路径，默认为'../results'
+    logger : logging.Logger, 可选
+        日志记录器实例，默认为None
+    use_timestamp : bool, 可选
+        是否使用时间戳模式，如果为True且数据中有timestamp字段，则使用时间戳作为X轴；否则使用start_idx
+    interactive : bool, 可选
+        是否创建交互式图表（使用plotly），默认为False
     """
-    print("可视化不同神经元的聚类分布...")
+    if logger:
+        logger.info("开始生成神经元钙波活动时间线图...")
+    else:
+        print("开始生成神经元钙波活动时间线图...")
+    
     # 将标签添加到数据框
     df_cluster = df.copy()
     df_cluster['cluster'] = labels
     
-    # 计算每个神经元不同簇的数量
-    cluster_counts = df_cluster.groupby(['neuron', 'cluster']).size().unstack().fillna(0)
+    # 检查必要的字段
+    required_fields = ['start_idx', 'end_idx', 'neuron', 'duration']
+    if not all(field in df_cluster.columns for field in required_fields):
+        error_msg = "错误: 数据中缺少必要字段(start_idx, end_idx, neuron, duration)，无法绘制时间线"
+        if logger:
+            logger.error(error_msg)
+        else:
+            print(error_msg)
+        return
     
-    # 绘制堆叠条形图
-    ax = cluster_counts.plot(kind='bar', stacked=True, figsize=(12, 6), colormap='tab10')
-    ax.set_title(f'Cluster Distribution for Different Neurons (k={len(np.unique(labels))})')
-    ax.set_xlabel('Neuron')
-    ax.set_ylabel('Number of Calcium Transients')
-    ax.legend(title='Cluster', bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax.grid(True, alpha=0.3)
+    # 设置统一线条粗细
+    line_width = 5  # 使用统一的线条粗细
+    df_cluster['line_width'] = line_width
     
-    plt.tight_layout()
-    
-    # 确保输出目录存在
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # 根据k_value调整文件名
-    if k_value:
-        filename = f'{output_dir}/neuron_cluster_distribution_k{k_value}.png'
+    # 检查是否使用时间戳模式
+    has_timestamp = 'timestamp' in df_cluster.columns
+    if use_timestamp and has_timestamp:
+        time_mode = "timestamp"
+        x_label = "Time (Timestamp)"
+        if logger:
+            logger.info("使用时间戳作为X轴...")
+        else:
+            print("使用时间戳作为X轴...")
     else:
-        filename = f'{output_dir}/neuron_cluster_distribution.png'
+        time_mode = "frame"
+        x_label = "Time (Frames)"
+        if use_timestamp and not has_timestamp:
+            if logger:
+                logger.warning("数据中没有timestamp字段，将使用帧索引作为替代...")
+            else:
+                print("数据中没有timestamp字段，将使用帧索引作为替代...")
     
-    plt.savefig(filename, dpi=300)
-    print(f"神经元聚类分布图已保存到: {filename}")
+    # 获取所有唯一的神经元并排序
+    neurons = sorted(df_cluster['neuron'].unique())
+    # 创建神经元到Y轴位置的映射
+    neuron_to_y = {neuron: i for i, neuron in enumerate(neurons)}
+    
+    # 获取聚类的数量
+    n_clusters = len(np.unique(labels))
+    if -1 in np.unique(labels):  # DBSCAN可能有噪声点标记为-1
+        n_clusters -= 1
+    
+    # 创建颜色映射
+    try:
+        # 尝试使用新的推荐方法
+        cmap = plt.colormaps['tab10']
+    except (AttributeError, KeyError):
+        # 如果失败，回退到旧方法
+        cmap = plt.cm.get_cmap('tab10', n_clusters)
+    
+    # 根据是否使用交互式模式选择不同的绘图方法
+    if interactive:
+        try:
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            
+            # 创建plotly图形
+            fig = make_subplots(specs=[[{"secondary_y": False}]])
+            
+            # 按聚类绘制时间线
+            for cluster_id in range(n_clusters):
+                # 提取属于该聚类的钙爆发事件
+                cluster_events = df_cluster[df_cluster['cluster'] == cluster_id]
+                
+                # 如果该簇没有事件，则跳过
+                if len(cluster_events) == 0:
+                    continue
+                
+                # 为该簇分配颜色（转换为RGB字符串）
+                cluster_color_rgba = cmap(cluster_id)
+                cluster_color = f'rgba({int(cluster_color_rgba[0]*255)},{int(cluster_color_rgba[1]*255)},{int(cluster_color_rgba[2]*255)},{cluster_color_rgba[3]})'
+                
+                # 准备绘图数据
+                for _, event in cluster_events.iterrows():
+                    neuron = event['neuron']
+                    y_position = neuron_to_y[neuron]
+                    
+                    # 根据模式选择时间轴数据
+                    if time_mode == "timestamp" and has_timestamp:
+                        start_time = event['timestamp']
+                        end_time = start_time + event['duration']
+                    else:
+                        start_time = event['start_idx']
+                        end_time = start_time + event['duration']
+                    
+                    # 准备悬停信息
+                    hover_text = f"神经元: {neuron}<br>聚类: {cluster_id+1}<br>开始: {start_time:.2f}<br>结束: {end_time:.2f}"
+                    if 'amplitude' in event:
+                        hover_text += f"<br>振幅: {event['amplitude']:.2f}"
+                    
+                    # 绘制水平线段，使用统一线宽
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[start_time, end_time],
+                            y=[y_position, y_position],
+                            mode='lines',
+                            line=dict(
+                                color=cluster_color,
+                                width=line_width
+                            ),
+                            name=f'Cluster {cluster_id+1}',
+                            legendgroup=f'Cluster {cluster_id+1}',
+                            showlegend=(y_position == neuron_to_y[neurons[0]]),  # 只在第一次出现时显示图例
+                            hoverinfo='text',
+                            hovertext=hover_text
+                        )
+                    )
+            
+            # 设置布局
+            fig.update_layout(
+                title='Neuron Calcium Wave Events Timeline by Cluster',
+                xaxis_title=x_label,
+                yaxis_title='Neuron ID',
+                yaxis=dict(
+                    tickmode='array',
+                    tickvals=list(neuron_to_y.values()),
+                    ticktext=list(neuron_to_y.keys())
+                ),
+                hoverlabel=dict(
+                    bgcolor="white",
+                    font_size=12
+                ),
+                height=800,  # 调整高度
+                width=1500    # 调整宽度
+            )
+            
+            # 保存交互式图表为HTML文件
+            suffix = "_timestamp" if time_mode == "timestamp" else ""
+            os.makedirs(output_dir, exist_ok=True)
+            html_path = f'{output_dir}/neuron_timeline{suffix}_interactive.html'
+            fig.write_html(html_path)
+            
+            if logger:
+                logger.info(f"交互式神经元钙波活动时间线图已保存到 {html_path}")
+            else:
+                print(f"交互式神经元钙波活动时间线图已保存到 {html_path}")
+                
+        except ImportError:
+            if logger:
+                logger.warning("无法导入plotly，回退到使用matplotlib生成静态图表...")
+            else:
+                print("无法导入plotly，回退到使用matplotlib生成静态图表...")
+            interactive = False
+    
+    # 如果不使用交互式或者plotly导入失败，使用matplotlib绘制
+    if not interactive:
+        # 创建图形 - 调整比例为15:8
+        plt.figure(figsize=(15, 8))
+        
+        # 按聚类绘制时间线，确保颜色对应聚类
+        for cluster_id in range(n_clusters):
+            # 提取属于该聚类的钙爆发事件
+            cluster_events = df_cluster[df_cluster['cluster'] == cluster_id]
+            
+            # 如果该簇没有事件，则跳过
+            if len(cluster_events) == 0:
+                continue
+            
+            # 为该簇分配颜色
+            cluster_color = cmap(cluster_id)
+            
+            # 为每个事件绘制条线
+            for _, event in cluster_events.iterrows():
+                neuron = event['neuron']
+                y_position = neuron_to_y[neuron]
+                
+                # 根据模式选择时间轴数据
+                if time_mode == "timestamp" and has_timestamp:
+                    start_time = event['timestamp']
+                    end_time = start_time + event['duration']
+                else:
+                    start_time = event['start_idx']
+                    end_time = start_time + event['duration']
+                
+                # 在对应神经元的位置上绘制代表钙波事件的水平线段，使用统一线宽
+                plt.hlines(y=y_position, xmin=start_time, xmax=end_time, 
+                          linewidth=line_width, color=cluster_color, alpha=0.7)
+        
+        # 设置Y轴刻度和标签
+        plt.yticks(list(neuron_to_y.values()), list(neuron_to_y.keys()))
+        
+        # 设置图表属性
+        plt.title('Neuron Calcium Wave Events Timeline by Cluster', fontsize=14)
+        plt.xlabel(x_label, fontsize=12)
+        plt.ylabel('Neuron ID', fontsize=12)
+        plt.grid(True, alpha=0.3, axis='y')
+        
+        # 添加聚类标签到图例
+        legend_elements = [plt.Line2D([0], [0], color=cmap(i), lw=4, label=f'Cluster {i+1}')
+                           for i in range(n_clusters)]
+        plt.legend(handles=legend_elements, loc='upper right')
+        
+        # 保存图表
+        os.makedirs(output_dir, exist_ok=True)
+        plt.tight_layout()
+        
+        # 根据时间模式添加后缀
+        suffix = "_timestamp" if time_mode == "timestamp" else ""
+        plt.savefig(f'{output_dir}/neuron_timeline{suffix}.png', dpi=300)
+        
+        if logger:
+            logger.info(f"神经元钙波活动时间线图已保存到 {output_dir}/neuron_timeline{suffix}.png")
+        else:
+            print(f"神经元钙波活动时间线图已保存到 {output_dir}/neuron_timeline{suffix}.png")
 
 def visualize_wave_type_distribution(df, labels, output_dir='../results'):
     """
@@ -701,7 +889,7 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
         plt.savefig(f'{output_dir}/cluster_feature_distribution_k{k}.png', dpi=300)
         
         # 神经元簇分布
-        visualize_neuron_cluster_distribution(df_clean, labels, k_value=k, output_dir=output_dir)
+        visualize_neuron_cluster_distribution(df_clean, labels, output_dir=output_dir)
         
         # 增加波形类型分析
         visualize_wave_type_distribution(df_clean, labels, output_dir=f'{output_dir}/k{k}')
@@ -1159,6 +1347,237 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
         print(f"平均钙爆发波形可视化已保存到 {output_dir}/cluster_average_waveforms.png")
         print(f"波形数据已保存到 {output_dir}/cluster_average_waveforms.csv")
 
+def visualize_neuron_cluster_distribution(df, labels, k_value=None, output_dir='../results'):
+    """
+    可视化不同神经元的聚类分布
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        原始数据
+    labels : numpy.ndarray
+        聚类标签
+    k_value : int, 可选
+        当前使用的K值，用于文件命名
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
+    """
+    print("可视化不同神经元的聚类分布...")
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
+    
+    # 计算每个神经元不同簇的数量
+    cluster_counts = df_cluster.groupby(['neuron', 'cluster']).size().unstack().fillna(0)
+    
+    # 绘制堆叠条形图
+    ax = cluster_counts.plot(kind='bar', stacked=True, figsize=(12, 6), colormap='tab10')
+    ax.set_title(f'Cluster Distribution for Different Neurons (k={len(np.unique(labels))})')
+    ax.set_xlabel('Neuron')
+    ax.set_ylabel('Number of Calcium Transients')
+    ax.legend(title='Cluster', bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 根据k_value调整文件名
+    if k_value:
+        filename = f'{output_dir}/neuron_cluster_distribution_k{k_value}.png'
+    else:
+        filename = f'{output_dir}/neuron_cluster_distribution.png'
+    
+    plt.savefig(filename, dpi=300)
+    print(f"神经元聚类分布图已保存到: {filename}")
+
+def visualize_wave_type_distribution(df, labels, output_dir='../results'):
+    """
+    可视化不同波形类型在各聚类中的分布
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含wave_type信息的数据
+    labels : numpy.ndarray
+        聚类标签
+    output_dir : str, 可选
+        输出目录路径
+    """
+    if 'wave_type' not in df.columns:
+        print("数据中没有wave_type信息，跳过波形类型分布可视化")
+        return
+        
+    print("可视化不同波形类型在各聚类中的分布...")
+    
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
+    
+    # 计算每个聚类中不同波形类型的分布
+    wave_type_counts = df_cluster.groupby(['cluster', 'wave_type']).size().unstack().fillna(0)
+    
+    # 计算百分比
+    wave_type_pcts = wave_type_counts.div(wave_type_counts.sum(axis=1), axis=0) * 100
+    
+    # 绘制堆叠条形图
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # 绝对数量图
+    wave_type_counts.plot(kind='bar', stacked=True, ax=ax1, colormap='Set3')
+    ax1.set_title('Wave Type Count in Each Cluster')
+    ax1.set_xlabel('Cluster')
+    ax1.set_ylabel('Count')
+    ax1.legend(title='Wave Type')
+    ax1.grid(True, alpha=0.3)
+    
+    # 百分比图
+    wave_type_pcts.plot(kind='bar', stacked=True, ax=ax2, colormap='Set3')
+    ax2.set_title('Wave Type Percentage in Each Cluster')
+    ax2.set_xlabel('Cluster')
+    ax2.set_ylabel('Percentage (%)')
+    ax2.legend(title='Wave Type')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/wave_type_distribution.png', dpi=300)
+    print(f"波形类型分布图已保存到: {output_dir}/wave_type_distribution.png")
+
+def analyze_subpeaks(df, labels, output_dir='../results'):
+    """
+    分析各聚类中子峰特征
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含subpeaks_count信息的数据
+    labels : numpy.ndarray
+        聚类标签
+    output_dir : str, 可选
+        输出目录路径
+    """
+    if 'subpeaks_count' not in df.columns:
+        print("数据中没有subpeaks_count信息，跳过子峰分析")
+        return
+        
+    print("分析各聚类中的子峰特征...")
+    
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
+    
+    # 绘制子峰数量箱线图 - 修复FutureWarning
+    plt.figure(figsize=(10, 6))
+    # 修改前: sns.boxplot(x='cluster', y='subpeaks_count', data=df_cluster, palette='Set2')
+    # 修改后: 将x变量分配给hue，并设置legend=False
+    sns.boxplot(x='cluster', y='subpeaks_count', hue='cluster', data=df_cluster, palette='Set2', legend=False)
+    plt.title('Distribution of Subpeaks Count in Each Cluster')
+    plt.xlabel('Cluster')
+    plt.ylabel('Number of Subpeaks')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/subpeaks_distribution.png', dpi=300)
+    
+    # 计算各聚类中子峰的统计信息
+    subpeak_stats = df_cluster.groupby('cluster')['subpeaks_count'].agg(['mean', 'median', 'std', 'min', 'max'])
+    subpeak_stats.to_csv(f'{output_dir}/subpeaks_statistics.csv')
+    print(f"子峰统计信息已保存到 {output_dir}/subpeaks_statistics.csv")
+
+def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input_file, output_dir='../results'):
+    """
+    比较不同K值的聚类效果
+    
+    参数
+    ----------
+    features_scaled : numpy.ndarray
+        标准化后的特征数据
+    feature_names : list
+        特征名称列表
+    df_clean : pandas.DataFrame
+        清洗后的数据
+    k_values : list
+        要比较的K值列表
+    input_file : str
+        输入文件路径，用于生成输出文件名
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
+    """
+    print(f"正在比较不同K值的聚类效果: {k_values}...")
+    
+    # 计算每个K值的轮廓系数
+    silhouette_scores_dict = {}
+    
+    # 创建比较图
+    fig, axes = plt.subplots(1, len(k_values), figsize=(5*len(k_values), 5))
+    if len(k_values) == 1:
+        axes = [axes]
+    
+    for i, k in enumerate(k_values):
+        # 执行K-means聚类
+        labels = cluster_kmeans(features_scaled, k)
+        
+        # 计算轮廓系数
+        sil_score = silhouette_score(features_scaled, labels)
+        silhouette_scores_dict[k] = sil_score
+        
+        # 使用PCA降维可视化
+        reducer = PCA(n_components=2, random_state=42)
+        embedding = reducer.fit_transform(features_scaled)
+        
+        # 绘制聚类结果
+        cmap = ListedColormap(plt.cm.tab10(np.linspace(0, 1, k+1)))
+        
+        # 在子图中绘制
+        for j in range(k):
+            axes[i].scatter(embedding[labels==j, 0], embedding[labels==j, 1], 
+                         c=[cmap(j)], marker='o', label=f'Cluster {j+1}')
+        
+        axes[i].set_title(f'K={k}, Silhouette={sil_score:.3f}')
+        axes[i].set_xlabel('PCA Dimension 1')
+        axes[i].set_ylabel('PCA Dimension 2')
+        axes[i].grid(True, alpha=0.3)
+        
+        # 保存该K值的结果
+        output_file = f'{output_dir}/all_neurons_transients_clustered_k{k}.xlsx'
+        add_cluster_to_excel(input_file, output_file, labels)
+        
+        # 生成该K值的特征分布图
+        visualize_feature_distribution(df_clean, labels, output_dir=output_dir)
+        plt.savefig(f'{output_dir}/cluster_feature_distribution_k{k}.png', dpi=300)
+        
+        # 神经元簇分布
+        visualize_neuron_cluster_distribution(df_clean, labels, output_dir=output_dir)
+        
+        # 增加波形类型分析
+        visualize_wave_type_distribution(df_clean, labels, output_dir=f'{output_dir}/k{k}')
+        
+        # 增加子峰分析
+        analyze_subpeaks(df_clean, labels, output_dir=f'{output_dir}/k{k}')
+    
+    plt.tight_layout()
+    
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig(f'{output_dir}/k_comparison.png', dpi=300)
+    
+    # 绘制轮廓系数比较图
+    plt.figure(figsize=(8, 5))
+    plt.bar(silhouette_scores_dict.keys(), silhouette_scores_dict.values(), color='skyblue')
+    plt.title('Silhouette Score Comparison for Different K Values')
+    plt.xlabel('Number of Clusters (K)')
+    plt.ylabel('Silhouette Score')
+    plt.grid(True, alpha=0.3)
+    plt.xticks(list(silhouette_scores_dict.keys()))
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/silhouette_comparison.png', dpi=300)
+    
+    print("不同K值对比完成，结果已保存")
+    
+    # 返回轮廓系数最高的K值
+    best_k = max(silhouette_scores_dict, key=silhouette_scores_dict.get)
+    return best_k
+
 def main():
     """
     主函数
@@ -1176,6 +1595,8 @@ def main():
     parser.add_argument('--raw_data_dir', type=str, help='原始数据文件目录，用于波形可视化')
     parser.add_argument('--skip_waveform', action='store_true', help='跳过波形可视化步骤')
     parser.add_argument('--log_dir', type=str, default=None, help='日志文件保存目录，默认为输出目录下的logs文件夹')
+    parser.add_argument('--use_timestamp', action='store_true', help='在神经元时间线图中使用时间戳作为X轴')
+    parser.add_argument('--interactive', action='store_true', help='生成交互式时间线图（需要安装plotly）')
     args = parser.parse_args()
     
     # 根据输入文件名生成输出目录
@@ -1280,6 +1701,15 @@ def main():
     
     # 添加子峰分析
     analyze_subpeaks(df_clean, kmeans_labels, output_dir=output_dir)
+    
+    # 可视化神经元活动时间线（帧模式）
+    visualize_neuron_timeline(df_clean, kmeans_labels, output_dir=output_dir, logger=logger, 
+                             use_timestamp=False, interactive=args.interactive)
+    
+    # 如果指定了使用时间戳，再生成时间戳模式的时间线图
+    if args.use_timestamp:
+        visualize_neuron_timeline(df_clean, kmeans_labels, output_dir=output_dir, logger=logger, 
+                                 use_timestamp=True, interactive=args.interactive)
     
     # 可视化不同聚类的平均钙爆发波形
     if not args.skip_waveform:
