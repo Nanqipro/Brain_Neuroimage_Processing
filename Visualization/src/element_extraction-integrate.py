@@ -382,20 +382,28 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
             decay_segment = smoothed_data[peak_idx:end_idx+1] - baseline
             decay_segment = decay_segment / decay_segment[0]  # 归一化
             
-            # 对数变换后应近似线性 - 测量对数变换后的线性度
-            log_decay = np.log(decay_segment + 1e-10)  # 防止log(0)
-            
-            # 使用线性拟合，计算拟合度
-            x = np.arange(len(log_decay))
-            if len(x) > 1:  # 确保有足够的点拟合
-                try:
-                    slope, intercept = np.polyfit(x, log_decay, 1)
-                    # 计算R²作为衰减指数特性指标
-                    y_pred = slope * x + intercept
-                    ss_tot = np.sum((log_decay - np.mean(log_decay))**2)
-                    ss_res = np.sum((log_decay - y_pred)**2)
-                    exp_decay_score = 1 - ss_res/ss_tot if ss_tot > 0 else 0
-                except:
+            # 对数变换前过滤无效值
+            valid_mask = decay_segment > 0
+            if np.any(valid_mask):
+                # 只对有效值(正值)取对数，防止出现警告
+                log_decay = np.zeros_like(decay_segment)
+                log_decay[valid_mask] = np.log(decay_segment[valid_mask])
+                
+                # 使用线性拟合，计算拟合度
+                x = np.arange(len(log_decay))
+                valid_idx = np.where(valid_mask)[0]
+                if len(valid_idx) > 1:  # 确保有足够的有效点拟合
+                    try:
+                        # 只使用有效点进行拟合
+                        slope, intercept = np.polyfit(valid_idx, log_decay[valid_idx], 1)
+                        # 计算R²作为衰减指数特性指标
+                        y_pred = slope * valid_idx + intercept
+                        ss_tot = np.sum((log_decay[valid_idx] - np.mean(log_decay[valid_idx]))**2)
+                        ss_res = np.sum((log_decay[valid_idx] - y_pred)**2)
+                        exp_decay_score = 1 - ss_res/ss_tot if ss_tot > 0 else 0
+                    except:
+                        exp_decay_score = 0
+                else:
                     exp_decay_score = 0
             else:
                 exp_decay_score = 0

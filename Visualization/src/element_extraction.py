@@ -86,10 +86,10 @@ def setup_logger(output_dir=None, prefix="element_extraction", capture_all_outpu
     logger.info(f"日志文件创建于: {log_file}")
     return logger
 
-def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
-                             peak_distance=20, baseline_percentile=20, max_duration=800,
-                             detect_subpeaks=True, subpeak_prominence=0.25, 
-                             subpeak_width=10, subpeak_distance=15, params=None, 
+def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth_window=65, 
+                             peak_distance=20, baseline_percentile=18, max_duration=800,
+                             detect_subpeaks=True, subpeak_prominence=0.3, 
+                             subpeak_width=12, subpeak_distance=18, params=None, 
                              min_morphology_score=0.45, min_exp_decay_score=0.25,
                              filter_strength=1.0):
     """
@@ -315,6 +315,20 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         if (end_idx - start_idx) < min_duration:
             continue
             
+        # 验证峰值形状 - 在信号尖峰处添加额外验证
+        # 计算峰值前后区域的斜率变化，检查是否符合典型钙爆发特征
+        peak_region_start = max(start_idx, peak_idx - 5)
+        peak_region_end = min(end_idx, peak_idx + 5)
+        
+        # 检查峰值前后的斜率变化，真实钙爆发通常在峰值处有明显的斜率变化
+        if peak_region_start < peak_idx and peak_idx < peak_region_end:
+            pre_slope = np.mean(np.diff(smoothed_data[peak_region_start:peak_idx+1]))
+            post_slope = np.mean(np.diff(smoothed_data[peak_idx:peak_region_end+1]))
+            
+            # 前斜率应为正（上升），后斜率应为负（下降）
+            if pre_slope <= 0 or post_slope >= 0:
+                continue  # 峰值前后斜率不符合预期，可能是噪声
+                
         # 计算特征
         peak_value = smoothed_data[peak_idx]
         amplitude = peak_value - baseline
@@ -382,20 +396,28 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
             decay_segment = smoothed_data[peak_idx:end_idx+1] - baseline
             decay_segment = decay_segment / decay_segment[0]  # 归一化
             
-            # 对数变换后应近似线性 - 测量对数变换后的线性度
-            log_decay = np.log(decay_segment + 1e-10)  # 防止log(0)
-            
-            # 使用线性拟合，计算拟合度
-            x = np.arange(len(log_decay))
-            if len(x) > 1:  # 确保有足够的点拟合
-                try:
-                    slope, intercept = np.polyfit(x, log_decay, 1)
-                    # 计算R²作为衰减指数特性指标
-                    y_pred = slope * x + intercept
-                    ss_tot = np.sum((log_decay - np.mean(log_decay))**2)
-                    ss_res = np.sum((log_decay - y_pred)**2)
-                    exp_decay_score = 1 - ss_res/ss_tot if ss_tot > 0 else 0
-                except:
+            # 对数变换前过滤无效值
+            valid_mask = decay_segment > 0
+            if np.any(valid_mask):
+                # 只对有效值(正值)取对数，防止出现警告
+                log_decay = np.zeros_like(decay_segment)
+                log_decay[valid_mask] = np.log(decay_segment[valid_mask])
+                
+                # 使用线性拟合，计算拟合度
+                x = np.arange(len(log_decay))
+                valid_idx = np.where(valid_mask)[0]
+                if len(valid_idx) > 1:  # 确保有足够的有效点拟合
+                    try:
+                        # 只使用有效点进行拟合
+                        slope, intercept = np.polyfit(valid_idx, log_decay[valid_idx], 1)
+                        # 计算R²作为衰减指数特性指标
+                        y_pred = slope * valid_idx + intercept
+                        ss_tot = np.sum((log_decay[valid_idx] - np.mean(log_decay[valid_idx]))**2)
+                        ss_res = np.sum((log_decay[valid_idx] - y_pred)**2)
+                        exp_decay_score = 1 - ss_res/ss_tot if ss_tot > 0 else 0
+                    except:
+                        exp_decay_score = 0
+                else:
                     exp_decay_score = 0
             else:
                 exp_decay_score = 0
@@ -410,11 +432,12 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         # non_monotonic_ratio应该小，rise_smoothness应该小，
         # exp_decay_score应该大，duration_width_ratio在适当范围
         
-        # 定义理想的参数范围
-        ideal_rise_decay_ratio = 0.3  # 理想的上升/衰减时间比例
-        min_asymmetry = 0.2  # 最小非对称度
-        max_non_monotonic = 0.3  # 上升沿非单调性最大允许值
-        ideal_duration_width_ratio = 2.5  # 理想的持续时间/宽度比
+        # 定义理想的参数范围（折中的标准）
+        ideal_rise_decay_ratio = 0.28  # 理想的上升/衰减时间比例
+        min_asymmetry = 0.22  # 最小非对称度
+        max_non_monotonic = 0.25  # 上升沿非单调性最大允许值
+        ideal_duration_width_ratio = 2.6  # 理想的持续时间/宽度比
+        min_exp_decay_score = 0.25  # 最小指数衰减评分
         
         # 计算各指标的评分
         rise_decay_score = np.exp(-2 * abs(rise_decay_ratio - ideal_rise_decay_ratio)) if rise_decay_ratio < 1 else 0
@@ -422,18 +445,31 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         monotonic_score = 1 - min(non_monotonic_ratio / max_non_monotonic, 1)
         duration_ratio_score = np.exp(-0.5 * abs(duration_width_ratio - ideal_duration_width_ratio))
         
-        # 综合形态评分 (0-1)，权重可根据重要性调整
+        # 综合形态评分 (0-1)，使用折中的权重配置
         morphology_score = (
-            0.25 * rise_decay_score + 
-            0.2 * asymmetry_score + 
-            0.2 * monotonic_score + 
-            0.2 * exp_decay_score + 
-            0.15 * duration_ratio_score
+            0.28 * rise_decay_score +     # 上升/衰减比例的权重
+            0.2 * asymmetry_score +      # 非对称性的权重
+            0.17 * monotonic_score +     # 单调性的权重
+            0.22 * exp_decay_score +     # 指数衰减特性的权重
+            0.13 * duration_ratio_score  # 持续时间比例的权重
         )
         
-        # 设置形态评分阈值，过滤不符合典型钙波形态的峰值
+        # 设置适中的形态评分阈值，过滤不符合典型钙波形态的峰值
+        min_morphology_score = 0.45  # 适中的最低形态评分要求
+        
+        # 考虑总体形态评分和关键特征
         if morphology_score < min_morphology_score:
-            continue  # 跳过此峰值，因为形态不符合典型钙波特征
+            continue  # 跳过此峰值，因为总体形态不符合典型钙波特征
+        
+        # 添加关键特征的检查，但使用较为宽松的条件
+        if exp_decay_score < min_exp_decay_score:  # 指数衰减特性是钙波的关键特征
+            continue  # 跳过指数衰减不明显的峰值
+            
+        if rise_decay_ratio > 0.8:  # 上升时间不应超过衰减时间的80%
+            continue  # 跳过上升过慢的峰值
+            
+        if non_monotonic_ratio > 0.5:  # 允许50%的非单调性作为上限
+            continue  # 跳过上升沿过于不规则的峰值
         
         # 检测波形的子峰值（如果启用）
         subpeaks = []
