@@ -1179,6 +1179,333 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     print(f"平均钙爆发波形可视化已保存到 {output_dir}/cluster_average_waveforms.png")
     print(f"波形数据已保存到 {output_dir}/cluster_average_waveforms.csv")
 
+def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, output_dir='../results', use_timestamp=False, interactive=False, sampling_freq=4.8):
+    """
+    基于神经元ID对应表可视化不同神经元的钙爆发时间线，将不同数据集的神经元数据整合到一个时间线图上
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含钙爆发特征的数据框，必须包含start_idx, end_idx, neuron, duration和dataset字段
+    labels : numpy.ndarray
+        聚类标签
+    neuron_map_path : str, 可选
+        神经元对应表路径，默认为None，会自动查找'../datasets/神经元对应表.xlsx'
+    output_dir : str, 可选
+        输出目录路径，默认为'../results'
+    use_timestamp : bool, 可选
+        是否使用时间戳模式，如果为True且数据中有timestamp字段，则使用时间戳作为X轴；否则使用start_idx
+    interactive : bool, 可选
+        是否创建交互式图表（使用plotly），默认为False
+    sampling_freq : float, 可选
+        采样频率，单位Hz，默认为4.8Hz，用于将帧索引转换为时间
+    """
+    print("开始生成整合神经元钙波活动时间线图...")
+    
+    # 将标签添加到数据框
+    df_cluster = df.copy()
+    df_cluster['cluster'] = labels
+    
+    # 检查必要的字段
+    required_fields = ['start_idx', 'end_idx', 'neuron', 'duration']
+    if not all(field in df_cluster.columns for field in required_fields):
+        print("错误: 数据中缺少必要字段(start_idx, end_idx, neuron, duration)，无法绘制时间线")
+        return
+    
+    # 检查是否有dataset字段，如果没有，尝试添加
+    if 'dataset' not in df_cluster.columns:
+        if 'source_file' in df_cluster.columns:
+            # 从source_file提取数据集信息
+            df_cluster['dataset'] = df_cluster['source_file'].apply(lambda x: os.path.splitext(os.path.basename(x))[0] if isinstance(x, str) else "unknown")
+        else:
+            # 如果没有数据集信息，默认为同一数据集
+            print("警告: 数据中没有dataset字段或source_file字段，假设所有数据来自同一数据集")
+            df_cluster['dataset'] = "default_dataset"
+    
+    # 加载神经元对应表
+    if neuron_map_path is None:
+        # 尝试自动查找神经元对应表
+        default_map_path = '../datasets/神经元对应表.xlsx'
+        if os.path.exists(default_map_path):
+            neuron_map_path = default_map_path
+        else:
+            print("错误: 未指定神经元对应表路径，且未找到默认位置的对应表")
+            return
+    
+    try:
+        print(f"加载神经元对应表: {neuron_map_path}")
+        neuron_map_df = pd.read_excel(neuron_map_path)
+        print(f"成功加载神经元对应表，形状: {neuron_map_df.shape}")
+        
+        # 获取对应表中的所有列名（数据集名称）
+        dataset_cols = neuron_map_df.columns.tolist()
+        print(f"对应表中的数据集: {dataset_cols}")
+    except Exception as e:
+        print(f"加载神经元对应表失败: {str(e)}")
+        return
+    
+    # 创建神经元ID映射字典
+    neuron_id_mapping = {}
+    
+    # 为每个数据集创建神经元ID映射
+    for col in dataset_cols:
+        neuron_id_mapping[col] = {}
+        # 遍历每一行，建立该数据集中神经元ID与统一ID的映射
+        for idx, row in neuron_map_df.iterrows():
+            # 检查值是否为NaN或None
+            if pd.notna(row[col]) and row[col] is not None:
+                # 使用行索引作为统一ID，将各数据集的神经元ID映射到这个统一ID
+                unified_id = idx  # 行索引作为统一ID
+                orig_id = row[col]
+                # 处理可能的数据类型问题
+                if isinstance(orig_id, (float, int)):
+                    orig_id = str(int(orig_id))
+                elif isinstance(orig_id, str):
+                    # 将'n1'格式转为'1'，以便统一处理
+                    if orig_id.startswith('n') and orig_id[1:].isdigit():
+                        orig_id = orig_id[1:]
+                else:
+                    continue  # 跳过无法处理的值
+                
+                # 进行两种格式的映射以增加匹配成功率
+                neuron_id_mapping[col][orig_id] = unified_id          # '1' -> unified_id
+                neuron_id_mapping[col][f"n{orig_id}"] = unified_id    # 'n1' -> unified_id
+    
+    print(f"创建了 {len(neuron_id_mapping)} 个数据集的神经元ID映射")
+    
+    # 添加统一神经元ID列
+    df_cluster['unified_neuron_id'] = None
+    
+    # 根据数据集和原始神经元ID确定统一ID
+    for idx, row in df_cluster.iterrows():
+        dataset = row['dataset']
+        orig_neuron = row['neuron']
+        
+        # 获取该数据集的映射字典
+        if dataset in neuron_id_mapping:
+            mapping = neuron_id_mapping[dataset]
+            
+            # 处理不同格式的神经元ID
+            if isinstance(orig_neuron, (float, int)):
+                orig_neuron = str(int(orig_neuron))
+            elif isinstance(orig_neuron, str):
+                if orig_neuron.startswith('n') and orig_neuron[1:].isdigit():
+                    # 如果是'n1'格式，也尝试使用'1'格式查找
+                    stripped_neuron = orig_neuron[1:]
+                    if stripped_neuron in mapping:
+                        df_cluster.at[idx, 'unified_neuron_id'] = mapping[stripped_neuron]
+                        continue
+            
+            # 查找统一ID
+            if orig_neuron in mapping:
+                df_cluster.at[idx, 'unified_neuron_id'] = mapping[orig_neuron]
+            elif f"n{orig_neuron}" in mapping:
+                df_cluster.at[idx, 'unified_neuron_id'] = mapping[f"n{orig_neuron}"]
+    
+    # 检查映射结果
+    mapped_count = df_cluster['unified_neuron_id'].notna().sum()
+    total_count = len(df_cluster)
+    mapping_rate = mapped_count / total_count * 100 if total_count > 0 else 0
+    
+    print(f"神经元ID映射完成: 成功映射 {mapped_count}/{total_count} 条记录 ({mapping_rate:.2f}%)")
+    
+    # 如果映射率太低，发出警告但继续处理
+    if mapping_rate < 50:
+        print(f"警告: 神经元ID映射率低于50%，可能导致时间线图不完整")
+    
+    # 过滤掉未能映射的记录
+    df_mapped = df_cluster.dropna(subset=['unified_neuron_id']).copy()
+    
+    # 如果没有足够的映射记录，返回
+    if len(df_mapped) < 10:
+        print("错误: 映射后的记录数量不足，无法生成有意义的时间线图")
+        return
+    
+    # 设置统一线条粗细
+    line_width = 5  # 使用统一的线条粗细
+    df_mapped['line_width'] = line_width
+    
+    # 检查是否使用时间戳模式
+    has_timestamp = 'timestamp' in df_mapped.columns
+    if use_timestamp and has_timestamp:
+        time_mode = "timestamp"
+        x_label = "Time (Timestamp)"
+        print("使用时间戳作为X轴...")
+    else:
+        time_mode = "frame"
+        x_label = "Time (Seconds)"
+        if use_timestamp and not has_timestamp:
+            print("数据中没有timestamp字段，将使用帧索引作为替代...")
+    
+    # 获取所有唯一的统一神经元ID并排序
+    unified_neurons = sorted(df_mapped['unified_neuron_id'].unique())
+    
+    # 创建统一神经元ID到Y轴位置的映射
+    neuron_to_y = {neuron: i for i, neuron in enumerate(unified_neurons)}
+    
+    # 获取聚类的数量
+    n_clusters = len(np.unique(labels))
+    if -1 in np.unique(labels):  # DBSCAN可能有噪声点标记为-1
+        n_clusters -= 1
+    
+    # 创建颜色映射
+    try:
+        # 尝试使用新的推荐方法
+        cmap = plt.colormaps['tab10']
+    except (AttributeError, KeyError):
+        # 如果失败，回退到旧方法
+        cmap = plt.cm.get_cmap('tab10', n_clusters)
+    
+    # 根据是否使用交互式模式选择不同的绘图方法
+    if interactive:
+        try:
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            
+            # 创建plotly图形
+            fig = make_subplots(specs=[[{"secondary_y": False}]])
+            
+            # 按聚类绘制时间线
+            for cluster_id in range(n_clusters):
+                # 提取属于该聚类的钙爆发事件
+                cluster_events = df_mapped[df_mapped['cluster'] == cluster_id]
+                
+                # 如果该簇没有事件，则跳过
+                if len(cluster_events) == 0:
+                    continue
+                
+                # 为该簇分配颜色（转换为RGB字符串）
+                cluster_color_rgba = cmap(cluster_id)
+                cluster_color = f'rgba({int(cluster_color_rgba[0]*255)},{int(cluster_color_rgba[1]*255)},{int(cluster_color_rgba[2]*255)},{cluster_color_rgba[3]})'
+                
+                # 准备绘图数据
+                for _, event in cluster_events.iterrows():
+                    unified_neuron = event['unified_neuron_id']
+                    y_position = neuron_to_y[unified_neuron]
+                    
+                    # 根据模式选择时间轴数据
+                    if time_mode == "timestamp" and has_timestamp:
+                        start_time = event['timestamp']
+                        end_time = start_time + event['duration']
+                    else:
+                        # 将帧索引转换为秒
+                        start_time = event['start_idx'] / sampling_freq
+                        # 注意：duration在帧索引下是帧数，需要转换为秒
+                        end_time = start_time + (event['duration'] / sampling_freq)
+                    
+                    # 准备悬停信息
+                    hover_text = f"统一神经元ID: {unified_neuron}<br>原始神经元: {event['neuron']}<br>数据集: {event['dataset']}<br>聚类: {cluster_id+1}<br>开始: {start_time:.2f}<br>结束: {end_time:.2f}"
+                    if 'amplitude' in event:
+                        hover_text += f"<br>振幅: {event['amplitude']:.2f}"
+                    
+                    # 绘制水平线段，使用统一线宽
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[start_time, end_time],
+                            y=[y_position, y_position],
+                            mode='lines',
+                            line=dict(
+                                color=cluster_color,
+                                width=line_width
+                            ),
+                            name=f'Cluster {cluster_id+1}',
+                            legendgroup=f'Cluster {cluster_id+1}',
+                            showlegend=(y_position == neuron_to_y[unified_neurons[0]]),  # 只在第一次出现时显示图例
+                            hoverinfo='text',
+                            hovertext=hover_text
+                        )
+                    )
+            
+            # 设置布局
+            fig.update_layout(
+                title='Integrated Neuron Calcium Wave Events Timeline by Cluster',
+                xaxis_title=x_label,
+                yaxis_title='Unified Neuron ID',
+                yaxis=dict(
+                    tickmode='array',
+                    tickvals=list(neuron_to_y.values()),
+                    ticktext=[f"Neuron {i}" for i in neuron_to_y.keys()]
+                ),
+                hoverlabel=dict(
+                    bgcolor="white",
+                    font_size=12
+                ),
+                height=800,   # 调整高度
+                width=1500    # 调整宽度为15:8比例
+            )
+            
+            # 保存交互式图表为HTML文件
+            suffix = "_timestamp" if time_mode == "timestamp" else ""
+            os.makedirs(output_dir, exist_ok=True)
+            html_path = f'{output_dir}/integrated_neuron_timeline{suffix}_interactive.html'
+            fig.write_html(html_path)
+            
+            print(f"交互式整合神经元钙波活动时间线图已保存到 {html_path}")
+                
+        except ImportError:
+            print("无法导入plotly，回退到使用matplotlib生成静态图表...")
+            interactive = False
+    
+    # 如果不使用交互式或者plotly导入失败，使用matplotlib绘制
+    if not interactive:
+        # 创建图形 - 调整比例为15:8
+        plt.figure(figsize=(15, 8))
+        
+        # 按聚类绘制时间线，确保颜色对应聚类
+        for cluster_id in range(n_clusters):
+            # 提取属于该聚类的钙爆发事件
+            cluster_events = df_mapped[df_mapped['cluster'] == cluster_id]
+            
+            # 如果该簇没有事件，则跳过
+            if len(cluster_events) == 0:
+                continue
+            
+            # 为该簇分配颜色
+            cluster_color = cmap(cluster_id)
+            
+            # 为每个事件绘制条线
+            for _, event in cluster_events.iterrows():
+                unified_neuron = event['unified_neuron_id']
+                y_position = neuron_to_y[unified_neuron]
+                
+                # 根据模式选择时间轴数据
+                if time_mode == "timestamp" and has_timestamp:
+                    start_time = event['timestamp']
+                    end_time = start_time + event['duration']
+                else:
+                    # 将帧索引转换为秒
+                    start_time = event['start_idx'] / sampling_freq
+                    # 注意：duration在帧索引下是帧数，需要转换为秒
+                    end_time = start_time + (event['duration'] / sampling_freq)
+                
+                # 在对应神经元的位置上绘制代表钙波事件的水平线段，使用统一线宽
+                plt.hlines(y=y_position, xmin=start_time, xmax=end_time, 
+                          linewidth=line_width, color=cluster_color, alpha=0.7)
+        
+        # 设置Y轴刻度和标签
+        plt.yticks(list(neuron_to_y.values()), [f"Neuron {i}" for i in neuron_to_y.keys()])
+        
+        # 设置图表属性
+        plt.title('Integrated Neuron Calcium Wave Events Timeline by Cluster', fontsize=14)
+        plt.xlabel(x_label, fontsize=12)
+        plt.ylabel('Unified Neuron ID', fontsize=12)
+        plt.grid(True, alpha=0.3, axis='y')
+        
+        # 添加聚类标签到图例
+        legend_elements = [plt.Line2D([0], [0], color=cmap(i), lw=4, label=f'Cluster {i+1}')
+                           for i in range(n_clusters)]
+        plt.legend(handles=legend_elements, loc='upper right')
+        
+        # 保存图表
+        os.makedirs(output_dir, exist_ok=True)
+        plt.tight_layout()
+        
+        # 根据时间模式添加后缀
+        suffix = "_timestamp" if time_mode == "timestamp" else ""
+        plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+        
+        print(f"整合神经元钙波活动时间线图已保存到 {output_dir}/integrated_neuron_timeline{suffix}.png")
+
 def main():
     """
     主函数
@@ -1199,6 +1526,13 @@ def main():
     parser.add_argument('--skip_waveform', action='store_true', help='跳过波形可视化步骤')
     parser.add_argument('--weights', type=str, help='特征权重，格式如"amplitude:1.2,duration:0.8"')
     parser.add_argument('--log_dir', type=str, default=None, help='日志文件保存目录，默认为输出目录下的logs文件夹')
+    # 添加新的命令行参数
+    parser.add_argument('--neuron_map_path', type=str, default=None, 
+                        help='神经元对应表路径，默认会查找"../datasets/神经元对应表.xlsx"')
+    parser.add_argument('--skip_timeline', action='store_true', help='跳过神经元时间线可视化步骤')
+    parser.add_argument('--interactive', action='store_true', help='使用交互式绘图模式(需要安装plotly)')
+    parser.add_argument('--use_timestamp', action='store_true', help='使用时间戳模式，如果数据中有timestamp字段')
+    parser.add_argument('--sampling_freq', type=float, default=4.8, help='采样频率，默认为4.8Hz，用于帧索引转换为时间')
     args = parser.parse_args()
     
     # 设置输出目录
@@ -1418,6 +1752,24 @@ def main():
             print(f"可视化波形时出错: {str(e)}")
     else:
         print("根据参数设置，跳过波形可视化")
+    
+    # 在main函数的最后，添加调用新函数的代码
+    try:
+        # 尝试生成整合神经元时间线图
+        if not args.skip_timeline:
+            try:
+                visualize_integrated_neuron_timeline(
+                    df_clean, kmeans_labels, 
+                    neuron_map_path=args.neuron_map_path,
+                    output_dir=output_dir, 
+                    use_timestamp=args.use_timestamp,
+                    interactive=args.interactive,
+                    sampling_freq=args.sampling_freq
+                )
+            except Exception as e:
+                print(f"生成整合神经元时间线图时出错: {str(e)}")
+    except Exception as e:
+        print(f"可视化波形时出错: {str(e)}")
     
     # 将聚类标签添加到Excel
     try:
