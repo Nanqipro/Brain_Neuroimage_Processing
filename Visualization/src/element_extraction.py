@@ -89,7 +89,7 @@ def setup_logger(output_dir=None, prefix="element_extraction", capture_all_outpu
 def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth_window=50, 
                              peak_distance=30, baseline_percentile=20, max_duration=350,
                              detect_subpeaks=True, subpeak_prominence=0.25, 
-                             subpeak_width=10, subpeak_distance=15, params=None):
+                             subpeak_width=10, subpeak_distance=15, params=None, filter_strength=1.0):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
@@ -120,6 +120,12 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
         子峰的最小宽度，默认为10
     subpeak_distance : int, 可选
         子峰间的最小距离，默认为15
+    params : dict, 可选
+        自定义参数字典，可覆盖默认参数
+    filter_strength : float, 可选
+        过滤强度调节参数，值越大过滤越强，默认为1.0。
+        可以调整此参数来平衡检测灵敏度和假阳性率，
+        值<1.0会降低过滤强度（更多检测），值>1.0会增加过滤强度（更少检测）
         
     返回
     -------
@@ -128,17 +134,135 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     smoothed_data : numpy.ndarray
         平滑后的数据
     """
-    # 如果提供了自定义参数，覆盖默认参数
+    # 获取数据特征和信噪比信息，用于调整参数
+    data_mean = np.mean(data)
+    data_std = np.std(data)
+    robust_range = np.percentile(data, 98) - np.percentile(data, 5)
+    
+    # 使用更高级的噪声评估方法
+    median_val = np.median(data)
+    mad = np.median(np.abs(data - median_val))
+    signal_noise_ratio = robust_range / (mad * 1.4826) if mad > 0 else 0
+    
+    # 评估数据的基线稳定性
+    sorted_data = np.sort(data)
+    lower_half = sorted_data[:len(sorted_data)//3]  # 使用下三分之一作为基线估计
+    baseline_variability = np.std(lower_half) / np.mean(lower_half) if np.mean(lower_half) > 0 else 0
+    
+    # 进行初步峰值检测来评估信号特征
+    from scipy.signal import find_peaks
+    peaks, _ = find_peaks(data, distance=25, prominence=data_std*2.0)
+    num_tentative_peaks = len(peaks)
+    
+    # 自适应参数配置，在这里使用现有的参数作为默认值创建完整参数字典
+    local_params = {
+        'min_snr': min_snr,
+        'min_duration': min_duration,
+        'smooth_window': smooth_window,
+        'peak_distance': peak_distance,
+        'baseline_percentile': baseline_percentile,
+        'max_duration': max_duration,
+        'subpeak_prominence': subpeak_prominence,
+        'subpeak_width': subpeak_width,
+        'subpeak_distance': subpeak_distance,
+        'min_morphology_score': 0.45  # 新增默认形态评分阈值
+    }
+    
+    # 1. 根据filter_strength调整信噪比阈值，平衡过滤噪声和保留信号
+    base_snr = 0.0  # 基础信噪比阈值
+    
+    if num_tentative_peaks == 0:  
+        # 即使没有检测到峰值，也提高最低阈值，避免误检
+        base_snr = 4.0
+    elif num_tentative_peaks < 3: 
+        base_snr = 4.5
+    else:
+        # 根据信噪比使用折中的调整
+        if signal_noise_ratio < 2:
+            base_snr = 4.5
+        elif signal_noise_ratio < 3:
+            base_snr = 5.0
+        elif signal_noise_ratio < 4:
+            base_snr = 5.5
+        elif signal_noise_ratio < 5:
+            base_snr = 6.0
+        elif signal_noise_ratio < 7:
+            base_snr = 7.0
+        elif signal_noise_ratio < 10:
+            base_snr = 8.0
+        elif signal_noise_ratio < 15:
+            base_snr = 8.5
+        else:
+            base_snr = 9.0
+    
+    # 根据filter_strength调整最终SNR阈值
+    local_params['min_snr'] = base_snr * filter_strength
+    
+    # 2. 调整baseline_percentile，更准确地估计基线
+    if baseline_variability > 0.3:
+        # 对于基线不稳定的信号，使用更低的百分位以更准确地捕获真实基线
+        local_params['baseline_percentile'] = 10
+    elif baseline_variability > 0.2:
+        local_params['baseline_percentile'] = 12
+    elif baseline_variability < 0.1:
+        # 基线稳定时，可以使用更高的百分位数，避免误将低振幅波动视为信号
+        local_params['baseline_percentile'] = 30
+    else:
+        local_params['baseline_percentile'] = 20
+    
+    # 3. 根据filter_strength和baseline_variability调整平滑窗口
+    base_window = 0  # 基础窗口大小
+    
+    if baseline_variability > 0.35:
+        base_window = 121
+    elif baseline_variability > 0.25:
+        base_window = 101
+    elif baseline_variability > 0.15:
+        base_window = 81
+    elif baseline_variability < 0.1:
+        base_window = 51
+    else:
+        base_window = 65
+    
+    # 根据filter_strength调整窗口大小
+    if filter_strength > 1.0:
+        window_adjustment = int(base_window * (filter_strength - 1) * 0.5)
+        local_params['smooth_window'] = base_window + window_adjustment
+    elif filter_strength < 1.0:
+        window_adjustment = int(base_window * (1 - filter_strength) * 0.3)
+        local_params['smooth_window'] = max(21, base_window - window_adjustment)
+    else:
+        local_params['smooth_window'] = base_window
+    
+    # 4. 调整峰值间距离和持续时间要求
+    if filter_strength > 1.0:
+        local_params['peak_distance'] = int(peak_distance * (1 + (filter_strength - 1) * 0.5))
+        local_params['min_duration'] = int(min_duration * (1 + (filter_strength - 1) * 0.3))
+    elif filter_strength < 1.0:
+        local_params['peak_distance'] = max(15, int(peak_distance * (1 - (1 - filter_strength) * 0.3)))
+        local_params['min_duration'] = max(10, int(min_duration * (1 - (1 - filter_strength) * 0.2)))
+    
+    # 5. 调整子峰参数
+    if filter_strength > 1.0:
+        local_params['subpeak_prominence'] = min(0.45, subpeak_prominence * (1 + (filter_strength - 1) * 0.5))
+    elif filter_strength < 1.0:
+        local_params['subpeak_prominence'] = max(0.15, subpeak_prominence * (1 - (1 - filter_strength) * 0.4))
+    
+    # 如果提供了外部参数字典，使用它来覆盖我们计算的值
     if params is not None:
-        min_snr = params.get('min_snr', min_snr)
-        min_duration = params.get('min_duration', min_duration)
-        smooth_window = params.get('smooth_window', smooth_window)
-        peak_distance = params.get('peak_distance', peak_distance)
-        baseline_percentile = params.get('baseline_percentile', baseline_percentile)
-        max_duration = params.get('max_duration', max_duration)
-        subpeak_prominence = params.get('subpeak_prominence', subpeak_prominence)
-        subpeak_width = params.get('subpeak_width', subpeak_width)
-        subpeak_distance = params.get('subpeak_distance', subpeak_distance)
+        for key, value in params.items():
+            local_params[key] = value
+    
+    # 将自适应计算的参数提取到变量中使用
+    min_snr = local_params['min_snr']
+    min_duration = local_params['min_duration']
+    smooth_window = local_params['smooth_window']
+    peak_distance = local_params['peak_distance']
+    baseline_percentile = local_params['baseline_percentile']
+    max_duration = local_params['max_duration']
+    subpeak_prominence = local_params['subpeak_prominence']
+    subpeak_width = local_params['subpeak_width']
+    subpeak_distance = local_params['subpeak_distance']
     
     # 1. 应用平滑滤波器
     if smooth_window > 1:
@@ -461,7 +585,7 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.0, min_duration=20, smooth
     
     return transients, smoothed_data
 
-def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpeaks=True, params=None):
+def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpeaks=True, params=None, filter_strength=1.0):
     """
     从钙离子浓度数据中提取关键特征
     
@@ -475,6 +599,11 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpea
         是否可视化结果，默认为False
     detect_subpeaks : bool, 可选
         是否检测大波中的小波峰，默认为True
+    params : dict, 可选
+        自定义参数字典，可覆盖默认参数
+    filter_strength : float, 可选
+        过滤强度调节参数，值越大过滤越强，默认为1.0
+        可以调整此参数来平衡检测灵敏度和假阳性率
         
     返回
     -------
@@ -489,7 +618,7 @@ def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpea
         data = neuron_data
     
     # 检测钙爆发
-    transients, smoothed_data = detect_calcium_transients(data, fs=fs, detect_subpeaks=detect_subpeaks, params=params)
+    transients, smoothed_data = detect_calcium_transients(data, fs=fs, detect_subpeaks=detect_subpeaks, params=params, filter_strength=filter_strength)
     
     # 如果没有检测到钙爆发，返回空特征
     if len(transients) == 0:
