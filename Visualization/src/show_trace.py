@@ -16,9 +16,9 @@ def parse_args():
     parser.add_argument('--output-dir', type=str, 
                         default='../results/CD1_traces/',
                         help='输出图像目录')
-    parser.add_argument('--before-stamps', type=int, default=50,
+    parser.add_argument('--before-stamps', type=int, default=200,
                         help='CD1标签前的时间戳数量')
-    parser.add_argument('--after-stamps', type=int, default=50,
+    parser.add_argument('--after-stamps', type=int, default=200,
                         help='CD1标签后的时间戳数量')
     return parser.parse_args()
 
@@ -179,25 +179,25 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path):
     plt.figure(figsize=(12, 8))
     
     # 使用统一的颜色方案绘制三条曲线及其阴影区域
-    # 组1
+    # Group 1
     plt.plot(plot_data['relative_time'], plot_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], label='组1', linewidth=2)
+             color=GROUP_COLORS['group1'], label='Group 1', linewidth=2)
     plt.fill_between(plot_data['relative_time'], 
                      plot_data['group1_avg'] - plot_data['group1_std'],
                      plot_data['group1_avg'] + plot_data['group1_std'],
                      color=GROUP_COLORS['group1'], alpha=0.3)
     
-    # 组2
+    # Group 2
     plt.plot(plot_data['relative_time'], plot_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], label='组2', linewidth=2)
+             color=GROUP_COLORS['group2'], label='Group 2', linewidth=2)
     plt.fill_between(plot_data['relative_time'], 
                      plot_data['group2_avg'] - plot_data['group2_std'],
                      plot_data['group2_avg'] + plot_data['group2_std'],
                      color=GROUP_COLORS['group2'], alpha=0.3)
     
-    # 组3
+    # Group 3
     plt.plot(plot_data['relative_time'], plot_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], label='组3', linewidth=2)
+             color=GROUP_COLORS['group3'], label='Group 3', linewidth=2)
     plt.fill_between(plot_data['relative_time'], 
                      plot_data['group3_avg'] - plot_data['group3_std'],
                      plot_data['group3_avg'] + plot_data['group3_std'],
@@ -205,16 +205,16 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path):
     
     # 添加图例和标签
     plt.legend(fontsize=12)
-    plt.xlabel('时间 (秒)', fontsize=14)
-    plt.ylabel('平均钙离子浓度', fontsize=14)
-    plt.title(f'CD1标签前{n_stamps}个时间戳的神经元平均钙离子浓度', fontsize=16)
+    plt.xlabel('Time (seconds)', fontsize=14)
+    plt.ylabel('Average Calcium Concentration', fontsize=14)
+    plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps Before CD1', fontsize=16)
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=plot_data['relative_time'].max(), color='k', linestyle='--', linewidth=2)
     plt.text(plot_data['relative_time'].max()-5, plt.ylim()[1]*0.9, 'CD1', fontsize=14)
     
     # 网格线
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.grid(False)
     
     # 保存图像
     plt.tight_layout()
@@ -254,25 +254,25 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path):
     plt.figure(figsize=(12, 8))
     
     # 使用统一的颜色方案绘制三条曲线及其阴影区域
-    # 组1
+    # Group 1
     plt.plot(plot_data['relative_time'], plot_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], label='组1', linewidth=2)
+             color=GROUP_COLORS['group1'], label='Group 1', linewidth=2)
     plt.fill_between(plot_data['relative_time'], 
                      plot_data['group1_avg'] - plot_data['group1_std'],
                      plot_data['group1_avg'] + plot_data['group1_std'],
                      color=GROUP_COLORS['group1'], alpha=0.3)
     
-    # 组2
+    # Group 2
     plt.plot(plot_data['relative_time'], plot_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], label='组2', linewidth=2)
+             color=GROUP_COLORS['group2'], label='Group 2', linewidth=2)
     plt.fill_between(plot_data['relative_time'], 
                      plot_data['group2_avg'] - plot_data['group2_std'],
                      plot_data['group2_avg'] + plot_data['group2_std'],
                      color=GROUP_COLORS['group2'], alpha=0.3)
     
-    # 组3
+    # Group 3
     plt.plot(plot_data['relative_time'], plot_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], label='组3', linewidth=2)
+             color=GROUP_COLORS['group3'], label='Group 3', linewidth=2)
     plt.fill_between(plot_data['relative_time'], 
                      plot_data['group3_avg'] - plot_data['group3_std'],
                      plot_data['group3_avg'] + plot_data['group3_std'],
@@ -280,16 +280,16 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path):
     
     # 添加图例和标签
     plt.legend(fontsize=12)
-    plt.xlabel('时间 (秒)', fontsize=14)
-    plt.ylabel('平均钙离子浓度', fontsize=14)
-    plt.title(f'CD1标签后{n_stamps}个时间戳的神经元平均钙离子浓度', fontsize=16)
+    plt.xlabel('Time (seconds)', fontsize=14)
+    plt.ylabel('Average Calcium Concentration', fontsize=14)
+    plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps After CD1', fontsize=16)
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=2)
     plt.text(5, plt.ylim()[1]*0.9, 'CD1', fontsize=14)
     
     # 网格线
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.grid(False)
     
     # 保存图像
     plt.tight_layout()
