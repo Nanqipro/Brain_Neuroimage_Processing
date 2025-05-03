@@ -300,7 +300,11 @@ def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca', 
         n_clusters -= 1
     
     # 创建随机颜色映射
-    cmap = ListedColormap(plt.cm.tab10(np.linspace(0, 1, n_clusters+1)))
+    # 使用统一的聚类颜色方案
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    if n_clusters > len(colors):
+        colors = colors * (n_clusters // len(colors) + 1)
+    cmap = ListedColormap(colors[:n_clusters])
     
     # 降维到2D
     if method == 'pca':
@@ -366,11 +370,18 @@ def visualize_feature_distribution(df, labels, output_dir='../results'):
     
     # 遍历每个特征并创建箱形图
     for i, feature in enumerate(features):
-        sns.boxplot(x='cluster', y=feature, hue='cluster', data=df_cluster, ax=axes[i], palette='Set2', legend=False)
+        # 使用统一的聚类颜色方案
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        n_clusters = len(df_cluster['cluster'].unique())
+        if n_clusters > len(colors):
+            colors = colors * (n_clusters // len(colors) + 1)
+        palette = {i: colors[i] for i in range(n_clusters)}
+        sns.boxplot(x='cluster', y=feature, hue='cluster', data=df_cluster, ax=axes[i], palette=palette, legend=False)
         axes[i].set_title(f'{feature} Distribution in Each Cluster')
         axes[i].set_xlabel('Cluster')
         axes[i].set_ylabel(feature)
-        axes[i].grid(True, alpha=0.3)
+        # 移除网格线
+        axes[i].grid(False)
     
     plt.tight_layout()
     
@@ -462,7 +473,8 @@ def visualize_cluster_radar(cluster_stats, output_dir='../results'):
     # 设置图的属性
     ax.set_thetagrids(np.degrees(angles[:-1]), features)
     ax.set_title('Comparison of Cluster Features using Radar Chart')
-    ax.grid(True)
+    # 移除网格线
+    ax.grid(False)
     ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
     
     plt.tight_layout()
@@ -531,7 +543,8 @@ def visualize_neuron_cluster_distribution(df, labels, k_value=None, output_dir='
     ax.set_xlabel('Neuron')
     ax.set_ylabel('Number of Calcium Transients')
     ax.legend(title='Cluster', bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax.grid(True, alpha=0.3)
+    # 移除网格线
+    ax.grid(False)
     
     plt.tight_layout()
     
@@ -633,7 +646,13 @@ def analyze_subpeaks(df, labels, output_dir='../results'):
     plt.figure(figsize=(10, 6))
     # 修改前: sns.boxplot(x='cluster', y='subpeaks_count', data=df_cluster, palette='Set2')
     # 修改后: 将x变量分配给hue，并设置legend=False
-    sns.boxplot(x='cluster', y='subpeaks_count', hue='cluster', data=df_cluster, palette='Set2', legend=False)
+    # 使用统一的聚类颜色方案
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    n_clusters = len(df_cluster['cluster'].unique())
+    if n_clusters > len(colors):
+        colors = colors * (n_clusters // len(colors) + 1)
+    palette = {i: colors[i] for i in range(n_clusters)}
+    sns.boxplot(x='cluster', y='subpeaks_count', hue='cluster', data=df_cluster, palette=palette, legend=False)
     plt.title('Distribution of Subpeaks Count in Each Cluster')
     plt.xlabel('Cluster')
     plt.ylabel('Number of Subpeaks')
@@ -698,7 +717,11 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
         embedding = reducer.fit_transform(features_scaled)
         
         # 绘制聚类结果
-        cmap = ListedColormap(plt.cm.tab10(np.linspace(0, 1, k+1)))
+        # 使用统一的聚类颜色方案
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        if k > len(colors):
+            colors = colors * (k // len(colors) + 1)
+        cmap = ListedColormap(colors[:k])
         
         # 在子图中绘制
         for j in range(k):
@@ -708,7 +731,8 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
         axes[i].set_title(f'K={k}, Silhouette={sil_score:.3f}')
         axes[i].set_xlabel('PCA Dimension 1')
         axes[i].set_ylabel('PCA Dimension 2')
-        axes[i].grid(True, alpha=0.3)
+        # 移除网格线
+        axes[i].grid(False)
         
         # 保存该K值的结果
         output_file = f'{output_dir}/transients_clustered_k{k}.xlsx'
@@ -938,13 +962,20 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     
     print(f"创建了 {len(neuron_mapping)} 个神经元名称映射")
     
-    # 创建颜色映射 - 修复弃用的get_cmap方法
-    try:
-        # 尝试使用新的推荐方法
-        cmap = plt.colormaps['tab10']
-    except (AttributeError, KeyError):
-        # 如果失败，回退到旧方法
-        cmap = plt.cm.get_cmap('tab10', n_clusters)
+    # 创建颜色映射 - 使用统一的聚类颜色方案
+    # 为聚类定义固定颜色
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    # 确保颜色足够
+    if n_clusters > len(colors):
+        # 如果聚类数量超过预设颜色，则循环使用
+        colors = colors * (n_clusters // len(colors) + 1)
+    
+    # 创建自定义颜色映射用于matplotlib
+    from matplotlib.colors import ListedColormap
+    cmap = ListedColormap(colors[:n_clusters])
+    
+    # 创建自定义颜色映射用于plotly
+    cluster_colors = {i: colors[i] for i in range(n_clusters)}
     
     # 为每个聚类提取和平均波形
     plt.figure(figsize=(12, 8))
@@ -1143,8 +1174,8 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)
     plt.grid(True, alpha=0.3)
     plt.legend(loc='upper right')
-    # 设置X轴只显示正半轴部分
-    plt.xlim(left=0)  # 从0开始显示X轴
+    # 设置X轴只显示正半轴部分，并限制最大范围为50秒
+    plt.xlim(left=0, right=50)  # 从0开始显示X轴，最大显示50秒
     plt.grid(True, alpha=0.3)
     
     # 添加额外标注说明X轴起点为钙波起始位置
@@ -1374,13 +1405,31 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
     if -1 in np.unique(labels):  # DBSCAN可能有噪声点标记为-1
         n_clusters -= 1
     
-    # 创建颜色映射
+    # 创建颜色映射 - 使用统一的聚类颜色方案
+    # 为聚类定义固定颜色
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    # 确保颜色足够
+    if n_clusters > len(colors):
+        # 如果聚类数量超过预设颜色，则循环使用
+        colors = colors * (n_clusters // len(colors) + 1)
+    
+    # 创建自定义颜色映射用于matplotlib
+    from matplotlib.colors import ListedColormap
+    cmap = ListedColormap(colors[:n_clusters])
+    
+    # 创建自定义颜色映射用于plotly
+    cluster_colors = {i: colors[i] for i in range(n_clusters)}
+    
+    # 为matplotlib创建colormap
     try:
-        # 尝试使用新的推荐方法
+        # 使用新的推荐方式替代被弃用的get_cmap函数
         cmap = plt.colormaps['tab10']
-    except (AttributeError, KeyError):
-        # 如果失败，回退到旧方法
-        cmap = plt.cm.get_cmap('tab10', n_clusters)
+        # 获取颜色映射实例
+        cmap_instance = lambda i: cmap(i % 10)  # 确保索引在范围内
+    except (AttributeError, ValueError):
+        # 兼容旧版本
+        cmap = plt.cm.tab10
+        cmap_instance = lambda i: cmap(i % 10)  # 确保索引在范围内
     
     # 根据是否使用交互式模式选择不同的绘图方法
     if interactive:
@@ -1400,9 +1449,8 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
                 if len(cluster_events) == 0:
                     continue
                 
-                # 为该簇分配颜色（转换为RGB字符串）
-                cluster_color_rgba = cmap(cluster_id)
-                cluster_color = f'rgba({int(cluster_color_rgba[0]*255)},{int(cluster_color_rgba[1]*255)},{int(cluster_color_rgba[2]*255)},{cluster_color_rgba[3]})'
+                # 使用预定义的颜色方案
+                cluster_color = cluster_colors[cluster_id]
                 
                 # 准备绘图数据
                 for _, event in cluster_events.iterrows():
@@ -1517,8 +1565,8 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
             if len(cluster_events) == 0:
                 continue
             
-            # 为该簇分配颜色
-            cluster_color = cmap(cluster_id)
+            # 使用预定义的颜色方案
+            cluster_color = cluster_colors[cluster_id]
             
             # 为每个事件绘制条线
             for _, event in cluster_events.iterrows():
@@ -1559,10 +1607,11 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
         plt.title('Integrated Neuron Ca2+ Activity Timeline (Arranged by Dataset)', fontsize=14)
         plt.xlabel(f"{x_label} (Including Dataset Offset)", fontsize=12)
         plt.ylabel('Unified Neuron ID', fontsize=12)
-        plt.grid(True, alpha=0.3, axis='y')
+        # 移除网格线
+        plt.grid(False)
         
-        # 添加聚类标签到图例
-        legend_elements = [plt.Line2D([0], [0], color=cmap(i), lw=4, label=f'Cluster {i+1}')
+        # 添加聚类标签到图例，使用统一颜色方案
+        legend_elements = [plt.Line2D([0], [0], color=cluster_colors[i], lw=4, label=f'Cluster {i+1}')
                            for i in range(n_clusters)]
         plt.legend(handles=legend_elements, loc='upper right')
         
