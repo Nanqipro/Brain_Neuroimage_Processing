@@ -218,14 +218,14 @@ def determine_optimal_k(features_scaled, max_k=10, output_dir='../results'):
     plt.title('Elbow Method')
     plt.xlabel('Number of Clusters (k)')
     plt.ylabel('Inertia')
-    plt.grid(True, alpha=0.3)
+    plt.grid(False)
     # 绘制轮廓系数图
     plt.subplot(1, 2, 2)
     plt.plot(range(2, max_k + 1), silhouette_scores, 'o-', color='green')
     plt.title('Silhouette Score')
     plt.xlabel('Number of Clusters (k)')
     plt.ylabel('Silhouette Score')
-    plt.grid(True, alpha=0.3)
+    plt.grid(False)
     plt.tight_layout()
     
     # 确保输出目录存在
@@ -334,7 +334,7 @@ def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca', 
     plt.xlabel(f"{method.upper()} Dimension 1")
     plt.ylabel(f"{method.upper()} Dimension 2")
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True, alpha=0.3)
+    plt.grid(False)
     plt.tight_layout()
     
     # 确保输出目录存在
@@ -656,7 +656,7 @@ def analyze_subpeaks(df, labels, output_dir='../results'):
     plt.title('Distribution of Subpeaks Count in Each Cluster')
     plt.xlabel('Cluster')
     plt.ylabel('Number of Subpeaks')
-    plt.grid(True, alpha=0.3)
+    plt.grid(False)
     plt.tight_layout()
     plt.savefig(f'{output_dir}/subpeaks_distribution.png', dpi=300)
     
@@ -759,7 +759,7 @@ def compare_multiple_k(features_scaled, feature_names, df_clean, k_values, input
     plt.title('Silhouette Score Comparison for Different K Values')
     plt.xlabel('Number of Clusters (K)')
     plt.ylabel('Silhouette Score')
-    plt.grid(True, alpha=0.3)
+    plt.grid(False)
     plt.xticks(list(silhouette_scores_dict.keys()))
     plt.tight_layout()
     plt.savefig(f'{output_dir}/silhouette_comparison.png', dpi=300)
@@ -1172,11 +1172,11 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     plt.title('Typical Calcium Wave Morphology Comparison (Cluster Averages)', fontsize=14)
     plt.xlabel('Time Relative to Start Point (seconds)', fontsize=12)
     plt.ylabel('Normalized Fluorescence Intensity (F/F0)', fontsize=12)
-    plt.grid(True, alpha=0.3)
+    plt.grid(False)
     plt.legend(loc='upper right')
     # 设置X轴只显示正半轴部分，并限制最大范围为50秒
     plt.xlim(left=0, right=50)  # 从0开始显示X轴，最大显示50秒
-    plt.grid(True, alpha=0.3)
+    plt.grid(False)
     
     # 添加额外标注说明X轴起点为钙波起始位置
     # 添加合适的标注位置，考虑到现在横坐标是秒
