@@ -1158,7 +1158,7 @@ def visualize_cluster_waveforms(df, labels, output_dir='../results', raw_data_pa
     plt.tight_layout()
     plt.savefig(f'{output_dir}/cluster_average_waveforms.png', dpi=300)
     # 保存第二个版本，文件名表明是以起始点为起点的可视化
-    plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
+    # plt.savefig(f'{output_dir}/cluster_average_waveforms_from_start.png', dpi=300)
     
     # 保存平均波形数据 - 修复append方法已弃用的问题
     waveform_data = []
@@ -1336,6 +1336,32 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
         x_label = "Time (Seconds)"
         if use_timestamp and not has_timestamp:
             print("数据中没有timestamp字段，将使用帧索引作为替代...")
+            
+    # 为不同数据集设置X轴上的偏移量，使数据集在时间轴上依次排列而不是重叠
+    datasets = sorted(df_mapped['dataset'].unique())
+    print(f"检测到 {len(datasets)} 个不同的数据集: {datasets}")
+    
+    # 计算每个数据集的最大持续时间，用于设置偏移量
+    dataset_max_times = {}
+    for dataset in datasets:
+        dataset_data = df_mapped[df_mapped['dataset'] == dataset]
+        if time_mode == "timestamp" and has_timestamp:
+            max_time = dataset_data['timestamp'].max() + dataset_data['duration'].max()
+        else:
+            # 将最大帧索引转换为秒
+            max_time = (dataset_data['start_idx'].max() + dataset_data['duration'].max()) / sampling_freq
+        dataset_max_times[dataset] = max_time
+        print(f"数据集 {dataset} 的最大时间为 {max_time:.2f} {x_label.lower()}")
+    
+    # 为每个数据集设置偏移量
+    dataset_to_offset = {}
+    current_offset = 0
+    padding = 10  # 数据集之间的间隔（以秒为单位）
+    
+    for dataset in datasets:
+        dataset_to_offset[dataset] = current_offset
+        print(f"数据集 {dataset} 的时间偏移量设置为 {current_offset:.2f} {x_label.lower()}")
+        current_offset += dataset_max_times[dataset] + padding
     
     # 获取所有唯一的统一神经元ID并排序
     unified_neurons = sorted(df_mapped['unified_neuron_id'].unique())
@@ -1416,10 +1442,39 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
                         )
                     )
             
+            # 添加数据集分隔标记
+            shapes = []
+            annotations = []
+            for dataset, offset in dataset_to_offset.items():
+                # 添加垂直分隔线
+                shapes.append(dict(
+                    type="line",
+                    x0=offset, y0=0,
+                    x1=offset, y1=1,
+                    yref="paper",
+                    line=dict(color="gray", width=1, dash="dash")
+                ))
+                
+                # 添加数据集名称标签
+                annotations.append(dict(
+                    x=offset + 2,
+                    y=1.05,
+                    xref="x",
+                    yref="paper",
+                    text=dataset,
+                    showarrow=False,
+                    font=dict(size=10),
+                    bgcolor="white",
+                    bordercolor="gray",
+                    borderwidth=1,
+                    borderpad=3,
+                    opacity=0.8
+                ))
+            
             # 设置布局
             fig.update_layout(
-                title='Integrated Neuron Calcium Wave Events Timeline by Cluster',
-                xaxis_title=x_label,
+                title='Integrated Neuron Calcium Activity Timeline (Arranged by Dataset)',
+                xaxis_title=f"{x_label} (Including Dataset Offset)",
                 yaxis_title='Unified Neuron ID',
                 yaxis=dict(
                     tickmode='array',
@@ -1431,7 +1486,9 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
                     font_size=12
                 ),
                 height=800,   # 调整高度
-                width=1500    # 调整宽度为15:8比例
+                width=1500,   # 调整宽度为15:8比例
+                shapes=shapes,
+                annotations=annotations
             )
             
             # 保存交互式图表为HTML文件
@@ -1449,7 +1506,7 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
     # 如果不使用交互式或者plotly导入失败，使用matplotlib绘制
     if not interactive:
         # 创建图形 - 调整比例为15:8
-        plt.figure(figsize=(15, 8))
+        plt.figure(figsize=(20, 8))
         
         # 按聚类绘制时间线，确保颜色对应聚类
         for cluster_id in range(n_clusters):
@@ -1469,12 +1526,16 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
                 y_position = neuron_to_y[unified_neuron]
                 
                 # 根据模式选择时间轴数据
+                dataset = event['dataset']
+                # 获取该数据集的时间偏移量
+                offset = dataset_to_offset[dataset]
+                
                 if time_mode == "timestamp" and has_timestamp:
-                    start_time = event['timestamp']
+                    start_time = event['timestamp'] + offset  # 添加偏移量
                     end_time = start_time + event['duration']
                 else:
-                    # 将帧索引转换为秒
-                    start_time = event['start_idx'] / sampling_freq
+                    # 将帧索引转换为秒并添加偏移量
+                    start_time = (event['start_idx'] / sampling_freq) + offset
                     # 注意：duration在帧索引下是帧数，需要转换为秒
                     end_time = start_time + (event['duration'] / sampling_freq)
                 
@@ -1485,9 +1546,18 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
         # 设置Y轴刻度和标签
         plt.yticks(list(neuron_to_y.values()), [f"Neuron {i}" for i in neuron_to_y.keys()])
         
+        # 为每个数据集添加分隔线和标签
+        for dataset, offset in dataset_to_offset.items():
+            # 添加垂直分隔线
+            plt.axvline(x=offset, color='gray', linestyle='--', alpha=0.5)
+            # 添加数据集名称标签
+            plt.text(offset + 2, len(unified_neurons) + 0.5, dataset, 
+                    fontsize=10, rotation=0, ha='left', va='bottom',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7))
+        
         # 设置图表属性
-        plt.title('Integrated Neuron Calcium Wave Events Timeline by Cluster', fontsize=14)
-        plt.xlabel(x_label, fontsize=12)
+        plt.title('Integrated Neuron Ca2+ Activity Timeline (Arranged by Dataset)', fontsize=14)
+        plt.xlabel(f"{x_label} (Including Dataset Offset)", fontsize=12)
         plt.ylabel('Unified Neuron ID', fontsize=12)
         plt.grid(True, alpha=0.3, axis='y')
         

@@ -1,0 +1,229 @@
+2025-05-03 10:51:18,191 - cluster-integrate - INFO - 日志文件创建于: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\logs\CD1_trace\cluster-integrate_20250503-105118.log
+2025-05-03 10:51:18,192 - cluster-integrate - INFO - 开始钙爆发聚类分析，输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients
+2025-05-03 10:51:18,192 - cluster-integrate - INFO - 使用输入文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\all_datasets_transients.xlsx
+2025-05-03 10:51:18,192 - cluster-integrate - INFO - OUTPUT: 正在从D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\all_datasets_transients.xlsx加载数据...
+2025-05-03 10:51:18,529 - cluster-integrate - INFO - OUTPUT: 成功加载数据，共990行
+2025-05-03 10:51:18,529 - cluster-integrate - INFO - OUTPUT: 输出目录设置为: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients
+2025-05-03 10:51:18,529 - cluster-integrate - INFO - OUTPUT: 使用权重设置进行聚类分析
+2025-05-03 10:51:18,532 - cluster-integrate - INFO - OUTPUT: 应用特征权重: amplitude:2.00, duration:1.00, fwhm:0.50, rise_time:0.80, decay_time:0.80, auc:0.50, snr:0.50, is_complex:1.00, subpeaks_count:1.00
+2025-05-03 10:51:18,533 - cluster-integrate - INFO - OUTPUT: 预处理完成，保留990个有效样本，使用特征: amplitude, duration, fwhm, rise_time, decay_time, auc, snr, is_complex, subpeaks_count
+2025-05-03 10:51:18,533 - cluster-integrate - INFO - OUTPUT: 使用指定的聚类数: K=4
+2025-05-03 10:51:18,533 - cluster-integrate - INFO - OUTPUT: 使用K均值聚类算法，聚类数=4...
+2025-05-03 10:51:18,711 - cluster-integrate - INFO - OUTPUT: 使用PCA降维可视化...
+2025-05-03 10:51:19,179 - cluster-integrate - INFO - OUTPUT: 使用t-SNE降维可视化...
+2025-05-03 10:51:20,755 - cluster-integrate - INFO - OUTPUT: 可视化各个簇的特征分布...
+2025-05-03 10:51:22,261 - cluster-integrate - INFO - OUTPUT: 分析各个簇的特征统计信息...
+2025-05-03 10:51:22,265 - cluster-integrate - INFO - OUTPUT: 聚类统计信息已保存到 'D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/cluster_statistics.csv'
+2025-05-03 10:51:22,266 - cluster-integrate - INFO - OUTPUT: 使用雷达图可视化各簇的特征...
+2025-05-03 10:51:22,730 - cluster-integrate - INFO - OUTPUT: 可视化不同神经元的聚类分布...
+2025-05-03 10:51:23,351 - cluster-integrate - INFO - OUTPUT: 神经元聚类分布图已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/neuron_cluster_distribution.png
+2025-05-03 10:51:23,352 - cluster-integrate - INFO - OUTPUT: 可视化不同波形类型在各聚类中的分布...
+2025-05-03 10:51:23,747 - cluster-integrate - INFO - OUTPUT: 波形类型分布图已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/wave_type_distribution.png
+2025-05-03 10:51:23,747 - cluster-integrate - INFO - OUTPUT: 分析各聚类中的子峰特征...
+2025-05-03 10:51:24,035 - cluster-integrate - INFO - OUTPUT: 子峰统计信息已保存到 D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/subpeaks_statistics.csv
+2025-05-03 10:51:24,036 - cluster-integrate - INFO - OUTPUT: 正在可视化不同聚类类别的平均钙爆发波形...
+2025-05-03 10:51:24,036 - cluster-integrate - INFO - OUTPUT: 检测到源文件路径信息，将优先使用这些信息加载原始数据
+2025-05-03 10:51:24,036 - cluster-integrate - INFO - OUTPUT: 从事件数据中检测到 3 个不同的源文件
+2025-05-03 10:51:24,036 - cluster-integrate - INFO - OUTPUT: 使用项目根目录: D:\GitHub_local\Brain_Neuroimage_Processing
+2025-05-03 10:51:24,036 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day3_with_behavior_labels_filled.xlsx
+2025-05-03 10:51:24,957 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: Day3_with_behavior_labels_filled, 形状: (2999, 54)
+2025-05-03 10:51:24,958 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day6_with_behavior_labels_filled.xlsx
+2025-05-03 10:51:26,012 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: Day6_with_behavior_labels_filled, 形状: (2999, 62)
+2025-05-03 10:51:26,012 - cluster-integrate - INFO - OUTPUT: 加载源文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day9_with_behavior_labels_filled.xlsx
+2025-05-03 10:51:27,019 - cluster-integrate - INFO - OUTPUT:   成功加载数据集: Day9_with_behavior_labels_filled, 形状: (2999, 60)
+2025-05-03 10:51:27,020 - cluster-integrate - INFO - OUTPUT: 原始数据中的神经元列：
+2025-05-03 10:51:27,020 - cluster-integrate - INFO - OUTPUT:   数据集 Day3_with_behavior_labels_filled: 52 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-03 10:51:27,020 - cluster-integrate - INFO - OUTPUT:   数据集 Day6_with_behavior_labels_filled: 60 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-03 10:51:27,020 - cluster-integrate - INFO - OUTPUT:   数据集 Day9_with_behavior_labels_filled: 58 个神经元列 - ['n1', 'n2', 'n3', 'n4', 'n5']...
+2025-05-03 10:51:27,021 - cluster-integrate - INFO - OUTPUT: 钙爆发数据中的神经元: 62 个 - ['n1' 'n2' 'n3' 'n4' 'n5']...
+2025-05-03 10:51:27,021 - cluster-integrate - INFO - OUTPUT: 创建了 62 个神经元名称映射
+2025-05-03 10:51:27,075 - cluster-integrate - INFO - OUTPUT: 聚类 1: 使用从起始点开始的固定长度400处理波形...
+2025-05-03 10:51:27,075 - cluster-integrate - INFO - OUTPUT: 聚类 1: 使用源文件信息匹配原始数据
+2025-05-03 10:51:27,108 - cluster-integrate - INFO - OUTPUT: 聚类 2: 使用从起始点开始的固定长度400处理波形...
+2025-05-03 10:51:27,108 - cluster-integrate - INFO - OUTPUT: 聚类 2: 使用源文件信息匹配原始数据
+2025-05-03 10:51:27,113 - cluster-integrate - INFO - OUTPUT: 聚类 3: 使用从起始点开始的固定长度400处理波形...
+2025-05-03 10:51:27,114 - cluster-integrate - INFO - OUTPUT: 聚类 3: 使用源文件信息匹配原始数据
+2025-05-03 10:51:27,122 - cluster-integrate - INFO - OUTPUT: 聚类 4: 使用从起始点开始的固定长度400处理波形...
+2025-05-03 10:51:27,123 - cluster-integrate - INFO - OUTPUT: 聚类 4: 使用源文件信息匹配原始数据
+2025-05-03 10:51:27,558 - cluster-integrate - INFO - OUTPUT: 平均钙爆发波形可视化已保存到 D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/cluster_average_waveforms.png
+2025-05-03 10:51:27,558 - cluster-integrate - INFO - OUTPUT: 波形数据已保存到 D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/cluster_average_waveforms.csv
+2025-05-03 10:51:27,559 - cluster-integrate - INFO - OUTPUT: 开始生成整合神经元钙波活动时间线图...
+2025-05-03 10:51:27,559 - cluster-integrate - INFO - OUTPUT: 加载神经元对应表: ../datasets/神经元对应表.xlsx
+2025-05-03 10:51:27,578 - cluster-integrate - INFO - OUTPUT: 成功加载神经元对应表，形状: (53, 3)
+2025-05-03 10:51:27,579 - cluster-integrate - INFO - OUTPUT: 对应表中的数据集: ['Day3_with_behavior_labels_filled', 'Day6_with_behavior_labels_filled', 'Day9_with_behavior_labels_filled']
+2025-05-03 10:51:27,584 - cluster-integrate - INFO - OUTPUT: 创建了 3 个数据集的神经元ID映射
+2025-05-03 10:51:27,628 - cluster-integrate - INFO - OUTPUT: 神经元ID映射完成: 成功映射 739/990 条记录 (74.65%)
+2025-05-03 10:51:27,631 - cluster-integrate - INFO - OUTPUT: 检测到 3 个不同的数据集: ['Day3_with_behavior_labels_filled', 'Day6_with_behavior_labels_filled', 'Day9_with_behavior_labels_filled']
+2025-05-03 10:51:27,632 - cluster-integrate - INFO - OUTPUT: 数据集 Day3_with_behavior_labels_filled 的最大时间为 815.00 time (seconds)
+2025-05-03 10:51:27,633 - cluster-integrate - INFO - OUTPUT: 数据集 Day6_with_behavior_labels_filled 的最大时间为 740.83 time (seconds)
+2025-05-03 10:51:27,634 - cluster-integrate - INFO - OUTPUT: 数据集 Day9_with_behavior_labels_filled 的最大时间为 744.17 time (seconds)
+2025-05-03 10:51:27,634 - cluster-integrate - INFO - OUTPUT: 数据集 Day3_with_behavior_labels_filled 的时间偏移量设置为 0.00 time (seconds)
+2025-05-03 10:51:27,634 - cluster-integrate - INFO - OUTPUT: 数据集 Day6_with_behavior_labels_filled 的时间偏移量设置为 825.00 time (seconds)
+2025-05-03 10:51:27,635 - cluster-integrate - INFO - OUTPUT: 数据集 Day9_with_behavior_labels_filled 的时间偏移量设置为 1575.83 time (seconds)
+2025-05-03 10:51:28,253 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 21253 (\N{CJK UNIFIED IDEOGRAPH-5305}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,253 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,254 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 21547 (\N{CJK UNIFIED IDEOGRAPH-542B}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,254 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,254 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 25968 (\N{CJK UNIFIED IDEOGRAPH-6570}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,254 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,255 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 25454 (\N{CJK UNIFIED IDEOGRAPH-636E}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,255 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,255 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 38598 (\N{CJK UNIFIED IDEOGRAPH-96C6}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,255 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,255 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 20559 (\N{CJK UNIFIED IDEOGRAPH-504F}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,256 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,256 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 31227 (\N{CJK UNIFIED IDEOGRAPH-79FB}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,256 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,272 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 32479 (\N{CJK UNIFIED IDEOGRAPH-7EDF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,273 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,274 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 19968 (\N{CJK UNIFIED IDEOGRAPH-4E00}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,274 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,274 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 31070 (\N{CJK UNIFIED IDEOGRAPH-795E}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,274 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,275 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 32463 (\N{CJK UNIFIED IDEOGRAPH-7ECF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,275 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,275 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 20803 (\N{CJK UNIFIED IDEOGRAPH-5143}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,275 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,288 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 25972 (\N{CJK UNIFIED IDEOGRAPH-6574}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,288 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,290 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 21512 (\N{CJK UNIFIED IDEOGRAPH-5408}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,290 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,290 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 38041 (\N{CJK UNIFIED IDEOGRAPH-9499}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,291 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,291 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 27874 (\N{CJK UNIFIED IDEOGRAPH-6CE2}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,291 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,291 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 27963 (\N{CJK UNIFIED IDEOGRAPH-6D3B}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,291 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,292 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 21160 (\N{CJK UNIFIED IDEOGRAPH-52A8}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,292 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,292 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 26102 (\N{CJK UNIFIED IDEOGRAPH-65F6}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,292 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,292 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 38388 (\N{CJK UNIFIED IDEOGRAPH-95F4}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,293 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,293 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 32447 (\N{CJK UNIFIED IDEOGRAPH-7EBF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,293 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,293 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 22270 (\N{CJK UNIFIED IDEOGRAPH-56FE}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,293 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,294 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 25353 (\N{CJK UNIFIED IDEOGRAPH-6309}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,294 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,294 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 20381 (\N{CJK UNIFIED IDEOGRAPH-4F9D}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,295 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,295 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 27425 (\N{CJK UNIFIED IDEOGRAPH-6B21}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,295 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,296 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 25490 (\N{CJK UNIFIED IDEOGRAPH-6392}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,296 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,296 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1571: UserWarning: Glyph 21015 (\N{CJK UNIFIED IDEOGRAPH-5217}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,297 - cluster-integrate - ERROR - OUTPUT:   plt.tight_layout()
+2025-05-03 10:51:28,352 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 32479 (\N{CJK UNIFIED IDEOGRAPH-7EDF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,352 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,353 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 19968 (\N{CJK UNIFIED IDEOGRAPH-4E00}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,353 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,354 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 31070 (\N{CJK UNIFIED IDEOGRAPH-795E}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,354 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,354 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 32463 (\N{CJK UNIFIED IDEOGRAPH-7ECF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,354 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,355 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 20803 (\N{CJK UNIFIED IDEOGRAPH-5143}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,355 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,356 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 25972 (\N{CJK UNIFIED IDEOGRAPH-6574}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,356 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,357 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 21512 (\N{CJK UNIFIED IDEOGRAPH-5408}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,357 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,357 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 38041 (\N{CJK UNIFIED IDEOGRAPH-9499}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,358 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,358 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 27874 (\N{CJK UNIFIED IDEOGRAPH-6CE2}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,358 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,358 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 27963 (\N{CJK UNIFIED IDEOGRAPH-6D3B}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,359 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,359 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 21160 (\N{CJK UNIFIED IDEOGRAPH-52A8}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,359 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,359 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 26102 (\N{CJK UNIFIED IDEOGRAPH-65F6}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,360 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,360 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 38388 (\N{CJK UNIFIED IDEOGRAPH-95F4}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,361 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,361 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 32447 (\N{CJK UNIFIED IDEOGRAPH-7EBF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,361 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,361 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 22270 (\N{CJK UNIFIED IDEOGRAPH-56FE}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,361 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,362 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 25353 (\N{CJK UNIFIED IDEOGRAPH-6309}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,362 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,363 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 25968 (\N{CJK UNIFIED IDEOGRAPH-6570}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,363 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,363 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 25454 (\N{CJK UNIFIED IDEOGRAPH-636E}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,363 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,364 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 38598 (\N{CJK UNIFIED IDEOGRAPH-96C6}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,364 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,364 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 20381 (\N{CJK UNIFIED IDEOGRAPH-4F9D}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,364 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,365 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 27425 (\N{CJK UNIFIED IDEOGRAPH-6B21}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,365 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,365 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 25490 (\N{CJK UNIFIED IDEOGRAPH-6392}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,365 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,366 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 21015 (\N{CJK UNIFIED IDEOGRAPH-5217}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,366 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,371 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 21253 (\N{CJK UNIFIED IDEOGRAPH-5305}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,371 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,371 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 21547 (\N{CJK UNIFIED IDEOGRAPH-542B}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,371 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,372 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 20559 (\N{CJK UNIFIED IDEOGRAPH-504F}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,372 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,372 - cluster-integrate - ERROR - OUTPUT: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\cluster-integrate.py:1575: UserWarning: Glyph 31227 (\N{CJK UNIFIED IDEOGRAPH-79FB}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:28,372 - cluster-integrate - ERROR - OUTPUT:   plt.savefig(f'{output_dir}/integrated_neuron_timeline{suffix}.png', dpi=300)
+2025-05-03 10:51:28,881 - cluster-integrate - INFO - OUTPUT: 整合神经元钙波活动时间线图已保存到 D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/integrated_neuron_timeline.png
+2025-05-03 10:51:28,882 - cluster-integrate - INFO - OUTPUT: 将聚类标签添加到原始数据...
+2025-05-03 10:51:29,472 - cluster-integrate - INFO - OUTPUT: 聚类结果已保存到 D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/transients_clustered_k4.xlsx
+2025-05-03 10:51:29,472 - cluster-integrate - INFO - OUTPUT: 聚类结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients/transients_clustered_k4.xlsx
+2025-05-03 10:51:29,472 - cluster-integrate - INFO - OUTPUT: 聚类分析完成!
+2025-05-03 10:51:29,958 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 32479 (\N{CJK UNIFIED IDEOGRAPH-7EDF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,958 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,959 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 19968 (\N{CJK UNIFIED IDEOGRAPH-4E00}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,959 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,959 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 31070 (\N{CJK UNIFIED IDEOGRAPH-795E}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,959 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,960 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 32463 (\N{CJK UNIFIED IDEOGRAPH-7ECF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,960 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,960 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 20803 (\N{CJK UNIFIED IDEOGRAPH-5143}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,960 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,961 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 25972 (\N{CJK UNIFIED IDEOGRAPH-6574}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,961 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,962 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 21512 (\N{CJK UNIFIED IDEOGRAPH-5408}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,962 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,962 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 38041 (\N{CJK UNIFIED IDEOGRAPH-9499}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,962 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,963 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 27874 (\N{CJK UNIFIED IDEOGRAPH-6CE2}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,963 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,964 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 27963 (\N{CJK UNIFIED IDEOGRAPH-6D3B}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,964 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,964 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 21160 (\N{CJK UNIFIED IDEOGRAPH-52A8}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,964 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,965 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 26102 (\N{CJK UNIFIED IDEOGRAPH-65F6}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,965 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,965 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 38388 (\N{CJK UNIFIED IDEOGRAPH-95F4}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,966 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,966 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 32447 (\N{CJK UNIFIED IDEOGRAPH-7EBF}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,966 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,966 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 22270 (\N{CJK UNIFIED IDEOGRAPH-56FE}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,966 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,967 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 25353 (\N{CJK UNIFIED IDEOGRAPH-6309}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,967 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,967 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 25968 (\N{CJK UNIFIED IDEOGRAPH-6570}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,967 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,968 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 25454 (\N{CJK UNIFIED IDEOGRAPH-636E}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,968 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,968 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 38598 (\N{CJK UNIFIED IDEOGRAPH-96C6}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,968 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,969 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 20381 (\N{CJK UNIFIED IDEOGRAPH-4F9D}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,969 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,969 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 27425 (\N{CJK UNIFIED IDEOGRAPH-6B21}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,970 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,970 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 25490 (\N{CJK UNIFIED IDEOGRAPH-6392}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,970 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,971 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 21015 (\N{CJK UNIFIED IDEOGRAPH-5217}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,971 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,977 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 21253 (\N{CJK UNIFIED IDEOGRAPH-5305}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,978 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,978 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 21547 (\N{CJK UNIFIED IDEOGRAPH-542B}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,978 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,979 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 20559 (\N{CJK UNIFIED IDEOGRAPH-504F}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,979 - cluster-integrate - ERROR - OUTPUT:   func(*args)
+2025-05-03 10:51:29,979 - cluster-integrate - ERROR - OUTPUT: C:\Users\nanqipro\.conda\envs\brain\lib\tkinter\__init__.py:839: UserWarning: Glyph 31227 (\N{CJK UNIFIED IDEOGRAPH-79FB}) missing from font(s) DejaVu Sans.
+2025-05-03 10:51:29,980 - cluster-integrate - ERROR - OUTPUT:   func(*args)

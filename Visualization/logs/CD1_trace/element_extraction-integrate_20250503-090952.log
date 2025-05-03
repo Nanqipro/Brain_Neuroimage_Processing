@@ -1,0 +1,758 @@
+2025-05-03 09:09:52,776 - element_extraction-integrate - INFO - 日志文件创建于: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\logs\CD1_trace\element_extraction-integrate_20250503-090952.log
+2025-05-03 09:09:52,776 - element_extraction-integrate - INFO - 使用项目根目录: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization
+2025-05-03 09:09:52,777 - element_extraction-integrate - INFO - OUTPUT: 共找到 2 个输入文件:
+2025-05-03 09:09:52,777 - element_extraction-integrate - INFO - OUTPUT:   - D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day3_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:52,777 - element_extraction-integrate - INFO - OUTPUT:   - D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day6_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:52,778 - element_extraction-integrate - INFO - OUTPUT: 正在处理文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day3_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:53,942 - element_extraction-integrate - INFO - OUTPUT: 成功加载数据，共 2999 行
+2025-05-03 09:09:53,942 - element_extraction-integrate - INFO - OUTPUT: 检测到 52 个神经元数据列
+2025-05-03 09:09:53,943 - element_extraction-integrate - INFO - OUTPUT: 输出目录设置为: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\Day3_with_behavior_labels_filled
+2025-05-03 09:09:53,944 - element_extraction-integrate - INFO - OUTPUT: 原始文件路径信息:
+2025-05-03 09:09:53,944 - element_extraction-integrate - INFO - OUTPUT:   - 文件名: Day3_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:53,944 - element_extraction-integrate - INFO - OUTPUT:   - 相对路径: datasets\Day3_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:53,944 - element_extraction-integrate - INFO - OUTPUT:   - 绝对路径: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day3_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:53,944 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n1 的钙爆发...
+2025-05-03 09:09:53,947 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n1 的最优参数...
+2025-05-03 09:09:53,952 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.40, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=31
+2025-05-03 09:09:53,968 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:53,968 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:53,968 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:53,968 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n2 的钙爆发...
+2025-05-03 09:09:53,968 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n2 的最优参数...
+2025-05-03 09:09:53,969 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.29, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:53,973 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:53,974 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:53,974 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:53,974 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:53,975 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n3 的钙爆发...
+2025-05-03 09:09:53,975 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n3 的最优参数...
+2025-05-03 09:09:53,976 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.57, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=32
+2025-05-03 09:09:53,980 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:53,980 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:53,981 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:53,981 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n4 的钙爆发...
+2025-05-03 09:09:53,981 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n4 的最优参数...
+2025-05-03 09:09:53,982 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.26, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=7
+2025-05-03 09:09:53,987 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:53,987 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 8 个
+2025-05-03 09:09:53,988 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:53,989 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n5 的钙爆发...
+2025-05-03 09:09:53,989 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n5 的最优参数...
+2025-05-03 09:09:53,991 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.41, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:53,995 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:53,995 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:53,996 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:53,996 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n6 的钙爆发...
+2025-05-03 09:09:53,996 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n6 的最优参数...
+2025-05-03 09:09:53,997 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.32, min_snr=3.8499999999999996, baseline=10, min_duration=31, smooth=111, peaks=11
+2025-05-03 09:09:54,003 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,003 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,004 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,004 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n7 的钙爆发...
+2025-05-03 09:09:54,005 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n7 的最优参数...
+2025-05-03 09:09:54,006 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.71, min_snr=3.8499999999999996, baseline=10, min_duration=31, smooth=111, peaks=9
+2025-05-03 09:09:54,009 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:54,009 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:54,009 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,010 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n8 的钙爆发...
+2025-05-03 09:09:54,010 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n8 的最优参数...
+2025-05-03 09:09:54,011 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.60, min_snr=3.8499999999999996, baseline=10, min_duration=31, smooth=111, peaks=9
+2025-05-03 09:09:54,017 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,018 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:54,018 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,018 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,018 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n9 的钙爆发...
+2025-05-03 09:09:54,018 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n9 的最优参数...
+2025-05-03 09:09:54,019 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.50, min_snr=4.199999999999999, baseline=10, min_duration=31, smooth=111, peaks=10
+2025-05-03 09:09:54,024 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,024 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,024 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,025 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n10 的钙爆发...
+2025-05-03 09:09:54,025 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n10 的最优参数...
+2025-05-03 09:09:54,027 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.78, min_snr=3.8499999999999996, baseline=10, min_duration=31, smooth=111, peaks=7
+2025-05-03 09:09:54,032 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,032 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,033 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,033 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n11 的钙爆发...
+2025-05-03 09:09:54,033 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n11 的最优参数...
+2025-05-03 09:09:54,035 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.71, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=12
+2025-05-03 09:09:54,041 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 9 个钙爆发，其中：
+2025-05-03 09:09:54,041 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 9 个
+2025-05-03 09:09:54,041 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,041 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n12 的钙爆发...
+2025-05-03 09:09:54,041 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n12 的最优参数...
+2025-05-03 09:09:54,044 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.43, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:54,048 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:54,048 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:54,048 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,049 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,050 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n14 的钙爆发...
+2025-05-03 09:09:54,050 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n14 的最优参数...
+2025-05-03 09:09:54,051 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.32, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=4
+2025-05-03 09:09:54,054 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:54,055 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:54,055 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,055 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,056 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n15 的钙爆发...
+2025-05-03 09:09:54,056 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n15 的最优参数...
+2025-05-03 09:09:54,057 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.28, min_snr=3.8499999999999996, baseline=10, min_duration=31, smooth=111, peaks=10
+2025-05-03 09:09:54,060 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:54,060 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 1 个
+2025-05-03 09:09:54,060 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,061 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,061 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n16 的钙爆发...
+2025-05-03 09:09:54,061 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n16 的最优参数...
+2025-05-03 09:09:54,062 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.22, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=12
+2025-05-03 09:09:54,064 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 1 个钙爆发，其中：
+2025-05-03 09:09:54,065 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 0 个
+2025-05-03 09:09:54,065 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,065 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:54,065 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n17 的钙爆发...
+2025-05-03 09:09:54,065 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n17 的最优参数...
+2025-05-03 09:09:54,067 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.16, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=10
+2025-05-03 09:09:54,071 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:54,071 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:54,072 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,072 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:54,072 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n18 的钙爆发...
+2025-05-03 09:09:54,072 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n18 的最优参数...
+2025-05-03 09:09:54,074 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=2.93, min_snr=3.5, baseline=30, min_duration=22, smooth=47, peaks=26
+2025-05-03 09:09:54,079 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:54,079 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,079 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,080 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,080 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n19 的钙爆发...
+2025-05-03 09:09:54,081 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n19 的最优参数...
+2025-05-03 09:09:54,082 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.41, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=9
+2025-05-03 09:09:54,086 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,086 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:54,087 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,087 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,087 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n20 的钙爆发...
+2025-05-03 09:09:54,088 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n20 的最优参数...
+2025-05-03 09:09:54,089 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=6.02, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:54,094 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,094 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,094 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,094 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n21 的钙爆发...
+2025-05-03 09:09:54,095 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n21 的最优参数...
+2025-05-03 09:09:54,096 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.90, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=14
+2025-05-03 09:09:54,100 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,100 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,100 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,100 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n22 的钙爆发...
+2025-05-03 09:09:54,101 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n22 的最优参数...
+2025-05-03 09:09:54,103 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.81, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=20
+2025-05-03 09:09:54,106 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:54,106 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:54,106 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,106 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n23 的钙爆发...
+2025-05-03 09:09:54,107 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n23 的最优参数...
+2025-05-03 09:09:54,108 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.32, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=62
+2025-05-03 09:09:54,113 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,114 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,114 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,114 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,114 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n24 的钙爆发...
+2025-05-03 09:09:54,115 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n24 的最优参数...
+2025-05-03 09:09:54,115 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.38, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=9
+2025-05-03 09:09:54,121 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,121 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,121 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,122 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n25 的钙爆发...
+2025-05-03 09:09:54,122 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n25 的最优参数...
+2025-05-03 09:09:54,124 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=10.04, min_snr=3.15, baseline=30, min_duration=22, smooth=47, peaks=2
+2025-05-03 09:09:54,127 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:54,127 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:54,128 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,128 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:54,128 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n26 的钙爆发...
+2025-05-03 09:09:54,128 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n26 的最优参数...
+2025-05-03 09:09:54,130 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.24, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=4
+2025-05-03 09:09:54,135 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,136 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,136 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,136 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n27 的钙爆发...
+2025-05-03 09:09:54,136 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n27 的最优参数...
+2025-05-03 09:09:54,137 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.53, min_snr=4.199999999999999, baseline=10, min_duration=31, smooth=111, peaks=9
+2025-05-03 09:09:54,142 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:54,143 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:54,143 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,143 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n28 的钙爆发...
+2025-05-03 09:09:54,144 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n28 的最优参数...
+2025-05-03 09:09:54,144 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.79, min_snr=3.8499999999999996, baseline=10, min_duration=31, smooth=92, peaks=13
+2025-05-03 09:09:54,148 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,148 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,148 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,148 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n29 的钙爆发...
+2025-05-03 09:09:54,149 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n29 的最优参数...
+2025-05-03 09:09:54,150 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.59, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=47
+2025-05-03 09:09:54,156 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:54,156 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,156 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 2 个 (含有子峰)
+2025-05-03 09:09:54,157 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:54,157 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n30 的钙爆发...
+2025-05-03 09:09:54,157 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n30 的最优参数...
+2025-05-03 09:09:54,158 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.18, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=26
+2025-05-03 09:09:54,161 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:54,162 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:54,162 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,162 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n31 的钙爆发...
+2025-05-03 09:09:54,163 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n31 的最优参数...
+2025-05-03 09:09:54,164 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.61, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=16
+2025-05-03 09:09:54,168 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:54,168 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:54,168 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,169 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n32 的钙爆发...
+2025-05-03 09:09:54,170 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n32 的最优参数...
+2025-05-03 09:09:54,171 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=2.73, min_snr=3.5, baseline=10, min_duration=31, smooth=111, peaks=15
+2025-05-03 09:09:54,177 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:54,177 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:54,177 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,177 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n33 的钙爆发...
+2025-05-03 09:09:54,177 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n33 的最优参数...
+2025-05-03 09:09:54,178 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.27, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=32
+2025-05-03 09:09:54,182 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,183 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,183 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,183 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,183 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n34 的钙爆发...
+2025-05-03 09:09:54,184 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n34 的最优参数...
+2025-05-03 09:09:54,185 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.86, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=17
+2025-05-03 09:09:54,190 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:54,190 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,191 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,191 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:54,191 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n35 的钙爆发...
+2025-05-03 09:09:54,191 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n35 的最优参数...
+2025-05-03 09:09:54,192 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.61, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=18
+2025-05-03 09:09:54,198 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,198 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,198 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,198 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n36 的钙爆发...
+2025-05-03 09:09:54,198 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n36 的最优参数...
+2025-05-03 09:09:54,200 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.95, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=7
+2025-05-03 09:09:54,204 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,204 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,205 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,205 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n37 的钙爆发...
+2025-05-03 09:09:54,205 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n37 的最优参数...
+2025-05-03 09:09:54,206 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.16, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=32
+2025-05-03 09:09:54,211 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,211 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,211 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,211 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n38 的钙爆发...
+2025-05-03 09:09:54,211 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n38 的最优参数...
+2025-05-03 09:09:54,212 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.85, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=30
+2025-05-03 09:09:54,218 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,218 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,218 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,218 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n39 的钙爆发...
+2025-05-03 09:09:54,218 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n39 的最优参数...
+2025-05-03 09:09:54,220 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.56, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=24
+2025-05-03 09:09:54,224 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:54,224 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:54,224 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,224 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:54,224 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n40 的钙爆发...
+2025-05-03 09:09:54,225 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n40 的最优参数...
+2025-05-03 09:09:54,226 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.07, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=20
+2025-05-03 09:09:54,231 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:54,231 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 1 个
+2025-05-03 09:09:54,232 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 2 个 (含有子峰)
+2025-05-03 09:09:54,232 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:54,232 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n41 的钙爆发...
+2025-05-03 09:09:54,232 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n41 的最优参数...
+2025-05-03 09:09:54,233 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=2.96, min_snr=3.5, baseline=30, min_duration=22, smooth=47, peaks=12
+2025-05-03 09:09:54,238 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,239 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:54,239 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,239 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n42 的钙爆发...
+2025-05-03 09:09:54,239 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n42 的最优参数...
+2025-05-03 09:09:54,240 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.06, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=24
+2025-05-03 09:09:54,242 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:54,242 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:54,243 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,244 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n43 的钙爆发...
+2025-05-03 09:09:54,244 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n43 的最优参数...
+2025-05-03 09:09:54,246 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.92, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=9
+2025-05-03 09:09:54,248 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:54,248 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:54,248 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,249 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n44 的钙爆发...
+2025-05-03 09:09:54,249 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n44 的最优参数...
+2025-05-03 09:09:54,251 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.98, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=8
+2025-05-03 09:09:54,255 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 10 个钙爆发，其中：
+2025-05-03 09:09:54,256 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 10 个
+2025-05-03 09:09:54,257 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,257 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n45 的钙爆发...
+2025-05-03 09:09:54,257 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n45 的最优参数...
+2025-05-03 09:09:54,258 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.96, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=13
+2025-05-03 09:09:54,264 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:54,265 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 8 个
+2025-05-03 09:09:54,265 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,265 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n46 的钙爆发...
+2025-05-03 09:09:54,265 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n46 的最优参数...
+2025-05-03 09:09:54,266 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.28, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=33
+2025-05-03 09:09:54,270 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:54,270 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:54,271 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,271 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n47 的钙爆发...
+2025-05-03 09:09:54,271 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n47 的最优参数...
+2025-05-03 09:09:54,272 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.77, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=44
+2025-05-03 09:09:54,278 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,278 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,279 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,279 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n48 的钙爆发...
+2025-05-03 09:09:54,279 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n48 的最优参数...
+2025-05-03 09:09:54,281 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=7.46, min_snr=5.6, baseline=30, min_duration=22, smooth=47, peaks=8
+2025-05-03 09:09:54,284 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:54,284 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:54,284 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,284 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n49 的钙爆发...
+2025-05-03 09:09:54,285 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n49 的最优参数...
+2025-05-03 09:09:54,286 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.24, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=27
+2025-05-03 09:09:54,291 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:54,291 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,292 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,292 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,292 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n50 的钙爆发...
+2025-05-03 09:09:54,292 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n50 的最优参数...
+2025-05-03 09:09:54,294 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=12.64, min_snr=5.949999999999999, baseline=30, min_duration=22, smooth=47, peaks=4
+2025-05-03 09:09:54,296 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:54,296 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:54,297 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,297 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n51 的钙爆发...
+2025-05-03 09:09:54,297 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n51 的最优参数...
+2025-05-03 09:09:54,298 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.68, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=18
+2025-05-03 09:09:54,302 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:54,303 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:54,303 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,303 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n52 的钙爆发...
+2025-05-03 09:09:54,304 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n52 的最优参数...
+2025-05-03 09:09:54,305 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.48, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=54
+2025-05-03 09:09:54,308 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:54,309 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:54,309 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:54,309 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:54,309 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n53 的钙爆发...
+2025-05-03 09:09:54,310 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n53 的最优参数...
+2025-05-03 09:09:54,311 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.51, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=52
+2025-05-03 09:09:54,315 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:54,315 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:54,315 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:54,445 - element_extraction-integrate - INFO - OUTPUT: 成功将所有钙爆发数据保存到: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\Day3_with_behavior_labels_filled\Day3_with_behavior_labels_filled_transients.xlsx
+2025-05-03 09:09:54,445 - element_extraction-integrate - INFO - OUTPUT: 共检测到 260 个钙爆发，已保存到 D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\Day3_with_behavior_labels_filled\Day3_with_behavior_labels_filled_transients.xlsx
+2025-05-03 09:09:54,446 - element_extraction-integrate - INFO - OUTPUT: 正在处理文件: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day6_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:55,548 - element_extraction-integrate - INFO - OUTPUT: 成功加载数据，共 2999 行
+2025-05-03 09:09:55,548 - element_extraction-integrate - INFO - OUTPUT: 检测到 60 个神经元数据列
+2025-05-03 09:09:55,549 - element_extraction-integrate - INFO - OUTPUT: 输出目录设置为: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\Day6_with_behavior_labels_filled
+2025-05-03 09:09:55,549 - element_extraction-integrate - INFO - OUTPUT: 原始文件路径信息:
+2025-05-03 09:09:55,549 - element_extraction-integrate - INFO - OUTPUT:   - 文件名: Day6_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:55,550 - element_extraction-integrate - INFO - OUTPUT:   - 相对路径: datasets\Day6_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:55,550 - element_extraction-integrate - INFO - OUTPUT:   - 绝对路径: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\datasets\Day6_with_behavior_labels_filled.xlsx
+2025-05-03 09:09:55,550 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n1 的钙爆发...
+2025-05-03 09:09:55,550 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n1 的最优参数...
+2025-05-03 09:09:55,552 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.76, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:55,556 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:55,556 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:55,556 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,556 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n2 的钙爆发...
+2025-05-03 09:09:55,557 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n2 的最优参数...
+2025-05-03 09:09:55,558 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.12, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=17
+2025-05-03 09:09:55,562 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:55,562 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,563 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 3 个 (含有子峰)
+2025-05-03 09:09:55,563 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 4 个
+2025-05-03 09:09:55,563 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n3 的钙爆发...
+2025-05-03 09:09:55,563 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n3 的最优参数...
+2025-05-03 09:09:55,565 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.11, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=8
+2025-05-03 09:09:55,570 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,570 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:55,571 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,571 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:55,572 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n4 的钙爆发...
+2025-05-03 09:09:55,572 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n4 的最优参数...
+2025-05-03 09:09:55,572 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.15, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=53
+2025-05-03 09:09:55,577 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,577 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:55,577 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,577 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:55,578 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n5 的钙爆发...
+2025-05-03 09:09:55,578 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n5 的最优参数...
+2025-05-03 09:09:55,578 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.64, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:55,586 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:55,586 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:55,586 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,586 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n6 的钙爆发...
+2025-05-03 09:09:55,586 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n6 的最优参数...
+2025-05-03 09:09:55,587 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=7.91, min_snr=5.6, baseline=30, min_duration=22, smooth=47, peaks=5
+2025-05-03 09:09:55,592 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,592 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:55,592 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,592 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:55,593 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n7 的钙爆发...
+2025-05-03 09:09:55,593 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n7 的最优参数...
+2025-05-03 09:09:55,594 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=8.53, min_snr=5.6, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:55,597 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:55,597 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:55,598 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,598 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n8 的钙爆发...
+2025-05-03 09:09:55,598 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n8 的最优参数...
+2025-05-03 09:09:55,599 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.34, min_snr=4.199999999999999, baseline=10, min_duration=31, smooth=111, peaks=11
+2025-05-03 09:09:55,603 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,603 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,604 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,604 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n9 的钙爆发...
+2025-05-03 09:09:55,604 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n9 的最优参数...
+2025-05-03 09:09:55,605 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.67, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=11
+2025-05-03 09:09:55,611 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 9 个钙爆发，其中：
+2025-05-03 09:09:55,611 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 9 个
+2025-05-03 09:09:55,611 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,612 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n10 的钙爆发...
+2025-05-03 09:09:55,613 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n10 的最优参数...
+2025-05-03 09:09:55,614 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.44, min_snr=3.8499999999999996, baseline=10, min_duration=31, smooth=111, peaks=17
+2025-05-03 09:09:55,617 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:55,617 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:55,618 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,618 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n12 的钙爆发...
+2025-05-03 09:09:55,618 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n12 的最优参数...
+2025-05-03 09:09:55,619 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.24, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=67
+2025-05-03 09:09:55,623 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,623 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:55,623 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,624 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:55,624 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n13 的钙爆发...
+2025-05-03 09:09:55,624 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n13 的最优参数...
+2025-05-03 09:09:55,625 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=13.54, min_snr=5.949999999999999, baseline=10, min_duration=31, smooth=111, peaks=4
+2025-05-03 09:09:55,628 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,628 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,629 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,629 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n14 的钙爆发...
+2025-05-03 09:09:55,629 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n14 的最优参数...
+2025-05-03 09:09:55,631 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.99, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=13
+2025-05-03 09:09:55,636 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 9 个钙爆发，其中：
+2025-05-03 09:09:55,636 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 9 个
+2025-05-03 09:09:55,636 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,636 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n15 的钙爆发...
+2025-05-03 09:09:55,637 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n15 的最优参数...
+2025-05-03 09:09:55,637 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.95, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=7
+2025-05-03 09:09:55,642 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,642 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,642 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,642 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n16 的钙爆发...
+2025-05-03 09:09:55,643 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n16 的最优参数...
+2025-05-03 09:09:55,645 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.31, min_snr=4.199999999999999, baseline=10, min_duration=31, smooth=111, peaks=9
+2025-05-03 09:09:55,650 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:55,650 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:55,651 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,651 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n17 的钙爆发...
+2025-05-03 09:09:55,651 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n17 的最优参数...
+2025-05-03 09:09:55,653 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.60, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:55,664 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:55,664 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 8 个
+2025-05-03 09:09:55,665 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,665 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n18 的钙爆发...
+2025-05-03 09:09:55,665 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n18 的最优参数...
+2025-05-03 09:09:55,668 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.50, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=13
+2025-05-03 09:09:55,677 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 11 个钙爆发，其中：
+2025-05-03 09:09:55,678 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 9 个
+2025-05-03 09:09:55,678 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 2 个 (含有子峰)
+2025-05-03 09:09:55,678 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 3 个
+2025-05-03 09:09:55,678 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n20 的钙爆发...
+2025-05-03 09:09:55,679 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n20 的最优参数...
+2025-05-03 09:09:55,681 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=6.74, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:55,685 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:55,686 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:55,686 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,686 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n21 的钙爆发...
+2025-05-03 09:09:55,687 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n21 的最优参数...
+2025-05-03 09:09:55,688 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=6.32, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=10
+2025-05-03 09:09:55,694 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:55,694 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 8 个
+2025-05-03 09:09:55,694 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,695 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n22 的钙爆发...
+2025-05-03 09:09:55,695 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n22 的最优参数...
+2025-05-03 09:09:55,696 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.67, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=8
+2025-05-03 09:09:55,699 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:55,700 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:55,700 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,700 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n23 的钙爆发...
+2025-05-03 09:09:55,700 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n23 的最优参数...
+2025-05-03 09:09:55,701 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=6.64, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=7
+2025-05-03 09:09:55,704 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:55,705 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:55,705 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,705 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n24 的钙爆发...
+2025-05-03 09:09:55,705 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n24 的最优参数...
+2025-05-03 09:09:55,707 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.06, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=25
+2025-05-03 09:09:55,708 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 1 个钙爆发，其中：
+2025-05-03 09:09:55,708 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 1 个
+2025-05-03 09:09:55,708 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,708 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n25 的钙爆发...
+2025-05-03 09:09:55,708 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n25 的最优参数...
+2025-05-03 09:09:55,709 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.63, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=16
+2025-05-03 09:09:55,715 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 10 个钙爆发，其中：
+2025-05-03 09:09:55,715 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 10 个
+2025-05-03 09:09:55,715 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,715 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n26 的钙爆发...
+2025-05-03 09:09:55,716 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n26 的最优参数...
+2025-05-03 09:09:55,717 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.85, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=10
+2025-05-03 09:09:55,722 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 10 个钙爆发，其中：
+2025-05-03 09:09:55,722 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 10 个
+2025-05-03 09:09:55,722 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,723 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n27 的钙爆发...
+2025-05-03 09:09:55,723 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n27 的最优参数...
+2025-05-03 09:09:55,724 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=9.02, min_snr=5.6, baseline=30, min_duration=22, smooth=47, peaks=6
+2025-05-03 09:09:55,727 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:55,727 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:55,727 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,728 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n28 的钙爆发...
+2025-05-03 09:09:55,728 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n28 的最优参数...
+2025-05-03 09:09:55,729 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=6.93, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=7
+2025-05-03 09:09:55,732 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,732 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,732 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,733 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n29 的钙爆发...
+2025-05-03 09:09:55,733 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n29 的最优参数...
+2025-05-03 09:09:55,734 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.63, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=11
+2025-05-03 09:09:55,738 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:55,738 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:55,739 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,739 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n30 的钙爆发...
+2025-05-03 09:09:55,739 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n30 的最优参数...
+2025-05-03 09:09:55,740 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.54, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=9
+2025-05-03 09:09:55,742 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,742 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,744 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,744 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n31 的钙爆发...
+2025-05-03 09:09:55,744 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n31 的最优参数...
+2025-05-03 09:09:55,745 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.94, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=12
+2025-05-03 09:09:55,748 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,748 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,749 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,749 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n32 的钙爆发...
+2025-05-03 09:09:55,750 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n32 的最优参数...
+2025-05-03 09:09:55,750 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.34, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=11
+2025-05-03 09:09:55,755 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 9 个钙爆发，其中：
+2025-05-03 09:09:55,756 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 9 个
+2025-05-03 09:09:55,756 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,756 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n33 的钙爆发...
+2025-05-03 09:09:55,756 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n33 的最优参数...
+2025-05-03 09:09:55,757 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=7.48, min_snr=5.6, baseline=30, min_duration=22, smooth=47, peaks=8
+2025-05-03 09:09:55,761 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,761 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,761 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,762 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n34 的钙爆发...
+2025-05-03 09:09:55,762 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n34 的最优参数...
+2025-05-03 09:09:55,763 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.98, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=15
+2025-05-03 09:09:55,768 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:55,769 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,769 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,769 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:55,769 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n35 的钙爆发...
+2025-05-03 09:09:55,769 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n35 的最优参数...
+2025-05-03 09:09:55,771 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.48, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=9
+2025-05-03 09:09:55,776 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:55,776 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 8 个
+2025-05-03 09:09:55,777 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,777 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n36 的钙爆发...
+2025-05-03 09:09:55,778 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n36 的最优参数...
+2025-05-03 09:09:55,778 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.09, min_snr=4.8999999999999995, baseline=10, min_duration=31, smooth=92, peaks=10
+2025-05-03 09:09:55,783 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:55,783 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 8 个
+2025-05-03 09:09:55,784 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,785 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n37 的钙爆发...
+2025-05-03 09:09:55,785 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n37 的最优参数...
+2025-05-03 09:09:55,786 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.73, min_snr=4.199999999999999, baseline=10, min_duration=31, smooth=111, peaks=8
+2025-05-03 09:09:55,791 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,791 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,792 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,792 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n38 的钙爆发...
+2025-05-03 09:09:55,792 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n38 的最优参数...
+2025-05-03 09:09:55,793 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.54, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=11
+2025-05-03 09:09:55,798 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,798 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,798 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,798 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n39 的钙爆发...
+2025-05-03 09:09:55,798 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n39 的最优参数...
+2025-05-03 09:09:55,800 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=7.26, min_snr=5.6, baseline=30, min_duration=22, smooth=47, peaks=5
+2025-05-03 09:09:55,803 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 2 个钙爆发，其中：
+2025-05-03 09:09:55,803 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 2 个
+2025-05-03 09:09:55,803 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,804 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n40 的钙爆发...
+2025-05-03 09:09:55,804 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n40 的最优参数...
+2025-05-03 09:09:55,805 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.63, min_snr=3.8499999999999996, baseline=10, min_duration=31, smooth=111, peaks=39
+2025-05-03 09:09:55,810 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:55,810 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:55,811 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,811 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n41 的钙爆发...
+2025-05-03 09:09:55,811 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n41 的最优参数...
+2025-05-03 09:09:55,812 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=6.08, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=5
+2025-05-03 09:09:55,818 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,818 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,818 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,818 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n42 的钙爆发...
+2025-05-03 09:09:55,818 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n42 的最优参数...
+2025-05-03 09:09:55,820 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.85, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=22
+2025-05-03 09:09:55,824 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,824 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,824 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,825 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n43 的钙爆发...
+2025-05-03 09:09:55,825 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n43 的最优参数...
+2025-05-03 09:09:55,826 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.65, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=11
+2025-05-03 09:09:55,829 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:55,830 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:55,830 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,831 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n44 的钙爆发...
+2025-05-03 09:09:55,831 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n44 的最优参数...
+2025-05-03 09:09:55,832 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.61, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=22
+2025-05-03 09:09:55,836 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:55,836 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,836 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,836 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:55,836 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n45 的钙爆发...
+2025-05-03 09:09:55,836 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n45 的最优参数...
+2025-05-03 09:09:55,838 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.67, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=16
+2025-05-03 09:09:55,842 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:55,842 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:55,842 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,843 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:55,843 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n46 的钙爆发...
+2025-05-03 09:09:55,844 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n46 的最优参数...
+2025-05-03 09:09:55,845 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.99, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=12
+2025-05-03 09:09:55,849 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:55,850 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,850 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,850 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:55,850 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n47 的钙爆发...
+2025-05-03 09:09:55,851 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n47 的最优参数...
+2025-05-03 09:09:55,851 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.19, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=15
+2025-05-03 09:09:55,857 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:55,857 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:55,857 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,858 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n48 的钙爆发...
+2025-05-03 09:09:55,858 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n48 的最优参数...
+2025-05-03 09:09:55,859 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.82, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=28
+2025-05-03 09:09:55,865 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 9 个钙爆发，其中：
+2025-05-03 09:09:55,865 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 9 个
+2025-05-03 09:09:55,866 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,866 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n49 的钙爆发...
+2025-05-03 09:09:55,867 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n49 的最优参数...
+2025-05-03 09:09:55,868 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.84, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=72
+2025-05-03 09:09:55,872 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:55,872 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:55,873 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,874 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n50 的钙爆发...
+2025-05-03 09:09:55,874 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n50 的最优参数...
+2025-05-03 09:09:55,875 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.06, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=62
+2025-05-03 09:09:55,882 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:55,882 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 8 个
+2025-05-03 09:09:55,882 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,882 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n51 的钙爆发...
+2025-05-03 09:09:55,883 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n51 的最优参数...
+2025-05-03 09:09:55,884 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.66, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=37
+2025-05-03 09:09:55,890 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 8 个钙爆发，其中：
+2025-05-03 09:09:55,890 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:55,890 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,890 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:55,890 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n52 的钙爆发...
+2025-05-03 09:09:55,891 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n52 的最优参数...
+2025-05-03 09:09:55,891 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.31, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=22
+2025-05-03 09:09:55,896 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,896 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 5 个
+2025-05-03 09:09:55,897 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,897 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n53 的钙爆发...
+2025-05-03 09:09:55,897 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n53 的最优参数...
+2025-05-03 09:09:55,898 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.27, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=21
+2025-05-03 09:09:55,902 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 1 个钙爆发，其中：
+2025-05-03 09:09:55,902 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 1 个
+2025-05-03 09:09:55,902 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,903 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n54 的钙爆发...
+2025-05-03 09:09:55,903 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n54 的最优参数...
+2025-05-03 09:09:55,904 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.01, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=34
+2025-05-03 09:09:55,908 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,908 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,908 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 2 个 (含有子峰)
+2025-05-03 09:09:55,909 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:55,909 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n55 的钙爆发...
+2025-05-03 09:09:55,910 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n55 的最优参数...
+2025-05-03 09:09:55,911 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.38, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=14
+2025-05-03 09:09:55,915 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,915 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,915 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,916 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n56 的钙爆发...
+2025-05-03 09:09:55,916 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n56 的最优参数...
+2025-05-03 09:09:55,918 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=6.02, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=12
+2025-05-03 09:09:55,920 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 3 个钙爆发，其中：
+2025-05-03 09:09:55,921 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,921 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,921 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n57 的钙爆发...
+2025-05-03 09:09:55,921 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n57 的最优参数...
+2025-05-03 09:09:55,922 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.71, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=15
+2025-05-03 09:09:55,927 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 10 个钙爆发，其中：
+2025-05-03 09:09:55,928 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 10 个
+2025-05-03 09:09:55,928 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,928 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n58 的钙爆发...
+2025-05-03 09:09:55,928 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n58 的最优参数...
+2025-05-03 09:09:55,929 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.06, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=39
+2025-05-03 09:09:55,933 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 6 个钙爆发，其中：
+2025-05-03 09:09:55,934 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 6 个
+2025-05-03 09:09:55,934 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,934 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n59 的钙爆发...
+2025-05-03 09:09:55,935 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n59 的最优参数...
+2025-05-03 09:09:55,936 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.53, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=35
+2025-05-03 09:09:55,939 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:55,940 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,940 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 1 个 (含有子峰)
+2025-05-03 09:09:55,940 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 1 个
+2025-05-03 09:09:55,940 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n60 的钙爆发...
+2025-05-03 09:09:55,941 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n60 的最优参数...
+2025-05-03 09:09:55,942 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=3.77, min_snr=3.8499999999999996, baseline=30, min_duration=22, smooth=47, peaks=50
+2025-05-03 09:09:55,946 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 5 个钙爆发，其中：
+2025-05-03 09:09:55,946 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 3 个
+2025-05-03 09:09:55,946 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 2 个 (含有子峰)
+2025-05-03 09:09:55,947 - element_extraction-integrate - INFO - OUTPUT:   - 子峰总数: 2 个
+2025-05-03 09:09:55,947 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n61 的钙爆发...
+2025-05-03 09:09:55,947 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n61 的最优参数...
+2025-05-03 09:09:55,948 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=5.67, min_snr=4.8999999999999995, baseline=30, min_duration=22, smooth=47, peaks=16
+2025-05-03 09:09:55,952 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 4 个钙爆发，其中：
+2025-05-03 09:09:55,952 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 4 个
+2025-05-03 09:09:55,952 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:55,952 - element_extraction-integrate - INFO - OUTPUT: 处理神经元 n62 的钙爆发...
+2025-05-03 09:09:55,953 - element_extraction-integrate - INFO - OUTPUT:   估计神经元 n62 的最优参数...
+2025-05-03 09:09:55,954 - element_extraction-integrate - INFO - OUTPUT:   - 强化过滤参数: SNR=4.05, min_snr=4.199999999999999, baseline=30, min_duration=22, smooth=47, peaks=28
+2025-05-03 09:09:55,958 - element_extraction-integrate - INFO - OUTPUT: 总共检测到 7 个钙爆发，其中：
+2025-05-03 09:09:55,958 - element_extraction-integrate - INFO - OUTPUT:   - 简单波形: 7 个
+2025-05-03 09:09:55,959 - element_extraction-integrate - INFO - OUTPUT:   - 复合波形: 0 个 (含有子峰)
+2025-05-03 09:09:56,111 - element_extraction-integrate - INFO - OUTPUT: 成功将所有钙爆发数据保存到: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\Day6_with_behavior_labels_filled\Day6_with_behavior_labels_filled_transients.xlsx
+2025-05-03 09:09:56,112 - element_extraction-integrate - INFO - OUTPUT: 共检测到 336 个钙爆发，已保存到 D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\Day6_with_behavior_labels_filled\Day6_with_behavior_labels_filled_transients.xlsx
+2025-05-03 09:09:56,377 - element_extraction-integrate - INFO - OUTPUT: 已将所有数据集的钙爆发结果合并，共 596 条记录
+2025-05-03 09:09:56,377 - element_extraction-integrate - INFO - OUTPUT: 合并结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\results\CD1_trace_transients\all_datasets_transients.xlsx
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT: 合并表包含以下列:
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT:   - start_idx
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT:   - peak_idx
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT:   - end_idx
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT:   - amplitude
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT:   - peak_value
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT:   - baseline
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT:   - duration
+2025-05-03 09:09:56,378 - element_extraction-integrate - INFO - OUTPUT:   - fwhm
+2025-05-03 09:09:56,379 - element_extraction-integrate - INFO - OUTPUT:   - rise_time
+2025-05-03 09:09:56,379 - element_extraction-integrate - INFO - OUTPUT:   - decay_time
+2025-05-03 09:09:56,379 - element_extraction-integrate - INFO - OUTPUT:   - auc
+2025-05-03 09:09:56,379 - element_extraction-integrate - INFO - OUTPUT:   - snr
+2025-05-03 09:09:56,380 - element_extraction-integrate - INFO - OUTPUT:   - wave_type
+2025-05-03 09:09:56,380 - element_extraction-integrate - INFO - OUTPUT:   - subpeaks_count
+2025-05-03 09:09:56,380 - element_extraction-integrate - INFO - OUTPUT:   - subpeaks
+2025-05-03 09:09:56,381 - element_extraction-integrate - INFO - OUTPUT:   - morphology_score
+2025-05-03 09:09:56,381 - element_extraction-integrate - INFO - OUTPUT:   - rise_decay_ratio
+2025-05-03 09:09:56,381 - element_extraction-integrate - INFO - OUTPUT:   - asymmetry
+2025-05-03 09:09:56,381 - element_extraction-integrate - INFO - OUTPUT:   - exp_decay_score
+2025-05-03 09:09:56,382 - element_extraction-integrate - INFO - OUTPUT:   - neuron
+2025-05-03 09:09:56,382 - element_extraction-integrate - INFO - OUTPUT:   - transient_id
+2025-05-03 09:09:56,382 - element_extraction-integrate - INFO - OUTPUT:   - source_file
+2025-05-03 09:09:56,382 - element_extraction-integrate - INFO - OUTPUT:   - source_path
+2025-05-03 09:09:56,382 - element_extraction-integrate - INFO - OUTPUT:   - source_abs_path
+2025-05-03 09:09:56,382 - element_extraction-integrate - INFO - OUTPUT:   - dataset
+2025-05-03 09:09:56,383 - element_extraction-integrate - INFO - OUTPUT:   - index
