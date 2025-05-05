@@ -64,7 +64,7 @@ try:
     # 导入PyTorch Geometric的Data类
     from torch_geometric.data import Data
     # 导入GCN和基础GNN模块
-    from neuron_gnn import GNNAnalyzer, NeuronGCN, TemporalGNN, ModuleGNN
+    from neuron_gnn import GNNAnalyzer, NeuronGCN, TemporalGNN, ModuleGNN, ImprovedGCN
     from neuron_gnn import train_gnn_model, plot_gnn_results, visualize_node_embeddings
     # 从独立的GAT模块导入
     from neuron_gat import NeuronGAT, visualize_gat_topology, visualize_gat_attention_weights
@@ -763,11 +763,12 @@ class ResultAnalyzer:
         plt.close()
         return behavior_importance
 
-    def build_neuron_network(self, X_scaled: np.ndarray, threshold: float = 0.4) -> Tuple[nx.Graph, np.ndarray, List[str], float]:
+    def build_neuron_network(self, X_scaled: np.ndarray, threshold: float = 0.4, 
+                             use_knn: bool = False, knn_k: int = 10) -> Tuple[nx.Graph, np.ndarray, List[str], float]:
         """
         构建神经元功能连接网络
         
-        基于神经元活动数据的相关性分析，构建功能连接网络，
+        基于神经元活动数据的相关性分析或KNN算法，构建功能连接网络，
         表示不同神经元之间的功能关联强度
         
         参数
@@ -776,13 +777,17 @@ class ResultAnalyzer:
             标准化后的神经元活动数据
         threshold : float, 默认 0.4
             相关性阈值，只有超过此阈值的连接才会被添加到网络中
+        use_knn : bool, 默认 False
+            是否使用KNN算法构建图，而不是相关性
+        knn_k : int, 默认 10
+            KNN算法的k值，即每个节点的近邻数量
             
         返回
         ----------
         G : nx.Graph
             NetworkX图对象，表示神经元连接网络
         correlation_matrix : np.ndarray
-            神经元间的相关性矩阵
+            神经元间的相关性或相似度矩阵
         available_neurons : List[str]
             可用神经元列表，包含实际使用的神经元标识符
         threshold : float
@@ -801,34 +806,56 @@ class ResultAnalyzer:
             # 如果处理器没有保存可用神经元列表，使用默认方法
             print("警告: 找不到可用神经元列表，使用连续编号")
             available_neurons = [f'n{i+1}' for i in range(n_neurons)]
-        
-        # 创建相关性矩阵
-        correlation_matrix = np.zeros((n_neurons, n_neurons))
-        
-        # 计算相关性矩阵
-        for i in range(n_neurons):
-            for j in range(i+1, n_neurons):
-                corr, _ = pearsonr(X_scaled[:, i], X_scaled[:, j])
-                correlation_matrix[i, j] = corr
-                correlation_matrix[j, i] = corr
-        
-        # 创建图对象
-        G = nx.Graph()
-        
-        # 添加节点(使用实际的神经元编号)
-        for neuron in available_neurons:
-            G.add_node(neuron)
-        
-        # 添加边(基于相关性阈值)
-        for i in range(n_neurons):
-            for j in range(i+1, n_neurons):
-                if abs(correlation_matrix[i, j]) >= threshold:
-                    G.add_edge(available_neurons[i], 
-                              available_neurons[j], 
-                              weight=abs(correlation_matrix[i, j]))
-        
-        print(f"网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
-        return G, correlation_matrix, available_neurons, threshold
+            
+        if use_knn:
+            # 使用KNN算法构建图
+            print(f"使用KNN算法构建图 (k={knn_k}, threshold={threshold if threshold else 'None'})")
+            
+            # 创建GNN分析器实例
+            from neuron_gnn import GNNAnalyzer
+            gnn_analyzer = GNNAnalyzer(self.config)
+            
+            # 调用build_knn_graph方法
+            G, correlation_matrix, available_neurons = gnn_analyzer.build_knn_graph(
+                X_scaled, 
+                k=knn_k, 
+                threshold=threshold,
+                available_neurons=available_neurons
+            )
+            
+            print(f"KNN网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
+            return G, correlation_matrix, available_neurons, threshold
+        else:
+            # 使用原始基于相关性的方法构建图
+            print(f"使用传统相关性方法构建图 (threshold={threshold})")
+            
+            # 创建相关性矩阵
+            correlation_matrix = np.zeros((n_neurons, n_neurons))
+            
+            # 计算相关性矩阵
+            for i in range(n_neurons):
+                for j in range(i+1, n_neurons):
+                    corr, _ = pearsonr(X_scaled[:, i], X_scaled[:, j])
+                    correlation_matrix[i, j] = corr
+                    correlation_matrix[j, i] = corr
+            
+            # 创建图对象
+            G = nx.Graph()
+            
+            # 添加节点(使用实际的神经元编号)
+            for neuron in available_neurons:
+                G.add_node(neuron)
+            
+            # 添加边(基于相关性阈值)
+            for i in range(n_neurons):
+                for j in range(i+1, n_neurons):
+                    if abs(correlation_matrix[i, j]) >= threshold:
+                        G.add_edge(available_neurons[i], 
+                                  available_neurons[j], 
+                                  weight=abs(correlation_matrix[i, j]))
+            
+            print(f"相关性网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
+            return G, correlation_matrix, available_neurons, threshold
 
     def extract_main_connections(self, G: nx.Graph, correlation_matrix: np.ndarray, 
                                available_neurons: List[str], method: str = 'top_edges', 
@@ -2061,21 +2088,36 @@ class ResultAnalyzer:
         
         return mapping_probs
 
-    def analyze_network_with_gnn(self, G, correlation_matrix, X_scaled, y, available_neurons):
+    def analyze_network_with_gnn(self, G=None, correlation_matrix=None, X_scaled=None, y=None, available_neurons=None, use_knn=False, knn_k=15):
         """
         使用GNN分析神经元网络
         
         参数：
-            G: NetworkX图对象
-            correlation_matrix: 相关性矩阵
+            G: NetworkX图对象，如果为None则会使用内部方法构建
+            correlation_matrix: 相关性矩阵，如果为None则会使用内部方法构建
             X_scaled: 标准化的神经元活动数据
             y: 行为标签
             available_neurons: 可用神经元列表
+            use_knn: 是否使用KNN算法构建图（如果G为None）
+            knn_k: KNN算法的k值
             
         返回：
             gnn_results: GNN分析结果字典
         """
         print("\n使用GNN进行神经元网络分析...")
+        
+        # 如果没有提供图和相关性矩阵，则构建它们
+        if G is None or correlation_matrix is None:
+            if X_scaled is None:
+                raise ValueError("如果没有提供图和相关性矩阵，则必须提供X_scaled数据用于构建图")
+            
+            # 使用相应的方法构建图
+            G, correlation_matrix, available_neurons, threshold = self.build_neuron_network(
+                X_scaled, 
+                threshold=self.config.analysis_params.get('correlation_threshold', 0.4),
+                use_knn=use_knn,
+                knn_k=knn_k
+            )
         
         # 创建GNN分析器
         gnn_analyzer = GNNAnalyzer(self.config)
@@ -2100,18 +2142,12 @@ class ResultAnalyzer:
             # 获取类别数
             num_classes = len(np.unique(y))
             
-            # 创建GCN模型
-            gcn_model = NeuronGCN(
-                in_channels=X_normalized.shape[1],
-                hidden_channels=self.config.analysis_params.get('gcn_hidden_channels', 128),  # 增加隐藏层维度
-                out_channels=num_classes,
-                dropout=self.config.analysis_params.get('gnn_dropout', 0.4),  # 稍微增加dropout
-                num_layers=self.config.analysis_params.get('gcn_num_layers', 4),  # 增加层数
-                heads=self.config.analysis_params.get('gcn_heads', 4),  # 增加注意力头数
-                use_batch_norm=self.config.analysis_params.get('gcn_use_batch_norm', True),
-                activation=self.config.analysis_params.get('gcn_activation', 'leaky_relu'),
-                alpha=self.config.analysis_params.get('gcn_alpha', 0.2),
-                residual=self.config.analysis_params.get('gcn_residual', True)
+            # 创建GCN模型（使用改进的ImprovedGCN）
+            gcn_model = ImprovedGCN(
+                num_features=X_normalized.shape[1],
+                hidden_dim=self.config.analysis_params.get('gcn_hidden_channels', 128),
+                num_classes=num_classes,
+                dropout=self.config.analysis_params.get('gnn_dropout', 0.4)
             )
             
             # 设置训练参数
@@ -2697,6 +2733,12 @@ def main() -> None:
         # 加载配置
         config = AnalysisConfig()
         
+        # 添加KNN图构建配置参数
+        if not hasattr(config.analysis_params, 'use_knn'):
+            config.analysis_params['use_knn'] = True  # 默认启用KNN
+        if not hasattr(config.analysis_params, 'knn_k'):
+            config.analysis_params['knn_k'] = 15  # 默认K值
+            
         # Setup and validate directories
         config.setup_directories()
         config.validate_paths()
@@ -2777,7 +2819,9 @@ pip install torch-geometric torch-scatter torch-sparse
         # 构建神经元功能连接网络
         G, correlation_matrix, available_neurons, threshold = analyzer.build_neuron_network(
             X_scaled, 
-            threshold=config.analysis_params['correlation_threshold']
+            threshold=config.analysis_params['correlation_threshold'],
+            use_knn=config.analysis_params.get('use_knn', False),
+            knn_k=config.analysis_params.get('knn_k', 15)
         )
         
         # 提取主要连接线路
@@ -2936,7 +2980,9 @@ pip install torch-geometric torch-scatter torch-sparse
         if hasattr(config, 'use_gnn') and config.use_gnn:
             custom_print("\n使用GNN进行神经元网络分析...")
             gnn_results = analyzer.analyze_network_with_gnn(
-                G, correlation_matrix, X_scaled, y, available_neurons
+                G, correlation_matrix, X_scaled, y, available_neurons,
+                use_knn=config.analysis_params.get('use_knn', False),
+                knn_k=config.analysis_params.get('knn_k', 15)
             )
             
             # 将GNN结果添加到分析结果中

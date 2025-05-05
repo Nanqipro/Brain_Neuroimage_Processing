@@ -15,6 +15,10 @@ from torch.nn import Sequential, Linear, BatchNorm1d, Dropout, ReLU, LeakyReLU, 
 from sklearn.manifold import TSNE
 from torch_geometric.data import Data
 from typing import List, Dict, Tuple, Optional, Union, Any
+# 导入改进的GCN模型
+from bettergcn.model import ImprovedGCN
+# 导入bettergcn中的数据处理和图构建方法
+from bettergcn.process import generate_graph, apply_smote, create_dataset
 
 class GNNAnalyzer:
     """
@@ -133,6 +137,120 @@ class GNNAnalyzer:
         
         print(f"时间序列GNN数据准备完成，生成了 {len(temporal_data)} 个时间窗口")
         return temporal_data
+    
+    def build_knn_graph(self, X_scaled, k=10, threshold=None, available_neurons=None):
+        """
+        使用KNN算法构建神经元功能连接网络
+        
+        参数:
+            X_scaled: 标准化后的神经元活动数据
+            k: KNN算法的k值，即每个节点的近邻数量
+            threshold: 可选的相似度阈值，低于此值的边将被删除
+            available_neurons: 可用神经元列表
+            
+        返回:
+            G: NetworkX图对象
+            similarities: 相似度矩阵
+            available_neurons: 可用神经元列表
+        """
+        print(f"\n使用KNN算法构建神经元功能连接网络 (k={k})...")
+        
+        # 如果没有提供可用神经元列表，则创建默认列表
+        if available_neurons is None:
+            n_neurons = X_scaled.shape[1]
+            available_neurons = [f'n{i+1}' for i in range(n_neurons)]
+        
+        # 使用KNN构建邻接矩阵
+        A = generate_graph(X_scaled, k=k, threshold=threshold)
+        
+        # 从边索引创建邻接矩阵用于相似度计算
+        n_neurons = X_scaled.shape[1]
+        similarities = np.zeros((n_neurons, n_neurons))
+        edge_list = A.t().numpy()
+        
+        # 创建NetworkX图
+        G = nx.Graph()
+        
+        # 添加节点
+        for neuron in available_neurons:
+            G.add_node(neuron)
+        
+        # 添加边
+        for i in range(edge_list.shape[1]):
+            src, dst = edge_list[0, i], edge_list[1, i]
+            
+            # 计算两个节点特征的相似度（如余弦相似度）
+            src_features = X_scaled[:, src]
+            dst_features = X_scaled[:, dst]
+            similarity = np.dot(src_features, dst_features) / (np.linalg.norm(src_features) * np.linalg.norm(dst_features))
+            
+            # 在邻接矩阵中记录相似度
+            similarities[src, dst] = similarity
+            similarities[dst, src] = similarity
+            
+            # 添加边到图中
+            G.add_edge(available_neurons[src], 
+                       available_neurons[dst], 
+                       weight=similarity)
+        
+        print(f"KNN网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
+        print(f"平均每个节点的边数: {len(G.edges())*2/len(G.nodes()):.2f}")
+        
+        return G, similarities, available_neurons
+
+    def prepare_data_with_bettergcn(self, X_scaled, y, test_size=0.2, apply_smote=True, k=15, threshold=None):
+        """
+        使用bettergcn中的方法准备GNN数据
+        
+        参数:
+            X_scaled: 标准化后的神经元活动数据
+            y: 行为标签
+            test_size: 测试集比例
+            apply_smote: 是否应用SMOTE过采样
+            k: KNN算法的k值
+            threshold: 可选的相似度阈值
+            
+        返回:
+            train_loader: 训练数据加载器
+            test_loader: 测试数据加载器
+            train_data: 训练数据
+            test_data: 测试数据
+        """
+        from sklearn.model_selection import train_test_split
+        from torch_geometric.loader import DataLoader
+        
+        print("\n使用bettergcn方法准备GNN数据...")
+        
+        # 划分训练集和测试集
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_scaled, y, test_size=test_size, random_state=42, stratify=y
+        )
+        
+        # 可选: 应用SMOTE过采样
+        if apply_smote:
+            print("使用SMOTE进行过采样...")
+            from bettergcn.process import apply_smote as bettergcn_apply_smote
+            X_train, y_train = bettergcn_apply_smote(X_train, y_train, random_state=42)
+            print(f"过采样后的训练集形状: {X_train.shape}")
+        
+        # 使用KNN构建图结构
+        print(f"为训练集和测试集构建KNN图 (k={k})...")
+        train_edge_index = generate_graph(X_train, k=k, threshold=threshold)
+        test_edge_index = generate_graph(X_test, k=k, threshold=threshold)
+        
+        # 创建PyTorch Geometric数据集
+        print("创建PyG数据集...")
+        train_dataset = create_dataset(X_train, y_train, train_edge_index) 
+        test_dataset = create_dataset(X_test, y_test, test_edge_index)
+        
+        # 创建数据加载器
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+        
+        print(f"数据准备完成。训练集: {len(train_dataset)} 样本, 测试集: {len(test_dataset)} 样本")
+        
+        # 还返回原始数据，用于其他分析
+        return train_loader, test_loader, (X_train, y_train, train_edge_index), (X_test, y_test, test_edge_index)
 
 class NeuronGCN(torch.nn.Module):
     """
@@ -826,6 +944,14 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         losses: 损失历史
         metrics: 其他指标历史（如准确率）
     """
+    # 检查模型类型，确保兼容性
+    is_improved_gcn = isinstance(model, ImprovedGCN)
+    if is_improved_gcn and not hasattr(data, 'batch'):
+        print("ImprovedGCN模型需要batch属性，正在添加...")
+        # 对于单个图的情况，创建批处理属性，所有节点属于同一个图
+        data.batch = torch.zeros(data.x.size(0), dtype=torch.long)
+        print(f"已为数据创建batch属性: {data.batch.size()}")
+    
     # 调试信息：检查输入数据的形状
     print(f"数据检查 - x形状: {data.x.size()}, y形状: {data.y.size() if hasattr(data, 'y') and data.y is not None else 'None'}")
     print(f"边索引形状: {data.edge_index.size()}, 边属性形状: {data.edge_attr.size() if hasattr(data, 'edge_attr') else 'None'}")
@@ -889,11 +1015,21 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         
         # 前向传播和优化
         optimizer.zero_grad()
-        out = model(data)
+        
+        # 检查模型类型并适配前向传播
+        if is_improved_gcn:
+            out = model(data)
+        else:
+            out = model(data)
         
         if hasattr(data, 'y') and data.y is not None:
             # 分类任务
-            loss = criterion(out[train_mask], data.y[train_mask])
+            if is_improved_gcn:
+                # 对于ImprovedGCN，output形状可能不同，需要适配
+                loss = criterion(out, data.y)
+            else:
+                loss = criterion(out[train_mask], data.y[train_mask])
+                
             loss.backward()
             
             # 梯度裁剪，避免梯度爆炸
@@ -904,9 +1040,14 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
             train_loss += loss.item()
             
             # 计算训练准确率
-            _, predicted = torch.max(out[train_mask], 1)
-            train_total += data.y[train_mask].size(0)
-            train_correct += (predicted == data.y[train_mask]).sum().item()
+            _, predicted = torch.max(out, 1) if is_improved_gcn else torch.max(out[train_mask], 1)
+            
+            if is_improved_gcn:
+                train_total += data.y.size(0)
+                train_correct += (predicted == data.y).sum().item()
+            else:
+                train_total += data.y[train_mask].size(0)
+                train_correct += (predicted == data.y[train_mask]).sum().item()
         else:
             # 如果不是分类任务，自定义损失函数
             loss = custom_gnn_loss(out[train_mask], data)
@@ -929,17 +1070,29 @@ def train_gnn_model(model, data, epochs, lr=0.01, weight_decay=1e-3, device='cpu
         val_mask[val_indices] = True
         
         with torch.no_grad():
-            out = model(data)
+            if is_improved_gcn:
+                out = model(data)
+            else:
+                out = model(data)
             
             if hasattr(data, 'y') and data.y is not None:
                 # 分类任务验证
-                val_loss_value = criterion(out[val_mask], data.y[val_mask]).item()
+                if is_improved_gcn:
+                    val_loss_value = criterion(out, data.y).item()
+                else:
+                    val_loss_value = criterion(out[val_mask], data.y[val_mask]).item()
+                    
                 val_loss += val_loss_value
                 
                 # 计算验证准确率
-                _, predicted = torch.max(out[val_mask], 1)
-                val_total += data.y[val_mask].size(0)
-                val_correct += (predicted == data.y[val_mask]).sum().item()
+                _, predicted = torch.max(out, 1) if is_improved_gcn else torch.max(out[val_mask], 1)
+                
+                if is_improved_gcn:
+                    val_total += data.y.size(0)
+                    val_correct += (predicted == data.y).sum().item()
+                else:
+                    val_total += data.y[val_mask].size(0)
+                    val_correct += (predicted == data.y[val_mask]).sum().item()
             else:
                 # 非分类任务验证
                 val_loss_value = custom_gnn_loss(out[val_mask], data).item()

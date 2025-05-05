@@ -56,3 +56,34 @@ class ImprovedGCN(torch.nn.Module):
         out = self.mlp(x_combined)
         
         return F.log_softmax(out, dim=1)
+        
+    def get_embeddings(self, data):
+        """
+        获取节点嵌入向量
+        
+        参数：
+            data: PyTorch Geometric 数据对象
+            
+        返回：
+            embeddings: 节点嵌入向量
+        """
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # GCN
+        x1 = self.conv1(x, edge_index)
+        x1 = self.bn1(x1)
+        x1 = F.relu(x1)
+        x1 = self.dropout(x1)
+        
+        # GraphSAGE
+        x2 = self.conv2(x1, edge_index)
+        x2 = self.bn2(x2)
+        x2 = F.relu(x2)
+        x2 = self.dropout(x2)
+        
+        # GAT
+        x3 = self.conv3(x2, edge_index)
+        x3 = self.bn3(x3)
+        x3 = F.relu(x3)
+        
+        return x3
