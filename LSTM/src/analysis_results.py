@@ -809,24 +809,30 @@ class ResultAnalyzer:
             
         if use_knn:
             # 使用KNN算法构建图
-            print(f"使用KNN算法构建图 (k={knn_k}, threshold={threshold if threshold else 'None'})")
-            
-            # 创建GNN分析器实例
-            from neuron_gnn import GNNAnalyzer
-            gnn_analyzer = GNNAnalyzer(self.config)
-            
-            # 调用build_knn_graph方法
-            G, correlation_matrix, available_neurons = gnn_analyzer.build_knn_graph(
-                X_scaled, 
-                k=knn_k, 
-                threshold=threshold,
-                available_neurons=available_neurons
-            )
-            
-            print(f"KNN网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
-            return G, correlation_matrix, available_neurons, threshold
-        else:
-            # 使用原始基于相关性的方法构建图
+            try:
+                print(f"使用KNN算法构建图 (k={knn_k}, threshold={threshold if threshold else 'None'})")
+                
+                # 创建GNN分析器实例
+                from neuron_gnn import GNNAnalyzer
+                gnn_analyzer = GNNAnalyzer(self.config)
+                
+                # 调用build_knn_graph方法
+                G, correlation_matrix, available_neurons = gnn_analyzer.build_knn_graph(
+                    X_scaled, 
+                    k=knn_k, 
+                    threshold=threshold,
+                    available_neurons=available_neurons
+                )
+                
+                print(f"KNN网络构建完成: {len(G.nodes())} 个节点, {len(G.edges())} 条边")
+                return G, correlation_matrix, available_neurons, threshold
+            except Exception as e:
+                print(f"KNN图构建失败: {str(e)}")
+                print("回退到传统相关性方法构建图")
+                use_knn = False
+                
+        # 使用原始基于相关性的方法构建图
+        if not use_knn:
             print(f"使用传统相关性方法构建图 (threshold={threshold})")
             
             # 创建相关性矩阵
@@ -1141,6 +1147,16 @@ class ResultAnalyzer:
         """
         print("\n识别功能模块...")
         
+        # 确保correlation_matrix是NumPy数组而不是PyTorch张量
+        if hasattr(correlation_matrix, 'numpy'):
+            # 如果是PyTorch张量，转换为NumPy数组
+            print("将PyTorch张量转换为NumPy数组...")
+            correlation_matrix = correlation_matrix.numpy()
+        elif hasattr(correlation_matrix, 'cpu'):
+            # 如果是在GPU上的张量，先移到CPU再转换
+            print("将GPU上的PyTorch张量转移到CPU并转换为NumPy数组...")
+            correlation_matrix = correlation_matrix.cpu().numpy()
+            
         # 使用谱聚类识别功能模块
         n_clusters = min(int(np.sqrt(len(G.nodes))), 10)  # 动态确定模块数量
         clustering = SpectralClustering(n_clusters=n_clusters, 
@@ -2106,538 +2122,216 @@ class ResultAnalyzer:
         """
         print("\n使用GNN进行神经元网络分析...")
         
-        # 如果没有提供图和相关性矩阵，则构建它们
-        if G is None or correlation_matrix is None:
-            if X_scaled is None:
-                raise ValueError("如果没有提供图和相关性矩阵，则必须提供X_scaled数据用于构建图")
-            
-            # 使用相应的方法构建图
-            G, correlation_matrix, available_neurons, threshold = self.build_neuron_network(
-                X_scaled, 
-                threshold=self.config.analysis_params.get('correlation_threshold', 0.4),
-                use_knn=use_knn,
-                knn_k=knn_k
-            )
-        
-        # 创建GNN分析器
-        gnn_analyzer = GNNAnalyzer(self.config)
-        
-        # 特征归一化 - 确保特征在合适的范围内
-        from sklearn.preprocessing import StandardScaler
-        X_normalized = StandardScaler().fit_transform(X_scaled)
-        
-        # 转换为GNN格式
-        print("\n开始使用GNN进行神经元网络分析...")
-        print(f"GNN分析器将使用设备: {gnn_analyzer.device}")
-        print("将神经元网络转换为GNN数据格式...")
-        data = gnn_analyzer.convert_network_to_gnn_format(G, X_normalized, y)
-        print(f"GNN数据转换完成: {data}")
-        
-        # GNN分析结果字典
-        gnn_results = {}
-        
-        # 1. 行为预测GCN模型
-        print("\n训练行为预测GCN模型...")
         try:
-            # 获取类别数
-            num_classes = len(np.unique(y))
+            # 导入ImprovedGCN
+            from bettergcn.model import ImprovedGCN
             
-            # 创建GCN模型（使用改进的ImprovedGCN）
-            gcn_model = ImprovedGCN(
-                num_features=X_normalized.shape[1],
-                hidden_dim=self.config.analysis_params.get('gcn_hidden_channels', 128),
-                num_classes=num_classes,
-                dropout=self.config.analysis_params.get('gnn_dropout', 0.4)
-            )
+            # 设置设备
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            print(f"GNN分析器将使用设备: {device}")
             
-            # 设置训练参数
-            epochs = self.config.analysis_params.get('gnn_epochs', 200)
-            lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
-            weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
-            patience = self.config.analysis_params.get('gnn_early_stop_patience', 20)
-            early_stopping_enabled = self.config.analysis_params.get('early_stopping_enabled', False)
+            # 如果没有提供图和相关性矩阵，则构建它们
+            if G is None or correlation_matrix is None:
+                if X_scaled is None:
+                    raise ValueError("如果没有提供图和相关性矩阵，则必须提供X_scaled数据用于构建图")
+                
+                # 使用相应的方法构建图
+                G, correlation_matrix, available_neurons, _ = self.build_neuron_network(
+                    X_scaled, 
+                    threshold=self.config.analysis_params.get('correlation_threshold', 0.2),
+                    use_knn=use_knn,
+                    knn_k=knn_k
+                )
             
-            # 训练模型   
-            trained_model, losses, accuracies = train_gnn_model(
-                model=gcn_model,
-                data=data,
-                epochs=epochs,
-                lr=lr,
-                weight_decay=weight_decay,
-                patience=patience,
-                device=gnn_analyzer.device,
-                early_stopping_enabled=early_stopping_enabled
-            )
+            # 初始化GNN分析器
+            from neuron_gnn import GNNAnalyzer
+            gnn_analyzer = GNNAnalyzer(self.config)
             
-            # 绘制训练曲线
-            loss_plot_path = self.config.gcn_training_plot
-            plot_gnn_results(losses, loss_plot_path)
+            # 将NetworkX图转换为PyTorch Geometric数据格式
+            data = gnn_analyzer.convert_network_to_gnn_format(G, X_scaled, y)
             
-            # 绘制准确率曲线
-            # 创建GNN可视化器用于绘制准确率曲线
-            from gnn_visualization import GNNVisualizer
-            visualizer = GNNVisualizer(self.config)
-            acc_epochs = list(range(1, len(accuracies['train'])+1))
-            accuracy_plot_path = visualizer.plot_training_metrics(
-                acc_epochs, 
-                accuracies['train'], 
-                accuracies['val'], 
-                metric_name='Accuracy',
-                title='GCN Model Training Accuracy Change',
-                filename='gcn_accuracy_curve.png'
-            )
+            # 保存GNN分析结果
+            gnn_results = {
+                'gnn_data_structure': str(data),
+                'node_count': data.num_nodes,
+                'edge_count': data.num_edges,
+                'feature_dim': data.num_node_features
+            }
             
-            # 可视化节点嵌入
-            gnn_topo_path = self.config.gcn_topology_png
-            visualize_node_embeddings(
-                trained_model, 
-                data, 
-                save_path=gnn_topo_path,
-                title='GCN Node Embeddings'
-            )
+            # 打印GNN数据信息
+            print(f"GNN数据转换完成: {data}")
             
-            # 评估模型
-            trained_model.eval()
-            with torch.no_grad():
-                out = trained_model(data)
-                _, predicted = torch.max(out, 1)
-                correct = (predicted == data.y).sum().item()
-                accuracy = correct / len(data.y)
-            
-            print(f"GCN行为预测模型完成，准确率: {accuracy:.4f}")
-            
-            # 基于GCN模型创建拓扑结构
-            print("\n基于GCN模型创建神经元拓扑结构...")
-            G_gnn = create_gnn_based_topology(
-                trained_model, 
-                data, 
-                G.copy(), 
-                node_names=[f"N{i+1}" for i in range(len(available_neurons))]
-            )
-            
-            print(f"GCN拓扑结构创建完成: {G_gnn.number_of_nodes()} 个节点, {G_gnn.number_of_edges()} 条边")
-            
-            # 保存GCN拓扑数据
-            save_gnn_topology_data(
-                G_gnn,
-                trained_model.get_embeddings(data).detach().cpu().numpy(),
-                nx.adjacency_matrix(G_gnn).todense(),
-                [f"N{i+1}" for i in range(len(available_neurons))],
-                self.config.gcn_topology_data
-            )
-            
-            # 生成静态拓扑结构图
-            visualize_gcn_topology(self.config.gcn_topology_data)
-            
-            # 使用真实位置坐标生成拓扑结构图
-            real_pos_topo_path = visualize_gcn_topology_with_real_positions(
-                self.config.gcn_topology_data,
-                self.config.position_data_file
-            )
-            print(f"基于真实位置的GCN拓扑结构图已保存至: {real_pos_topo_path}")
-            
-            # 创建交互式可视化
-            create_interactive_gnn_topology(
-                G=G_gnn,
-                embeddings=trained_model.get_embeddings(data).detach().cpu().numpy(),
-                similarities=nx.adjacency_matrix(G_gnn).todense(),
-                node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                output_path=self.config.gcn_interactive_topology
-            )
-            
-            # 分析GCN拓扑中的社区与行为标签关联
-            print("\n分析GCN社区与行为标签的关联...")
+            # 1. 行为预测GCN模型
+            print("\n训练行为预测GCN模型...")
             try:
-                # 获取社区划分
-                communities = community_louvain.best_partition(G_gnn)
+                # 获取类别数
+                num_classes = len(np.unique(y))
                 
-                # 导入社区-行为映射函数
-                from gnn_topology import analyze_community_behaviors, visualize_community_behavior_mapping
-                
-                # 获取行为标签名称列表
-                if hasattr(self, 'behavior_labels') and len(self.behavior_labels) > 0:
-                    behavior_names = self.behavior_labels
-                elif hasattr(self.config, 'behavior_labels') and len(self.config.behavior_labels) > 0:
-                    behavior_names = self.config.behavior_labels
-                else:
-                    # 如果没有定义行为标签名称，则使用数字索引
-                    behavior_names = [f"Behavior_{i}" for i in range(len(np.unique(y)))]
-                
-                # 分析社区与行为标签的关联
-                community_behavior_mapping = analyze_community_behaviors(
-                    G=G_gnn,
-                    communities=communities,
-                    X_scaled=X_scaled,
-                    y=y,
-                    behavior_labels=behavior_names
+                # 创建GCN模型（使用改进的ImprovedGCN）
+                gcn_model = ImprovedGCN(
+                    num_features=X_scaled.shape[1],
+                    hidden_dim=self.config.analysis_params.get('gcn_hidden_channels', 128),
+                    num_classes=num_classes,
+                    dropout=self.config.analysis_params.get('gnn_dropout', 0.4)
                 )
                 
-                # 可视化社区-行为映射
-                community_behavior_viz_path = os.path.join(
-                    os.path.dirname(self.config.gcn_topology_data),
-                    'community_behavior_mapping.png'
+                # 设置训练参数
+                epochs = self.config.analysis_params.get('gnn_epochs', 200)
+                lr = self.config.analysis_params.get('gnn_learning_rate', 0.008)
+                weight_decay = self.config.analysis_params.get('gnn_weight_decay', 1e-3)
+                patience = self.config.analysis_params.get('gnn_early_stop_patience', 15)
+                
+                # 训练GCN模型
+                from neuron_gnn import train_gnn_model
+                trained_model, losses, accuracies = train_gnn_model(
+                    gcn_model, data, epochs, lr, weight_decay, 
+                    device=device,  # 使用本地变量device
+                    patience=patience,
+                    early_stopping_enabled=True
                 )
                 
-                community_behavior_network_path = visualize_community_behavior_mapping(
-                    G=G_gnn,
-                    community_behavior_mapping=community_behavior_mapping,
-                    output_path=community_behavior_viz_path
+                # 保存训练结果
+                gnn_results['gcn_model'] = 'trained'
+                gnn_results['gcn_losses'] = [float(l) for l in losses]
+                gnn_results['gcn_train_acc'] = [float(a) for a in accuracies['train_acc']]
+                gnn_results['gcn_val_acc'] = [float(a) for a in accuracies['val_acc']]
+                gnn_results['gcn_final_train_acc'] = float(accuracies['train_acc'][-1])
+                gnn_results['gcn_final_val_acc'] = float(accuracies['val_acc'][-1])
+                
+                # 保存损失曲线
+                from neuron_gnn import plot_gnn_results
+                plot_path = os.path.join(self.config.gnn_results_dir, 'gcn_training_curve.png')
+                plot_gnn_results(losses, plot_path)
+                gnn_results['gcn_loss_plot'] = plot_path
+                
+                # 获取节点嵌入并可视化
+                from neuron_gnn import visualize_node_embeddings
+                embeddings_path = os.path.join(self.config.gnn_results_dir, 'gcn_node_embeddings.png')
+                visualize_node_embeddings(
+                    trained_model, data, embeddings_path,
+                    title='神经元GCN嵌入可视化'
                 )
-                
-                print(f"社区-行为映射可视化已保存至: {community_behavior_viz_path}")
-                
-                # 将社区-行为映射结果保存为JSON
-                community_behavior_json = os.path.join(
-                    os.path.dirname(self.config.gcn_topology_data),
-                    'community_behavior_mapping.json'
-                )
-                
-                with open(community_behavior_json, 'w') as f:
-                    json.dump(community_behavior_mapping, f, indent=4)
-                
-                print(f"社区-行为映射数据已保存至: {community_behavior_json}")
+                gnn_results['gcn_embeddings_plot'] = embeddings_path
+                print(f"GCN模型训练完成。最终验证准确率: {gnn_results['gcn_final_val_acc']:.4f}")
                 
             except Exception as e:
-                print(f"分析社区-行为关联时出错: {str(e)}")
+                print(f"GCN行为预测模型训练出错: {e}")
+                print("错误详情:")
                 import traceback
-                print(f"错误详情:\n{traceback.format_exc()}")
-                community_behavior_viz_path = None
-                community_behavior_mapping = {}
+                traceback.print_exc()
             
-            # 记录GCN分析结果
-            gnn_results = {
-                'gcn_behavior_prediction': {
-                    'accuracy': accuracy,
-                    'loss_plot_path': loss_plot_path,
-                    'topology_plot_path': gnn_topo_path,
-                    'real_positions_topology_path': real_pos_topo_path,  # 添加真实位置拓扑图路径
-                    'accuracy_plot_path': accuracy_plot_path,
-                    'train_acc_history': accuracies['train'],
-                    'val_acc_history': accuracies['val'],
-                    'epochs': epochs,
-                    'community_behavior_mapping': community_behavior_mapping,
-                    'community_behavior_viz_path': community_behavior_viz_path
-                }
-            }
-        except Exception as e:
-            import traceback
-            error_trace = traceback.format_exc()
-            print(f"GCN行为预测模型训练出错: {str(e)}")
-            print(f"错误详情:\n{error_trace}")
-        
-        # 2. 神经元模块识别GAT模型
-        print("\n训练神经元模块识别GAT模型...")
-        try:
-            # 首先检查配置是否启用GAT分析
-            if not hasattr(self.config, 'use_gat') or not self.config.use_gat:
-                print("GAT模型分析已在配置中禁用。")
-                gnn_results['gat_module_detection'] = {
-                    'status': 'disabled',
-                    'message': 'GAT模型分析已在配置中禁用'
-                }
-            else:
-                # 创建GAT模型
-                # 先使用社区检测算法获取社区作为标签
+            # 2. 神经元模块识别GAT模型
+            print("\n训练神经元模块识别GAT模型...")
+            if self.config.analysis_params.get('use_gat', False):
                 try:
-                    communities = community_louvain.best_partition(G)
-                    community_labels = np.array([communities[node] for node in G.nodes()])
-                    num_communities = len(set(communities.values()))
-                    
-                    # 创建新的数据对象，确保节点特征和标签维度匹配
-                    # 修复维度不匹配问题：
-                    # 1. 如果有样本数据，则使用样本特征而不是使用之前为GCN准备的data
-                    node_features = []
-                    for node in G.nodes():
-                        # 提取该节点的度作为特征
-                        node_degree = G.degree(node)
-                        # 创建简单的特征向量
-                        node_features.append([float(node_degree)])
-                    
-                    # 创建基于节点的数据对象(而非基于样本)
-                    node_features = torch.tensor(node_features, dtype=torch.float)
-                    
-                    # 修复边索引创建 - 使用正确的节点索引
-                    edge_index = []
-                    edge_weights = []
-                    node_idx_map = {node: idx for idx, node in enumerate(G.nodes())}
-                    
-                    for u, v, attr in G.edges(data=True):
-                        edge_index.append((node_idx_map[u], node_idx_map[v]))
-                        edge_index.append((node_idx_map[v], node_idx_map[u]))  # 添加双向边
-                        # 使用相关性作为边权重
-                        edge_weights.append(attr['weight'])
-                        edge_weights.append(attr['weight'])
-                    
-                    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
-                    edge_weight = torch.tensor(edge_weights, dtype=torch.float)
-                    
-                    # 创建新的数据对象
-                    gat_data = Data(
-                        x=node_features,
-                        edge_index=edge_index,
-                        edge_attr=edge_weight,
-                        y=torch.tensor(community_labels, dtype=torch.long)
-                    )
-                    
-                    print(f"为GAT创建的数据: {gat_data}")
-                    
-                    # 使用配置参数创建GAT模型
+                    from neuron_gnn import NeuronGAT
+                    # 创建GAT模型
                     gat_model = NeuronGAT(
-                        in_channels=node_features.size(1),  # 使用节点特征维度
-                        hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 128),
-                        out_channels=num_communities,
+                        in_channels=X_scaled.shape[1],
+                        hidden_channels=self.config.analysis_params.get('gat_hidden_channels', 64),
+                        out_channels=num_classes,
                         heads=self.config.analysis_params.get('gat_heads', 4),
-                        dropout=self.config.analysis_params.get('gat_dropout', 0.3),
-                        residual=self.config.analysis_params.get('gat_residual', True),
-                        num_layers=self.config.analysis_params.get('gat_num_layers', 3),
-                        alpha=self.config.analysis_params.get('gat_alpha', 0.2)
+                        dropout=self.config.analysis_params.get('gat_dropout', 0.3)
                     )
                     
-                    # 设置训练参数 - 使用GAT特定参数
-                    epochs = self.config.analysis_params.get('gat_epochs', 300)
-                    lr = self.config.analysis_params.get('gat_learning_rate', 0.005)
-                    weight_decay = self.config.analysis_params.get('gat_weight_decay', 5e-4)
-                    patience = self.config.analysis_params.get('gat_patience', 20)
-                    early_stopping_enabled = self.config.analysis_params.get('gat_early_stopping_enabled', False)
-                    
-                    # 训练模型 - 使用新创建的gat_data
+                    # 训练GAT模型
                     trained_gat, gat_losses, gat_accuracies = train_gnn_model(
-                        model=gat_model,
-                        data=gat_data,
-                        epochs=epochs,
-                        lr=lr,
-                        weight_decay=weight_decay,
+                        gat_model, data, epochs, lr, weight_decay,
+                        device=device,  # 使用本地变量device
                         patience=patience,
-                        device=gnn_analyzer.device,
-                        early_stopping_enabled=early_stopping_enabled
+                        early_stopping_enabled=True
                     )
                     
-                    # 绘制GAT训练曲线
-                    gat_loss_plot_path = self.config.gat_training_plot
-                    plot_gnn_results(gat_losses, gat_loss_plot_path)
-                    
-                    # 绘制GAT准确率曲线
-                    gat_acc_epochs = list(range(1, len(gat_accuracies['train'])+1))
-                    gat_accuracy_plot_path = visualizer.plot_training_metrics(
-                        gat_acc_epochs, 
-                        gat_accuracies['train'], 
-                        gat_accuracies['val'], 
-                        metric_name='Accuracy',
-                        title='GAT Model Training Accuracy Change',
-                        filename='gat_accuracy_curve.png'
-                    )
-                    
-                    # 评估模型
-                    trained_gat.eval()
-                    with torch.no_grad():
-                        out = trained_gat(gat_data)
-                        _, predicted = torch.max(out, 1)
-                        gat_accuracy = (predicted == gat_data.y).sum().item() / len(gat_data.y)
-                    
-                    print(f"GAT模块识别模型完成，准确率: {gat_accuracy:.4f}")
-                    
-                    # 保存结果
-                    gnn_results['gat_module_detection'] = {
-                        'accuracy': gat_accuracy,
-                        'loss_plot_path': gat_loss_plot_path,
-                        'accuracy_plot_path': gat_accuracy_plot_path,
-                        'num_communities': num_communities,
-                        'train_acc_history': gat_accuracies['train'],
-                        'val_acc_history': gat_accuracies['val']
+                    # 保存训练结果
+                    gnn_results['gat_model'] = 'trained'
+                    gnn_results['gat_losses'] = [float(l) for l in gat_losses]
+                    gnn_results['gat_accuracies'] = {
+                        'train': [float(a) for a in gat_accuracies['train_acc']],
+                        'val': [float(a) for a in gat_accuracies['val_acc']]
                     }
                     
-                    # 基于GAT创建新的拓扑结构
-                    try:
-                        print("\n基于GAT模型创建神经元拓扑结构...")
-                        
-                        # 使用GNN模型创建拓扑结构
-                        gat_G = create_gnn_based_topology(
-                            model=trained_gat,
-                            data=gat_data,
-                            G=G.copy(),
-                            node_names=[f"N{i+1}" for i in range(len(available_neurons))],
-                            threshold=0.5 # 使用更高阈值突出模块结构
-                        )
-                        
-                        # 获取节点嵌入和相似度矩阵
-                        with torch.no_grad():
-                            gat_embeddings = trained_gat.get_embeddings(gat_data).detach().cpu().numpy()
-                        gat_similarities = nx.adjacency_matrix(gat_G).todense()
-                        
-                        print(f"GAT拓扑结构创建完成: {gat_G.number_of_nodes()} 个节点, {gat_G.number_of_edges()} 条边")
-                        
-                        # 创建交互式GNN拓扑可视化
-                        print(f"开始创建交互式GNN拓扑可视化: {self.config.gat_interactive_topology}")
-                        try:
-                            create_interactive_gnn_topology(
-                                G=gat_G,
-                                embeddings=gat_embeddings,
-                                similarities=gat_similarities.astype(float) if hasattr(gat_similarities, 'astype') else gat_similarities,
-                                node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
-                                output_path=self.config.gat_interactive_topology
-                            )
-                            print(f"交互式神经元网络已成功保存到: {self.config.gat_interactive_topology}")
-                        except Exception as e:
-                            print(f"创建交互式GAT拓扑结构时出错: {str(e)}")
-                        
-                        # 保存GAT拓扑数据
-                        save_gnn_topology_data(
-                            G=gat_G,
-                            embeddings=gat_embeddings,
-                            similarities=gat_similarities,
-                            node_names=[f"N{i+1}" for i in range(gat_G.number_of_nodes())],
-                            output_path=self.config.gat_topology_data
-                        )
-                        print(f"GNN拓扑数据已保存到: {self.config.gat_topology_data}")
-                        
-                        # 使用visualize_gat_topology生成GAT静态拓扑图
-                        print("\n开始生成GAT静态拓扑结构图...")
-                        gat_static_topo_path = visualize_gat_topology(self.config.gat_topology_data)
-                        
-                        # 分析GAT拓扑结构
-                        topo_metrics = analyze_gnn_topology(gat_G, gat_similarities)
-                        
-                        # 分析GAT拓扑中的社区与行为标签关联
-                        print("\n分析GAT社区与行为标签的关联...")
-                        try:
-                            # 获取行为标签名称列表
-                            if hasattr(self, 'behavior_labels') and len(self.behavior_labels) > 0:
-                                behavior_names = self.behavior_labels
-                            elif hasattr(self.config, 'behavior_labels') and len(self.config.behavior_labels) > 0:
-                                behavior_names = self.config.behavior_labels
-                            else:
-                                # 如果没有定义行为标签名称，则使用数字索引
-                                behavior_names = [f"Behavior_{i}" for i in range(len(np.unique(y)))]  
-                            
-                            # 确保行为标签名称与配置一致，如果配置为不纳入CD1，确保behavior_names中不包含CD1
-                            if not self.config.include_cd1_behavior and 'CD1' in behavior_names:
-                                print("\n社区行为分析中排除CD1行为标签")
-                                behavior_names = [label for label in behavior_names if label != 'CD1']
-                            
-                            # 分析社区与行为标签的关联
-                            gat_community_behavior_mapping = analyze_community_behaviors(
-                                G=gat_G,
-                                communities=communities,  # 使用之前检测到的社区
-                                X_scaled=X_scaled,
-                                y=y,
-                                behavior_labels=behavior_names
-                            )
-                            
-                            # 可视化社区-行为映射
-                            gat_community_behavior_viz_path = os.path.join(
-                                os.path.dirname(self.config.gat_topology_data),
-                                'gat_community_behavior_mapping.png'
-                            )
-                            
-                            gat_community_behavior_network_path = visualize_community_behavior_mapping(
-                                G=gat_G,
-                                community_behavior_mapping=gat_community_behavior_mapping,
-                                output_path=gat_community_behavior_viz_path
-                            )
-                            
-                            print(f"GAT社区-行为映射可视化已保存至: {gat_community_behavior_viz_path}")
-                            
-                            # 将社区-行为映射结果保存为JSON
-                            gat_community_behavior_json = os.path.join(
-                                os.path.dirname(self.config.gat_topology_data),
-                                'gat_community_behavior_mapping.json'
-                            )
-                            
-                            with open(gat_community_behavior_json, 'w') as f:
-                                json.dump(gat_community_behavior_mapping, f, indent=4)
-                            
-                            print(f"GAT社区-行为映射数据已保存至: {gat_community_behavior_json}")
-                            
-                        except Exception as e:
-                            print(f"分析GAT社区-行为关联时出错: {str(e)}")
-                            import traceback
-                            print(f"错误详情:\n{traceback.format_exc()}")
-                            gat_community_behavior_viz_path = None
-                            gat_community_behavior_mapping = {}
-                        
-                        # 保存GAT拓扑分析结果
-                        gnn_results['gat_topology'] = {
-                            'visualization_path': gat_static_topo_path,  # 使用静态拓扑图路径
-                            'interactive_path': self.config.gat_interactive_topology,
-                            'data_path': self.config.gat_topology_data,
-                            'topology_metrics': topo_metrics,
-                            'node_count': gat_G.number_of_nodes(),
-                            'edge_count': gat_G.number_of_edges(),
-                            'community_behavior_mapping': gat_community_behavior_mapping if 'gat_community_behavior_mapping' in locals() else {},
-                            'community_behavior_viz_path': gat_community_behavior_viz_path if 'gat_community_behavior_viz_path' in locals() else None
-                        }
-                        
-                    except Exception as e:
-                        print(f"无法进行社区检测，跳过GAT模型: {str(e)}")
-                        import traceback
-                        print(f"错误详情:\n{traceback.format_exc()}")
-                        gnn_results['gat_topology'] = {
-                            'error': str(e)
-                        }
+                    # 保存损失曲线
+                    gat_plot_path = os.path.join(self.config.gnn_results_dir, 'gat_training_curve.png')
+                    plot_gnn_results(gat_losses, gat_plot_path)
+                    gnn_results['gat_loss_plot'] = gat_plot_path
+                    
+                    # 可视化GAT注意力权重
+                    from neuron_gat import visualize_gat_attention_weights
+                    attn_path = os.path.join(self.config.gnn_results_dir, 'gat_attention_weights.png')
+                    visualize_gat_attention_weights(trained_gat, data, attn_path)
+                    gnn_results['gat_attention_plot'] = attn_path
+                    
+                    # 可视化GAT拓扑
+                    from neuron_gat import visualize_gat_topology
+                    topo_path = os.path.join(self.config.gnn_results_dir, 'gat_topology.png')
+                    visualize_gat_topology(trained_gat, data, G, topo_path)
+                    gnn_results['gat_topology_plot'] = topo_path
+                    
                 except Exception as e:
-                    print(f"GAT训练过程中出错: {str(e)}")
+                    print(f"GAT模型训练出错: {e}")
                     import traceback
-                    print(f"错误详情:\n{traceback.format_exc()}")
-                    gnn_results['gat_module_detection'] = {
-                        'error': str(e)
-                    }
-        except Exception as e:
-            import traceback
-            error_trace = traceback.format_exc()
-            print(f"GAT模型训练整体过程出错: {str(e)}")
-            print(f"错误详情:\n{error_trace}")
-            gnn_results['gat_error'] = str(e)
-        
-        # 3. 时间序列GNN分析
-        print("\n准备时间序列GNN数据...")
-        try:
-            # 设置时间窗口参数
-            window_size = self.config.analysis_params.get('temporal_window_size', 10)
-            stride = self.config.analysis_params.get('temporal_stride', 5)
+                    traceback.print_exc()
+            else:
+                print("GAT模型分析已在配置中禁用。")
             
-            # 准备时间序列数据
-            temporal_data = gnn_analyzer.prepare_temporal_gnn_data(
-                G, X_scaled, window_size=window_size, stride=stride
-            )
+            # 3. 时间序列GNN分析
+            print("\n准备时间序列GNN数据...")
+            try:
+                # 准备时间序列数据
+                window_size = self.config.analysis_params.get('temporal_window_size', 10)
+                stride = self.config.analysis_params.get('temporal_stride', 5)
+                temporal_data = gnn_analyzer.prepare_temporal_gnn_data(G, X_scaled, window_size, stride)
+                
+                # 记录时间序列数据信息
+                gnn_results['temporal_data'] = {
+                    'window_size': window_size,
+                    'stride': stride,
+                    'num_windows': len(temporal_data)
+                }
+                
+                print(f"时间序列GNN数据准备完成，共 {len(temporal_data)} 个窗口")
+            except Exception as e:
+                print(f"时间序列GNN数据准备出错: {e}")
             
-            print(f"时间序列GNN数据准备完成，共 {len(temporal_data)} 个窗口")
+            # 将GNN分析结果保存到文件
+            results_path = os.path.join(self.config.gnn_results_dir, 'gnn_analysis_results.json')
+            import json
+            with open(results_path, 'w') as f:
+                json.dump(gnn_results, f, default=str, indent=2)
+                
+            print(f"GNN分析结果已保存到 {results_path}")
             
-            # 保存结果
-            gnn_results['temporal_gnn'] = {
-                'windows_count': len(temporal_data),
-                'window_size': window_size,
-                'stride': stride
-            }
-            
-        except Exception as e:
-            print(f"时间序列GNN数据准备出错: {str(e)}")
-            gnn_results['temporal_gnn'] = {'error': str(e)}
-        
-        # 保存GNN分析结果到JSON文件
-        gnn_results_file = self.config.gnn_analysis_results
-        try:
-            # 将不可序列化的对象转换为字符串
-            serializable_results = convert_to_serializable(gnn_results)
-            with open(gnn_results_file, 'w') as f:
-                json.dump(serializable_results, f, indent=4)
-            print(f"GNN分析结果已保存到 {gnn_results_file}")
-            
-            # 更新网络分析结果
-            if hasattr(self, 'network_analysis_results') and self.network_analysis_results is not None:
-                self.network_analysis_results['gnn_analysis'] = serializable_results
+            # 添加网络分析结果的合并
+            try:
+                # 读取现有的网络分析结果
+                network_results_path = os.path.join(self.config.analysis_dir, 'network_analysis_results.json')
+                with open(network_results_path, 'r') as f:
+                    network_results = json.load(f)
+                    
+                # 将GNN结果合并到网络分析结果中
+                network_results['gnn_analysis'] = gnn_results
                 
                 # 保存更新后的网络分析结果
-                network_results_path = os.path.join(self.config.analysis_dir, 'network_analysis_results.json')
                 with open(network_results_path, 'w') as f:
-                    json.dump(convert_to_serializable(self.network_analysis_results), f, indent=4)
-                print(f"更新的网络分析结果（包含GNN分析）已保存到 {network_results_path}")
+                    json.dump(network_results, f, default=str, indent=2)
+                    
+                print(f"GNN分析结果已合并到网络分析结果中")
+            except Exception as e:
+                print(f"GNN分析过程中出现错误: {e}")
+                import traceback
+                traceback.print_exc()
+                
+            return gnn_results
+            
+        except ImportError as e:
+            print(f"无法导入GNN相关模块: {e}")
+            print("请确保已安装PyTorch Geometric和相关依赖")
+            return None
         except Exception as e:
+            print(f"GNN分析过程中出现错误: {e}")
             import traceback
-            error_trace = traceback.format_exc()
-            print(f"保存GNN分析结果时出错: {str(e)}")
-            print(f"错误详情:\n{error_trace}")
-        
-        return gnn_results
+            traceback.print_exc()
+            return None
 
 def convert_to_serializable(obj: Any) -> Any:
     """
@@ -2734,10 +2428,26 @@ def main() -> None:
         config = AnalysisConfig()
         
         # 添加KNN图构建配置参数
+        if not hasattr(config, 'analysis_params'):
+            config.analysis_params = {}
         if not hasattr(config.analysis_params, 'use_knn'):
             config.analysis_params['use_knn'] = True  # 默认启用KNN
         if not hasattr(config.analysis_params, 'knn_k'):
             config.analysis_params['knn_k'] = 15  # 默认K值
+        
+        # 检查是否可以导入bettergcn
+        try:
+            import sys
+            print("当前Python路径:")
+            for path in sys.path:
+                print(f"  - {path}")
+                
+            import bettergcn
+            print(f"成功导入bettergcn模块，版本: {getattr(bettergcn, '__version__', '未知')}")
+        except ImportError as e:
+            print(f"警告: 无法导入bettergcn模块 ({str(e)})")
+            print("将禁用KNN图构建功能，使用传统相关性方法")
+            config.analysis_params['use_knn'] = False
             
         # Setup and validate directories
         config.setup_directories()
