@@ -20,6 +20,8 @@ def parse_args():
                         help='CD1标签前的时间戳数量')
     parser.add_argument('--after-stamps', type=int, default=100,
                         help='CD1标签后的时间戳数量')
+    parser.add_argument('--no-shadow', action='store_true',
+                        help='不显示标准差阴影区域')
     return parser.parse_args()
 
 def ensure_dir(directory):
@@ -150,7 +152,7 @@ GROUP_COLORS = {
     'group3': '#4DAF4A'   # 绿色
 }
 
-def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path):
+def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, show_shadow=True):
     """
     绘制CD1标签前n_stamps个时间戳的神经元组平均钙离子浓度轨迹图
     
@@ -159,6 +161,7 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path):
         cd1_index: CD1标签首次出现的索引
         n_stamps: 要绘制的时间戳数量
         output_path: 输出图像路径
+        show_shadow: 是否显示标准差阴影区域
     """
     if cd1_index is None or cd1_index < n_stamps:
         print(f"警告: CD1标签前的数据不足{n_stamps}个时间戳，将使用所有可用数据")
@@ -172,7 +175,6 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path):
     plot_data = data.iloc[start_idx:end_idx+1].copy()
     
     # 创建相对时间轴（以秒为单位，假设每个时间戳间隔为0.1秒）
-    # 注意：这里调整为从0开始，到CD1出现前的时间
     plot_data['relative_time'] = [(i * 0.1) for i in range(len(plot_data))]
     
     # 创建图像
@@ -182,26 +184,29 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path):
     # Group 1
     plt.plot(plot_data['relative_time'], plot_data['group1_avg'], 
              color=GROUP_COLORS['group1'], label='Group 1', linewidth=2)
-    plt.fill_between(plot_data['relative_time'], 
-                     plot_data['group1_avg'] - plot_data['group1_std'],
-                     plot_data['group1_avg'] + plot_data['group1_std'],
-                     color=GROUP_COLORS['group1'], alpha=0.3)
+    if show_shadow:
+        plt.fill_between(plot_data['relative_time'], 
+                         plot_data['group1_avg'] - plot_data['group1_std'],
+                         plot_data['group1_avg'] + plot_data['group1_std'],
+                         color=GROUP_COLORS['group1'], alpha=0.3)
     
     # Group 2
     plt.plot(plot_data['relative_time'], plot_data['group2_avg'], 
              color=GROUP_COLORS['group2'], label='Group 2', linewidth=2)
-    plt.fill_between(plot_data['relative_time'], 
-                     plot_data['group2_avg'] - plot_data['group2_std'],
-                     plot_data['group2_avg'] + plot_data['group2_std'],
-                     color=GROUP_COLORS['group2'], alpha=0.3)
+    if show_shadow:
+        plt.fill_between(plot_data['relative_time'], 
+                         plot_data['group2_avg'] - plot_data['group2_std'],
+                         plot_data['group2_avg'] + plot_data['group2_std'],
+                         color=GROUP_COLORS['group2'], alpha=0.3)
     
     # Group 3
     plt.plot(plot_data['relative_time'], plot_data['group3_avg'], 
              color=GROUP_COLORS['group3'], label='Group 3', linewidth=2)
-    plt.fill_between(plot_data['relative_time'], 
-                     plot_data['group3_avg'] - plot_data['group3_std'],
-                     plot_data['group3_avg'] + plot_data['group3_std'],
-                     color=GROUP_COLORS['group3'], alpha=0.3)
+    if show_shadow:
+        plt.fill_between(plot_data['relative_time'], 
+                         plot_data['group3_avg'] - plot_data['group3_std'],
+                         plot_data['group3_avg'] + plot_data['group3_std'],
+                         color=GROUP_COLORS['group3'], alpha=0.3)
     
     # 添加图例和标签
     plt.legend(fontsize=12)
@@ -223,7 +228,7 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path):
     
     print(f"CD1前轨迹图已保存至: {output_path}")
 
-def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path):
+def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, show_shadow=True):
     """
     绘制CD1标签后n_stamps个时间戳的神经元组平均钙离子浓度轨迹图
     
@@ -232,6 +237,7 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path):
         cd1_index: CD1标签首次出现的索引
         n_stamps: 要绘制的时间戳数量
         output_path: 输出图像路径
+        show_shadow: 是否显示标准差阴影区域
     """
     if cd1_index is None:
         print("警告: 未找到CD1标签，无法绘制CD1后的图表")
@@ -247,7 +253,6 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path):
     plot_data = data.iloc[cd1_index:end_idx+1].copy()
     
     # 创建相对时间轴（以秒为单位，假设每个时间戳间隔为0.1秒）
-    # 注意：这里调整为从0开始，表示从CD1出现开始的时间
     plot_data['relative_time'] = [(i * 0.1) for i in range(len(plot_data))]
     
     # 创建图像
@@ -257,26 +262,29 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path):
     # Group 1
     plt.plot(plot_data['relative_time'], plot_data['group1_avg'], 
              color=GROUP_COLORS['group1'], label='Group 1', linewidth=2)
-    plt.fill_between(plot_data['relative_time'], 
-                     plot_data['group1_avg'] - plot_data['group1_std'],
-                     plot_data['group1_avg'] + plot_data['group1_std'],
-                     color=GROUP_COLORS['group1'], alpha=0.3)
+    if show_shadow:
+        plt.fill_between(plot_data['relative_time'], 
+                         plot_data['group1_avg'] - plot_data['group1_std'],
+                         plot_data['group1_avg'] + plot_data['group1_std'],
+                         color=GROUP_COLORS['group1'], alpha=0.3)
     
     # Group 2
     plt.plot(plot_data['relative_time'], plot_data['group2_avg'], 
              color=GROUP_COLORS['group2'], label='Group 2', linewidth=2)
-    plt.fill_between(plot_data['relative_time'], 
-                     plot_data['group2_avg'] - plot_data['group2_std'],
-                     plot_data['group2_avg'] + plot_data['group2_std'],
-                     color=GROUP_COLORS['group2'], alpha=0.3)
+    if show_shadow:
+        plt.fill_between(plot_data['relative_time'], 
+                         plot_data['group2_avg'] - plot_data['group2_std'],
+                         plot_data['group2_avg'] + plot_data['group2_std'],
+                         color=GROUP_COLORS['group2'], alpha=0.3)
     
     # Group 3
     plt.plot(plot_data['relative_time'], plot_data['group3_avg'], 
              color=GROUP_COLORS['group3'], label='Group 3', linewidth=2)
-    plt.fill_between(plot_data['relative_time'], 
-                     plot_data['group3_avg'] - plot_data['group3_std'],
-                     plot_data['group3_avg'] + plot_data['group3_std'],
-                     color=GROUP_COLORS['group3'], alpha=0.3)
+    if show_shadow:
+        plt.fill_between(plot_data['relative_time'], 
+                         plot_data['group3_avg'] - plot_data['group3_std'],
+                         plot_data['group3_avg'] + plot_data['group3_std'],
+                         color=GROUP_COLORS['group3'], alpha=0.3)
     
     # 添加图例和标签
     plt.legend(fontsize=12)
@@ -298,7 +306,7 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path):
     
     print(f"CD1后轨迹图已保存至: {output_path}")
 
-def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output_path):
+def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output_path, show_shadow=True):
     """
     在同一个图中绘制CD1标签前后的神经元组平均钙离子浓度轨迹图
     
@@ -308,6 +316,7 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
         before_stamps: CD1标签前的时间戳数量
         after_stamps: CD1标签后的时间戳数量
         output_path: 输出图像路径
+        show_shadow: 是否显示标准差阴影区域
     """
     if cd1_index is None:
         print("警告: 未找到CD1标签，无法绘制组合图表")
@@ -345,51 +354,57 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     # Group 1
     plt.plot(before_data['relative_time'], before_data['group1_avg'], 
              color=GROUP_COLORS['group1'], label='Group 1', linewidth=2)
-    plt.fill_between(before_data['relative_time'], 
-                     before_data['group1_avg'] - before_data['group1_std'],
-                     before_data['group1_avg'] + before_data['group1_std'],
-                     color=GROUP_COLORS['group1'], alpha=0.2)
+    if show_shadow:
+        plt.fill_between(before_data['relative_time'], 
+                         before_data['group1_avg'] - before_data['group1_std'],
+                         before_data['group1_avg'] + before_data['group1_std'],
+                         color=GROUP_COLORS['group1'], alpha=0.2)
     
     # Group 2
     plt.plot(before_data['relative_time'], before_data['group2_avg'], 
              color=GROUP_COLORS['group2'], label='Group 2', linewidth=2)
-    plt.fill_between(before_data['relative_time'], 
-                     before_data['group2_avg'] - before_data['group2_std'],
-                     before_data['group2_avg'] + before_data['group2_std'],
-                     color=GROUP_COLORS['group2'], alpha=0.2)
+    if show_shadow:
+        plt.fill_between(before_data['relative_time'], 
+                         before_data['group2_avg'] - before_data['group2_std'],
+                         before_data['group2_avg'] + before_data['group2_std'],
+                         color=GROUP_COLORS['group2'], alpha=0.2)
     
     # Group 3
     plt.plot(before_data['relative_time'], before_data['group3_avg'], 
              color=GROUP_COLORS['group3'], label='Group 3', linewidth=2)
-    plt.fill_between(before_data['relative_time'], 
-                     before_data['group3_avg'] - before_data['group3_std'],
-                     before_data['group3_avg'] + before_data['group3_std'],
-                     color=GROUP_COLORS['group3'], alpha=0.2)
+    if show_shadow:
+        plt.fill_between(before_data['relative_time'], 
+                         before_data['group3_avg'] - before_data['group3_std'],
+                         before_data['group3_avg'] + before_data['group3_std'],
+                         color=GROUP_COLORS['group3'], alpha=0.2)
     
     # 绘制CD1后的轨迹
     # Group 1
     plt.plot(after_data['relative_time'], after_data['group1_avg'], 
              color=GROUP_COLORS['group1'], linewidth=2)
-    plt.fill_between(after_data['relative_time'], 
-                     after_data['group1_avg'] - after_data['group1_std'],
-                     after_data['group1_avg'] + after_data['group1_std'],
-                     color=GROUP_COLORS['group1'], alpha=0.2)
+    if show_shadow:
+        plt.fill_between(after_data['relative_time'], 
+                         after_data['group1_avg'] - after_data['group1_std'],
+                         after_data['group1_avg'] + after_data['group1_std'],
+                         color=GROUP_COLORS['group1'], alpha=0.2)
     
     # Group 2
     plt.plot(after_data['relative_time'], after_data['group2_avg'], 
              color=GROUP_COLORS['group2'], linewidth=2)
-    plt.fill_between(after_data['relative_time'], 
-                     after_data['group2_avg'] - after_data['group2_std'],
-                     after_data['group2_avg'] + after_data['group2_std'],
-                     color=GROUP_COLORS['group2'], alpha=0.2)
+    if show_shadow:
+        plt.fill_between(after_data['relative_time'], 
+                         after_data['group2_avg'] - after_data['group2_std'],
+                         after_data['group2_avg'] + after_data['group2_std'],
+                         color=GROUP_COLORS['group2'], alpha=0.2)
     
     # Group 3
     plt.plot(after_data['relative_time'], after_data['group3_avg'], 
              color=GROUP_COLORS['group3'], linewidth=2)
-    plt.fill_between(after_data['relative_time'], 
-                     after_data['group3_avg'] - after_data['group3_std'],
-                     after_data['group3_avg'] + after_data['group3_std'],
-                     color=GROUP_COLORS['group3'], alpha=0.2)
+    if show_shadow:
+        plt.fill_between(after_data['relative_time'], 
+                         after_data['group3_avg'] - after_data['group3_std'],
+                         after_data['group3_avg'] + after_data['group3_std'],
+                         color=GROUP_COLORS['group3'], alpha=0.2)
     
     # 添加图例和标签
     plt.legend(fontsize=12)
@@ -404,6 +419,7 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     # 在图中标记CD1前后
     plt.text(-before_stamps*0.1*0.5, plt.ylim()[1]*0.85, 'Before CD1', fontsize=12, ha='center')
     plt.text(after_stamps*0.1*0.5, plt.ylim()[1]*0.85, 'After CD1', fontsize=12, ha='center')
+    
     # 网格线
     plt.grid(False)
     
@@ -440,14 +456,17 @@ def main():
     output_after_cd1 = os.path.join(args.output_dir, "trace_after_cd1.png")
     output_combined_cd1 = os.path.join(args.output_dir, "trace_combined_cd1.png")
     
+    # 控制是否显示阴影
+    show_shadow = not args.no_shadow
+    
     # 绘制CD1标签前的轨迹图
-    plot_trace_before_cd1(data_with_avgs, cd1_index, args.before_stamps, output_before_cd1)
+    plot_trace_before_cd1(data_with_avgs, cd1_index, args.before_stamps, output_before_cd1, show_shadow)
     
     # 绘制CD1标签后的轨迹图
-    plot_trace_after_cd1(data_with_avgs, cd1_index, args.after_stamps, output_after_cd1)
+    plot_trace_after_cd1(data_with_avgs, cd1_index, args.after_stamps, output_after_cd1, show_shadow)
     
     # 绘制CD1标签前后组合的轨迹图
-    plot_combined_cd1_trace(data_with_avgs, cd1_index, args.before_stamps, args.after_stamps, output_combined_cd1)
+    plot_combined_cd1_trace(data_with_avgs, cd1_index, args.before_stamps, args.after_stamps, output_combined_cd1, show_shadow)
     
     print("轨迹图绘制完成！")
 
