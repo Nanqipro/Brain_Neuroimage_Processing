@@ -10,7 +10,7 @@ import os
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EM2Trace_plus.xlsx'
+    INPUT_FILE = '../../datasets/EMtrace_plus.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
@@ -93,26 +93,15 @@ print("开始计算神经元钙爆发时间排序...")
 # 对数据进行标准化，用于钙事件检测
 trace_data_standardized = (trace_data - trace_data.mean()) / trace_data.std()
 
-# 定义函数：找到神经元第一次超过阈值的时间点
-def find_first_peak_time(neuron_data, threshold=Config.CALCIUM_THRESHOLD):
-    """找到神经元信号第一次超过阈值的时间点"""
-    # 找到所有超过阈值的时间点
-    above_threshold = neuron_data[neuron_data > threshold]
-    if len(above_threshold) > 0:
-        # 返回第一次超过阈值的时间点
-        return above_threshold.index[0]
-    else:
-        # 如果没有超过阈值的点，返回最大值的时间点
-        return neuron_data.idxmax()
+# 使用与heatmap_sort-EM.py完全相同的排序方法
+# 对于每个神经元，找到其信号达到全局最大值的时间戳
+peak_times = trace_data_standardized.idxmax()
 
-# 找到每个神经元第一次钙爆发的时间点
-first_peak_times = {}
-for column in trace_data_standardized.columns:
-    first_peak_times[column] = find_first_peak_time(trace_data_standardized[column])
+# 将神经元按照峰值时间从早到晚排序
+sorted_neurons_by_first_peak = peak_times.sort_values().index
 
-# 转换为Series并排序
-first_peak_times_series = pd.Series(first_peak_times)
-sorted_neurons_by_first_peak = first_peak_times_series.sort_values().index
+# 创建一个字典存储每个神经元的峰值时间，用于绘制标记点
+first_peak_times = peak_times.to_dict()
 
 # 根据排序创建排序后的数据框
 sorted_trace_data = trace_data[sorted_neurons_by_first_peak]
