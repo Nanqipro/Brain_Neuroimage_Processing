@@ -122,6 +122,7 @@ ax.set_yticks(range(0, 60, 10))
 
 # Grid style for academic papers
 ax.grid(True, axis='y', linestyle='--', alpha=0.6)
+# ax.grid(False)
 
 # Professional legend configuration
 legend = ax.legend(loc='upper center',
