@@ -1758,9 +1758,9 @@ def main():
         # 添加特征权重设置 - 修改为无条件应用默认权重
         feature_weights = {
             'amplitude': 2,  # 振幅权重更高
-            'duration': 1,   # 持续时间权重更高
-            'rise_time': 0.8,  # 上升时间权重较低
-            'decay_time': 0.8, # 衰减时间权重较低
+            'duration': 2,   # 持续时间权重更高
+            'rise_time': 1.5,  # 上升时间权重较低
+            'decay_time': 1.5, # 衰减时间权重较低
             'snr': 0.5,        # 信噪比正常权重
             'fwhm': 0.5,       # 半高宽正常权重
             'auc': 0.5         # 曲线下面积正常权重

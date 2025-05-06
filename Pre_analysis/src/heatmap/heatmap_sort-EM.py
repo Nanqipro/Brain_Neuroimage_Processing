@@ -11,7 +11,7 @@ from matplotlib.backends.backend_agg import FigureCanvas
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EMtrace_plus.xlsx'
+    INPUT_FILE = '../../datasets/EM2Trace.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort_'
     # 时间戳区间默认值（None表示不限制）
@@ -164,22 +164,22 @@ ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
 # 只有当behavior列存在时才添加行为标记
 if has_behavior and len(unique_behaviors) > 0:
     # 创建固定的行为颜色映射，确保相同行为始终使用相同颜色
-    # 预定义所有可能的行为及其固定颜色
+    # 预定义所有可能的行为及其固定颜色，使用更加鲜明和对比度更高的颜色
     fixed_color_map = {
-        'Open': '#ff7f0e',  # 橙色
-        'Close': '#1f77b4',  # 蓝色
-        'Middle': '#2ca02c',   # 绿色
-        'WI': '#d62728',   # 红色
-        'LVR': '#9467bd',  # 紫色
-        'FM': '#8c564b',   # 棕色
-        'GR': '#e377c2',   # 粉色
-        'ELT': '#7f7f7f',  # 灰色
-        'CM': '#bcbd22',   # 黄绿色
-        'CT': '#17becf',   # 海蓝色
-        'NI': '#aec7e8',   # 浅蓝色
-        'EM': '#98df8a',   # 浅绿色
-        'RF': '#ff9896',   # 浅红色
-        'RN': '#c5b0d5'    # 浅紫色
+        'Open': '#FF9500',    # 明亮橙色
+        'Close': '#0066CC',   # 深蓝色
+        'Middle': '#00CC00',  # 亮绿色
+        'WI': '#FF0000',      # 鲜红色
+        'LVR': '#9900FF',     # 亮紫色
+        'FM': '#994C00',      # 深棕色
+        'GR': '#FF00CC',      # 亮粉色
+        'ELT': '#000000',     # 黑色
+        'CM': '#AACC00',      # 亮黄绿色
+        'CT': '#00CCFF',      # 亮蓝绿色
+        'NI': '#66B3FF',      # 亮蓝色
+        'EM': '#33FF33',      # 鲜绿色
+        'RF': '#FF6666',      # 亮红色
+        'RN': '#CC99FF'       # 亮紫色
     }
     
     # 为当前数据集中的行为创建颜色映射
@@ -189,10 +189,10 @@ if has_behavior and len(unique_behaviors) > 0:
             # 使用预定义的颜色
             color_map[behavior] = fixed_color_map[behavior]
         else:
-            # 对于未预定义的行为，仍使用动态分配的颜色
-            # 但使用不同的颜色范围，避免与预定义的颜色冲突
-            colors = plt.cm.Set3(np.linspace(0, 1, len(unique_behaviors)*2))
-            color_map[behavior] = colors[i + len(fixed_color_map)]
+            # 对于未预定义的行为，使用更鲜明的调色板
+            # 从tab10调色板获取颜色，它提供更高的对比度
+            colors = plt.cm.tab10(np.linspace(0, 1, len(unique_behaviors)))
+            color_map[behavior] = colors[i % 10]
     
     # 创建图例补丁列表
     legend_patches = []
@@ -222,10 +222,11 @@ if has_behavior and len(unique_behaviors) > 0:
                 # 如果区间有宽度
                 if end_pos - start_pos > 0:  
                     # 在行为标记子图中绘制区间，使用精确的数据点对齐方式
+                    # 提高alpha值从0.7到0.9，使颜色更加明显
                     rect = plt.Rectangle((start_pos - 0.5, y_positions[behavior] - 0.4), 
                                         end_pos - start_pos, 0.8, 
-                                        color=behavior_color, alpha=0.7, 
-                                        ec='none')  # 去除边框以提高可见度
+                                        color=behavior_color, alpha=0.9, 
+                                        ec='black')  # 添加黑色边框以增强可见度
                     ax_behavior.add_patch(rect)
                     
                     # 在热图中添加区间边界垂直线
@@ -233,8 +234,8 @@ if has_behavior and len(unique_behaviors) > 0:
                     ax_heatmap.axvline(x=start_pos - 0.5, color='white', linestyle='--', linewidth=2, alpha=0.5)
                     ax_heatmap.axvline(x=end_pos - 0.5, color='white', linestyle='--', linewidth=2, alpha=0.5)
         
-        # 添加到图例
-        legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.7, label=behavior))
+        # 添加到图例，同样提高alpha值
+        legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
     
     # 再次确认两个坐标轴的对齐情况
     # 唯一正确的做法是设置完全相同的范围
@@ -267,7 +268,7 @@ if has_behavior and len(unique_behaviors) > 0:
                            title='Behavior Types', title_fontsize=14, bbox_to_anchor=(1.0, 1.3))
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = 'EMtrace-heatmap'
+title_text = 'EM2Trace-heatmap'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -289,7 +290,7 @@ ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=14, fontweight
 # 而是使用之前设置的subplots_adjust()已经足够调整布局
 
 # 构建输出文件名，包含时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}EMtrace"
+output_filename = f"{Config.OUTPUT_PREFIX}EM2Trace"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
