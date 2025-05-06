@@ -11,13 +11,13 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description='绘制神经元分组的钙离子浓度轨迹图')
     parser.add_argument('--input', type=str, 
-                        default='../datasets/Day3_with_behavior_labels_filled.xlsx',
+                        default='../datasets/Day9_with_behavior_labels_filled.xlsx',
                         help='输入数据文件路径')
     parser.add_argument('--output-dir', type=str, 
-                        default='../results/CD1_traces_day3/',
+                        default='../results/CD1_traces_day9/',
                         help='输出图像目录')
     parser.add_argument('--position-file', type=str,
-                        default='../datasets/Day3_Max_position.csv',
+                        default='../datasets/Day9_Max_position.csv',
                         help='神经元位置坐标文件路径')
     parser.add_argument('--before-stamps', type=int, default=100,
                         help='CD1标签前的时间戳数量')
@@ -72,12 +72,12 @@ def group_neurons(data):
         group2_cols: 第二组神经元列名
         group3_cols: 第三组神经元列名
     """
-    # 定义神经元分组 day3
-    group1 = ['n49', 'n32', 'n22', 'n47', 'n17', 'n12', 'n28', 'n18', 'n42', 
-              'n46', 'n38', 'n40', 'n52', 'n7', 'n45', 'n43', 'n15', 'n16', 'n2', 'n51', 'n53']
+    # # 定义神经元分组 day3
+    # group1 = ['n49', 'n32', 'n22', 'n47', 'n17', 'n12', 'n28', 'n18', 'n42', 
+    #           'n46', 'n38', 'n40', 'n52', 'n7', 'n45', 'n43', 'n15', 'n16', 'n2', 'n51', 'n53']
     
-    group2 = ['n20', 'n33', 'n21', 'n5', 'n1', 'n26', 'n25', 'n36', 'n44', 
-              'n34', 'n4', 'n24', 'n10', 'n11', 'n9', 'n3', 'n41', 'n35', 'n48', 'n19']
+    # group2 = ['n20', 'n33', 'n21', 'n5', 'n1', 'n26', 'n25', 'n36', 'n44', 
+    #           'n34', 'n4', 'n24', 'n10', 'n11', 'n9', 'n3', 'n41', 'n35', 'n48', 'n19']
     
     # # 定义神经元分组 day6
     # group1 = ['n2', 'n10', 'n15', 'n17', 'n18', 'n22', 'n40', 'n24', 'n27', 
@@ -87,12 +87,12 @@ def group_neurons(data):
     #           'n4', 'n57', 'n5', 'n32', 'n60', 'n41']
 
 
-    # # 定义神经元分组 day9
-    # group1 = ['n38', 'n9', 'n17', 'n31', 'n23', 'n20', 'n22', 'n26', 'n12', 
-    #           'n35', 'n42', 'n53', 'n46', 'n23', 'n51', 'n40', 'n1', 'n57']
+    # 定义神经元分组 day9
+    group1 = ['n38', 'n9', 'n17', 'n31', 'n23', 'n20', 'n22', 'n26', 'n12', 
+              'n35', 'n42', 'n53', 'n46', 'n23', 'n51', 'n40', 'n1', 'n57']
     
-    # group2 = ['n2', 'n6', 'n3', 'n7', 'n11', 'n13', 'n29', 'n24', 'n39', 
-    #           'n10', 'n58', 'n47', 'n5', 'n61', 'n54', 'n18']
+    group2 = ['n2', 'n6', 'n3', 'n7', 'n11', 'n13', 'n29', 'n24', 'n39', 
+              'n10', 'n58', 'n47', 'n5', 'n61', 'n54', 'n18']
 
     
     
@@ -241,9 +241,12 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, show_shadow=Tr
     plt.ylabel('Δ F /F', fontsize=14)
     plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps Before CD1', fontsize=16)
     
+    # 设置统一的y轴范围
+    plt.ylim([-0.3, 0.5])
+    
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=plot_data['relative_time'].max(), color='k', linestyle='--', linewidth=2)
-    plt.text(plot_data['relative_time'].max()-5, plt.ylim()[1]*0.9, 'CD1', fontsize=14)
+    plt.text(plot_data['relative_time'].max()-5, 0.35, 'CD1', fontsize=14)
     
     # 网格线
     plt.grid(False)
@@ -323,9 +326,12 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, show_shadow=Tru
     plt.ylabel('Δ F /F', fontsize=14)
     plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps After CD1', fontsize=16)
     
+    # 设置统一的y轴范围
+    plt.ylim([-0.3, 0.5])
+    
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=2)
-    plt.text(5, plt.ylim()[1]*0.9, 'CD1', fontsize=14)
+    plt.text(5, 0.35, 'CD1', fontsize=14)
     
     # 网格线
     plt.grid(False)
@@ -447,13 +453,16 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     plt.ylabel('Δ F /F', fontsize=14)
     plt.title(f'Comparison of Average Calcium Concentration of Neurons Before and After CD1 ({before_stamps}/{after_stamps} timestamps)', fontsize=16)
     
+    # 设置统一的y轴范围
+    plt.ylim([-0.3, 0.5])
+    
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=2)
-    plt.text(0.05, plt.ylim()[1]*0.95, 'CD1', fontsize=14)
+    plt.text(0.05, 0.35, 'CD1', fontsize=14)
     
     # 在图中标记CD1前后
-    plt.text(-before_stamps*sampling_period*0.5, plt.ylim()[1]*0.85, 'Before CD1', fontsize=12, ha='center')
-    plt.text(after_stamps*sampling_period*0.5, plt.ylim()[1]*0.85, 'After CD1', fontsize=12, ha='center')
+    plt.text(-before_stamps*sampling_period*0.5, 0.3, 'Before CD1', fontsize=12, ha='center')
+    plt.text(after_stamps*sampling_period*0.5, 0.3, 'After CD1', fontsize=12, ha='center')
     
     # 网格线
     plt.grid(False)
