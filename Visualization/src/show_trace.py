@@ -11,13 +11,13 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description='绘制神经元分组的钙离子浓度轨迹图')
     parser.add_argument('--input', type=str, 
-                        default='../datasets/Day9_with_behavior_labels_filled.xlsx',
+                        default='../datasets/Day3_with_behavior_labels_filled.xlsx',
                         help='输入数据文件路径')
     parser.add_argument('--output-dir', type=str, 
-                        default='../results/CD1_traces_day9/',
+                        default='../results/CD1_traces_day3/',
                         help='输出图像目录')
     parser.add_argument('--position-file', type=str,
-                        default='../datasets/Day9_Max_position.csv',
+                        default='../datasets/Day3_Max_position.csv',
                         help='神经元位置坐标文件路径')
     parser.add_argument('--before-stamps', type=int, default=100,
                         help='CD1标签前的时间戳数量')
@@ -72,6 +72,7 @@ def group_neurons(data):
         group2_cols: 第二组神经元列名
         group3_cols: 第三组神经元列名
     """
+    # #按Day3分组
     # # 定义神经元分组 day3
     # group1 = ['n49', 'n32', 'n22', 'n47', 'n17', 'n12', 'n28', 'n18', 'n42', 
     #           'n46', 'n38', 'n40', 'n52', 'n7', 'n45', 'n43', 'n15', 'n16', 'n2', 'n51', 'n53']
@@ -86,15 +87,36 @@ def group_neurons(data):
     # group2 = ['n3', 'n4', 'n34', 'n12', 'n13', 'n14', 'n21', 'n29', 'n31', 
     #           'n4', 'n57', 'n5', 'n32', 'n60', 'n41']
 
-
-    # 定义神经元分组 day9
-    group1 = ['n38', 'n9', 'n17', 'n31', 'n23', 'n20', 'n22', 'n26', 'n12', 
-              'n35', 'n42', 'n53', 'n46', 'n23', 'n51', 'n40', 'n1', 'n57']
+    # # 定义神经元分组 day9
+    # group1 = ['n38', 'n9', 'n17', 'n31', 'n23', 'n20', 'n22', 'n26', 'n12', 
+    #           'n35', 'n42', 'n53', 'n46', 'n23', 'n51', 'n40', 'n1', 'n57']
     
-    group2 = ['n2', 'n6', 'n3', 'n7', 'n11', 'n13', 'n29', 'n24', 'n39', 
-              'n10', 'n58', 'n47', 'n5', 'n61', 'n54', 'n18']
+    # group2 = ['n2', 'n6', 'n3', 'n7', 'n11', 'n13', 'n29', 'n24', 'n39', 
+    #           'n10', 'n58', 'n47', 'n5', 'n61', 'n54', 'n18']
 
+    #按Day6分组
+    #day3
+    # 定义神经元分组
+    group1 = ['n5', 'n10', 'n11', 'n18', 'n21', 'n29', 'n34', 'n36', 'n43', 
+              'n44', 'n45']
     
+    group2 = ['n14', 'n17', 'n19', 'n20', 'n32', 'n50']
+
+
+    # #day6
+    # # 定义神经元分组
+    # group1 = ['n32', 'n31', 'n48', 'n28', 'n36', 'n40', 'n35', 'n34', 'n33', 
+    #           'n38', 'n14', 'n49', 'n13', 'n41', 'n5', 'n26','n50']
+    
+    # group2 = ['n47', 'n62', 'n23', 'n22', 'n39', 'n61', 'n16', 'n6', 'n44', 
+    #           'n21', 'n45', 'n29']
+
+
+    # #day9
+    # # 定义神经元分组
+    # group1 = ['n7', 'n11', 'n13', 'n22', 'n39', 'n37', 'n5', 'n18']
+    
+    # group2 = ['n19', 'n20', 'n29', 'n24', 'n35', 'n2']
     
     
     # 获取所有神经元列名（排除'stamp'和'behavior'列）
