@@ -673,6 +673,9 @@ class ResultAnalyzer:
         behavior_importance = {}
         effect_size_data = []  # 用于存储所有效应量数据
         
+        # 用于保存每种行为按效应量排序的神经元ID
+        behavior_sorted_neurons = {}
+        
         for behavior_idx, behavior in enumerate(self.behavior_labels):
             behavior_mask = (y == behavior_idx)
             behavior_data = X_scaled[behavior_mask]
@@ -691,6 +694,9 @@ class ResultAnalyzer:
             sorted_indices = np.argsort(effect_size)[::-1]  # 从大到小排序
             sorted_effect_sizes = effect_size[sorted_indices]
             neuron_numbers = sorted_indices + 1  # +1 for 1-based indexing
+            
+            # 保存排好序的神经元ID
+            behavior_sorted_neurons[behavior] = neuron_numbers
             
             # 将该行为的所有神经元效应量数据添加到列表中
             effect_size_data.append({
@@ -729,6 +735,22 @@ class ResultAnalyzer:
         csv_path = os.path.join(self.config.analysis_dir, 'neuron_effect_sizes.csv')
         all_neurons_df.to_csv(csv_path)
         print(f"\n所有神经元的效应量数据已保存到: {csv_path}")
+        
+        # 保存神经元排序数据到CSV文件
+        neuron_ranking_df = pd.DataFrame()
+        for behavior, neuron_ids in behavior_sorted_neurons.items():
+            # 创建一个行，包含行为名称和按效应量排序的神经元ID
+            row_data = {f'Rank_{i+1}': int(neuron_id) for i, neuron_id in enumerate(neuron_ids)}
+            row_data['Behavior'] = behavior
+            neuron_ranking_df = pd.concat([neuron_ranking_df, pd.DataFrame([row_data])], ignore_index=True)
+        
+        # 设置'Behavior'列为索引
+        neuron_ranking_df.set_index('Behavior', inplace=True)
+        
+        # 保存到CSV文件
+        ranking_csv_path = os.path.join(self.config.analysis_dir, 'neuron_ranking_by_effect_size.csv')
+        neuron_ranking_df.to_csv(ranking_csv_path)
+        print(f"\n按效应量排序的神经元ID已保存到: {ranking_csv_path}")
         
         # Plot results
         plt.figure(figsize=self.config.visualization_params['figure_sizes']['key_neurons'])
