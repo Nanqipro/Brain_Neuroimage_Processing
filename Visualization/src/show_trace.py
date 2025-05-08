@@ -23,7 +23,6 @@ def parse_args():
                         help='CD1标签前的时间戳数量')
     parser.add_argument('--after-stamps', type=int, default=100,
                         help='CD1标签后的时间戳数量')
-    # 阴影区域参数已被移除
     parser.add_argument('--sampling-rate', type=float, default=4.8,
                         help='采样频率(Hz)，默认为4.8Hz')
     return parser.parse_args()
@@ -205,7 +204,6 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
         cd1_index: CD1标签首次出现的索引
         n_stamps: 要绘制的时间戳数量
         output_path: 输出图像路径
-        show_shadow: 是否显示标准差阴影区域
         sampling_rate: 采样频率(Hz)
     """
     if cd1_index is None or cd1_index < n_stamps:
@@ -276,7 +274,6 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
         cd1_index: CD1标签首次出现的索引
         n_stamps: 要绘制的时间戳数量
         output_path: 输出图像路径
-        show_shadow: 是否显示标准差阴影区域
         sampling_rate: 采样频率(Hz)
     """
     if cd1_index is None:
@@ -350,7 +347,6 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
         before_stamps: CD1标签前的时间戳数量
         after_stamps: CD1标签后的时间戳数量
         output_path: 输出图像路径
-        show_shadow: 是否显示标准差阴影区域
         sampling_rate: 采样频率(Hz)
     """
     if cd1_index is None:
@@ -392,33 +388,57 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     # Group 1 - 绿色
     plt.plot(before_data['relative_time'], before_data['group1_avg'], 
              color=GROUP_COLORS['group1'], label='Group 1', linewidth=4)
-    # 阴影区域显示已移除
+    # 添加阴影区域表示标准差
+    plt.fill_between(before_data['relative_time'], 
+                    before_data['group1_avg'] - before_data['group1_std'], 
+                    before_data['group1_avg'] + before_data['group1_std'], 
+                    color=GROUP_COLORS['group1'], alpha=0.3)
     
     # Group 2 - 黄色
     plt.plot(before_data['relative_time'], before_data['group2_avg'], 
              color=GROUP_COLORS['group2'], label='Group 2', linewidth=4)
-    # 阴影区域显示已移除
+    # 添加阴影区域表示标准差
+    plt.fill_between(before_data['relative_time'], 
+                    before_data['group2_avg'] - before_data['group2_std'], 
+                    before_data['group2_avg'] + before_data['group2_std'], 
+                    color=GROUP_COLORS['group2'], alpha=0.3)
     
     # Group 3 - 灰色虚线
     plt.plot(before_data['relative_time'], before_data['group3_avg'], 
              color=GROUP_COLORS['group3'], label='Group 3', linewidth=4, linestyle='--')
-    # 阴影区域显示已移除
+    # 添加阴影区域表示标准差
+    plt.fill_between(before_data['relative_time'], 
+                    before_data['group3_avg'] - before_data['group3_std'], 
+                    before_data['group3_avg'] + before_data['group3_std'], 
+                    color=GROUP_COLORS['group3'], alpha=0.3)
     
     # 绘制CD1后的轨迹
     # Group 1 - 绿色
     plt.plot(after_data['relative_time'], after_data['group1_avg'], 
              color=GROUP_COLORS['group1'], linewidth=4)
-    # 阴影区域显示已移除
+    # 添加阴影区域表示标准差
+    plt.fill_between(after_data['relative_time'], 
+                    after_data['group1_avg'] - after_data['group1_std'], 
+                    after_data['group1_avg'] + after_data['group1_std'], 
+                    color=GROUP_COLORS['group1'], alpha=0.3)
     
     # Group 2 - 黄色
     plt.plot(after_data['relative_time'], after_data['group2_avg'], 
              color=GROUP_COLORS['group2'], linewidth=4)
-    # 阴影区域显示已移除
+    # 添加阴影区域表示标准差
+    plt.fill_between(after_data['relative_time'], 
+                    after_data['group2_avg'] - after_data['group2_std'], 
+                    after_data['group2_avg'] + after_data['group2_std'], 
+                    color=GROUP_COLORS['group2'], alpha=0.3)
     
     # Group 3 - 灰色虚线
     plt.plot(after_data['relative_time'], after_data['group3_avg'], 
              color=GROUP_COLORS['group3'], linewidth=4, linestyle='--')
-    # 阴影区域显示已移除
+    # 添加阴影区域表示标准差
+    plt.fill_between(after_data['relative_time'], 
+                    after_data['group3_avg'] - after_data['group3_std'], 
+                    after_data['group3_avg'] + after_data['group3_std'], 
+                    color=GROUP_COLORS['group3'], alpha=0.3)
     
     # 添加图例和标签
     plt.legend(fontsize=12)
@@ -579,7 +599,7 @@ def main():
     output_combined_cd1 = os.path.join(args.output_dir, "trace_combined_cd1.png")
     output_topology = os.path.join(args.output_dir, "neuron_topology.png")
     
-    # 阴影区域控制已被移除
+    # 所有图形都会显示阴影区域
     
     # 绘制CD1标签前的轨迹图
     plot_trace_before_cd1(data_with_avgs, cd1_index, args.before_stamps, output_before_cd1, 
