@@ -232,30 +232,30 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, show_shadow=Tr
     # 使用统一的颜色方案绘制三条曲线及其阴影区域
     # Group 1 - 绿色
     plt.plot(plot_data['relative_time'], plot_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], label='Group 1', linewidth=2)
+             color=GROUP_COLORS['group1'], label='Group 1', linewidth=4)
     if show_shadow:
         plt.fill_between(plot_data['relative_time'], 
                          plot_data['group1_avg'] - plot_data['group1_std'],
                          plot_data['group1_avg'] + plot_data['group1_std'],
-                         color=GROUP_COLORS['group1'], alpha=0.2)
+                         color=GROUP_COLORS['group1'], alpha=0.25)
     
     # Group 2 - 黄色
     plt.plot(plot_data['relative_time'], plot_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], label='Group 2', linewidth=2)
+             color=GROUP_COLORS['group2'], label='Group 2', linewidth=4)
     if show_shadow:
         plt.fill_between(plot_data['relative_time'], 
                          plot_data['group2_avg'] - plot_data['group2_std'],
                          plot_data['group2_avg'] + plot_data['group2_std'],
-                         color=GROUP_COLORS['group2'], alpha=0.2)
+                         color=GROUP_COLORS['group2'], alpha=0.25)
     
     # Group 3 - 黑色
     plt.plot(plot_data['relative_time'], plot_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], label='Group 3', linewidth=2)
+             color=GROUP_COLORS['group3'], label='Group 3', linewidth=4)
     if show_shadow:
         plt.fill_between(plot_data['relative_time'], 
                          plot_data['group3_avg'] - plot_data['group3_std'],
                          plot_data['group3_avg'] + plot_data['group3_std'],
-                         color=GROUP_COLORS['group3'], alpha=0.2)
+                         color=GROUP_COLORS['group3'], alpha=0.25)
     
     # 添加图例和标签
     plt.legend(fontsize=12)
@@ -267,7 +267,7 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, show_shadow=Tr
     plt.ylim([-0.3, 0.5])
     
     # 添加垂直线标记CD1出现时间点
-    plt.axvline(x=plot_data['relative_time'].max(), color='k', linestyle='--', linewidth=2)
+    plt.axvline(x=plot_data['relative_time'].max(), color='k', linestyle='--', linewidth=3)
     plt.text(plot_data['relative_time'].max()-5, 0.35, 'CD1', fontsize=14)
     
     # 网格线
@@ -317,30 +317,30 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, show_shadow=Tru
     # 使用统一的颜色方案绘制三条曲线及其阴影区域
     # Group 1 - 绿色
     plt.plot(plot_data['relative_time'], plot_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], label='Group 1', linewidth=2)
+             color=GROUP_COLORS['group1'], label='Group 1', linewidth=4)
     if show_shadow:
         plt.fill_between(plot_data['relative_time'], 
                          plot_data['group1_avg'] - plot_data['group1_std'],
                          plot_data['group1_avg'] + plot_data['group1_std'],
-                         color=GROUP_COLORS['group1'], alpha=0.2)
+                         color=GROUP_COLORS['group1'], alpha=0.25)
     
     # Group 2 - 黄色
     plt.plot(plot_data['relative_time'], plot_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], label='Group 2', linewidth=2)
+             color=GROUP_COLORS['group2'], label='Group 2', linewidth=4)
     if show_shadow:
         plt.fill_between(plot_data['relative_time'], 
                          plot_data['group2_avg'] - plot_data['group2_std'],
                          plot_data['group2_avg'] + plot_data['group2_std'],
-                         color=GROUP_COLORS['group2'], alpha=0.2)
+                         color=GROUP_COLORS['group2'], alpha=0.25)
     
     # Group 3 - 黑色
     plt.plot(plot_data['relative_time'], plot_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], label='Group 3', linewidth=2)
+             color=GROUP_COLORS['group3'], label='Group 3', linewidth=4)
     if show_shadow:
         plt.fill_between(plot_data['relative_time'], 
                          plot_data['group3_avg'] - plot_data['group3_std'],
                          plot_data['group3_avg'] + plot_data['group3_std'],
-                         color=GROUP_COLORS['group3'], alpha=0.2)
+                         color=GROUP_COLORS['group3'], alpha=0.25)
     
     # 添加图例和标签
     plt.legend(fontsize=12)
@@ -352,7 +352,7 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, show_shadow=Tru
     plt.ylim([-0.3, 0.5])
     
     # 添加垂直线标记CD1出现时间点
-    plt.axvline(x=0, color='k', linestyle='--', linewidth=2)
+    plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
     plt.text(5, 0.35, 'CD1', fontsize=14)
     
     # 网格线
@@ -416,58 +416,58 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     # 绘制CD1前的轨迹
     # Group 1 - 绿色
     plt.plot(before_data['relative_time'], before_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], label='Group 1', linewidth=2)
+             color=GROUP_COLORS['group1'], label='Group 1', linewidth=4)
     if show_shadow:
         plt.fill_between(before_data['relative_time'], 
                          before_data['group1_avg'] - before_data['group1_std'],
                          before_data['group1_avg'] + before_data['group1_std'],
-                         color=GROUP_COLORS['group1'], alpha=0.2)
+                         color=GROUP_COLORS['group1'], alpha=0.25)
     
     # Group 2 - 黄色
     plt.plot(before_data['relative_time'], before_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], label='Group 2', linewidth=2)
+             color=GROUP_COLORS['group2'], label='Group 2', linewidth=4)
     if show_shadow:
         plt.fill_between(before_data['relative_time'], 
                          before_data['group2_avg'] - before_data['group2_std'],
                          before_data['group2_avg'] + before_data['group2_std'],
-                         color=GROUP_COLORS['group2'], alpha=0.2)
+                         color=GROUP_COLORS['group2'], alpha=0.25)
     
     # Group 3 - 黑色
     plt.plot(before_data['relative_time'], before_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], label='Group 3', linewidth=2)
+             color=GROUP_COLORS['group3'], label='Group 3', linewidth=4)
     if show_shadow:
         plt.fill_between(before_data['relative_time'], 
                          before_data['group3_avg'] - before_data['group3_std'],
                          before_data['group3_avg'] + before_data['group3_std'],
-                         color=GROUP_COLORS['group3'], alpha=0.2)
+                         color=GROUP_COLORS['group3'], alpha=0.25)
     
     # 绘制CD1后的轨迹
     # Group 1 - 绿色
     plt.plot(after_data['relative_time'], after_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], linewidth=2)
+             color=GROUP_COLORS['group1'], linewidth=4)
     if show_shadow:
         plt.fill_between(after_data['relative_time'], 
                          after_data['group1_avg'] - after_data['group1_std'],
                          after_data['group1_avg'] + after_data['group1_std'],
-                         color=GROUP_COLORS['group1'], alpha=0.2)
+                         color=GROUP_COLORS['group1'], alpha=0.25)
     
     # Group 2 - 黄色
     plt.plot(after_data['relative_time'], after_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], linewidth=2)
+             color=GROUP_COLORS['group2'], linewidth=4)
     if show_shadow:
         plt.fill_between(after_data['relative_time'], 
                          after_data['group2_avg'] - after_data['group2_std'],
                          after_data['group2_avg'] + after_data['group2_std'],
-                         color=GROUP_COLORS['group2'], alpha=0.2)
+                         color=GROUP_COLORS['group2'], alpha=0.25)
     
     # Group 3 - 黑色
     plt.plot(after_data['relative_time'], after_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], linewidth=2)
+             color=GROUP_COLORS['group3'], linewidth=4)
     if show_shadow:
         plt.fill_between(after_data['relative_time'], 
                          after_data['group3_avg'] - after_data['group3_std'],
                          after_data['group3_avg'] + after_data['group3_std'],
-                         color=GROUP_COLORS['group3'], alpha=0.2)
+                         color=GROUP_COLORS['group3'], alpha=0.25)
     
     # 添加图例和标签
     plt.legend(fontsize=12)
@@ -479,7 +479,7 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     plt.ylim([-0.3, 0.5])
     
     # 添加垂直线标记CD1出现时间点
-    plt.axvline(x=0, color='k', linestyle='--', linewidth=2)
+    plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
     plt.text(0.05, 0.35, 'CD1', fontsize=14)
     
     # 在图中标记CD1前后
