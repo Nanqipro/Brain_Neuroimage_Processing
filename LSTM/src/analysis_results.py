@@ -820,14 +820,41 @@ class ResultAnalyzer:
         behavior_nodes = [node for node in G.nodes() if G.nodes[node]['node_type'] == 'behavior']
         neuron_nodes = [node for node in G.nodes() if G.nodes[node]['node_type'] == 'neuron']
         
+        # 计算每个神经元节点的度数（即连接的行为数量）
+        neuron_degrees = {}
+        for node in neuron_nodes:
+            # 计算与行为节点的连接数量
+            neighbors = list(G.neighbors(node))
+            behavior_connections = [n for n in neighbors if n in behavior_nodes]
+            neuron_degrees[node] = len(behavior_connections)
+        
+        # 获取度数范围
+        if neuron_degrees:
+            min_degree = min(neuron_degrees.values())
+            max_degree = max(neuron_degrees.values())
+            # 创建归一化器，将度数映射到0-1范围
+            norm = plt.Normalize(min_degree, max(max_degree, min_degree+1))  # 确保有范围差异
+            
+            # 创建颜色映射
+            cmap = plt.cm.YlGn  # 使用YlGn（黄绿）色谱，深色表示度数高
+            
+            # 为每个神经元节点分配颜色
+            neuron_colors = [cmap(norm(neuron_degrees[node])) for node in neuron_nodes]
+        else:
+            # 如果没有神经元度数数据，使用默认颜色
+            neuron_colors = ['lightgreen'] * len(neuron_nodes)
+        
+        # 绘制行为节点
         nx.draw_networkx_nodes(G, pos, nodelist=behavior_nodes, 
                              node_color='lightblue', node_size=2000, alpha=0.7)
+        
+        # 绘制神经元节点，使用基于度数的颜色
         nx.draw_networkx_nodes(G, pos, nodelist=neuron_nodes,
-                             node_color='lightgreen', node_size=1500, alpha=0.7)
+                             node_color=neuron_colors, node_size=1500, alpha=0.7)
         
         # 根据权重绘制边
         edges = G.edges(data=True)
-        weights = [d['weight'] for (u, v, d) in edges]
+        weights = [d['weight'] * 3 for (u, v, d) in edges]  # 乘以3使权重更明显
         nx.draw_networkx_edges(G, pos, width=weights, alpha=0.5)
         
         # 添加标签 - 行为节点使用原始标签，神经元节点使用数字ID
@@ -839,6 +866,29 @@ class ResultAnalyzer:
         # 绘制神经元ID标签
         nx.draw_networkx_labels(G, pos, labels=neuron_labels, font_size=16, font_color='black', font_weight='bold')
         
+        # 添加度数信息到图例
+        if neuron_degrees:
+            # 创建图例句柄
+            legend_elements = []
+            if max_degree > min_degree:
+                # 创建3个示例点表示不同度数范围
+                degree_ranges = [min_degree, (min_degree + max_degree) // 2, max_degree]
+                for degree in degree_ranges:
+                    color = cmap(norm(degree))
+                    legend_elements.append(
+                        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color,
+                                 markersize=18, label=f'Connected to {degree} behaviors')
+                    )
+            # 在图的右上角添加图例
+            legend = plt.legend(handles=legend_elements, loc='upper right', 
+                             title='Neuron Degree', fontsize=20,
+                             title_fontsize=22,
+                             framealpha=0.9,  # 增加图例背景不透明度
+                             edgecolor='gray')  # 添加图例边框
+            
+            # 增加图例的标题字体粗细
+            plt.setp(legend.get_title(), fontweight='bold')
+        
         plt.title('Behavior-Neuron Interaction Network', fontsize=22, pad=20)
         plt.axis('off')
         plt.tight_layout()
@@ -846,6 +896,14 @@ class ResultAnalyzer:
                    dpi=self.config.visualization_params['dpi'])
         plt.close()
         print(f"行为-神经元网络关系图已保存至: {self.config.network_plot}")
+        
+        # 输出神经元度数统计
+        if neuron_degrees:
+            print("\n神经元连接度统计:")
+            for node, degree in sorted(neuron_degrees.items(), key=lambda x: x[1], reverse=True):
+                print(f"  {node} (ID: {G.nodes[node]['id']}): 连接 {degree} 个行为")
+                
+        return G  # 返回图对象以便进一步分析
 
     def build_neuron_network(self, X_scaled: np.ndarray, threshold: float = 0.4) -> Tuple[nx.Graph, np.ndarray, List[str], float]:
         """
