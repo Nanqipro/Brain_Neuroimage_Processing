@@ -47,7 +47,6 @@ from neuron_lstm import (
 )
 from kmeans_lstm_analysis import NeuronDataProcessor
 from analysis_config import AnalysisConfig
-from visualization import VisualizationManager  # 确保导入VisualizationManager
 
 
 
@@ -185,8 +184,6 @@ class ResultAnalyzer:
         self.config = config
         self.processor = NeuronDataProcessor(config)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # 创建可视化管理器实例
-        self.visualizer = VisualizationManager(config)
         
     def balance_data(self, X: np.ndarray, y: np.ndarray, min_samples: int) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -425,9 +422,32 @@ class ResultAnalyzer:
         behavior_activity_df = pd.DataFrame(behavior_means).T
         behavior_activity_df.columns = [f'Neuron {i+1}' for i in range(behavior_activity_df.shape[1])]
         
-        # 使用VisualizationManager绘制相关性热图
-        self.visualizer.plot_behavior_neuron_correlation(behavior_activity_df)
-        print(f"行为-神经元相关性分析结果已保存到: {self.config.correlation_plot}")
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['correlation'])
+        
+        # 设置字体样式
+        plt.rcParams['font.family'] = 'Arial'
+        
+        sns.heatmap(behavior_activity_df, 
+                   cmap=self.config.visualization_params['colormaps']['correlation'],
+                   center=0,
+                   annot=False,  # 移除数字标注
+                   cbar_kws={'label': 'Correlation Coefficient'})
+        
+        plt.title('Average Correlation between Behaviors and Neuron Activities', 
+                 fontsize=14, 
+                 fontfamily='Arial')
+        plt.xlabel('Neurons', fontsize=12, fontfamily='Arial')
+        plt.ylabel('Behaviors', fontsize=12, fontfamily='Arial')
+        plt.xticks(fontsize=10, fontfamily='Arial')
+        plt.yticks(fontsize=10, fontfamily='Arial')
+        
+        # 调整布局以确保所有标签都可见
+        plt.tight_layout()
+        
+        plt.savefig(self.config.correlation_plot, 
+                   dpi=self.config.visualization_params['dpi'],
+                   bbox_inches='tight')
+        plt.close()
         
         return behavior_activity_df
     
@@ -543,9 +563,65 @@ class ResultAnalyzer:
         # 确保输出目录存在
         os.makedirs(self.config.temporal_pattern_dir, exist_ok=True)
         
-        # 使用VisualizationManager绘制时间模式图
-        self.visualizer.plot_temporal_patterns(X_scaled, y, self.behavior_labels)
-        print(f"时间模式分析完成。结果保存在: {self.config.temporal_pattern_dir}")
+        # 获取配置的窗口大小
+        window_size = self.config.analysis_params['temporal_window_size']
+        min_samples_required = 3  # 最少需要3个时间点才能看出趋势
+        
+        for behavior_idx, behavior in enumerate(self.behavior_labels):
+            print(f"处理行为: {behavior}")
+            behavior_mask = (y == behavior_idx)
+            behavior_data = X_scaled[behavior_mask]
+            
+            # 根据数据长度动态调整窗口大小
+            actual_window_size = min(window_size, len(behavior_data) // 3)
+            
+            if len(behavior_data) >= min_samples_required:
+                try:
+                    # 计算移动平均
+                    rolling_mean = np.array([
+                        np.mean(behavior_data[i:i+actual_window_size], axis=0) 
+                        for i in range(0, len(behavior_data)-actual_window_size+1, max(1, actual_window_size//2))
+                    ])
+                    
+                    if len(rolling_mean) > 0:
+                        plt.figure(figsize=(15, 8))  # 增加图表大小以适应更多神经元
+                        
+                        # 显示前10个神经元的活动
+                        colors = plt.cm.tab10(np.linspace(0, 1, 10))  # 使用10种不同的颜色
+                        for neuron in range(min(10, rolling_mean.shape[1])):
+                            plt.plot(
+                                rolling_mean[:, neuron],
+                                label=f'Neuron {neuron+1}',
+                                linewidth=self.config.visualization_params['line_width'],
+                                color=colors[neuron]
+                            )
+                        
+                        plt.title(f'Neuron Activity Temporal Pattern During {behavior}\n(Window Size: {actual_window_size})', fontsize=14)
+                        plt.xlabel('Time Window', fontsize=12)
+                        plt.ylabel('Normalized Activity', fontsize=12)
+                        plt.xticks(fontsize=11)
+                        plt.yticks(fontsize=11)
+                        plt.legend(fontsize=11, bbox_to_anchor=(1.05, 1), loc='upper left')
+                        plt.tight_layout()
+                        
+                        # 保存图表
+                        output_path = self.config.get_temporal_pattern_path(behavior)
+                        plt.savefig(
+                            output_path,
+                            dpi=self.config.visualization_params['dpi'],
+                            bbox_inches='tight'
+                        )
+                        plt.close()
+                        print(f"已保存时间模式图表: {output_path}")
+                    else:
+                        print(f"警告: 行为 {behavior} 的时间序列计算结果为空")
+                        
+                except Exception as e:
+                    print(f"警告: 处理行为 {behavior} 时出错: {str(e)}")
+                    plt.close()  # 确保关闭图表
+                    
+            else:
+                print(f"警告: 行为 {behavior} 的样本数量({len(behavior_data)})不足以进行时间模式分析，需要至少{min_samples_required}个样本")
     
     def analyze_behavior_transitions(self, y):
         """
@@ -564,9 +640,22 @@ class ResultAnalyzer:
         row_sums = transitions.sum(axis=1)
         transitions_norm = transitions / row_sums[:, np.newaxis]
         
-        # 使用VisualizationManager绘制行为转换矩阵热图
-        self.visualizer.plot_behavior_transitions(transitions_norm, self.behavior_labels)
-        print(f"行为转换分析完成。结果保存在: {self.config.transition_plot}")
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['transitions'])
+        sns.heatmap(transitions_norm, 
+                   xticklabels=self.behavior_labels,
+                   yticklabels=self.behavior_labels,
+                   cmap=self.config.visualization_params['colormaps']['transitions'],
+                   annot=True,
+                   fmt='.2f',
+                   annot_kws={'size': 10},
+                   cbar_kws={'label': 'Transition Probability'})
+        plt.title('Behavior Transition Probability Matrix', fontsize=14)
+        plt.xlabel('Target Behavior', fontsize=12)
+        plt.ylabel('Initial Behavior', fontsize=12)
+        plt.xticks(fontsize=11, rotation=45)
+        plt.yticks(fontsize=11, rotation=0)
+        plt.savefig(self.config.transition_plot)
+        plt.close()
         
         return transitions_norm
     
@@ -695,6 +784,68 @@ class ResultAnalyzer:
         plt.savefig(self.config.key_neurons_plot, dpi=300, bbox_inches='tight')
         plt.close()
         return behavior_importance
+
+    def plot_neuron_network(self, behavior_importance):
+        """
+        绘制行为-神经元网络关系图
+        
+        参数:
+            behavior_importance: 包含行为重要性数据的字典
+        """
+        print("\n绘制行为-神经元网络关系图...")
+        G = nx.Graph()
+        
+        # 添加节点和边
+        neuron_counter = 1
+        neuron_id_map = {}  # 用于跟踪神经元编号
+        
+        for behavior, data in behavior_importance.items():
+            G.add_node(behavior, node_type='behavior')
+            for neuron, effect in zip(data['neurons'], data['effect_sizes']):
+                neuron_name = f'N{neuron}'
+                if neuron_name not in neuron_id_map:
+                    neuron_id_map[neuron_name] = neuron_counter
+                    neuron_counter += 1
+                G.add_node(neuron_name, node_type='neuron', id=neuron_id_map[neuron_name])
+                if effect > self.config.analysis_params['neuron_significance_threshold']:
+                    G.add_edge(behavior, neuron_name, weight=effect)
+        
+        # 创建布局
+        pos = nx.spring_layout(G, k=1, iterations=50)
+        
+        # 绘制图形
+        plt.figure(figsize=self.config.visualization_params['figure_sizes']['network'])
+        
+        # 绘制节点
+        behavior_nodes = [node for node in G.nodes() if G.nodes[node]['node_type'] == 'behavior']
+        neuron_nodes = [node for node in G.nodes() if G.nodes[node]['node_type'] == 'neuron']
+        
+        nx.draw_networkx_nodes(G, pos, nodelist=behavior_nodes, 
+                             node_color='lightblue', node_size=2000, alpha=0.7)
+        nx.draw_networkx_nodes(G, pos, nodelist=neuron_nodes,
+                             node_color='lightgreen', node_size=1500, alpha=0.7)
+        
+        # 根据权重绘制边
+        edges = G.edges(data=True)
+        weights = [d['weight'] for (u, v, d) in edges]
+        nx.draw_networkx_edges(G, pos, width=weights, alpha=0.5)
+        
+        # 添加标签 - 行为节点使用原始标签，神经元节点使用数字ID
+        behavior_labels = {node: node for node in behavior_nodes}
+        neuron_labels = {node: str(G.nodes[node]['id']) for node in neuron_nodes}
+        
+        # 绘制行为标签
+        nx.draw_networkx_labels(G, pos, labels=behavior_labels, font_size=20)
+        # 绘制神经元ID标签
+        nx.draw_networkx_labels(G, pos, labels=neuron_labels, font_size=16, font_color='black', font_weight='bold')
+        
+        plt.title('Behavior-Neuron Interaction Network', fontsize=22, pad=20)
+        plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(self.config.network_plot,
+                   dpi=self.config.visualization_params['dpi'])
+        plt.close()
+        print(f"行为-神经元网络关系图已保存至: {self.config.network_plot}")
 
     def build_neuron_network(self, X_scaled: np.ndarray, threshold: float = 0.4) -> Tuple[nx.Graph, np.ndarray, List[str], float]:
         """
@@ -1283,11 +1434,97 @@ class ResultAnalyzer:
         
     def visualize_community_behavior_network(self, G, community_behavior_mapping, output_path):
         """
-        可视化基于社区划分的神经元网络
-        为了使用VisualizationManager，我们将这个方法封装为调用visualizer的相应方法
+        可视化基于社区划分的神经元网络，不同社区使用不同颜色，并根据行为关联标注
+        
+        参数：
+            G: networkx图对象
+            community_behavior_mapping: 社区-行为映射字典
+            output_path: 输出文件路径
         """
-        # 调用visualizer的neuron_network方法来可视化
-        self.visualizer.plot_neuron_network(community_behavior_mapping)
+        plt.figure(figsize=(16, 16))
+        
+        # 创建颜色映射
+        unique_behaviors = list(set([data['behavior'] for data in community_behavior_mapping.values()]))
+        behavior_colors = plt.cm.tab10(np.linspace(0, 1, len(unique_behaviors)))
+        behavior_color_map = {b: behavior_colors[i] for i, b in enumerate(unique_behaviors)}
+        
+        # 创建节点颜色映射
+        node_colors = {}
+        node_communities = {}
+        for comm_id, data in community_behavior_mapping.items():
+            behavior = data['behavior']
+            color = behavior_color_map[behavior]
+            for node in data['neurons']:
+                node_colors[node] = color
+                node_communities[node] = comm_id
+        
+        # 使用spring布局 - 这里我们控制随机种子以确保每次可视化结果一致
+        pos = nx.spring_layout(G, seed=42, k=0.3)
+        
+        # 绘制节点
+        for node in G.nodes():
+            if node in node_colors:
+                nx.draw_networkx_nodes(G, pos, nodelist=[node], 
+                                     node_color=[node_colors[node]], 
+                                     node_size=100, alpha=0.8)
+            else:
+                # 对于没有社区的节点，使用灰色
+                nx.draw_networkx_nodes(G, pos, nodelist=[node], 
+                                     node_color=['lightgray'], 
+                                     node_size=50, alpha=0.5)
+        
+        # 绘制边 - 根据是否连接同一社区的节点使用不同透明度
+        same_community_edges = []
+        diff_community_edges = []
+        for u, v in G.edges():
+            if u in node_communities and v in node_communities:
+                if node_communities[u] == node_communities[v]:
+                    same_community_edges.append((u, v))
+                else:
+                    diff_community_edges.append((u, v))
+            else:
+                diff_community_edges.append((u, v))
+        
+        # 同一社区内的边使用高透明度
+        nx.draw_networkx_edges(G, pos, edgelist=same_community_edges, 
+                             width=1.5, alpha=0.7, edge_color='gray')
+        # 不同社区之间的边使用低透明度
+        nx.draw_networkx_edges(G, pos, edgelist=diff_community_edges, 
+                             width=0.5, alpha=0.2, edge_color='lightgray')
+        
+        # 添加社区标签
+        # 计算每个社区的中心位置
+        community_centers = {}
+        for comm_id, data in community_behavior_mapping.items():
+            comm_nodes = data['neurons']
+            if not comm_nodes:
+                continue
+            # 计算社区节点的平均位置
+            center_x = np.mean([pos[node][0] for node in comm_nodes if node in pos])
+            center_y = np.mean([pos[node][1] for node in comm_nodes if node in pos])
+            community_centers[comm_id] = (center_x, center_y)
+        
+        # 绘制社区标签
+        for comm_id, center in community_centers.items():
+            behavior = community_behavior_mapping[comm_id]['behavior']
+            plt.text(center[0], center[1], 
+                    f"{comm_id}\n({behavior})", 
+                    fontsize=12, fontweight='bold', 
+                    ha='center', va='center',
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        
+        # 添加图例
+        legend_elements = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color, 
+                                    markersize=10, label=behavior) 
+                          for behavior, color in behavior_color_map.items()]
+        plt.legend(handles=legend_elements, loc='upper right', title='Behavior type')
+        
+        plt.title('Neural community-behavior association network', fontsize=16)
+        plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
         print(f"社区-行为网络可视化已保存到: {output_path}")
     
     def visualize_network_topology(self, G, metrics, modules):
@@ -2620,6 +2857,11 @@ pip install torch-geometric torch-scatter torch-sparse
             for i, (neuron, effect) in enumerate(zip(data['neurons'], data['effect_sizes'])):
                 custom_print(f"  神经元 {neuron}: 效应量 = {effect:.3f}")
         
+        # 绘制行为-神经元网络关系图
+        custom_print("\n绘制行为-神经元网络关系图...")
+        analyzer.plot_neuron_network(behavior_importance)
+        custom_print(f"行为-神经元网络关系图已保存至: {config.network_plot}")
+        
         custom_print("\n开始神经元网络拓扑分析...")
         # 构建神经元功能连接网络
         G, correlation_matrix, available_neurons, threshold = analyzer.build_neuron_network(
@@ -2687,8 +2929,9 @@ pip install torch-geometric torch-scatter torch-sparse
         
         # 生成交互式神经元网络可视化
         try:
-            # 不需要再次导入VisualizationManager，直接使用analyzer中的visualizer实例
-            interactive_path = analyzer.visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
+            from visualization import VisualizationManager
+            visualizer = VisualizationManager(config)
+            interactive_path = visualizer.plot_interactive_neuron_network(G, topology_metrics, functional_modules)
             if interactive_path:
                 custom_print(f"生成交互式神经元网络可视化完成。结果保存在: {interactive_path}")
         except Exception as e:
@@ -2696,14 +2939,15 @@ pip install torch-geometric torch-scatter torch-sparse
         
         # 尝试为主要连接也生成交互式可视化
         try:
-            # 不需要再次导入VisualizationManager，直接使用analyzer中的visualizer实例
+            from visualization import VisualizationManager
+            visualizer = VisualizationManager(config)
             for method in main_methods:
                 main_G = analyzer.extract_main_connections(
                     G, correlation_matrix, available_neurons,
                     method=method, threshold=0.4 if method == 'threshold' else None,
                     top_k=3 if method == 'top_edges' else None
                 )
-                interactive_path = analyzer.visualizer.plot_interactive_neuron_network(
+                interactive_path = visualizer.plot_interactive_neuron_network(
                     main_G, 
                     topology_metrics, 
                     functional_modules, 
