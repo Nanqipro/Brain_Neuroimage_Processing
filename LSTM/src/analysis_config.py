@@ -26,8 +26,8 @@ class AnalysisConfig:
         
         # 数据路径配置
         self.data_dir = os.path.join(self.base_dir, 'datasets')  # 数据集目录
-        self.data_file = os.path.join(self.data_dir, 'Day9_with_2label.xlsx')  # 原始数据文件
-        self.data_identifier = 'Day9_with_2label'  # 从数据文件名提取标识符
+        self.data_file = os.path.join(self.data_dir, 'Day3_with_2label.xlsx')  # 原始数据文件
+        self.data_identifier = 'Day3_with_2label'  # 从数据文件名提取标识符
         
         # 输出目录配置
         self.output_dir = os.path.join(self.base_dir, 'results')  # 结果输出总目录
@@ -103,7 +103,7 @@ class AnalysisConfig:
         self.batch_size: int = 64          # 批次大小：训练时的批量大小
         self.learning_rate: float = 0.001  # 学习率：模型训练的学习率
         self.num_epochs: int = 100         # 训练轮数：模型训练的总轮数
-        self.n_clusters: int = 3           # 聚类数量：K-means聚类的类别数
+        self.n_clusters: int = 6           # 聚类数量：K-means聚类的类别数
         self.test_size: float = 0.2        # 测试集比例：数据集中测试集的占比
         self.random_seed: int = 42         # 随机种子：确保结果可重复性
         
