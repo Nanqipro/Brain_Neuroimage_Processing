@@ -166,9 +166,19 @@ def save_model(model, optimizer, epoch, train_acc, test_acc, save_dir='models'):
     print(f'Model saved to {filename}')
     return filename
 
-def plot_results(train_losses, train_accs, test_accs, save_path=None):
-    """绘制训练结果"""
+def plot_results(train_losses, train_accs, test_accs, save_dir=None, save_path=None):
+    """
+    绘制训练结果
+    
+    参数:
+        train_losses: 训练损失列表
+        train_accs: 训练准确率列表
+        test_accs: 测试准确率列表
+        save_dir: 保存目录路径，如果提供，将保存到该目录下的training_results.png
+        save_path: 完整的保存路径（包括文件名），优先级高于save_dir
+    """
     import matplotlib.pyplot as plt
+    import os
     
     plt.figure(figsize=(12, 4))
     
@@ -190,7 +200,18 @@ def plot_results(train_losses, train_accs, test_accs, save_path=None):
     
     plt.tight_layout()
     
+    # 确定保存路径
+    final_save_path = None
     if save_path:
-        plt.savefig(save_path)
+        final_save_path = save_path
+    elif save_dir:
+        # 确保目录存在
+        os.makedirs(save_dir, exist_ok=True)
+        final_save_path = os.path.join(save_dir, 'training_results.png')
+    
+    # 保存图像
+    if final_save_path:
+        plt.savefig(final_save_path)
+        print(f"训练结果图已保存至: {final_save_path}")
     
     plt.show()
