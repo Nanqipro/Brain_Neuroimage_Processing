@@ -108,8 +108,10 @@ def create_dataset(features, labels, edge_index):
         x = torch.tensor(features[i], dtype=torch.float).reshape(1, feature_dim)
         y = torch.tensor(labels[i], dtype=torch.long)
         
+        # 为每个样本创建一个自环，保证索引在有效范围内
         sample_edge_index = torch.tensor([[0], [0]], dtype=torch.long)
         
+        # 使用单节点的自环代替全局edge_index
         data_obj = Data(x=x, edge_index=sample_edge_index, y=y)
         dataset.append(data_obj)
     

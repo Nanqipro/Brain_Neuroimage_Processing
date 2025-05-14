@@ -48,7 +48,8 @@ def train_evaluate(model, train_loader, test_loader, optimizer, criterion,
     
     train_losses, train_accs, test_accs = [], [], []
     
-    scaler = torch.cuda.amp.GradScaler() if torch.cuda.is_available() else None
+    # 使用新版本的GradScaler API
+    scaler = torch.amp.GradScaler('cuda') if torch.cuda.is_available() else None
     
     for epoch in range(1, epochs + 1):
         # training
@@ -62,7 +63,8 @@ def train_evaluate(model, train_loader, test_loader, optimizer, criterion,
             optimizer.zero_grad()
             
             if scaler is not None:
-                with torch.cuda.amp.autocast():
+                # 使用新版本的autocast API
+                with torch.amp.autocast('cuda'):
                     out = model(data)
                     loss = weighted_criterion(out, data.y)
                 

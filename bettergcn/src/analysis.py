@@ -19,20 +19,31 @@ class GCNVisualizer:
     """
     GCN模型可视化工具类，用于生成各种神经网络拓扑结构图
     """
-    def __init__(self, model_path='../results/best_model.pth', data_path='../dataset/EMtrace01.xlsx'):
+    def __init__(self, base_path='../datasets/EMtrace01_plus', model_file_name='_best_model.pth', data_file_name='.xlsx'):
         """
         初始化可视化器
         
         参数:
-            model_path: 训练好的模型路径
-            data_path: 原始数据路径
+            base_path: 基础路径，所有输入输出路径都基于此路径生成
+            model_file_name: 模型文件名后缀
+            data_file_name: 数据文件名后缀
         """
-        self.model_path = model_path
-        self.data_path = data_path
+        # 提取基础文件名（不含路径和扩展名）
+        self.dataset_name = os.path.basename(base_path)
+        
+        # 设置路径
+        self.base_path = base_path
+        self.model_path = f"../results/{self.dataset_name}{model_file_name}"
+        self.data_path = f"{base_path}{data_file_name}"
+        self.output_dir = f"../results/{self.dataset_name}"
+        
+        # 确保输出目录存在
+        os.makedirs(self.output_dir, exist_ok=True)
+        
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # 加载数据和模型
-        self.features, self.labels, self.encoder, _ = load_data(data_path)
+        self.features, self.labels, self.encoder, _ = load_data(self.data_path)
         self.num_classes = len(self.encoder.classes_)
         
         # 加载模型
@@ -94,7 +105,14 @@ class GCNVisualizer:
                 
         return np.vstack(embeddings)
     
-    def visualize_network(self, save_path='../results/network_visualization.png'):
+    def visualize_network(self, filename='network_visualization.png'):
+        """
+        可视化神经元之间的拓扑关系
+        
+        参数:
+            filename: 保存文件名
+        """
+        save_path = os.path.join(self.output_dir, filename)
         """
         可视化神经元之间的拓扑关系
         
@@ -161,7 +179,14 @@ class GCNVisualizer:
         
         print(f"神经元拓扑结构图已保存至: {save_path}")
     
-    def visualize_embeddings_2d(self, save_path='../results/embeddings_2d.png'):
+    def visualize_embeddings_2d(self, filename='embeddings_2d.png'):
+        """
+        使用t-SNE将节点嵌入可视化为2D散点图
+        
+        参数:
+            filename: 保存文件名
+        """
+        save_path = os.path.join(self.output_dir, filename)
         """
         使用t-SNE将节点嵌入可视化为2D散点图
         
@@ -205,7 +230,14 @@ class GCNVisualizer:
         
         print(f"节点嵌入2D可视化已保存至: {save_path}")
     
-    def visualize_embeddings_3d(self, save_path='../results/embeddings_3d.png'):
+    def visualize_embeddings_3d(self, filename='embeddings_3d.png'):
+        """
+        使用t-SNE将节点嵌入可视化为3D散点图
+        
+        参数:
+            filename: 保存文件名
+        """
+        save_path = os.path.join(self.output_dir, filename)
         """
         使用t-SNE将节点嵌入可视化为3D散点图
         
@@ -255,7 +287,14 @@ class GCNVisualizer:
         
         print(f"节点嵌入3D可视化已保存至: {save_path}")
     
-    def visualize_attention_weights(self, save_path='../results/attention_weights.png'):
+    def visualize_attention_weights(self, filename='attention_weights.png'):
+        """
+        可视化注意力权重 - 使用GAT层的注意力权重
+        
+        参数:
+            filename: 保存文件名
+        """
+        save_path = os.path.join(self.output_dir, filename)
         """
         可视化注意力权重 - 使用GAT层的注意力权重
         
@@ -339,7 +378,14 @@ class GCNVisualizer:
         
         print(f"注意力权重可视化已保存至: {save_path}")
     
-    def visualize_heatmap(self, save_path='../results/correlation_heatmap.png'):
+    def visualize_heatmap(self, filename='correlation_heatmap.png'):
+        """
+        可视化特征之间的相关性热力图
+        
+        参数:
+            filename: 保存文件名
+        """
+        save_path = os.path.join(self.output_dir, filename)
         """
         可视化特征之间的相关性热力图
         
@@ -379,8 +425,11 @@ def main():
     # 创建结果目录
     os.makedirs('../results', exist_ok=True)
     
+    # 设置数据集基础路径 - 只需修改此处即可更改所有相关路径
+    dataset_base_path = '../datasets/EMtrace01_plus'
+    
     # 初始化可视化器
-    visualizer = GCNVisualizer()
+    visualizer = GCNVisualizer(base_path=dataset_base_path)
     
     # 执行各种可视化
     print("正在生成神经元拓扑结构图...")
@@ -398,7 +447,7 @@ def main():
     print("正在生成特征相关性热力图...")
     visualizer.visualize_heatmap()
     
-    print("可视化分析完成！所有结果已保存到../results目录")
+    print(f"可视化分析完成！所有结果已保存到{visualizer.output_dir}目录")
 
 
 if __name__ == "__main__":

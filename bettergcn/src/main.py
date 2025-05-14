@@ -7,6 +7,7 @@ from model import ImprovedGCN
 from train import train_evaluate, plot_results
 from feature import extract_advanced_features, select_features
 from torch_geometric.loader import DataLoader
+import pathlib
 
 def set_seed(seed=42):
     random.seed(seed)
@@ -19,10 +20,25 @@ def set_seed(seed=42):
 
 if __name__ == '__main__':
     set_seed(42)
-    os.makedirs('../results', exist_ok=True)
     
-    # load data 
-    features, labels, encoder, class_weights = load_data('../dataset/EMtrace01.xlsx')
+    # 设置数据集基础路径 - 只需修改此处即可更改所有相关路径
+    dataset_name = 'EMtrace01_plus'
+    base_path = f'../datasets/{dataset_name}'
+    data_file = f'{base_path}.xlsx'
+    results_path = f'../results'
+    model_save_path = f'{results_path}/{dataset_name}_best_model.pth'
+    
+    # 创建结果目录
+    os.makedirs(results_path, exist_ok=True)
+    
+    # 打印当前使用的数据集和路径信息
+    print(f"使用数据集: {dataset_name}")
+    print(f"数据文件路径: {data_file}")
+    print(f"结果保存路径: {results_path}")
+    print(f"模型保存路径: {model_save_path}")
+    
+    # 加载数据 
+    features, labels, encoder, class_weights = load_data(data_file)
     train_features, test_features, train_labels, test_labels = split_data(
         features, labels, test_size=0.2, random_state=42
     )
@@ -65,11 +81,18 @@ if __name__ == '__main__':
         test_loader, 
         optimizer, 
         criterion, 
-        epochs=150,
-        patience=20,
+        epochs=100,
+        patience=10,
         class_weights=class_weights
     )
     
-    plot_results(train_losses, train_accs, test_accs)
+    # 创建特定于当前数据集的结果目录
+    dataset_results_path = f"{results_path}/{dataset_name}"
+    os.makedirs(dataset_results_path, exist_ok=True)
     
-    torch.save(model.state_dict(), '../results/EMtrace01_best_model.pth')
+    # 绘制并保存训练结果
+    plot_results(train_losses, train_accs, test_accs, save_dir=dataset_results_path)
+    
+    # 保存训练好的模型
+    torch.save(model.state_dict(), model_save_path)
+    print(f"模型已保存至: {model_save_path}")
