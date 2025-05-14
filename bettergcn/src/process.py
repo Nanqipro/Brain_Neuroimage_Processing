@@ -13,8 +13,27 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.neighbors import kneighbors_graph
 
 def load_data(data_path):
-    data = pd.read_csv(data_path)
-    features = data.loc[:, 'n1':'n53'].values
+    # 根据文件扩展名决定使用哪种方法读取数据
+    if data_path.endswith('.csv'):
+        data = pd.read_csv(data_path)
+    elif data_path.endswith('.xlsx') or data_path.endswith('.xls'):
+        data = pd.read_excel(data_path)
+    else:
+        raise ValueError(f"不支持的文件格式: {data_path}，请使用.csv或.xlsx/.xls格式")
+    
+    # 自动检测神经元特征列（假设所有神经元列都是以'n'开头后跟数字的格式）
+    neuron_cols = [col for col in data.columns if col.startswith('n') and col[1:].isdigit()]
+    
+    if not neuron_cols:
+        raise ValueError("未找到神经元特征列，请确保神经元列名以'n'开头后跟数字")
+    
+    print(f"自动检测到{len(neuron_cols)}个神经元特征列: {neuron_cols[:5]}...等")
+    
+    # 按照编号顺序排序神经元列
+    neuron_cols.sort(key=lambda x: int(x[1:]))
+    
+    # 提取特征和标签
+    features = data.loc[:, neuron_cols].values
     labels = data['behavior'].values
 
     class_counts = Counter(labels)

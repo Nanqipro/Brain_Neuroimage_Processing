@@ -19,10 +19,10 @@ def set_seed(seed=42):
 
 if __name__ == '__main__':
     set_seed(42)
-    os.makedirs('results', exist_ok=True)
+    os.makedirs('../results', exist_ok=True)
     
     # load data 
-    features, labels, encoder, class_weights = load_data(r'day3_CD.csv')
+    features, labels, encoder, class_weights = load_data('../dataset/EMtrace01.xlsx')
     train_features, test_features, train_labels, test_labels = split_data(
         features, labels, test_size=0.2, random_state=42
     )
@@ -72,4 +72,4 @@ if __name__ == '__main__':
     
     plot_results(train_losses, train_accs, test_accs)
     
-    torch.save(model.state_dict(), 'results/best_model.pth')
+    torch.save(model.state_dict(), '../results/EMtrace01_best_model.pth')
