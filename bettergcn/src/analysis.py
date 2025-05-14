@@ -87,14 +87,19 @@ class GCNVisualizer:
         # 创建数据集
         dataset = create_dataset(self.features, self.labels, self.edge_index)
         
+        # 确保模型在正确的设备上
+        self.model = self.model.to(self.device)
+        
         embeddings = []
         with torch.no_grad():
             for data in dataset:
+                # 将整个数据移动到设备上
                 data = data.to(self.device)
                 
                 # 提取中间层特征（修改forward方法或使用钩子）
                 # 这里我们直接使用模型的第一个卷积层输出作为节点嵌入
-                x, edge_index = data.x, data.edge_index
+                # 明确确保x和edge_index在同一设备上
+                x, edge_index = data.x.to(self.device), data.edge_index.to(self.device)
                 
                 # GCN第一层
                 x1 = self.model.conv1(x, edge_index)
@@ -287,97 +292,6 @@ class GCNVisualizer:
         
         print(f"节点嵌入3D可视化已保存至: {save_path}")
     
-    def visualize_attention_weights(self, filename='attention_weights.png'):
-        """
-        可视化注意力权重 - 使用GAT层的注意力权重
-        
-        参数:
-            filename: 保存文件名
-        """
-        save_path = os.path.join(self.output_dir, filename)
-        """
-        可视化注意力权重 - 使用GAT层的注意力权重
-        
-        参数:
-            save_path: 保存图像的路径
-        """
-        # 注意: 这需要模型中GAT层能够访问注意力权重
-        # 创建数据集
-        dataset = create_dataset(self.features, self.labels, self.edge_index)
-        
-        # 选择一个样本进行可视化
-        sample_idx = 0
-        data = dataset[sample_idx].to(self.device)
-        
-        # 使用模型获取注意力权重
-        with torch.no_grad():
-            # 模拟前向传播以获取注意力权重
-            x, edge_index = data.x, data.edge_index
-            
-            # GCN和SAGE层
-            x1 = self.model.conv1(x, edge_index)
-            x1 = self.model.bn1(x1)
-            x1 = torch.relu(x1)
-            
-            x2 = self.model.conv2(x1, edge_index)
-            x2 = self.model.bn2(x2)
-            x2 = torch.relu(x2)
-            
-            # GAT层 - 需要修改GAT层代码来返回注意力权重
-            # 这里简化为使用边的权重
-            edge_list = self.edge_index.t().numpy()
-            num_edges = edge_list.shape[0]
-            
-            # 随机生成注意力权重(实际应用中应获取真实权重)
-            attention_weights = np.random.rand(num_edges)
-            
-        # 构建图
-        G = nx.Graph()
-        
-        # 添加节点
-        for i in range(len(self.features)):
-            G.add_node(i, label=str(self.labels[i]))
-            
-        # 添加边并设置权重
-        for i, edge in enumerate(edge_list):
-            G.add_edge(edge[0], edge[1], weight=attention_weights[i])
-        
-        # 绘制图
-        plt.figure(figsize=(12, 10))
-        pos = nx.spring_layout(G, seed=42)
-        
-        # 获取边的权重用于设置宽度
-        edges = G.edges()
-        weights = [G[u][v]['weight'] * 3 for u, v in edges]  # 权重乘以3以增加可视性
-        
-        # 绘制节点
-        nx.draw_networkx_nodes(
-            G, pos, 
-            node_color=[plt.cm.viridis(x) for x in self.labels/max(self.labels)], 
-            node_size=100, 
-            alpha=0.8
-        )
-        
-        # 绘制边 - 宽度与注意力权重成比例
-        nx.draw_networkx_edges(
-            G, pos, 
-            width=weights, 
-            alpha=0.5, 
-            edge_color=weights,
-            edge_cmap=plt.cm.Blues
-        )
-        
-        plt.title('GCN Model Attention Weights Visualization')
-        plt.colorbar(plt.cm.ScalarMappable(cmap=plt.cm.Blues), 
-                     label='Attention Weight')
-        
-        # 保存图像
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        print(f"注意力权重可视化已保存至: {save_path}")
-    
     def visualize_heatmap(self, filename='correlation_heatmap.png'):
         """
         可视化特征之间的相关性热力图
@@ -440,10 +354,7 @@ def main():
     
     print("正在生成节点嵌入3D静态可视化...")
     visualizer.visualize_embeddings_3d()
-    
-    print("正在生成注意力权重可视化...")
-    visualizer.visualize_attention_weights()
-    
+     
     print("正在生成特征相关性热力图...")
     visualizer.visualize_heatmap()
     

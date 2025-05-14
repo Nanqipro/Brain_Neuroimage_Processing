@@ -45,7 +45,7 @@ if __name__ == '__main__':
     
     # feature engineering
     train_enhanced, pca_model = extract_advanced_features(train_features, is_train=True)
-    train_selected, selector = select_features(train_enhanced, train_labels, k=40, is_train=True)
+    train_selected, selector = select_features(train_enhanced, train_labels, k=35, is_train=True)
     test_enhanced, _ = extract_advanced_features(test_features, pca_model=pca_model, is_train=False)
     test_selected, _ = select_features(test_enhanced, test_labels, selector=selector, is_train=False)
     
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     
     # model
     model = ImprovedGCN(
-        num_features=40,  
+        num_features=35,  
         hidden_dim=64,
         num_classes=len(encoder.classes_), 
         dropout=0.3
