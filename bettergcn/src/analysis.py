@@ -6,8 +6,6 @@ import networkx as nx
 from torch_geometric.utils import to_networkx
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-import plotly.graph_objects as go
-import plotly.express as px
 from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D
@@ -148,11 +146,11 @@ class GCNVisualizer:
         
         # 为不同类别的节点添加标签
         class_labels = {i: f"Class {i}" for i in range(self.num_classes)}
-        plt.title('GCN神经元拓扑结构图')
+        plt.title('GCN Neural Topology Structure')
         
         # 添加图例
         for i in range(self.num_classes):
-            plt.scatter([], [], color=plt.cm.rainbow(i/self.num_classes), label=f'类别 {self.encoder.inverse_transform([i])[0]}')
+            plt.scatter([], [], color=plt.cm.rainbow(i/self.num_classes), label=f'Class {self.encoder.inverse_transform([i])[0]}')
         
         plt.legend()
         
@@ -195,10 +193,10 @@ class GCNVisualizer:
             s=50
         )
         
-        plt.colorbar(scatter, label='类别')
-        plt.title('GCN节点嵌入2D可视化')
-        plt.xlabel('t-SNE特征1')
-        plt.ylabel('t-SNE特征2')
+        plt.colorbar(scatter, label='Class')
+        plt.title('GCN Node Embedding 2D Visualization')
+        plt.xlabel('t-SNE Feature 1')
+        plt.ylabel('t-SNE Feature 2')
         
         # 保存图像
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -207,12 +205,12 @@ class GCNVisualizer:
         
         print(f"节点嵌入2D可视化已保存至: {save_path}")
     
-    def visualize_embeddings_3d(self, save_path='../results/embeddings_3d.html'):
+    def visualize_embeddings_3d(self, save_path='../results/embeddings_3d.png'):
         """
-        使用t-SNE将节点嵌入可视化为3D交互式散点图
+        使用t-SNE将节点嵌入可视化为3D散点图
         
         参数:
-            save_path: 保存HTML文件的路径
+            save_path: 保存图像的路径
         """
         # 提取节点嵌入
         embeddings = self.extract_node_embeddings()
@@ -228,39 +226,34 @@ class GCNVisualizer:
         tsne = TSNE(n_components=3, random_state=42)
         embeddings_3d = tsne.fit_transform(embeddings_pca)
         
-        # 创建DataFrame用于Plotly
-        import pandas as pd
-        df = pd.DataFrame({
-            'x': embeddings_3d[:, 0],
-            'y': embeddings_3d[:, 1],
-            'z': embeddings_3d[:, 2],
-            'class': [self.encoder.inverse_transform([label])[0] for label in self.labels]
-        })
+        # 创建3D静态散点图
+        fig = plt.figure(figsize=(12, 10))
+        ax = fig.add_subplot(111, projection='3d')
         
-        # 使用Plotly创建3D交互式散点图
-        fig = px.scatter_3d(
-            df, x='x', y='y', z='z',
-            color='class',
-            title='GCN节点嵌入3D可视化',
-            labels={'class': '类别'},
-            opacity=0.8
+        # 为不同类别使用不同颜色
+        scatter = ax.scatter(
+            embeddings_3d[:, 0], 
+            embeddings_3d[:, 1], 
+            embeddings_3d[:, 2],
+            c=self.labels,
+            cmap='viridis',
+            alpha=0.8,
+            s=50
         )
         
-        # 更新布局
-        fig.update_layout(
-            scene=dict(
-                xaxis_title='t-SNE特征1',
-                yaxis_title='t-SNE特征2',
-                zaxis_title='t-SNE特征3'
-            ),
-            margin=dict(l=0, r=0, b=0, t=40)
-        )
+        ax.set_title('GCN Node Embedding 3D Visualization')
+        ax.set_xlabel('t-SNE Feature 1')
+        ax.set_ylabel('t-SNE Feature 2')
+        ax.set_zlabel('t-SNE Feature 3')
         
-        # 保存为HTML文件（可交互）
+        plt.colorbar(scatter, ax=ax, label='Class')
+        
+        # 保存图像
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        fig.write_html(save_path)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
         
-        print(f"节点嵌入3D交互式可视化已保存至: {save_path}")
+        print(f"节点嵌入3D可视化已保存至: {save_path}")
     
     def visualize_attention_weights(self, save_path='../results/attention_weights.png'):
         """
@@ -335,9 +328,9 @@ class GCNVisualizer:
             edge_cmap=plt.cm.Blues
         )
         
-        plt.title('GCN模型注意力权重可视化')
+        plt.title('GCN Model Attention Weights Visualization')
         plt.colorbar(plt.cm.ScalarMappable(cmap=plt.cm.Blues), 
-                     label='注意力权重')
+                     label='Attention Weight')
         
         # 保存图像
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -364,10 +357,10 @@ class GCNVisualizer:
             center=0,
             square=True,
             annot=False,
-            cbar_kws={'label': '相关系数'}
+            cbar_kws={'label': 'Correlation Coefficient'}
         )
         
-        plt.title('特征相关性热力图')
+        plt.title('Feature Correlation Heatmap')
         plt.tight_layout()
         
         # 保存图像
@@ -396,7 +389,7 @@ def main():
     print("正在生成节点嵌入2D可视化...")
     visualizer.visualize_embeddings_2d()
     
-    print("正在生成节点嵌入3D可视化...")
+    print("正在生成节点嵌入3D静态可视化...")
     visualizer.visualize_embeddings_3d()
     
     print("正在生成注意力权重可视化...")
@@ -405,7 +398,7 @@ def main():
     print("正在生成特征相关性热力图...")
     visualizer.visualize_heatmap()
     
-    print("可视化分析完成！所有结果已保存到results目录")
+    print("可视化分析完成！所有结果已保存到../results目录")
 
 
 if __name__ == "__main__":
