@@ -6,6 +6,8 @@ import numpy as np
 import argparse
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvas
+from scipy.signal import find_peaks
+from scipy import stats
 
 # 自定义参数配置
 # 可以根据需要修改默认值
@@ -17,14 +19,25 @@ class Config:
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
+    # 排序方式：'peak'（默认，按峰值时间排序）或'calcium_wave'（按第一次真实钙波发生时间排序）
+    SORT_METHOD = 'peak'
+    # 钙波检测参数
+    CALCIUM_WAVE_THRESHOLD = 1.5  # 钙波阈值（标准差的倍数）
+    MIN_PROMINENCE = 1.0  # 最小峰值突出度
+    MIN_RISE_RATE = 0.1  # 最小上升速率
+    MAX_FALL_RATE = 0.05  # 最大下降速率（下降应当比上升慢）
 
 # 解析命令行参数（如果需要从命令行指定参数）
 def parse_args():
-    parser = argparse.ArgumentParser(description='神经元活动热图生成工具，支持自定义时间区间')
+    parser = argparse.ArgumentParser(description='神经元活动热图生成工具，支持自定义时间区间和排序方式')
     parser.add_argument('--input', type=str, help='输入数据文件路径')
     parser.add_argument('--output-prefix', type=str, help='输出文件名前缀')
     parser.add_argument('--stamp-min', type=float, help='最小时间戳值')
     parser.add_argument('--stamp-max', type=float, help='最大时间戳值')
+    parser.add_argument('--sort-method', type=str, choices=['peak', 'calcium_wave'], 
+                        help='排序方式：peak（按峰值时间排序）或calcium_wave（按第一次真实钙波时间排序）')
+    parser.add_argument('--ca-threshold', type=float, help='钙波检测阈值（标准差的倍数）')
+    parser.add_argument('--min-prominence', type=float, help='最小峰值突出度')
     return parser.parse_args()
 
 # 解析命令行参数并更新配置
@@ -37,6 +50,12 @@ if args.stamp_min is not None:
     Config.STAMP_MIN = args.stamp_min
 if args.stamp_max is not None:
     Config.STAMP_MAX = args.stamp_max
+if args.sort_method:
+    Config.SORT_METHOD = args.sort_method
+if args.ca_threshold is not None:
+    Config.CALCIUM_WAVE_THRESHOLD = args.ca_threshold
+if args.min_prominence is not None:
+    Config.MIN_PROMINENCE = args.min_prominence
 
 # 加载数据
 day6_data = pd.read_excel(Config.INPUT_FILE)
@@ -64,17 +83,81 @@ if has_behavior:
 # 数据标准化（Z-score 标准化）
 day6_data_standardized = (day6_data - day6_data.mean()) / day6_data.std()
 
-# **步骤1：计算每个神经元信号峰值出现的时间点**
+# 函数：检测神经元第一次真实钙波发生的时间点
+def detect_first_calcium_wave(neuron_data):
+    """
+    检测神经元第一次真实钙波发生的时间点
+    
+    参数:
+    neuron_data -- 包含神经元活动的时间序列数据（标准化后）
+    
+    返回:
+    first_wave_time -- 第一次真实钙波发生的时间点，如果没有检测到则返回数据最后一个时间点
+    """
+    # 计算阈值（基于数据的标准差）
+    threshold = Config.CALCIUM_WAVE_THRESHOLD
+    
+    # 使用find_peaks函数检测峰值
+    peaks, properties = find_peaks(neuron_data, 
+                                 height=threshold, 
+                                 prominence=Config.MIN_PROMINENCE,
+                                 distance=5)  # 要求峰值之间至少间隔5个时间点
+    
+    if len(peaks) == 0:
+        # 如果没有检测到峰值，返回时间序列的最后一个点
+        return neuron_data.index[-1]
+    
+    # 对每个峰值进行验证，确认是否为真实钙波（上升快，下降慢）
+    for peak_idx in peaks:
+        # 确保峰值不在时间序列的开始或结束处
+        if peak_idx <= 1 or peak_idx >= len(neuron_data) - 2:
+            continue
+            
+        # 计算峰值前的上升速率（取峰值前5个点或更少）
+        pre_peak_idx = max(0, peak_idx - 5)
+        rise_rate = (neuron_data.iloc[peak_idx] - neuron_data.iloc[pre_peak_idx]) / (peak_idx - pre_peak_idx)
+        
+        # 计算峰值后的下降速率（取峰值后10个点或更少）
+        post_peak_idx = min(len(neuron_data) - 1, peak_idx + 10)
+        if post_peak_idx <= peak_idx:
+            continue
+        
+        fall_rate = (neuron_data.iloc[peak_idx] - neuron_data.iloc[post_peak_idx]) / (post_peak_idx - peak_idx)
+        
+        # 确认是否符合钙波特征：上升快，下降慢
+        if rise_rate > Config.MIN_RISE_RATE and 0 < fall_rate < Config.MAX_FALL_RATE:
+            # 找到第一个真实钙波，返回时间点
+            return neuron_data.index[peak_idx]
+    
+    # 如果没有满足条件的钙波，返回时间序列的最后一个点
+    return neuron_data.index[-1]
 
-# 对于每个神经元，找到其信号达到最大值的时间戳
-peak_times = day6_data_standardized.idxmax()
-
-# **步骤2：按照峰值出现的时间对神经元进行排序**
-
-# 将神经元按照峰值时间从早到晚排序
-sorted_neurons = peak_times.sort_values().index
-
-# **步骤3：重新排列数据**
+# 根据排序方式选择相应的排序算法
+if Config.SORT_METHOD == 'peak':
+    # 原始方法：按峰值时间排序
+    # 对于每个神经元，找到其信号达到最大值的时间戳
+    peak_times = day6_data_standardized.idxmax()
+    
+    # 将神经元按照峰值时间从早到晚排序
+    sorted_neurons = peak_times.sort_values().index
+    
+    sort_method_str = "Sorted by peak time"
+else:  # 'calcium_wave'
+    # 新方法：按第一次真实钙波发生时间排序
+    first_wave_times = {}
+    
+    # 对每个神经元进行钙波检测
+    for neuron in day6_data_standardized.columns:
+        neuron_data = day6_data_standardized[neuron]
+        first_wave_times[neuron] = detect_first_calcium_wave(neuron_data)
+    
+    # 转换为Series以便排序
+    first_wave_times_series = pd.Series(first_wave_times)
+    
+    # 按第一次钙波时间排序
+    sorted_neurons = first_wave_times_series.sort_values().index
+    
+    sort_method_str = "Sorted by first calcium wave time"
 
 # 根据排序后的神经元顺序重新排列 DataFrame 的列
 sorted_day6_data = day6_data_standardized[sorted_neurons]
@@ -268,7 +351,7 @@ if has_behavior and len(unique_behaviors) > 0:
                            title='Behavior Types', title_fontsize=14, bbox_to_anchor=(1.0, 1.3))
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = 'EM2Trace-heatmap'
+title_text = f'EM2Trace-heatmap ({sort_method_str})'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -289,8 +372,8 @@ ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=14, fontweight
 # 不使用tight_layout()，因为它与GridSpec布局不兼容
 # 而是使用之前设置的subplots_adjust()已经足够调整布局
 
-# 构建输出文件名，包含时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}EM2Trace"
+# 构建输出文件名，包含排序方式和时间区间信息（如果有）
+output_filename = f"{Config.OUTPUT_PREFIX}EM2Trace_{Config.SORT_METHOD}"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
