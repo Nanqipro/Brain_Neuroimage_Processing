@@ -10,7 +10,7 @@ import os
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EMtrace_plus.xlsx'
+    INPUT_FILE = '../../datasets/2979240926ymazetrace2.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
@@ -166,8 +166,10 @@ if Config.STAMP_MIN is not None and Config.STAMP_MAX is not None:
     ax_trace.set_xlim(Config.STAMP_MIN / Config.SAMPLING_RATE, Config.STAMP_MAX / Config.SAMPLING_RATE)
 
 # 设置轴标签和标题
-ax_trace.set_xlabel('Time (seconds)', fontsize=12)
-ax_trace.set_ylabel('Neuron ID', fontsize=12)
+ax_trace.set_xlabel('Time (seconds)', fontsize=18)
+ax_trace.set_ylabel('Neuron ID', fontsize=18)
+# 设置刻度标签字体大小
+ax_trace.tick_params(axis='both', labelsize=14)
 
 # 添加网格线，使trace更容易阅读
 ax_trace.grid(False)
@@ -405,8 +407,10 @@ if Config.STAMP_MIN is not None and Config.STAMP_MAX is not None:
     ax_trace_sorted.set_xlim(Config.STAMP_MIN / Config.SAMPLING_RATE, Config.STAMP_MAX / Config.SAMPLING_RATE)
 
 # 设置轴标签和标题
-ax_trace_sorted.set_xlabel('Time (seconds)', fontsize=12)
-ax_trace_sorted.set_ylabel('Neuron ID (Sorted by First Calcium Event)', fontsize=12)
+ax_trace_sorted.set_xlabel('Time (seconds)', fontsize=18)
+ax_trace_sorted.set_ylabel('Neuron ID (Sorted by First Calcium Event)', fontsize=18)
+# 设置刻度标签字体大小
+ax_trace_sorted.tick_params(axis='both', labelsize=14)
 
 # 添加网格线
 ax_trace_sorted.grid(False)

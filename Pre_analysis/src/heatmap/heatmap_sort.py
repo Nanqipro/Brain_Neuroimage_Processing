@@ -11,9 +11,9 @@ from matplotlib.backends.backend_agg import FigureCanvas
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/2979数据/socialtrace02.xlsx'
+    INPUT_FILE = '../../datasets/2979240926ymazetrace2.xlsx'
     # 输出文件名前缀
-    OUTPUT_PREFIX = '../../graph/2979/heatmap_sort_'
+    OUTPUT_PREFIX = '../../graph/heatmap_sort_'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
@@ -137,14 +137,14 @@ if has_behavior and len(unique_behaviors) > 0:
                 plt.text(position + 0.5, -5, 'CD1', 
                         color='black', rotation=90, verticalalignment='top', fontsize=30, fontweight='bold')
 
-# 在第426个时间戳位置添加白色虚线
-# 检查数据中是否有足够的时间戳
-if len(sorted_day6_data.index) > 322:
-    # 绘制垂直线，白色虚线
-    ax.axvline(x=322, color='white', linestyle='--', linewidth=4)
+# # 在第426个时间戳位置添加白色虚线
+# # 检查数据中是否有足够的时间戳
+# if len(sorted_day6_data.index) > 322:
+#     # 绘制垂直线，白色虚线
+#     ax.axvline(x=322, color='white', linestyle='--', linewidth=4)
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = 'socialtrace02'
+title_text = '2979240926ymazetrace2'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -170,7 +170,7 @@ ax.set_xticklabels(xtick_labels, fontsize=20)
 plt.tight_layout()
 
 # 构建输出文件名，包含时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}socialtrace02"
+output_filename = f"{Config.OUTPUT_PREFIX}2979240926ymazetrace2"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
