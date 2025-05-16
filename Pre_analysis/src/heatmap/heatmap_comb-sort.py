@@ -89,6 +89,23 @@ aligned_day9_df = (aligned_day9_df - aligned_day9_df.mean()) / aligned_day9_df.s
 # 设置绘图颜色范围
 vmin, vmax = -2, 2  # 控制颜色对比度
 
+# 检查数据集中是否包含行为列
+has_behavior_day3 = 'behavior' in day3_data.columns
+has_behavior_day6 = 'behavior' in day6_data.columns
+has_behavior_day9 = 'behavior' in day9_data.columns
+
+# 找出CD1行为的时间点
+cd1_indices_day3 = []
+cd1_indices_day6 = []
+cd1_indices_day9 = []
+
+if has_behavior_day3:
+    cd1_indices_day3 = day3_data[day3_data['behavior'] == 'CD1'].index.tolist()
+if has_behavior_day6:
+    cd1_indices_day6 = day6_data[day6_data['behavior'] == 'CD1'].index.tolist()
+if has_behavior_day9:
+    cd1_indices_day9 = day9_data[day9_data['behavior'] == 'CD1'].index.tolist()
+
 # 绘制热图
 plt.figure(figsize=(40, 10))
 
@@ -99,6 +116,15 @@ plt.title('Day3 (Sorted by Peak Time)', fontsize=25)
 plt.xlabel('stamp', fontsize=25)
 plt.ylabel('neuron', fontsize=25)
 
+# 标记Day3的CD1行为
+if has_behavior_day3 and len(cd1_indices_day3) > 0:
+    for cd1_time in cd1_indices_day3:
+        if cd1_time in aligned_day3_df.index:
+            position = aligned_day3_df.index.get_loc(cd1_time)
+            ax1.axvline(x=position, color='white', linestyle='--', linewidth=2)
+            plt.text(position + 0.5, -5, 'CD1', 
+                    color='black', rotation=90, verticalalignment='top', fontsize=20, fontweight='bold')
+
 # Day6 热图
 plt.subplot(1, 3, 2)
 ax2 = sns.heatmap(aligned_day6_df.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)  # 转置 DataFrame 以调换横纵坐标
@@ -106,12 +132,30 @@ plt.title('Day6 (Using Day3 Sorting)', fontsize=25)
 plt.xlabel('stamp', fontsize=25)
 plt.ylabel('')
 
+# 标记Day6的CD1行为
+if has_behavior_day6 and len(cd1_indices_day6) > 0:
+    for cd1_time in cd1_indices_day6:
+        if cd1_time in aligned_day6_df.index:
+            position = aligned_day6_df.index.get_loc(cd1_time)
+            ax2.axvline(x=position, color='white', linestyle='--', linewidth=2)
+            plt.text(position + 0.5, -5, 'CD1', 
+                    color='black', rotation=90, verticalalignment='top', fontsize=20, fontweight='bold')
+
 # Day9 热图
 plt.subplot(1, 3, 3)
 ax3 = sns.heatmap(aligned_day9_df.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax)  # 转置 DataFrame 以调换横纵坐标
 plt.title('Day9 (Using Day3 Sorting)', fontsize=25)
 plt.xlabel('stamp', fontsize=25)
 plt.ylabel('')
+
+# 标记Day9的CD1行为
+if has_behavior_day9 and len(cd1_indices_day9) > 0:
+    for cd1_time in cd1_indices_day9:
+        if cd1_time in aligned_day9_df.index:
+            position = aligned_day9_df.index.get_loc(cd1_time)
+            ax3.axvline(x=position, color='white', linestyle='--', linewidth=2)
+            plt.text(position + 0.5, -5, 'CD1', 
+                    color='black', rotation=90, verticalalignment='top', fontsize=20, fontweight='bold')
 
 plt.tight_layout()
 plt.savefig('../../graph/heatmap_combined_sorted_complete_neurons.png')
