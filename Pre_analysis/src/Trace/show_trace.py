@@ -10,7 +10,7 @@ import os
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/2979240926ymazetrace2.xlsx'
+    INPUT_FILE = '../../datasets/EM.xls'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
@@ -21,7 +21,7 @@ class Config:
     SCALING_FACTOR = 40  # 信号振幅缩放因子（仿照init_show.py）
     MAX_NEURONS = 60    # 最大显示神经元数量（避免图表过于拥挤）
     TRACE_ALPHA = 0.8   # trace线的透明度
-    LINE_WIDTH = 1.0    # trace线的宽度
+    LINE_WIDTH = 2.0    # trace线的宽度
     # 采样率 (Hz)
     SAMPLING_RATE = 4.8  # 采样频率，用于将时间戳转换为秒
     # 钙爆发检测参数
@@ -166,10 +166,10 @@ if Config.STAMP_MIN is not None and Config.STAMP_MAX is not None:
     ax_trace.set_xlim(Config.STAMP_MIN / Config.SAMPLING_RATE, Config.STAMP_MAX / Config.SAMPLING_RATE)
 
 # 设置轴标签和标题
-ax_trace.set_xlabel('Time (seconds)', fontsize=18)
-ax_trace.set_ylabel('Neuron ID', fontsize=18)
+ax_trace.set_xlabel('Time (seconds)', fontsize=25)
+ax_trace.set_ylabel('Neuron ID', fontsize=25)
 # 设置刻度标签字体大小
-ax_trace.tick_params(axis='both', labelsize=14)
+ax_trace.tick_params(axis='both', labelsize=15)
 
 # 添加网格线，使trace更容易阅读
 ax_trace.grid(False)
@@ -288,9 +288,9 @@ if has_behavior and len(unique_behaviors) > 0:
     legend = ax_behavior.legend(
         handles=legend_patches, 
         loc='upper right', 
-        fontsize=10, 
+        fontsize=25, 
         title='Behavior Types', 
-        title_fontsize=12
+        title_fontsize=25
     )
     
     # 仅在行为轴上方显示x轴刻度
@@ -307,7 +307,7 @@ if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     title_text += f' (Time Range: {min_seconds:.2f}s - {max_seconds:.2f}s)'
 
 # 添加标题
-plt.suptitle(title_text, fontsize=16, y=0.98)
+plt.suptitle(title_text, fontsize=25, y=0.98)
 
 # 调整布局
 # plt.tight_layout()  # 这会导致警告，因为GridSpec布局与tight_layout不兼容
@@ -407,10 +407,10 @@ if Config.STAMP_MIN is not None and Config.STAMP_MAX is not None:
     ax_trace_sorted.set_xlim(Config.STAMP_MIN / Config.SAMPLING_RATE, Config.STAMP_MAX / Config.SAMPLING_RATE)
 
 # 设置轴标签和标题
-ax_trace_sorted.set_xlabel('Time (seconds)', fontsize=18)
-ax_trace_sorted.set_ylabel('Neuron ID (Sorted by First Calcium Event)', fontsize=18)
+ax_trace_sorted.set_xlabel('Time (seconds)', fontsize=25)
+ax_trace_sorted.set_ylabel('Neuron ID (Sorted by First Calcium Event)', fontsize=25)
 # 设置刻度标签字体大小
-ax_trace_sorted.tick_params(axis='both', labelsize=14)
+ax_trace_sorted.tick_params(axis='both', labelsize=15)
 
 # 添加网格线
 ax_trace_sorted.grid(False)
@@ -456,9 +456,9 @@ if has_behavior and len(unique_behaviors) > 0:
     ax_behavior_sorted.legend(
         handles=legend_patches,
         loc='upper right',
-        fontsize=10,
+        fontsize=25,
         title='Behavior Types',
-        title_fontsize=12
+        title_fontsize=25
     )
     
     # 设置轴参数
@@ -473,7 +473,7 @@ if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     sorted_title_text += f' (Time Range: {min_seconds:.2f}s - {max_seconds:.2f}s)'
 
 # 添加标题
-plt.suptitle(sorted_title_text, fontsize=16, y=0.98)
+plt.suptitle(sorted_title_text, fontsize=25, y=0.98)
 
 # 调整布局
 if has_behavior:

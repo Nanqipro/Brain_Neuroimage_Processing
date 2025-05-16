@@ -13,7 +13,7 @@ from scipy import stats
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/Day3_with_behavior_labels_filled.xlsx'
+    INPUT_FILE = '../../datasets/EM.xls'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort_'
     # 时间戳区间默认值（None表示不限制）
@@ -227,7 +227,7 @@ if has_behavior and len(unique_behaviors) > 0:
 #     ax.axvline(x=322, color='white', linestyle='--', linewidth=4)
 
 # 生成标题，包含排序方式和时间区间信息
-title_text = f'Day3_with_behavior_labels_filled ({sort_method_str})'
+title_text = f'EM ({sort_method_str})'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -253,7 +253,7 @@ ax.set_xticklabels(xtick_labels, fontsize=20)
 plt.tight_layout()
 
 # 构建输出文件名，包含排序方式和时间区间信息
-output_filename = f"{Config.OUTPUT_PREFIX}Day3_with_behavior_labels_filled_{Config.SORT_METHOD}"
+output_filename = f"{Config.OUTPUT_PREFIX}EM_{Config.SORT_METHOD}"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
