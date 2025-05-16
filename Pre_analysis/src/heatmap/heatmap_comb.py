@@ -8,43 +8,38 @@ import numpy as np
 day3_data = pd.read_excel('../../datasets/Day3_with_behavior_labels_filled.xlsx')
 day6_data = pd.read_excel('../../datasets/Day6_with_behavior_labels_filled.xlsx')
 day9_data = pd.read_excel('../../datasets/Day9_with_behavior_labels_filled.xlsx')
-correspondence_table = pd.read_excel('../../datasets/神经元对应表.xlsx')
+correspondence_table = pd.read_excel('../../datasets/神经元对应表2979.xlsx')
 
 # 根据对应表准备数据
 aligned_day3, aligned_day6, aligned_day9 = [], [], []
 neuron_labels_day3, neuron_labels_day6, neuron_labels_day9 = [], [], []
 
+# 筛选三天都有数据的神经元
 for _, row in correspondence_table.iterrows():
-    day3_neuron, day6_neuron, day9_neuron = row['Day3'], row['Day6'], row['Day9']
-
-    # 添加 Day3 的数据和标签；若为 null 则填充 NaN
-    if pd.notna(day3_neuron) and day3_neuron in day3_data.columns:
+    day3_neuron, day6_neuron, day9_neuron = row['Day3_with_behavior_labels_filled'], row['Day6_with_behavior_labels_filled'], row['Day9_with_behavior_labels_filled']
+    
+    # 检查三天是否都有数据 (都不为null且对应列存在于数据中)
+    if (pd.notna(day3_neuron) and day3_neuron in day3_data.columns and
+        pd.notna(day6_neuron) and day6_neuron in day6_data.columns and
+        pd.notna(day9_neuron) and day9_neuron in day9_data.columns):
+        
+        # 三天都有数据，添加到相应列表
         aligned_day3.append(day3_data[day3_neuron])
         neuron_labels_day3.append(day3_neuron)
-    else:
-        aligned_day3.append(pd.Series([np.nan] * len(day3_data)))
-        neuron_labels_day3.append(None)
-
-    # 添加 Day6 的数据和标签；若为 null 则填充 NaN
-    if pd.notna(day6_neuron) and day6_neuron in day6_data.columns:
+        
         aligned_day6.append(day6_data[day6_neuron])
         neuron_labels_day6.append(day6_neuron)
-    else:
-        aligned_day6.append(pd.Series([np.nan] * len(day6_data)))
-        neuron_labels_day6.append(None)
-
-    # 添加 Day9 的数据和标签；若为 null 则填充 NaN
-    if pd.notna(day9_neuron) and day9_neuron in day9_data.columns:
+        
         aligned_day9.append(day9_data[day9_neuron])
         neuron_labels_day9.append(day9_neuron)
-    else:
-        aligned_day9.append(pd.Series([np.nan] * len(day9_data)))
-        neuron_labels_day9.append(None)
 
 # 将列表转换为 DataFrame，并设置索引为时间戳 (stamp)，再转置以交换横纵坐标
 aligned_day3_df = pd.DataFrame(aligned_day3, index=neuron_labels_day3).T
 aligned_day6_df = pd.DataFrame(aligned_day6, index=neuron_labels_day6).T
 aligned_day9_df = pd.DataFrame(aligned_day9, index=neuron_labels_day9).T
+
+# 打印保留的神经元数量
+print(f"保留的神经元数量: {len(neuron_labels_day3)}")
 
 # 标准化数据
 aligned_day3_df = (aligned_day3_df - aligned_day3_df.mean()) / aligned_day3_df.std()
@@ -79,5 +74,5 @@ plt.xlabel('stamp')
 plt.ylabel('')
 
 plt.tight_layout()
-plt.savefig('../../graph/heatmap_combined.png')
+plt.savefig('../../graph/heatmap_combined_complete_neurons.png')
 plt.close()
