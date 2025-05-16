@@ -13,16 +13,16 @@ amplitude_scale = 5  # 增大波动幅度的缩放系数，可以调整此值来
 
 # 定义数据文件列表和对应的标题
 data_files = [
-    'NORhabititutetrace.xlsx',
-    'NORtesttrace.xlsx',
-    'tangsuitiewangtrace.xlsx',
-    'xuanweitrace.xlsx',
-    'socialtrace01.xlsx',
-    'socialtrace02.xlsx',
-    'ymazetrace.xlsx',
-    'tstrace.xlsx',
-    'homecagetrace.xlsx',
-    'homecagefamilarmicetrace.xlsx'
+    'processed_NORhabititutetrace.xlsx',
+    'processed_NORtesttrace.xlsx',
+    'processed_tangsuitiewangtrace.xlsx',
+    'processed_xuanweitrace.xlsx',
+    'processed_socialtrace01.xlsx',
+    'processed_socialtrace02.xlsx',
+    'processed_ymazetrace.xlsx',
+    'processed_tstrace.xlsx',
+    'processed_homecagetrace.xlsx',
+    'processed_homecagefamilarmicetrace.xlsx'
 ]
 
 # 定义图表标题（和文件名对应）
@@ -42,10 +42,29 @@ titles = [
 # 加载神经元对应表
 correspondence_table = pd.read_excel('../../datasets/神经元对应表2979.xlsx')
 
+# 定义文件名到神经元对应表2979列名的映射关系
+# 这个字典将每个文件名映射到对应表2979中的对应列名
+file_to_column_mapping = {
+    # 格式: '文件名.xlsx': '对应表中的列名'
+    # 这表示该文件在对应表2979中的哪一列
+    
+    # 请填入实际的宝工关系
+    'processed_NORhabititutetrace.xlsx': 'NORhabititutetrace',  
+    'processed_NORtesttrace.xlsx': 'NORtesttrace',
+    'processed_tangsuitiewangtrace.xlsx': 'tangsuitiewangtrace',
+    'processed_xuanweitrace.xlsx': 'xuanweitrace',
+    'processed_socialtrace01.xlsx': 'socialtrace01',
+    'processed_socialtrace02.xlsx': 'socialtrace02',
+    'processed_ymazetrace.xlsx': 'ymazetrace',
+    'processed_tstrace.xlsx': 'tstrace',
+    'processed_homecagetrace.xlsx': 'homecagetrace',
+    'processed_homecagefamilarmicetrace.xlsx': 'homecagefamilarmicetrace'
+}
+
 # 加载参考排序表（基准神经元排序）
 try:
     # 尝试载入基准文件
-    reference_file = '../../datasets/2979数据/NORhabititutetrace.xlsx'
+    reference_file = '../../datasets/2979数据/processed_NORhabititutetrace.xlsx'
     reference_data = pd.read_excel(reference_file)
     print(f'成功加载基准排序文件: {reference_file}')
 except Exception as e:
@@ -104,9 +123,17 @@ for file_idx, (file_name, title) in enumerate(zip(data_files, titles)):
     neurons_processed = 0
     offset = 10  # 设置垂直偏移量
     
+    # 获取当前文件在对应表2979中的列名
+    corr_column_name = file_to_column_mapping.get(file_name, None)
+    
+    # 如果没有映射关系，跳过该文件
+    if corr_column_name is None:
+        print(f'警告: 文件 {file_name} 没有在映射表中定义对应的神经元列名')
+        continue
+    
     # 尝试按照基准排序绘制神经元trace
     for i, ref_neuron in enumerate(reference_neurons):
-        # 检查神经元是否存在于当前数据中
+        # 检查当前神经元是否存在于数据中
         if ref_neuron in data.columns:
             # Z-score 标准化并放大
             trace = (data[ref_neuron] - data[ref_neuron].mean()) / data[ref_neuron].std()
@@ -115,6 +142,11 @@ for file_idx, (file_name, title) in enumerate(zip(data_files, titles)):
             # 绘制带偏移的trace
             plt.plot(time_stamps, trace + i * offset, linewidth=0.8)
             neurons_processed += 1
+            
+    # Display the corresponding neuron column name
+    plt.text(0.02, 0.92, f'Corresponding column in 2979: {corr_column_name}', 
+             transform=plt.gca().transAxes, fontsize=9,
+             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
     # 设置坐标轴和标题
     plt.title(title)
@@ -140,7 +172,7 @@ output_dir = '../../graph/traces-Integration/'
 # 确保输出目录存在
 os.makedirs(output_dir, exist_ok=True)
 # 保存图像，设置高分辨率
-output_file = os.path.join(output_dir, 'multi_behavior_trace_integration.png')
+output_file = os.path.join(output_dir, 'processed_multi_behavior_trace_integration.png')
 plt.savefig(output_file, dpi=300, bbox_inches='tight')
 print(f'图像已保存至: {output_file}')
 
