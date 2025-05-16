@@ -86,38 +86,8 @@ n_files = len(data_files)
 ncols = min(5, n_files)  # 最多5列
 nrows = (n_files + ncols - 1) // ncols  # 向上取整计算行数
 
-# 创建大尺寸的图形并使用GridSpec精确控制布局
-fig = plt.figure(figsize=(ncols * 10, nrows * 8))
-from matplotlib.gridspec import GridSpec
-gs = GridSpec(nrows, ncols, figure=fig)
-
-# 设置统一的子图比例和间距
-gs.update(wspace=0.3, hspace=0.6)  # 调整子图间距
-
-# 统一的X轴和Y轴范围参数
-x_min, x_max = float('inf'), float('-inf')  # 初始化X轴范围
-y_min, y_max = float('inf'), float('-inf')  # 初始化Y轴范围
-
-# 先计算所有数据的全局范围，用于统一坐标轴范围
-for file_name in data_files:
-    data = data_dict[file_name]
-    if data.empty:
-        continue
-        
-    time_stamps = time_stamps_dict[file_name]
-    
-    # 计算时间范围
-    if len(time_stamps) > 0:
-        x_min = min(x_min, time_stamps.min())
-        x_max = max(x_max, time_stamps.max())
-    
-    # 计算trace值范围
-    for ref_neuron in reference_neurons:
-        if ref_neuron in data.columns:
-            trace = (data[ref_neuron] - data[ref_neuron].mean()) / data[ref_neuron].std() * amplitude_scale
-            if not trace.empty:
-                y_min = min(y_min, trace.min())
-                y_max = max(y_max, trace.max())
+# 创建大尺寸的图形
+plt.figure(figsize=(ncols * 10, nrows * 8))
 
 # 处理每个数据文件，创建子图
 for file_idx, (file_name, title) in enumerate(zip(data_files, titles)):
@@ -127,16 +97,12 @@ for file_idx, (file_name, title) in enumerate(zip(data_files, titles)):
         
     time_stamps = time_stamps_dict[file_name]
     
-    # 使用GridSpec创建子图
-    ax = plt.subplot(gs[file_idx // ncols, file_idx % ncols])
+    # 创建子图
+    plt.subplot(nrows, ncols, file_idx + 1)
     
     # 处理该文件中的神经元，按照参考神经元顺序
     neurons_processed = 0
     offset = 10  # 设置垂直偏移量
-    max_neurons = len(reference_neurons)  # 最大神经元数量
-    
-    # 计算当前子图中的Y轴范围（考虑神经元数量和偏移）
-    subplot_y_max = max_neurons * offset
     
     # 尝试按照基准排序绘制神经元trace
     for i, ref_neuron in enumerate(reference_neurons):
@@ -147,31 +113,24 @@ for file_idx, (file_name, title) in enumerate(zip(data_files, titles)):
             trace = trace * amplitude_scale
             
             # 绘制带偏移的trace
-            ax.plot(time_stamps, trace + i * offset, linewidth=0.8)
+            plt.plot(time_stamps, trace + i * offset, linewidth=0.8)
             neurons_processed += 1
     
-    # 设置坐标轴范围（统一所有子图）
-    ax.set_xlim(x_min, x_max)  # 统一X轴范围
-    ax.set_ylim(-amplitude_scale, subplot_y_max)  # 根据神经元数量和偏移量设置统一Y轴范围
-    
     # 设置坐标轴和标题
-    ax.set_title(title, fontsize=12)
-    ax.set_xlabel('Time Stamp', fontsize=10)
+    plt.title(title)
+    plt.xlabel('Time Stamp')
     
     # 第一列的图添加y轴标签
     if file_idx % ncols == 0:
-        ax.set_ylabel('Neuron Trace', fontsize=10)
+        plt.ylabel('Neuron Trace')
     
     # 不显示y轴刻度（神经元太多，显示会很乱）
-    ax.set_yticks([])
-    
-    # 调整网格线
-    ax.grid(True, linestyle='--', alpha=0.3)  # 添加网格线并设置其半透明
+    plt.yticks([])
     
     # 显示处理的神经元数量
-    ax.text(0.02, 0.98, f'神经元数量: {neurons_processed}', 
-            transform=ax.transAxes, fontsize=9,
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    plt.text(0.02, 0.98, f'Neurons: {neurons_processed}', 
+             transform=plt.gca().transAxes, fontsize=9,
+             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
 # 调整子图间距
 plt.tight_layout()
