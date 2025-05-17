@@ -109,12 +109,18 @@ def plot_confusion_matrix(y_true, y_pred, class_names, result_dir='result'):
     """绘制混淆矩阵"""
     cm = confusion_matrix(y_true, y_pred)
 
+    # 确保class_names和混淆矩阵大小匹配
+    if len(class_names) != cm.shape[0]:
+        print(f"警告：类别名称列表({len(class_names)})与混淆矩阵大小({cm.shape[0]})不匹配")
+        # 如果不匹配，使用默认类别标签
+        class_names = [f"类别{i}" for i in range(cm.shape[0])]
+
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
                xticklabels=class_names, yticklabels=class_names)
-    plt.xlabel('预测标签')
-    plt.ylabel('真实标签')
-    plt.title('混淆矩阵')
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label') 
+    plt.title('Confusion Matrix')
     plt.tight_layout()
     plt.savefig(f'{result_dir}/confusion_matrix.png')
     plt.close()

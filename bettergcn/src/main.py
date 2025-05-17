@@ -11,13 +11,13 @@ import matplotlib as mpl
 from sklearn.metrics import classification_report
 from torch_geometric.data import Data, DataLoader
 from sklearn.model_selection import train_test_split
-from model import ImprovedGCN, PureGCN, PureGAT
+from model import ImprovedGCN
 from process import load_data, oversample_data, compute_correlation_matrix, create_pyg_dataset, visualize_graph
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics, plot_learning_curve
 
 def setup_result_directory():
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_dir = f"result/{timestamp}"
+    result_dir = f"../result/{timestamp}"
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
     return result_dir
@@ -42,11 +42,12 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
-    features, labels, class_weights, class_names = load_data('dataset/processed3.csv')
+    # 设定最小样本数为50，将样本数少于50的标签过滤
+    min_samples = 50
+    features, labels, class_weights, class_names = load_data('../datasets/EMtrace01.xlsx', min_samples=min_samples)
     # # 相关性矩阵
     # correlation_matrix = compute_correlation_matrix(features)
     # print(f"Correlation matrix shape: {correlation_matrix.shape}")
-
 
     features_resampled, labels_resampled = oversample_data(features, labels, ramdom_state=42)
     print(f"Resampled features shape: {features_resampled.shape}")
@@ -68,18 +69,17 @@ def main():
     # 可视化相关性矩阵
     plt.figure(figsize=(10, 8))
     sns.heatmap(correlation_matrix, cmap='coolwarm', center=0)
-    plt.title("神经元相关性矩阵")
+    plt.title("Neuron Correlation Matrix")
     plt.savefig(f'{result_dir}/correlation_matrix.png')
     plt.close()
     
     print(f"Training set: {X_train.shape}, Validation set: {X_val.shape}, Test set: {X_test.shape}")
-    
     # 生成图数据
     train_data_list = create_pyg_dataset(X_train, y_train, correlation_matrix)
     val_data_list = create_pyg_dataset(X_val, y_val, correlation_matrix)
     test_data_list = create_pyg_dataset(X_test, y_test, correlation_matrix)
 
-    visualize_graph(train_data_list, sample_index=0, title="训练样本神经元图", result_dir=result_dir)
+    visualize_graph(train_data_list, sample_index=0, title="Training Sample Neuron Graph", result_dir=result_dir)
 
     # 统计一些图结构特征
     num_nodes = train_data_list[0].x.shape[0]  # 节点数量
@@ -183,6 +183,8 @@ def main():
     
     # 保存最终测试结果
     with open(f'{result_dir}/test_results.txt', 'w', encoding='utf-8') as f:
+        f.write(f"最小样本数阈值: {min_samples}\n")
+        f.write(f"剩余标签数量: {len(class_names)}\n\n")
         f.write(f"测试集准确率: {test_metrics['accuracy']:.4f}\n")
         f.write(f"测试集精确率: {test_metrics['precision']:.4f}\n")
         f.write(f"测试集召回率: {test_metrics['recall']:.4f}\n")
@@ -195,6 +197,8 @@ def main():
         ))
     
     print(f"\n最终测试结果:")
+    print(f"  最小样本数阈值: {min_samples}")
+    print(f"  剩余标签数量: {len(class_names)}")
     print(f"  准确率: {test_metrics['accuracy']:.4f}")
     print(f"  精确率: {test_metrics['precision']:.4f}")
     print(f"  召回率: {test_metrics['recall']:.4f}")
