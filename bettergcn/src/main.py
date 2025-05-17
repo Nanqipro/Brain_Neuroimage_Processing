@@ -51,6 +51,7 @@ def main():
     
     # 定义数据文件路径和最小样本数
     data_file = '../datasets/EMtrace01.xlsx'
+    position_file = '../datasets/EMtrace01_Max_position.csv'
     min_samples = 50
     
     # 使用数据文件名和最小样本数来设置结果目录
@@ -63,6 +64,7 @@ def main():
     # 保存实验配置
     with open(f'{result_dir}/config.txt', 'w', encoding='utf-8') as f:
         f.write(f"数据文件: {data_file}\n")
+        f.write(f"神经元位置文件: {position_file}\n")
         f.write(f"最小样本数: {min_samples}\n")
         f.write(f"设备: {device}\n")
         f.write(f"随机种子: 42\n")
@@ -104,7 +106,14 @@ def main():
     val_data_list = create_pyg_dataset(X_val, y_val, correlation_matrix)
     test_data_list = create_pyg_dataset(X_test, y_test, correlation_matrix)
 
-    visualize_graph(train_data_list, sample_index=0, title="Training Sample Neuron Graph", result_dir=result_dir)
+    # 使用真实空间位置可视化神经元图
+    visualize_graph(
+        train_data_list, 
+        sample_index=0, 
+        title="Neuron Network Topology (Training Samples)", 
+        result_dir=result_dir,
+        position_file=position_file
+    )
 
     # 统计一些图结构特征
     num_nodes = train_data_list[0].x.shape[0]  # 节点数量

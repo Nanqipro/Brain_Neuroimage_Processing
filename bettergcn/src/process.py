@@ -10,6 +10,7 @@ from collections import Counter
 from scipy.stats import pearsonr
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+import os
 
 def load_data(data_path, min_samples=50):
     # 根据文件扩展名决定使用哪种方法读取数据
@@ -143,7 +144,7 @@ def create_pyg_dataset(features, labels, correlation_matrix, threshold=0.4):
     return data_list
     
 # 将生成的拓扑图可视化
-def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", result_dir='result'):
+def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", result_dir='result', position_file=None):
     plt.figure(figsize=(10, 10))
     graph_data = data[sample_index]
     G = nx.Graph()
@@ -156,10 +157,42 @@ def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", resul
         weight = float(graph_data.edge_attr[i]) if graph_data.edge_attr is not None else 1.0
         G.add_edge(src, dst, weight=weight)
 
-    try:
-        pos = nx.kamada_kawai_layout(G)
-    except:
-        pos = nx.spring_layout(G, seed=42)
+    # 如果提供了位置文件，则从中读取真实的空间位置
+    if position_file and os.path.exists(position_file):
+        try:
+            # 读取位置数据
+            position_data = pd.read_csv(position_file)
+            # 创建一个从神经元ID到位置的映射
+            position_map = {}
+            
+            for _, row in position_data.iterrows():
+                neuron_id = int(row['number'])
+                # 确保神经元ID对应于图中的节点
+                if neuron_id < len(G.nodes):
+                    position_map[neuron_id] = (row['relative_x'], row['relative_y'])
+            
+            # 如果我们有足够的位置信息，使用真实的空间位置
+            if len(position_map) == len(G.nodes):
+                pos = position_map
+                print(f"使用真实空间位置可视化 {len(pos)} 个神经元")
+            else:
+                print(f"警告：位置数据不完整 ({len(position_map)}/{len(G.nodes)})，将使用布局算法")
+                try:
+                    pos = nx.kamada_kawai_layout(G)
+                except:
+                    pos = nx.spring_layout(G, seed=42)
+        except Exception as e:
+            print(f"读取位置数据时出错：{e}，将使用布局算法")
+            try:
+                pos = nx.kamada_kawai_layout(G)
+            except:
+                pos = nx.spring_layout(G, seed=42)
+    else:
+        # 如果没有位置文件，使用布局算法
+        try:
+            pos = nx.kamada_kawai_layout(G)
+        except:
+            pos = nx.spring_layout(G, seed=42)
 
     # 获取节点值以用于颜色映射
     node_values = [G.nodes[i]['value'] for i in range(len(G.nodes))]
@@ -210,6 +243,11 @@ def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", resul
     behavior_label = graph_data.y.item()
     plt.title(f"{title}\nSample Label: {behavior_label}", fontsize=14, fontweight='bold')
     plt.text(0.02, 0.02, f"Number of Nodes: {G.number_of_nodes()}, Number of Edges: {G.number_of_edges()}",
+             transform=plt.gca().transAxes, fontsize=10)
+    
+    # 添加坐标位置信息
+    position_source = "Real Space Position" if position_file and os.path.exists(position_file) else "Layout Algorithm Generated"
+    plt.text(0.02, 0.06, f"Position Source: {position_source}",
              transform=plt.gca().transAxes, fontsize=10)
     plt.axis('off')
     plt.tight_layout()
