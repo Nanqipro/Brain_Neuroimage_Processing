@@ -1,8 +1,0 @@
-README.md
-setup.py
-src/medical_image_processor.egg-info/PKG-INFO
-src/medical_image_processor.egg-info/SOURCES.txt
-src/medical_image_processor.egg-info/dependency_links.txt
-src/medical_image_processor.egg-info/entry_points.txt
-src/medical_image_processor.egg-info/requires.txt
-src/medical_image_processor.egg-info/top_level.txt

@@ -1,5 +1,0 @@
-[console_scripts]
-mip-batch = batch_processor:main
-mip-gui = gui_processor:main
-mip-process = medical_image_processor:main
-
