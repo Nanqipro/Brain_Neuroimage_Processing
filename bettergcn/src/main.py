@@ -12,7 +12,7 @@ from sklearn.metrics import classification_report
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
 from model import ImprovedGCN
-from process import load_data, oversample_data, compute_correlation_matrix, create_pyg_dataset, visualize_graph
+from process import load_data, oversample_data, compute_correlation_matrix, create_pyg_dataset, visualize_graph, enhance_balanced_dataset
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics, plot_learning_curve
 
 def setup_result_directory(input_file_path, min_samples=None):
@@ -50,8 +50,8 @@ def main():
     setup_matplotlib_fonts()
     
     # 定义数据文件路径和最小样本数
-    data_file = '../datasets/EMtrace02.xlsx'
-    position_file = '../datasets/EMtrace02_Max_position.csv'
+    data_file = '../datasets/EMtrace01.xlsx'
+    position_file = '../datasets/EMtrace01_Max_position.csv'
     min_samples = 50
     
     # 使用数据文件名和最小样本数来设置结果目录
@@ -72,12 +72,42 @@ def main():
 
     # 设定最小样本数为50，将样本数少于50的标签过滤
     features, labels, class_weights, class_names = load_data(data_file, min_samples=min_samples)
-    # # 相关性矩阵
-    # correlation_matrix = compute_correlation_matrix(features)
-    # print(f"Correlation matrix shape: {correlation_matrix.shape}")
-
-    features_resampled, labels_resampled = oversample_data(features, labels, ramdom_state=42)
-    print(f"Resampled features shape: {features_resampled.shape}")
+    
+    # 使用增强的数据平衡方法处理不平衡数据
+    # 选择合适的数据增强策略
+    augmentation_strategy = 'comprehensive'  # 可选: 'basic', 'gan', 'vae', 'comprehensive'
+    
+    if augmentation_strategy == 'basic':
+        # 基础策略: 组合重采样 + 时间序列增强
+        features_resampled, labels_resampled = enhance_balanced_dataset(
+            features, labels, 
+            methods=['combined', 'timeseries']
+        )
+    elif augmentation_strategy == 'gan':
+        # GAN策略: 先下采样再用GAN生成
+        features_resampled, labels_resampled = enhance_balanced_dataset(
+            features, labels, 
+            methods=['random_under', 'gan']
+        )
+    elif augmentation_strategy == 'vae':
+        # VAE策略: 先下采样再用VAE生成
+        features_resampled, labels_resampled = enhance_balanced_dataset(
+            features, labels, 
+            methods=['random_under', 'vae']
+        )
+    elif augmentation_strategy == 'comprehensive':
+        # 综合策略: 先下采样再组合多种生成方法
+        features_resampled, labels_resampled = enhance_balanced_dataset(
+            features, labels, 
+            methods=['combined', 'timeseries', 'gan', 'vae']
+        )
+    else:
+        # 默认使用SMOTE
+        features_resampled, labels_resampled = oversample_data(
+            features, labels, ramdom_state=42, method='smote'
+        )
+    
+    print(f"最终重采样后特征形状: {features_resampled.shape}")
 
     # 划分训练集和验证集和测试集 (60%/20%/20%)
     X_train, X_temp, y_train, y_temp = train_test_split(
