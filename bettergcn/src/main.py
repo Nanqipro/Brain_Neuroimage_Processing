@@ -9,7 +9,7 @@ import os
 import datetime
 import matplotlib as mpl
 from sklearn.metrics import classification_report
-from torch_geometric.data import Data, DataLoader
+from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
 from model import ImprovedGCN
 from process import load_data, oversample_data, compute_correlation_matrix, create_pyg_dataset, visualize_graph
@@ -44,7 +44,7 @@ def main():
 
     # 设定最小样本数为50，将样本数少于50的标签过滤
     min_samples = 50
-    features, labels, class_weights, class_names = load_data('../datasets/EMtrace01.xlsx', min_samples=min_samples)
+    features, labels, class_weights, class_names = load_data('../datasets/EMtrace01_plus.xlsx', min_samples=min_samples)
     # # 相关性矩阵
     # correlation_matrix = compute_correlation_matrix(features)
     # print(f"Correlation matrix shape: {correlation_matrix.shape}")
@@ -104,7 +104,7 @@ def main():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=10, verbose=True
+        optimizer, mode='max', factor=0.5, patience=10
     )
     
     # 训练模型

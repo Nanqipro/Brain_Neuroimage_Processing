@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
-from torch_geometric.data import DataLoader
+from torch_geometric.loader import DataLoader
 
 
 

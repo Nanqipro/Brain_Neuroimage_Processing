@@ -185,13 +185,13 @@ def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", resul
         linewidths=0.5
     )
     
-    # 绘制边
+    # 绘制边 - 解决connectionstyle警告
     edges = nx.draw_networkx_edges(
         G, pos,
         width=edge_weights,
         edge_color='gray',
         alpha=0.6,
-        connectionstyle='arc3,rad=0.1'  # 使边弯曲，避免重叠
+        arrows=True  # 使用arrows=True替代connectionstyle
     )
     
     # 绘制节点标签
