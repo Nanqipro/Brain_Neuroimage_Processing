@@ -247,8 +247,8 @@ class PointMarker:
 
 def main():
     """Main function to run the point marking tool."""
-    image_path = '../datasets/EMtrace02_Max.png'
-    output_file = '../datasets/EMtrace02_Max_position.csv'
+    image_path = '../datasets/EMtrace01_Max.jpg'
+    output_file = '../datasets/EMtrace01_Max_position.csv'
     
     marker = PointMarker(image_path)
     plt.show(block=True)

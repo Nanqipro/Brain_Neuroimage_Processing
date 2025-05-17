@@ -162,25 +162,70 @@ def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", resul
         try:
             # 读取位置数据
             position_data = pd.read_csv(position_file)
+            print(f"位置数据文件包含 {len(position_data)} 个神经元的位置信息")
+            
             # 创建一个从神经元ID到位置的映射
             position_map = {}
             
-            for _, row in position_data.iterrows():
-                neuron_id = int(row['number'])
-                # 确保神经元ID对应于图中的节点
-                if neuron_id < len(G.nodes):
-                    position_map[neuron_id] = (row['relative_x'], row['relative_y'])
+            # 检查是否存在神经元编号与索引不一致的问题
+            neuron_ids_in_csv = set([int(row['number']) for _, row in position_data.iterrows()])
+            nodes_in_graph = set(range(len(G.nodes)))
+            
+            # 查看最小和最大神经元ID，可能的偏移量
+            min_neuron_id = min(neuron_ids_in_csv) if neuron_ids_in_csv else -1
+            max_neuron_id = max(neuron_ids_in_csv) if neuron_ids_in_csv else -1
+            print(f"CSV中神经元ID范围: {min_neuron_id} 到 {max_neuron_id}")
+            print(f"图中节点ID范围: 0 到 {len(G.nodes)-1}")
+            
+            # 检测是否需要应用偏移量 (如果CSV从1开始而图从0开始)
+            offset = 0
+            if min_neuron_id == 1 and 0 in nodes_in_graph and 0 not in neuron_ids_in_csv:
+                offset = -1
+                print(f"检测到神经元ID偏移: 应用 {offset} 的偏移量")
+            
+            missing_nodes = []
+            for i in range(len(G.nodes)):
+                csv_id = i - offset  # 计算CSV中的对应ID
+                row = position_data[position_data['number'] == csv_id]
+                if len(row) > 0:
+                    position_map[i] = (float(row['relative_x'].values[0]), float(row['relative_y'].values[0]))
+                else:
+                    missing_nodes.append(i)
             
             # 如果我们有足够的位置信息，使用真实的空间位置
             if len(position_map) == len(G.nodes):
                 pos = position_map
                 print(f"使用真实空间位置可视化 {len(pos)} 个神经元")
             else:
-                print(f"警告：位置数据不完整 ({len(position_map)}/{len(G.nodes)})，将使用布局算法")
-                try:
-                    pos = nx.kamada_kawai_layout(G)
-                except:
-                    pos = nx.spring_layout(G, seed=42)
+                print(f"警告：位置数据不完整 ({len(position_map)}/{len(G.nodes)})")
+                if missing_nodes:
+                    print(f"缺失节点ID: {missing_nodes}")
+                    
+                # 尝试使用可用的位置数据，对缺失的使用布局算法补充
+                if len(position_map) > len(G.nodes) * 0.8:  # 如果有超过80%的节点有位置数据
+                    print("使用部分真实位置数据，缺失部分使用布局算法补充")
+                    # 为缺失的节点生成位置
+                    try:
+                        # 使用布局算法为缺失节点生成位置
+                        temp_g = G.copy()
+                        for node in position_map:
+                            temp_g.remove_node(node)
+                        
+                        if temp_g.number_of_nodes() > 0:
+                            temp_pos = nx.spring_layout(temp_g, seed=42)
+                            # 合并两个位置字典
+                            pos = {**position_map, **temp_pos}
+                        else:
+                            pos = position_map
+                    except Exception as e:
+                        print(f"补充缺失节点位置时出错: {e}")
+                        pos = position_map
+                else:  # 如果缺失太多，使用布局算法
+                    print("缺失位置数据过多，使用布局算法")
+                    try:
+                        pos = nx.kamada_kawai_layout(G)
+                    except:
+                        pos = nx.spring_layout(G, seed=42)
         except Exception as e:
             print(f"读取位置数据时出错：{e}，将使用布局算法")
             try:
