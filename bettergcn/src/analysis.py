@@ -13,7 +13,6 @@ from mpl_toolkits.mplot3d import Axes3D
 # 导入项目中的其他模块
 from model import ImprovedGCN
 from process import load_data, generate_graph, create_dataset
-from feature import extract_advanced_features, select_features
 
 class GCNVisualizer:
     """
