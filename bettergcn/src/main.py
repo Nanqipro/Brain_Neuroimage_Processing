@@ -50,8 +50,8 @@ def main():
     setup_matplotlib_fonts()
     
     # 定义数据文件路径和最小样本数
-    data_file = '../datasets/EMtrace01.xlsx'
-    position_file = '../datasets/EMtrace01_Max_position.csv'
+    data_file = '../datasets/EMtrace02.xlsx'
+    position_file = '../datasets/EMtrace02_Max_position.csv'
     min_samples = 50
     
     # 使用数据文件名和最小样本数来设置结果目录
