@@ -15,9 +15,19 @@ from model import ImprovedGCN
 from process import load_data, oversample_data, compute_correlation_matrix, create_pyg_dataset, visualize_graph
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics, plot_learning_curve
 
-def setup_result_directory():
+def setup_result_directory(input_file_path, min_samples=None):
+    # 提取文件名（不含路径和扩展名）
+    file_name = os.path.basename(input_file_path)
+    file_name = os.path.splitext(file_name)[0]
+    
+    # 添加最小样本数信息（如果提供）
+    if min_samples is not None:
+        file_name = f"{file_name}"
+    
+    # 添加时间戳以确保唯一性
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_dir = f"../result/{timestamp}"
+    result_dir = f"../result/{file_name}"
+    
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
     return result_dir
@@ -38,13 +48,28 @@ def main():
     torch.manual_seed(42)
     np.random.seed(42)
     setup_matplotlib_fonts()
-    result_dir = setup_result_directory()
+    
+    # 定义数据文件路径和最小样本数
+    data_file = '../datasets/EMtrace01_plus.xlsx'
+    min_samples = 50
+    
+    # 使用数据文件名和最小样本数来设置结果目录
+    result_dir = setup_result_directory(data_file, min_samples)
+    print(f"结果将保存到: {result_dir}")
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
+    # 保存实验配置
+    with open(f'{result_dir}/config.txt', 'w', encoding='utf-8') as f:
+        f.write(f"数据文件: {data_file}\n")
+        f.write(f"最小样本数: {min_samples}\n")
+        f.write(f"设备: {device}\n")
+        f.write(f"随机种子: 42\n")
+        f.write(f"训练开始时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
     # 设定最小样本数为50，将样本数少于50的标签过滤
-    min_samples = 50
-    features, labels, class_weights, class_names = load_data('../datasets/EMtrace01_plus.xlsx', min_samples=min_samples)
+    features, labels, class_weights, class_names = load_data(data_file, min_samples=min_samples)
     # # 相关性矩阵
     # correlation_matrix = compute_correlation_matrix(features)
     # print(f"Correlation matrix shape: {correlation_matrix.shape}")

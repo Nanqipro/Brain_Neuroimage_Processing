@@ -18,7 +18,7 @@ class GCNVisualizer:
     """
     GCN模型可视化工具类，用于生成各种神经网络拓扑结构图
     """
-    def __init__(self, base_path='../datasets/EMtrace01_plus', model_file_name='_best_model.pth', data_file_name='.xlsx'):
+    def __init__(self, base_path='../datasets/EMtrace01', model_file_name='_best_model.pth', data_file_name='.xlsx'):
         """
         初始化可视化器
         
