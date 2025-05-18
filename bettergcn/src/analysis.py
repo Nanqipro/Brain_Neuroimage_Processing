@@ -146,7 +146,7 @@ class GCNVisualizer:
         
         print(f"特征相关性热力图已保存至: {save_path}")
         
-    def detect_communities(self, method='louvain', resolution=1.0):
+    def detect_communities(self, method='louvain', resolution=0.6):
         """
         检测神经元网络中的社区
         
@@ -464,7 +464,7 @@ class GCNVisualizer:
         print("开始进行完整的神经元网络分析...")
         
         # 1. 可视化神经元相关性热力图
-        self.visualize_heatmap(filename='neuron_correlation_heatmap.png')
+        # self.visualize_heatmap(filename='neuron_correlation_heatmap.png')
         
         # 2. 检测社区
         partition = self.detect_communities(method=community_method, resolution=resolution)
@@ -527,8 +527,8 @@ def main():
     
     # 执行完整分析
     visualizer.run_full_analysis(
-        community_method='louvain',  # 可选: 'louvain', 'girvan_newman', 'label_propagation'
-        resolution=1.0  # Louvain算法的分辨率参数，值越大社区越小
+        community_method='label_propagation',  # 可选: 'louvain', 'girvan_newman', 'label_propagation'
+        resolution=0.6  # Louvain算法的分辨率参数，值越大社区越小
     )
     
     print(f"可视化分析完成！所有结果已保存到{visualizer.output_dir}目录")
