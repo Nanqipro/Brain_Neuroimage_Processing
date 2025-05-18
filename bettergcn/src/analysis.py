@@ -3,14 +3,11 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 import seaborn as sns
 import community as community_louvain
 from collections import Counter, defaultdict
 import pandas as pd
 from scipy.stats import chi2_contingency
-import matplotlib.patheffects as PathEffects
 
 # 导入项目中的其他模块
 from model import ImprovedGCN
@@ -116,43 +113,6 @@ class GCNVisualizer:
         model.eval()  # 设置为评估模式
         
         return model
-    
-    def extract_node_embeddings(self):
-        """
-        提取节点嵌入向量，用于可视化
-        
-        返回:
-            节点嵌入向量
-        """
-        if self.model is None:
-            print("模型未加载，无法提取节点嵌入")
-            return None
-            
-        # 创建数据集
-        dataset = create_pyg_dataset(self.features, self.labels, self.correlation_matrix)
-        
-        # 确保模型在正确的设备上
-        self.model = self.model.to(self.device)
-        
-        embeddings = []
-        with torch.no_grad():
-            for data in dataset:
-                # 将整个数据移动到设备上
-                data = data.to(self.device)
-                
-                # 提取中间层特征（修改forward方法或使用钩子）
-                # 这里我们直接使用模型的第一个卷积层输出作为节点嵌入
-                # 明确确保x和edge_index在同一设备上
-                x, edge_index = data.x.to(self.device), data.edge_index.to(self.device)
-                
-                # GCN第一层
-                x1 = self.model.conv1(x, edge_index)
-                x1 = self.model.bn1(x1)
-                x1 = torch.relu(x1)
-                
-                embeddings.append(x1.cpu().numpy())
-                
-        return np.vstack(embeddings)
     
     def visualize_heatmap(self, filename='correlation_heatmap.png'):
         """
@@ -494,104 +454,13 @@ class GCNVisualizer:
         
         print(f"社区间连接网络图已保存至: {save_path}")
     
-    def visualize_neuron_embedding(self, method='tsne', partition=None, filename='neuron_embedding.png'):
-        """
-        可视化神经元嵌入空间
-        
-        参数:
-            method: 降维方法，'tsne'或'pca'
-            partition: 社区划分字典，如果提供则按社区着色
-            filename: 保存文件名
-        """
-        save_path = os.path.join(self.output_dir, filename)
-        
-        # 获取节点嵌入
-        node_embeddings = self.extract_node_embeddings()
-        
-        if node_embeddings is None:
-            print("节点嵌入获取失败，无法可视化")
-            return
-        
-        # 降维
-        if method == 'tsne':
-            print("使用t-SNE进行降维...")
-            reducer = TSNE(n_components=2, random_state=42)
-        else:
-            print("使用PCA进行降维...")
-            reducer = PCA(n_components=2)
-            
-        reduced_embeddings = reducer.fit_transform(node_embeddings)
-        
-        # 可视化
-        plt.figure(figsize=(14, 10))
-        
-        if partition is not None:
-            # 按社区着色
-            num_communities = len(set(partition.values()))
-            if num_communities <= 10:
-                cmap = plt.cm.get_cmap('tab10', num_communities)
-            else:
-                cmap = plt.cm.get_cmap('viridis', num_communities)
-                
-            # 为每个点分配颜色
-            node_colors = [cmap(partition[i]) for i in range(len(reduced_embeddings))]
-            
-            # 绘制散点图
-            scatter = plt.scatter(
-                reduced_embeddings[:, 0], 
-                reduced_embeddings[:, 1],
-                c=node_colors,
-                s=50,
-                alpha=0.8
-            )
-            
-            # 添加图例
-            legend_handles = [plt.Line2D([0], [0], marker='o', color='w', 
-                                        markerfacecolor=cmap(i), markersize=10)
-                            for i in range(num_communities)]
-            legend_labels = [f"社区 {i}" for i in range(num_communities)]
-            
-            plt.legend(legend_handles, legend_labels, title="社区", loc='best')
-            
-        else:
-            # 普通散点图
-            plt.scatter(
-                reduced_embeddings[:, 0], 
-                reduced_embeddings[:, 1],
-                c='blue',
-                s=50,
-                alpha=0.8
-            )
-        
-        # 添加一些标签
-        for i in range(0, len(reduced_embeddings), max(1, len(reduced_embeddings) // 20)):
-            txt = plt.annotate(
-                f"{i}", 
-                (reduced_embeddings[i, 0], reduced_embeddings[i, 1]),
-                fontsize=9
-            )
-            txt.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='w')])
-        
-        plt.title(f"神经元嵌入空间可视化 ({method.upper()})", fontsize=16)
-        plt.xlabel(f"{method.upper()} 维度 1", fontsize=12)
-        plt.ylabel(f"{method.upper()} 维度 2", fontsize=12)
-        plt.grid(True, linestyle='--', alpha=0.7)
-        plt.tight_layout()
-        
-        # 保存图像
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        print(f"神经元嵌入空间可视化已保存至: {save_path}")
-    
-    def run_full_analysis(self, community_method='louvain', resolution=1.0, embedding_method='tsne'):
+    def run_full_analysis(self, community_method='louvain', resolution=1.0):
         """
         运行完整的社区分析和可视化流程
         
         参数:
             community_method: 社区检测方法
             resolution: 分辨率参数
-            embedding_method: 嵌入空间可视化方法
         """
         print("开始进行完整的神经元网络分析...")
         
@@ -612,14 +481,6 @@ class GCNVisualizer:
         
         # 6. 可视化社区间网络
         self.visualize_community_network(partition, filename='community_network.png')
-        
-        # 7. 可视化神经元嵌入空间
-        if self.model is not None:
-            self.visualize_neuron_embedding(
-                method=embedding_method, 
-                partition=partition,
-                filename=f'neuron_embedding_{embedding_method}.png'
-            )
         
         print("神经元网络分析完成！所有结果已保存到目录:", self.output_dir)
 
@@ -668,8 +529,7 @@ def main():
     # 执行完整分析
     visualizer.run_full_analysis(
         community_method='louvain',  # 可选: 'louvain', 'girvan_newman', 'label_propagation'
-        resolution=1.0,  # Louvain算法的分辨率参数，值越大社区越小
-        embedding_method='tsne'  # 可选: 'tsne', 'pca'
+        resolution=1.0  # Louvain算法的分辨率参数，值越大社区越小
     )
     
     print(f"可视化分析完成！所有结果已保存到{visualizer.output_dir}目录")
