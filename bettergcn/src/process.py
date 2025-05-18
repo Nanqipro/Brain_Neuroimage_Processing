@@ -350,18 +350,19 @@ class Generator(nn.Module):
             隐藏层维度, by default 128
         """
         super(Generator, self).__init__()
+        # 使用LayerNorm代替BatchNorm以解决单样本批次问题
         self.model = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.LeakyReLU(0.2),
-            nn.BatchNorm1d(hidden_dim),
+            nn.LayerNorm(hidden_dim),  # 替换为LayerNorm
             
             nn.Linear(hidden_dim, hidden_dim * 2),
             nn.LeakyReLU(0.2),
-            nn.BatchNorm1d(hidden_dim * 2),
+            nn.LayerNorm(hidden_dim * 2),  # 替换为LayerNorm
             
             nn.Linear(hidden_dim * 2, hidden_dim * 4),
             nn.LeakyReLU(0.2),
-            nn.BatchNorm1d(hidden_dim * 4),
+            nn.LayerNorm(hidden_dim * 4),  # 替换为LayerNorm
             
             nn.Linear(hidden_dim * 4, neuron_count),
             nn.Tanh()  # 输出范围[-1, 1]，根据需要可换成Sigmoid或其他激活函数
@@ -424,14 +425,14 @@ class VAE(nn.Module):
         """
         super(VAE, self).__init__()
         
-        # 编码器
+        # 编码器 - 使用LayerNorm替代BatchNorm
         self.encoder = nn.Sequential(
             nn.Linear(neuron_count, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
+            nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             
             nn.Linear(hidden_dim, hidden_dim * 2),
-            nn.BatchNorm1d(hidden_dim * 2),
+            nn.LayerNorm(hidden_dim * 2),
             nn.ReLU(),
         )
         
@@ -439,14 +440,14 @@ class VAE(nn.Module):
         self.fc_mu = nn.Linear(hidden_dim * 2, latent_dim)
         self.fc_logvar = nn.Linear(hidden_dim * 2, latent_dim)
         
-        # 解码器
+        # 解码器 - 使用LayerNorm替代BatchNorm
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim, hidden_dim * 2),
-            nn.BatchNorm1d(hidden_dim * 2),
+            nn.LayerNorm(hidden_dim * 2),
             nn.ReLU(),
             
             nn.Linear(hidden_dim * 2, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
+            nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             
             nn.Linear(hidden_dim, neuron_count),
@@ -561,10 +562,18 @@ def augment_with_gan(features, labels, noise_dim=100, batch_size=32, epochs=50,
             except Exception as e:
                 print(f"SMOTE处理出错: {e}，使用原始数据")
         
+        # 确保批次大小至少为2，且不超过数据集大小
+        effective_batch_size = min(max(2, batch_size), len(class_features))
+        
         # 创建PyTorch数据集
         tensor_x = torch.FloatTensor(class_features).to(device)
         dataset = TensorDataset(tensor_x)
-        dataloader = DataLoader(dataset, batch_size=min(batch_size, len(class_features)), shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=effective_batch_size, shuffle=True, drop_last=True)
+        
+        # 如果数据集太小，无法形成至少一个完整批次，则跳过
+        if len(dataloader) == 0:
+            print(f"类别 {label} 的样本数量过少，无法形成有效批次，跳过GAN训练")
+            continue
         
         # 初始化模型
         neuron_count = features.shape[1]
@@ -726,10 +735,18 @@ def augment_with_vae(features, labels, latent_dim=20, batch_size=32, epochs=50,
             except Exception as e:
                 print(f"SMOTE处理出错: {e}，使用原始数据")
         
+        # 确保批次大小至少为2，且不超过数据集大小
+        effective_batch_size = min(max(2, batch_size), len(class_features))
+        
         # 创建PyTorch数据集
         tensor_x = torch.FloatTensor(class_features).to(device)
         dataset = TensorDataset(tensor_x)
-        dataloader = DataLoader(dataset, batch_size=min(batch_size, len(class_features)), shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=effective_batch_size, shuffle=True, drop_last=True)
+        
+        # 如果数据集太小，无法形成至少一个完整批次，则跳过
+        if len(dataloader) == 0:
+            print(f"类别 {label} 的样本数量过少，无法形成有效批次，跳过VAE训练")
+            continue
         
         # 初始化模型
         neuron_count = features.shape[1]
@@ -871,14 +888,14 @@ def enhance_balanced_dataset(features, labels, methods=None):
             # 使用GAN进行增强
             current_features, current_labels = augment_with_gan(
                 current_features, current_labels,
-                epochs=30,  # 减少训练轮数以加快处理速度
+                epochs=100,  # 减少训练轮数以加快处理速度
                 batch_size=16
             )
         elif method == 'vae':
             # 使用VAE进行增强
             current_features, current_labels = augment_with_vae(
                 current_features, current_labels,
-                epochs=30,  # 减少训练轮数以加快处理速度
+                epochs=100,  # 减少训练轮数以加快处理速度
                 batch_size=16
             )
     

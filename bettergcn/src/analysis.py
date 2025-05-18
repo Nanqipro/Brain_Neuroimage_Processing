@@ -172,7 +172,7 @@ class GCNVisualizer:
             print(f"错误详情:\n{traceback.format_exc()}")
             return {}
     
-    def hierarchical_community_detection(self, n_communities=10):
+    def hierarchical_community_detection(self, n_communities=7):
         """
         使用层次聚类方法得到指定数量的社区
         
@@ -989,11 +989,11 @@ def main():
     
     print("\n=== 方法3: 使用层次聚类截断法控制社区数量 ===")
     # 执行层次聚类，指定社区数量
-    communities = visualizer.hierarchical_community_detection(n_communities=10)
+    communities = visualizer.hierarchical_community_detection(n_communities=7)
     # 可视化社区结构
     community_viz_path = visualizer.visualize_communities(
         output_path=f"{output_base_dir}/hierarchical_communities.png", 
-        title="Neural Network Community Structure (Hierarchical Clustering, 10 Communities)",
+        title="Neural Network Community Structure (Hierarchical Clustering, 7 Communities)",
         position_file=position_file
     )
     # 分析社区与行为的关联

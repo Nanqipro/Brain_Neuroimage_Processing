@@ -75,7 +75,7 @@ def main():
     
     # 使用增强的数据平衡方法处理不平衡数据
     # 选择合适的数据增强策略
-    augmentation_strategy = 'comprehensive'  # 可选: 'basic', 'gan', 'vae', 'comprehensive'
+    augmentation_strategy = 'comprehensive'  # 可选: 'basic', 'gan', 'vae', 'comprehensive', 'adasyn', 'none'
     
     if augmentation_strategy == 'basic':
         # 基础策略: 组合重采样 + 时间序列增强
@@ -101,12 +101,21 @@ def main():
             features, labels, 
             methods=['combined', 'timeseries', 'gan', 'vae']
         )
+    elif augmentation_strategy == 'adasyn':
+        # ADASYN策略: 使用ADASYN自适应合成采样
+        features_resampled, labels_resampled = enhance_balanced_dataset(
+            features, labels,
+            methods=['adasyn']
+        )
+    elif augmentation_strategy == 'none':
+        # 不使用任何数据增强方法，直接使用原始数据
+        print("不使用数据增强方法，保持原始数据分布")
+        features_resampled, labels_resampled = features, labels
     else:
         # 默认使用SMOTE
         features_resampled, labels_resampled = oversample_data(
             features, labels, ramdom_state=42, method='smote'
         )
-    
     print(f"最终重采样后特征形状: {features_resampled.shape}")
 
     # 划分训练集和验证集和测试集 (60%/20%/20%)
