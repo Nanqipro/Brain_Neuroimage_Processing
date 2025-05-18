@@ -133,13 +133,13 @@ class GCNVisualizer:
             center=0,
             square=True,
             annot=False,
-            cbar_kws={'label': '相关系数'}
+            cbar_kws={'label': 'Correlation Coefficient'}
         )
         
-        plt.title('神经元间相关性热力图')
+        plt.title('Neuron Correlation Heatmap')
         plt.tight_layout()
         
-        # 保存图像
+        # Save the image
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()
@@ -306,16 +306,15 @@ class GCNVisualizer:
         
         # 添加标题和图例
         community_sizes = Counter(partition.values())
-        legend_labels = [f"社区 {i} ({community_sizes[i]}个神经元)" 
+        legend_labels = [f"Community {i} ({community_sizes[i]} neurons)" 
                         for i in sorted(set(partition.values()))]
-        
         # 创建图例代理
         legend_handles = [plt.Line2D([0], [0], marker='o', color='w', 
                                     markerfacecolor=cmap(i), markersize=10)
                         for i in range(num_communities)]
         
-        plt.legend(legend_handles, legend_labels, title="社区", loc='upper right')
-        plt.title("神经元网络社区结构可视化", fontsize=16)
+        plt.legend(legend_handles, legend_labels, title="Community", loc='upper right')
+        plt.title("Neural Network Community Structure Visualization", fontsize=16)
         plt.axis('off')
         plt.tight_layout()
         
@@ -346,12 +345,12 @@ class GCNVisualizer:
             cmap='YlOrRd', 
             annot=True, 
             fmt='.2f', 
-            cbar_kws={'label': '比例'}
+            cbar_kws={'label': 'Proportion'}
         )
         
-        plt.title('社区与行为标签关系热力图', fontsize=16)
-        plt.xlabel('行为标签', fontsize=14)
-        plt.ylabel('社区ID', fontsize=14)
+        plt.title('Community-Behavior Heatmap', fontsize=16)
+        plt.xlabel('Behavior Label', fontsize=14)
+        plt.ylabel('Community ID', fontsize=14)
         plt.tight_layout()
         
         # 保存图像
@@ -436,15 +435,15 @@ class GCNVisualizer:
         nx.draw_networkx_edge_labels(C, pos, edge_labels=edge_labels, font_size=8)
         
         # 添加标题和图例
-        plt.title("社区间连接网络", fontsize=16)
+        plt.title("Community Connection Network", fontsize=16)
         
         # 为图例创建代理对象
         legend_handles = [plt.Line2D([0], [0], marker='o', color='w', 
                                      markerfacecolor=cmap(i), markersize=10)
                          for i in C.nodes()]
-        legend_labels = [f"社区 {i} ({C.nodes[i]['size']}个神经元)" for i in C.nodes()]
+        legend_labels = [f"Community {i} ({C.nodes[i]['size']} neurons)" for i in C.nodes()]
         
-        plt.legend(legend_handles, legend_labels, title="社区", loc='upper right')
+        plt.legend(legend_handles, legend_labels, title="Community", loc='upper right')
         plt.axis('off')
         plt.tight_layout()
         
