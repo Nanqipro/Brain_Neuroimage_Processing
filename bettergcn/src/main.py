@@ -176,7 +176,7 @@ def main():
     best_epoch = 0
     patience = 20  # early stopping patience
     epochs_no_improve = 0
-    max_epochs = 200
+    max_epochs = 250
     
     history = {
         'train': {
