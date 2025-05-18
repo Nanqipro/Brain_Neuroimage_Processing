@@ -21,7 +21,7 @@ class GCNVisualizer:
     """
     GCN模型可视化工具类，用于生成特定的拓扑结构图
     """
-    def __init__(self, base_path='../datasets/EMtrace01', model_file_name='best_model.pth', data_file_name='.xlsx'):
+    def __init__(self, base_path='../datasets/EMtrace02', model_file_name='best_model.pth', data_file_name='.xlsx'):
         """
         初始化可视化器
         
@@ -947,6 +947,15 @@ def main():
     dataset_base_path = '../datasets/EMtrace01'
     position_file = '../datasets/EMtrace01_Max_position.csv'
     
+    # 提取数据集名称并创建统一的输出路径
+    dataset_name = os.path.basename(dataset_base_path)
+    output_base_dir = f"../results/{dataset_name}"
+    
+    # 确保输出目录存在
+    os.makedirs(output_base_dir, exist_ok=True)
+    print(f"数据集: {dataset_name}")
+    print(f"输出目录: {output_base_dir}")
+    
     # 初始化可视化器
     visualizer = GCNVisualizer(base_path=dataset_base_path)
     
@@ -954,34 +963,43 @@ def main():
     # 执行Louvain社区检测
     communities = visualizer.detect_communities()
     # 可视化社区结构
-    community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/louvain_communities.png", 
-                                                         title="Neural Network Community Structure (Louvain Algorithm)",
-                                                         position_file=position_file)
+    community_viz_path = visualizer.visualize_communities(
+        output_path=f"{output_base_dir}/louvain_communities.png", 
+        title="Neural Network Community Structure (Louvain Algorithm)",
+        position_file=position_file
+    )
     # 分析社区与行为的关联
     community_behavior_mapping = visualizer.analyze_community_behavior_association(
-                                                         output_path="../results/EMtrace01/louvain_community_behaviors.png")
+        output_path=f"{output_base_dir}/louvain_community_behaviors.png"
+    )
     
     print("\n=== 方法2: 使用Louvain算法，降低分辨率控制社区数量 ===")
     # 执行社区检测，降低分辨率
     communities = visualizer.detect_communities(resolution=0.3)
     # 可视化社区结构
-    community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/louvain_communities_low_res.png", 
-                                                         title="Neural Network Community Structure (Louvain Algorithm, Low Resolution)",
-                                                         position_file=position_file)
+    community_viz_path = visualizer.visualize_communities(
+        output_path=f"{output_base_dir}/louvain_communities_low_res.png", 
+        title="Neural Network Community Structure (Louvain Algorithm, Low Resolution)",
+        position_file=position_file
+    )
     # 分析社区与行为的关联
     community_behavior_mapping = visualizer.analyze_community_behavior_association(
-                                                         output_path="../results/EMtrace01/louvain_low_res_behaviors.png")
+        output_path=f"{output_base_dir}/louvain_low_res_behaviors.png"
+    )
     
     print("\n=== 方法3: 使用层次聚类截断法控制社区数量 ===")
     # 执行层次聚类，指定社区数量
     communities = visualizer.hierarchical_community_detection(n_communities=10)
     # 可视化社区结构
-    community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/hierarchical_communities.png", 
-                                                         title="Neural Network Community Structure (Hierarchical Clustering, 10 Communities)",
-                                                         position_file=position_file)
+    community_viz_path = visualizer.visualize_communities(
+        output_path=f"{output_base_dir}/hierarchical_communities.png", 
+        title="Neural Network Community Structure (Hierarchical Clustering, 10 Communities)",
+        position_file=position_file
+    )
     # 分析社区与行为的关联
     community_behavior_mapping = visualizer.analyze_community_behavior_association(
-                                                         output_path="../results/EMtrace01/hierarchical_behaviors.png")
+        output_path=f"{output_base_dir}/hierarchical_behaviors.png"
+    )
     
     print("\n=== 方法4: 合并小社区 ===")
     # 使用Louvain算法检测社区
@@ -989,12 +1007,15 @@ def main():
     # 合并小社区
     merged_communities = visualizer.merge_small_communities(min_size=5)
     # 可视化合并后的社区结构
-    community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/merged_communities.png", 
-                                                         title="Neural Network Community Structure (Merged Small Communities)",
-                                                         position_file=position_file)
+    community_viz_path = visualizer.visualize_communities(
+        output_path=f"{output_base_dir}/merged_communities.png", 
+        title="Neural Network Community Structure (Merged Small Communities)",
+        position_file=position_file
+    )
     # 分析社区与行为的关联
     community_behavior_mapping = visualizer.analyze_community_behavior_association(
-                                                         output_path="../results/EMtrace01/merged_behaviors.png")
+        output_path=f"{output_base_dir}/merged_behaviors.png"
+    )
     
     # 创建一个专门用真实位置的版本进行对比
     print("\n=== 额外输出: 使用真实位置的层次聚类结果 ===")
@@ -1002,7 +1023,7 @@ def main():
     communities = visualizer.hierarchical_community_detection(n_communities=6)
     # 可视化社区结构 - 使用真实位置
     community_viz_path = visualizer.visualize_communities(
-        output_path="../results/EMtrace01/hierarchical_real_positions.png", 
+        output_path=f"{output_base_dir}/hierarchical_real_positions.png", 
         title="Neural Network Community Structure (Hierarchical, Real Positions, 6 Communities)",
         position_file=position_file
     )
