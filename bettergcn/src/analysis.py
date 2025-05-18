@@ -391,13 +391,14 @@ class GCNVisualizer:
             
         return new_communities
     
-    def visualize_communities(self, output_path=None, title="Neural Network Community Structure"):
+    def visualize_communities(self, output_path=None, title="Neural Network Community Structure", position_file=None):
         """
         可视化社区结构
         
         参数:
             output_path: 输出文件路径，默认为None，将根据title生成
             title: 图表标题
+            position_file: 神经元位置坐标CSV文件路径，如果提供则使用真实空间位置
             
         返回:
             output_path: 输出图像路径
@@ -410,6 +411,7 @@ class GCNVisualizer:
             output_path = os.path.join(self.output_dir, "community_structure.png")
             
         print(f"\n开始生成社区结构可视化: {output_path}")
+        print(f"位置数据文件: {position_file if position_file else '未提供，将使用布局算法'}")
         
         # 创建图形
         plt.figure(figsize=(15, 15))
@@ -421,15 +423,155 @@ class GCNVisualizer:
         # 获取边权重用于设置边的宽度
         edge_weights = [self.G[u][v]['weight'] * 1.5 for u, v in self.G.edges()]
         
-        # 使用spring布局
-        pos = nx.spring_layout(self.G, k=2.0, iterations=100, seed=42)
+        # 确定节点位置
+        if position_file and os.path.exists(position_file):
+            try:
+                # 读取位置数据
+                import pandas as pd
+                position_data = pd.read_csv(position_file)
+                print(f"位置数据文件包含 {len(position_data)} 个神经元的位置信息")
+                
+                # 创建一个从神经元ID到位置的映射
+                position_map = {}
+                
+                # 检查CSV文件中的列名
+                columns = position_data.columns.tolist()
+                x_col = 'relative_x' if 'relative_x' in columns else columns[1]  # 默认第二列为x坐标
+                y_col = 'relative_y' if 'relative_y' in columns else columns[2]  # 默认第三列为y坐标
+                id_col = 'number' if 'number' in columns else columns[0]        # 默认第一列为ID
+                
+                print(f"使用列: ID={id_col}, X={x_col}, Y={y_col}")
+                
+                # 检查是否存在神经元编号与索引不一致的问题
+                neuron_ids_in_csv = set([int(row[id_col]) for _, row in position_data.iterrows()])
+                nodes_in_graph = set(self.G.nodes())
+                
+                # 查看最小和最大神经元ID，可能的偏移量
+                min_neuron_id = min(neuron_ids_in_csv) if neuron_ids_in_csv else -1
+                max_neuron_id = max(neuron_ids_in_csv) if neuron_ids_in_csv else -1
+                min_node_id = min(nodes_in_graph) if nodes_in_graph else -1
+                max_node_id = max(nodes_in_graph) if nodes_in_graph else -1
+                print(f"CSV中神经元ID范围: {min_neuron_id} 到 {max_neuron_id}")
+                print(f"图中节点ID范围: {min_node_id} 到 {max_node_id}")
+                
+                # 计算可能的偏移量，检查多种情况
+                offset = 0
+                
+                # 情况1: CSV从1开始，图从0开始 - 常见情况
+                if min_neuron_id == 1 and min_node_id == 0 and max_neuron_id - min_neuron_id == max_node_id - min_node_id:
+                    offset = -1
+                    print(f"检测到固定偏移: CSV从1开始，图从0开始，应用偏移量 {offset}")
+                
+                # 情况2: 检查ID集合的平均差值
+                elif len(neuron_ids_in_csv) > 0 and len(nodes_in_graph) > 0:
+                    # 如果数据集大小相同且有固定偏移，计算平均偏移
+                    if len(neuron_ids_in_csv) == len(nodes_in_graph):
+                        sorted_csv_ids = sorted(neuron_ids_in_csv)
+                        sorted_node_ids = sorted(nodes_in_graph)
+                        # 计算前10个ID的平均偏移（或全部如果少于10个）
+                        sample_size = min(10, len(sorted_csv_ids))
+                        offsets = [sorted_csv_ids[i] - sorted_node_ids[i] for i in range(sample_size)]
+                        avg_offset = sum(offsets) / len(offsets)
+                        # 如果所有偏移都相同，则认为是有效偏移
+                        if all(o == offsets[0] for o in offsets):
+                            offset = -offsets[0]  # 取负值因为我们需要从CSV ID到节点ID的映射
+                            print(f"检测到固定偏移模式: 平均偏移 {offsets[0]}，应用偏移量 {offset}")
+                
+                # 寻找每个节点的位置
+                missing_nodes = []
+                
+                for node in self.G.nodes():
+                    csv_id = node - offset  # 计算CSV中的对应ID
+                    if csv_id < 0:  # 防止负ID
+                        missing_nodes.append(node)
+                        continue
+                        
+                    row = position_data[position_data[id_col] == csv_id]
+                    if len(row) > 0:
+                        position_map[node] = (float(row[x_col].values[0]), float(row[y_col].values[0]))
+                    else:
+                        missing_nodes.append(node)
+                
+                # 如果我们有足够的位置信息，使用真实的空间位置
+                if len(position_map) == len(self.G.nodes()):
+                    pos = position_map
+                    print(f"使用真实空间位置可视化 {len(pos)} 个神经元")
+                else:
+                    print(f"警告：位置数据不完整 ({len(position_map)}/{len(self.G.nodes())})")
+                    if missing_nodes:
+                        print(f"缺失节点数量: {len(missing_nodes)}")
+                        if len(missing_nodes) < 10:
+                            print(f"缺失节点ID: {missing_nodes}")
+                        
+                    # 尝试使用可用的位置数据，对缺失的使用布局算法补充
+                    if len(position_map) > len(self.G.nodes()) * 0.8:  # 如果有超过80%的节点有位置数据
+                        print("使用部分真实位置数据，缺失部分使用布局算法补充")
+                        # 为缺失的节点生成位置
+                        try:
+                            # 使用布局算法为缺失节点生成位置
+                            temp_g = self.G.copy()
+                            for node in position_map:
+                                if node in temp_g:
+                                    temp_g.remove_node(node)
+                            
+                            if temp_g.number_of_nodes() > 0:
+                                temp_pos = nx.spring_layout(temp_g, seed=42)
+                                # 合并两个位置字典
+                                pos = {**position_map, **temp_pos}
+                            else:
+                                pos = position_map
+                        except Exception as e:
+                            print(f"补充缺失节点位置时出错: {e}")
+                            pos = position_map
+                    else:  # 如果缺失太多，使用布局算法
+                        print("缺失位置数据过多，使用布局算法")
+                        try:
+                            pos = nx.kamada_kawai_layout(self.G)
+                        except:
+                            pos = nx.spring_layout(self.G, seed=42, k=2.0, iterations=100)
+            except Exception as e:
+                print(f"读取位置数据时出错：{e}，将使用布局算法")
+                import traceback
+                print(f"错误详情:\n{traceback.format_exc()}")
+                try:
+                    pos = nx.kamada_kawai_layout(self.G)
+                except:
+                    pos = nx.spring_layout(self.G, seed=42, k=2.0, iterations=100)
+        else:
+            # 如果没有位置文件，使用布局算法
+            try:
+                pos = nx.kamada_kawai_layout(self.G)
+                print("使用Kamada-Kawai布局算法")
+            except:
+                pos = nx.spring_layout(self.G, seed=42, k=2.0, iterations=100)
+                print("使用Spring布局算法")
         
-        # 绘制边
-        nx.draw_networkx_edges(self.G, pos, width=edge_weights, alpha=0.2, edge_color='gray')
+        # 绘制边 - 根据不同社区边的透明度不同
+        same_community_edges = []
+        diff_community_edges = []
+        
+        for u, v in self.G.edges():
+            if self.communities[u] == self.communities[v]:
+                same_community_edges.append((u, v))
+            else:
+                diff_community_edges.append((u, v))
+        
+        # 先绘制社区间边（低透明度）
+        if diff_community_edges:
+            nx.draw_networkx_edges(self.G, pos, edgelist=diff_community_edges,
+                                width=[self.G[u][v]['weight'] * 1.0 for u, v in diff_community_edges],
+                                alpha=0.2, edge_color='lightgray')
+        
+        # 再绘制社区内边（高透明度）
+        if same_community_edges:
+            nx.draw_networkx_edges(self.G, pos, edgelist=same_community_edges,
+                                width=[self.G[u][v]['weight'] * 1.5 for u, v in same_community_edges],
+                                alpha=0.5, edge_color='gray')
         
         # 绘制节点
         node_sizes = [400 for _ in self.G.nodes()]
-        nx.draw_networkx_nodes(self.G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.9)
+        nx.draw_networkx_nodes(self.G, pos, node_size=node_sizes, node_color=node_colors, alpha=0.9,
+                            edgecolors='black', linewidths=0.5)
         
         # 绘制节点标签
         labels = {node: f'N{node+1}' for node in self.G.nodes()}
@@ -445,6 +587,12 @@ class GCNVisualizer:
                                     markersize=10, label=f'Community {i+1}')
                          for i in range(num_communities)]
         plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5))
+        
+        # 添加位置信息来源说明
+        position_source = "Real Space Position" if position_file and os.path.exists(position_file) else "Layout Algorithm Generated"
+        plt.figtext(0.02, 0.02, f"Position Source: {position_source}", fontsize=10)
+        plt.figtext(0.02, 0.04, f"Nodes: {len(self.G.nodes())}, Edges: {len(self.G.edges())}, Communities: {num_communities}", fontsize=10)
+        
         # 保存图像
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
@@ -797,6 +945,7 @@ def main():
     
     # 设置数据集基础路径 - 只需修改此处即可更改所有相关路径
     dataset_base_path = '../datasets/EMtrace01'
+    position_file = '../datasets/EMtrace01_Max_position.csv'
     
     # 初始化可视化器
     visualizer = GCNVisualizer(base_path=dataset_base_path)
@@ -806,7 +955,8 @@ def main():
     communities = visualizer.detect_communities()
     # 可视化社区结构
     community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/louvain_communities.png", 
-                                                         title="Neural Network Community Structure (Louvain Algorithm)")
+                                                         title="Neural Network Community Structure (Louvain Algorithm)",
+                                                         position_file=position_file)
     # 分析社区与行为的关联
     community_behavior_mapping = visualizer.analyze_community_behavior_association(
                                                          output_path="../results/EMtrace01/louvain_community_behaviors.png")
@@ -816,7 +966,8 @@ def main():
     communities = visualizer.detect_communities(resolution=0.3)
     # 可视化社区结构
     community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/louvain_communities_low_res.png", 
-                                                         title="Neural Network Community Structure (Louvain Algorithm, Low Resolution)")
+                                                         title="Neural Network Community Structure (Louvain Algorithm, Low Resolution)",
+                                                         position_file=position_file)
     # 分析社区与行为的关联
     community_behavior_mapping = visualizer.analyze_community_behavior_association(
                                                          output_path="../results/EMtrace01/louvain_low_res_behaviors.png")
@@ -826,7 +977,8 @@ def main():
     communities = visualizer.hierarchical_community_detection(n_communities=10)
     # 可视化社区结构
     community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/hierarchical_communities.png", 
-                                                         title="Neural Network Community Structure (Hierarchical Clustering, 10 Communities)")
+                                                         title="Neural Network Community Structure (Hierarchical Clustering, 10 Communities)",
+                                                         position_file=position_file)
     # 分析社区与行为的关联
     community_behavior_mapping = visualizer.analyze_community_behavior_association(
                                                          output_path="../results/EMtrace01/hierarchical_behaviors.png")
@@ -838,12 +990,25 @@ def main():
     merged_communities = visualizer.merge_small_communities(min_size=5)
     # 可视化合并后的社区结构
     community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/merged_communities.png", 
-                                                         title="Neural Network Community Structure (Merged Small Communities)")
+                                                         title="Neural Network Community Structure (Merged Small Communities)",
+                                                         position_file=position_file)
     # 分析社区与行为的关联
     community_behavior_mapping = visualizer.analyze_community_behavior_association(
                                                          output_path="../results/EMtrace01/merged_behaviors.png")
     
+    # 创建一个专门用真实位置的版本进行对比
+    print("\n=== 额外输出: 使用真实位置的层次聚类结果 ===")
+    # 执行层次聚类，指定社区数量为更少的数字
+    communities = visualizer.hierarchical_community_detection(n_communities=6)
+    # 可视化社区结构 - 使用真实位置
+    community_viz_path = visualizer.visualize_communities(
+        output_path="../results/EMtrace01/hierarchical_real_positions.png", 
+        title="Neural Network Community Structure (Hierarchical, Real Positions, 6 Communities)",
+        position_file=position_file
+    )
+    
     print(f"\n可视化分析完成！所有结果已保存到{visualizer.output_dir}目录")
+    print(f"所有可视化均使用了真实神经元位置数据：{position_file}")
 
 
 if __name__ == "__main__":
