@@ -10,6 +10,8 @@ import pandas as pd
 from scipy.stats import chi2_contingency
 from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_similarity
+from scipy.cluster.hierarchy import linkage, fcluster
+from scipy.spatial.distance import squareform
 
 # 导入项目中的其他模块
 from model import ImprovedGCN
@@ -120,18 +122,21 @@ class GCNVisualizer:
         
         return model
     
-    def detect_communities(self):
+    def detect_communities(self, resolution=1.0):
         """
         使用Louvain算法检测图中的社区结构
         
+        参数:
+            resolution: 分辨率参数，值越大社区数量越多，越小社区数量越少
+            
         返回:
             communities: 节点-社区映射字典，键为节点ID，值为社区ID
         """
-        print("\n开始进行社区检测...")
+        print(f"\n开始进行社区检测 (分辨率: {resolution})...")
         
         try:
             # 使用Louvain方法检测社区
-            communities = community_louvain.best_partition(self.G)
+            communities = community_louvain.best_partition(self.G, resolution=resolution)
             
             # 统计社区信息
             community_count = Counter(communities.values())
@@ -166,6 +171,225 @@ class GCNVisualizer:
             import traceback
             print(f"错误详情:\n{traceback.format_exc()}")
             return {}
+    
+    def hierarchical_community_detection(self, n_communities=10):
+        """
+        使用层次聚类方法得到指定数量的社区
+        
+        参数:
+            n_communities: 目标社区数量
+            
+        返回:
+            communities: 节点-社区映射字典
+        """
+        print(f"\n开始使用层次聚类进行社区检测 (目标社区数: {n_communities})...")
+        
+        try:
+            # 获取邻接矩阵
+            adj_matrix = nx.to_numpy_array(self.G)
+            
+            # 将权重转换为距离矩阵：高权重(高相似度)=低距离
+            # 对于没有连接的节点对，距离设为最大值1.0
+            dist_matrix = 1.0 - adj_matrix
+            
+            # 确保对角线为0，这是scipy.spatial.distance.squareform的要求
+            np.fill_diagonal(dist_matrix, 0)
+            
+            # 压缩距离矩阵为压缩距离向量（层次聚类算法需要）
+            condensed_dist = squareform(dist_matrix)
+            
+            # 进行层次聚类 - 使用Ward方法，最小化聚类内方差
+            print("正在进行层次聚类...")
+            Z = linkage(condensed_dist, method='ward')
+            
+            # 切割树状图得到指定数量的社区
+            print(f"截断聚类树以得到{n_communities}个社区...")
+            labels = fcluster(Z, n_communities, criterion='maxclust')
+            
+            # 创建节点-社区映射
+            communities = {node: int(label-1) for node, label in zip(self.G.nodes(), labels)}
+            
+            # 统计社区信息
+            community_count = Counter(communities.values())
+            community_sizes = sorted([(comm, count) for comm, count in community_count.items()], 
+                                    key=lambda x: x[1], reverse=True)
+            
+            actual_n_communities = len(set(communities.values()))
+            print(f"层次聚类完成，共生成了{actual_n_communities}个社区")
+            print("社区大小分布:")
+            for i, (comm_id, size) in enumerate(community_sizes):
+                print(f"  社区 {comm_id}: {size}个节点")
+            
+            # 为不同社区分配不同颜色
+            community_colors = [
+                "#FF6347", "#4682B4", "#32CD32", "#FFD700", "#9370DB", 
+                "#20B2AA", "#FF69B4", "#8A2BE2", "#00CED1", "#FF8C00",
+                "#1E90FF", "#FF1493", "#00FA9A", "#DC143C", "#BA55D3"
+            ]
+            
+            # 确保颜色足够
+            if actual_n_communities > len(community_colors):
+                community_colors = community_colors * (actual_n_communities // len(community_colors) + 1)
+                
+            # 存储检测结果
+            self.communities = communities
+            self.community_colors = community_colors
+            
+            # 可视化层次聚类树状图
+            self._visualize_dendrogram(Z, n_communities)
+            
+            return communities
+            
+        except Exception as e:
+            print(f"层次聚类社区检测失败: {str(e)}")
+            import traceback
+            print(f"错误详情:\n{traceback.format_exc()}")
+            return {}
+    
+    def _visualize_dendrogram(self, Z, n_clusters, max_d=None):
+        """
+        可视化层次聚类的树状图
+        
+        参数:
+            Z: 层次聚类的结果
+            n_clusters: 社区数量
+            max_d: 最大距离阈值，用于在图上显示截断线
+        """
+        from scipy.cluster.hierarchy import dendrogram
+        
+        plt.figure(figsize=(12, 8))
+        plt.title('Neural Network Hierarchical Clustering Dendrogram', fontsize=16)
+        plt.xlabel('Neuron Index', fontsize=12)
+        plt.ylabel('Distance', fontsize=12)
+        
+        # 计算截断距离，如果未提供
+        if max_d is None:
+            # 找到产生n_clusters的距离
+            from scipy.cluster.hierarchy import fcluster
+            distances = Z[:, 2]
+            distances_sorted = np.sort(distances)
+            if len(distances) >= n_clusters:
+                # 由于Python索引从0开始，我们需要使用len(distances) - n_clusters + 1来获取正确的距离
+                threshold_idx = len(distances) - n_clusters + 1
+                if threshold_idx < len(distances):
+                    max_d = distances_sorted[threshold_idx]
+                else:
+                    max_d = distances_sorted[-1]
+            else:
+                max_d = distances_sorted[-1] if len(distances_sorted) > 0 else None
+        
+        # 绘制树状图
+        dendrogram(
+            Z,
+            truncate_mode='lastp',  # 显示最后的p个聚类
+            p=n_clusters * 2,       # 显示的节点数
+            leaf_rotation=90.,      # 旋转叶节点标签
+            leaf_font_size=10.,     # 叶节点标签的字体大小
+            show_contracted=True,   # 压缩非叶节点
+            color_threshold=max_d   # 颜色阈值
+        )
+        
+        # 添加截断线
+        if max_d:
+            plt.axhline(y=max_d, c='k', ls='--', lw=1)
+            plt.text(plt.xlim()[1] * 0.98, max_d, f'Cutoff Line (n_clusters={n_clusters})', 
+                    va='center', ha='right', bbox=dict(facecolor='white', alpha=0.7))
+        
+        # 保存图像
+        output_path = os.path.join(self.output_dir, 'hierarchy_dendrogram.png')
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"层次聚类树状图已保存至: {output_path}")
+        return output_path
+    
+    def merge_small_communities(self, min_size=5):
+        """
+        合并小社区到最相近的大社区
+        
+        参数:
+            min_size: 小于此大小的社区将被合并
+            
+        返回:
+            new_communities: 合并后的社区映射
+        """
+        if self.communities is None:
+            print("请先运行社区检测再合并小社区")
+            return None
+            
+        print(f"\n开始合并小于{min_size}节点的社区...")
+        
+        # 统计每个社区的大小
+        community_count = Counter(self.communities.values())
+        community_sizes = {comm: count for comm, count in community_count.items()}
+        
+        # 找出小社区
+        small_communities = {c for c, size in community_sizes.items() if size < min_size}
+        
+        if not small_communities:
+            print("没有发现小于阈值的社区，无需合并")
+            return self.communities
+            
+        print(f"发现{len(small_communities)}个小于{min_size}节点的社区，开始合并...")
+        
+        # 计算社区间连接强度
+        community_connections = defaultdict(lambda: defaultdict(float))
+        
+        for u, v, data in self.G.edges(data=True):
+            if u in self.communities and v in self.communities:
+                c1, c2 = self.communities[u], self.communities[v]
+                if c1 != c2:  # 不同社区之间的连接
+                    weight = data.get('weight', 1.0)
+                    community_connections[c1][c2] += weight
+                    community_connections[c2][c1] += weight
+        
+        # 复制原始社区结果
+        new_communities = dict(self.communities)
+        
+        # 处理每个小社区
+        for small_comm in small_communities:
+            # 找到连接最强的大社区
+            best_target = None
+            max_strength = -1
+            
+            for target_comm, strength in community_connections[small_comm].items():
+                if target_comm not in small_communities and strength > max_strength:
+                    best_target = target_comm
+                    max_strength = strength
+            
+            # 如果找不到连接的大社区，则找最大的社区
+            if best_target is None:
+                large_comms = [(c, size) for c, size in community_sizes.items() if c not in small_communities]
+                if large_comms:
+                    best_target = max(large_comms, key=lambda x: x[1])[0]
+                    
+            # 合并社区
+            if best_target is not None:
+                for node, comm in self.communities.items():
+                    if comm == small_comm:
+                        new_communities[node] = best_target
+                print(f"社区 {small_comm} (大小: {community_sizes[small_comm]}) 已合并到社区 {best_target} (大小: {community_sizes[best_target]})")
+        
+        # 重新映射社区ID为连续数字
+        unique_communities = sorted(set(new_communities.values()))
+        comm_mapping = {old: new for new, old in enumerate(unique_communities)}
+        new_communities = {node: comm_mapping[comm] for node, comm in new_communities.items()}
+        
+        # 更新类属性
+        self.communities = new_communities
+        
+        # 重新统计并打印社区信息
+        community_count = Counter(new_communities.values())
+        community_sizes = sorted([(comm, count) for comm, count in community_count.items()], 
+                                key=lambda x: x[1], reverse=True)
+        
+        print(f"合并后共有{len(community_sizes)}个社区")
+        print("合并后社区大小分布（前5个）:")
+        for i, (comm_id, size) in enumerate(community_sizes[:5]):
+            print(f"  社区 {comm_id}: {size}个节点")
+            
+        return new_communities
     
     def visualize_communities(self, output_path=None, title="Neural Network Community Structure"):
         """
@@ -577,16 +801,49 @@ def main():
     # 初始化可视化器
     visualizer = GCNVisualizer(base_path=dataset_base_path)
     
-    # 执行社区检测
+    print("\n=== 方法1: 使用Louvain算法检测社区（默认分辨率）===")
+    # 执行Louvain社区检测
     communities = visualizer.detect_communities()
-    
     # 可视化社区结构
-    community_viz_path = visualizer.visualize_communities()
-    
+    community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/louvain_communities.png", 
+                                                         title="Neural Network Community Structure (Louvain Algorithm)")
     # 分析社区与行为的关联
-    community_behavior_mapping = visualizer.analyze_community_behavior_association()
+    community_behavior_mapping = visualizer.analyze_community_behavior_association(
+                                                         output_path="../results/EMtrace01/louvain_community_behaviors.png")
     
-    print(f"可视化分析完成！所有结果已保存到{visualizer.output_dir}目录")
+    print("\n=== 方法2: 使用Louvain算法，降低分辨率控制社区数量 ===")
+    # 执行社区检测，降低分辨率
+    communities = visualizer.detect_communities(resolution=0.3)
+    # 可视化社区结构
+    community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/louvain_communities_low_res.png", 
+                                                         title="Neural Network Community Structure (Louvain Algorithm, Low Resolution)")
+    # 分析社区与行为的关联
+    community_behavior_mapping = visualizer.analyze_community_behavior_association(
+                                                         output_path="../results/EMtrace01/louvain_low_res_behaviors.png")
+    
+    print("\n=== 方法3: 使用层次聚类截断法控制社区数量 ===")
+    # 执行层次聚类，指定社区数量
+    communities = visualizer.hierarchical_community_detection(n_communities=10)
+    # 可视化社区结构
+    community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/hierarchical_communities.png", 
+                                                         title="Neural Network Community Structure (Hierarchical Clustering, 10 Communities)")
+    # 分析社区与行为的关联
+    community_behavior_mapping = visualizer.analyze_community_behavior_association(
+                                                         output_path="../results/EMtrace01/hierarchical_behaviors.png")
+    
+    print("\n=== 方法4: 合并小社区 ===")
+    # 使用Louvain算法检测社区
+    communities = visualizer.detect_communities()
+    # 合并小社区
+    merged_communities = visualizer.merge_small_communities(min_size=5)
+    # 可视化合并后的社区结构
+    community_viz_path = visualizer.visualize_communities(output_path="../results/EMtrace01/merged_communities.png", 
+                                                         title="Neural Network Community Structure (Merged Small Communities)")
+    # 分析社区与行为的关联
+    community_behavior_mapping = visualizer.analyze_community_behavior_association(
+                                                         output_path="../results/EMtrace01/merged_behaviors.png")
+    
+    print(f"\n可视化分析完成！所有结果已保存到{visualizer.output_dir}目录")
 
 
 if __name__ == "__main__":
