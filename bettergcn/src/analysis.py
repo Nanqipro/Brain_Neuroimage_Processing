@@ -17,13 +17,13 @@ class GCNVisualizer:
     """
     GCN模型可视化工具类，用于生成特定的拓扑结构图
     """
-    def __init__(self, base_path='../datasets/EMtrace01', model_file_name='_best_model.pth', data_file_name='.xlsx'):
+    def __init__(self, base_path='../datasets/EMtrace01', model_file_name='best_model.pth', data_file_name='.xlsx'):
         """
         初始化可视化器
         
         参数:
             base_path: 基础路径，所有输入输出路径都基于此路径生成
-            model_file_name: 模型文件名后缀
+            model_file_name: 模型文件名
             data_file_name: 数据文件名后缀
         """
         # 提取基础文件名（不含路径和扩展名）
@@ -31,7 +31,7 @@ class GCNVisualizer:
         
         # 设置路径
         self.base_path = base_path
-        self.model_path = f"../results/{self.dataset_name}{model_file_name}"
+        self.model_path = f"../results/{self.dataset_name}/{model_file_name}"
         self.data_path = f"{base_path}{data_file_name}"
         self.output_dir = f"../results/{self.dataset_name}"
         
@@ -41,7 +41,7 @@ class GCNVisualizer:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # 加载数据和模型
-        self.features, self.labels, _, self.class_weights, self.class_names = load_data(self.data_path, return_names=True)
+        self.features, self.labels, self.class_weights, self.class_names = load_data(self.data_path, return_names=True)
         self.num_classes = len(self.class_names)
         
         # 计算相关性矩阵用于构建神经元拓扑图
@@ -268,13 +268,14 @@ class GCNVisualizer:
         # 创建颜色映射
         if num_communities <= 10:
             # 使用定性颜色映射，如果社区数量较少
-            cmap = plt.cm.get_cmap('tab10', num_communities)
+            colors = plt.cm.tab10.colors
         else:
             # 使用连续颜色映射，如果社区数量较多
-            cmap = plt.cm.get_cmap('viridis', num_communities)
+            colors = plt.cm.viridis(np.linspace(0, 1, num_communities))
             
         # 为每个节点分配颜色
-        node_colors = [cmap(partition[node]) for node in self.G.nodes()]
+        color_map = {comm_id: colors[i % len(colors)] for i, comm_id in enumerate(sorted(set(partition.values())))}
+        node_colors = [color_map[partition[node]] for node in self.G.nodes()]
         
         # 绘制图
         plt.figure(figsize=(14, 12))
@@ -296,8 +297,7 @@ class GCNVisualizer:
         nx.draw_networkx_nodes(
             self.G, pos,
             node_color=node_colors,
-            node_size=node_size,
-            cmap=cmap
+            node_size=node_size
         )
         
         # 绘制节点标签
@@ -310,8 +310,8 @@ class GCNVisualizer:
                         for i in sorted(set(partition.values()))]
         # 创建图例代理
         legend_handles = [plt.Line2D([0], [0], marker='o', color='w', 
-                                    markerfacecolor=cmap(i), markersize=10)
-                        for i in range(num_communities)]
+                                    markerfacecolor=color_map[i], markersize=10)
+                        for i in sorted(set(partition.values()))]
         
         plt.legend(legend_handles, legend_labels, title="Community", loc='upper right')
         plt.title("Neural Network Community Structure Visualization", fontsize=16)
@@ -391,9 +391,9 @@ class GCNVisualizer:
         # 创建颜色映射
         num_communities = len(C.nodes())
         if num_communities <= 10:
-            cmap = plt.cm.get_cmap('tab10', num_communities)
+            cmap = plt.colormaps['tab10']
         else:
-            cmap = plt.cm.get_cmap('viridis', num_communities)
+            cmap = plt.colormaps['viridis']
         
         # 绘制社区网络
         plt.figure(figsize=(14, 12))
@@ -418,7 +418,7 @@ class GCNVisualizer:
         # 绘制节点
         nx.draw_networkx_nodes(
             C, pos,
-            node_color=[cmap(i) for i in C.nodes()],
+            node_color=[cmap(i % cmap.N) for i in C.nodes()],
             node_size=node_sizes,
             alpha=0.9
         )
