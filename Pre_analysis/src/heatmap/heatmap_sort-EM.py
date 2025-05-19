@@ -13,7 +13,7 @@ from scipy import stats
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EM.xls'
+    INPUT_FILE = '../../datasets/29790930糖水铁网糖水trace2.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort_'
     # 时间戳区间默认值（None表示不限制）
@@ -249,20 +249,20 @@ if has_behavior and len(unique_behaviors) > 0:
     # 创建固定的行为颜色映射，确保相同行为始终使用相同颜色
     # 预定义所有可能的行为及其固定颜色，使用更加鲜明和对比度更高的颜色
     fixed_color_map = {
-        'Open': '#FF9500',    # 明亮橙色
-        'Close': '#0066CC',   # 深蓝色
-        'Middle': '#00CC00',  # 亮绿色
-        'WI': '#FF0000',      # 鲜红色
-        'LVR': '#9900FF',     # 亮紫色
-        'FM': '#994C00',      # 深棕色
-        'GR': '#FF00CC',      # 亮粉色
-        'ELT': '#000000',     # 黑色
-        'CM': '#AACC00',      # 亮黄绿色
-        'CT': '#00CCFF',      # 亮蓝绿色
-        'NI': '#66B3FF',      # 亮蓝色
-        'EM': '#33FF33',      # 鲜绿色
-        'RF': '#FF6666',      # 亮红色
-        'RN': '#CC99FF'       # 亮紫色
+        'Crack-seeds-shells': '#FF9500',    # 明亮橙色
+        'Eat-feed': '#0066CC',              # 深蓝色
+        'Eat-seed-kernels': '#00CC00',      # 亮绿色
+        'Explore': '#FF0000',               # 鲜红色
+        'Explore-search-seeds': '#9900FF',  # 亮紫色
+        'Find-seeds': '#994C00',            # 深棕色
+        'Get-feed': '#FF00CC',              # 亮粉色
+        'Get-seeds': '#000000',             # 黑色
+        'Grab-seeds': '#AACC00',            # 亮黄绿色
+        'Groom': '#00CCFF',                 # 亮蓝绿色
+        'Smell-feed': '#66B3FF',            # 亮蓝色
+        'Smell-Get-seeds': '#33FF33',       # 鲜绿色
+        'Store-seeds': '#FF6666',           # 亮红色
+        'Water': '#CC99FF'                  # 亮紫色
     }
     
     # 为当前数据集中的行为创建颜色映射
@@ -351,7 +351,7 @@ if has_behavior and len(unique_behaviors) > 0:
                            title='Behavior Types', title_fontsize=14, bbox_to_anchor=(1.0, 1.3))
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = f'EM-heatmap ({sort_method_str})'
+title_text = f'29790930tangsuitewangtrace2-heatmap ({sort_method_str})'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -373,7 +373,7 @@ ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=14, fontweight
 # 而是使用之前设置的subplots_adjust()已经足够调整布局
 
 # 构建输出文件名，包含排序方式和时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}EM_{Config.SORT_METHOD}"
+output_filename = f"{Config.OUTPUT_PREFIX}29790930tangsuitewangtrace2_{Config.SORT_METHOD}"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()

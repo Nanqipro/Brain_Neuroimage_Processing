@@ -4,7 +4,7 @@ import os
 
 def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataFrame:
     """
-    处理原始数据，确保Position列每行都有对应标签
+    处理原始数据，确保FrameLost列每行都有对应标签
     
     Parameters
     ----------
@@ -22,7 +22,7 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
     data = pd.read_excel(input_file_path, sheet_name='Sheet1')
     
     # 确保数据列存在
-    required_columns = ['stamp', 'Position']
+    required_columns = ['stamp', 'FrameLost']
     for col in required_columns:
         if col not in data.columns:
             # 如果列不存在，创建空列
@@ -30,9 +30,9 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
             print(f"警告: 创建了缺失的列 '{col}'")
     
     # 将空字符串替换为NaN以便正确填充
-    data['Position'] = data['Position'].replace('', np.nan)
+    data['FrameLost'] = data['FrameLost'].replace('', np.nan)
     # 使用前向填充填充空值
-    data['Position'] = data['Position'].ffill()
+    data['FrameLost'] = data['FrameLost'].ffill()
     
     # 将所有仍为NaN的值替换为'NULL'字符串
     data = data.fillna('NULL')
@@ -48,12 +48,12 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
 
 if __name__ == "__main__":
     # 定义输入和输出文件路径
-    input_path = '../../raw_data/29792409EM2Trace.xlsx'
-    output_path = '../../processed_data/EM2Trace_processed.xlsx'
+    input_path = '../../raw_data/29790930糖水铁网糖水trace2.xlsx'
+    output_path = '../../processed_data/29790930糖水铁网糖水trace2_processed.xlsx'
     
     # 处理数据
     processed_data = process_data(input_path, output_path)
     
     # 打印处理结果统计信息
     print(f"处理完成，共处理 {len(processed_data)} 行数据")
-    print(f"Position列非空值数量: {processed_data['Position'].ne('NULL').sum()}")
+    print(f"FrameLost列非空值数量: {processed_data['FrameLost'].ne('NULL').sum()}")

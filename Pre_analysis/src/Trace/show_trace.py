@@ -10,7 +10,7 @@ import os
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EM.xls'
+    INPUT_FILE = '../../datasets/29790930糖水铁网糖水trace2.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
@@ -124,20 +124,20 @@ else:
 
 # 预定义颜色映射，与热图保持一致
 fixed_color_map = {
-    'Open': '#FF9500',    # 明亮橙色
-    'Close': '#0066CC',   # 深蓝色
-    'Middle': '#00CC00',  # 亮绿色
-    'WI': '#FF0000',      # 鲜红色
-    'LVR': '#9900FF',     # 亮紫色
-    'FM': '#994C00',      # 深棕色
-    'GR': '#FF00CC',      # 亮粉色
-    'ELT': '#7f7f7f',  # 灰色
-    'CM': '#bcbd22',   # 黄绿色
-    'CT': '#17becf',   # 海蓝色
-    'NI': '#aec7e8',   # 浅蓝色
-    'EM': '#98df8a',   # 浅绿色
-    'RF': '#ff9896',   # 浅红色
-    'RN': '#c5b0d5'    # 浅紫色
+        'Crack-seeds-shells': '#FF9500',    # 明亮橙色
+        'Eat-feed': '#0066CC',              # 深蓝色
+        'Eat-seed-kernels': '#00CC00',      # 亮绿色
+        'Explore': '#FF0000',               # 鲜红色
+        'Explore-search-seeds': '#9900FF',  # 亮紫色
+        'Find-seeds': '#994C00',            # 深棕色
+        'Get-feed': '#FF00CC',              # 亮粉色
+        'Get-seeds': '#000000',             # 黑色
+        'Grab-seeds': '#AACC00',            # 亮黄绿色
+        'Groom': '#00CCFF',                 # 亮蓝绿色
+        'Smell-feed': '#66B3FF',            # 亮蓝色
+        'Smell-Get-seeds': '#33FF33',       # 鲜绿色
+        'Store-seeds': '#FF6666',           # 亮红色
+        'Water': '#CC99FF'                  # 亮紫色
 }
 
 # 绘制Trace图
@@ -226,76 +226,68 @@ if has_behavior and len(unique_behaviors) > 0:
     # 创建图例补丁列表
     legend_patches = []
     
-    # 设置行为区域的展示参数
-    ax_behavior.set_ylim(0, 1)  # 固定高度
-    ax_behavior.set_xlim(ax_trace.get_xlim())  # 确保与主图x轴范围一致
-    
-    # 隐藏行为区域的y轴刻度和标签
-    ax_behavior.set_yticks([])
-    
-    # 为每种行为分配颜色
-    color_map = {}
-    for behavior in unique_behaviors:
-        if behavior in fixed_color_map:
-            color_map[behavior] = fixed_color_map[behavior]
-        else:
-            # 对于未预定义的行为，使用动态颜色
-            colors = plt.cm.Set3(np.linspace(0, 1, len(unique_behaviors)*2))
-            color_map[behavior] = colors[list(unique_behaviors).index(behavior)]
-    
-    # 收集所有行为变化点用于绘制垂直分隔线
-    behavior_change_points = set()
-    
-    # 按行为堆叠显示区间
+    # 为每种行为绘制区间
     y_positions = {}
-    total_behaviors = len(unique_behaviors)
+    max_position = len(unique_behaviors)
+    
+    # 为每种行为分配Y轴位置
     for i, behavior in enumerate(unique_behaviors):
-        # 计算行为区间的垂直位置，将不同行为错开显示
-        y_pos = 1.0 - (i + 1) / (total_behaviors + 1)
-        y_positions[behavior] = y_pos
-        
-        # 为此行为创建图例项
-        legend_patches.append(mpatches.Patch(color=color_map[behavior], label=behavior))
-        
-        # 绘制此行为的所有区间
-        for start, end in behavior_intervals[behavior]:
-            # 添加起点和终点到变化点集合
-            behavior_change_points.add(start)
-            behavior_change_points.add(end)
-            
-            # 创建一个矩形区域表示行为区间
-            rect = mpatches.Rectangle(
-                (start, y_pos - 0.1),  # 左下角坐标
-                end - start,           # 宽度
-                0.2,                   # 高度
-                edgecolor='none',      # 边框颜色
-                facecolor=color_map[behavior],  # 填充颜色
-                alpha=0.7,             # 透明度
-            )
-            ax_behavior.add_patch(rect)
-            
-            # 仿照init_show.py添加行为标签文本
-            # ax_behavior.text(start, 1, str(behavior), rotation=90, verticalalignment='top', fontsize=10)
+        y_positions[behavior] = max_position - i
     
-    # 在每个行为变化点处添加垂直虚线
-    for change_point in behavior_change_points:
-        # 在行为图中添加虚线
-        ax_behavior.axvline(x=change_point, color='gray', linestyle='--', linewidth=0.8, alpha=0.5)
-        # 在主图中也添加虚线
-        ax_trace.axvline(x=change_point, color='gray', linestyle='--', linewidth=0.8, alpha=0.5)
+    # 设置Y轴范围和刻度位置
+    ax_behavior.set_ylim(0, max_position + 1)
+    # 先设置刻度位置，再设置刻度标签，避免警告
+    ax_behavior.set_yticks([y_positions[b] for b in unique_behaviors])
+    ax_behavior.set_yticklabels(unique_behaviors, fontsize=12, fontweight='bold')
     
-    # 添加行为图例，修改位置避免布局问题
+    # 特别重要：移除X轴刻度，让它只在热图上显示
+    ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+    ax_behavior.set_title('Behavior Intervals', fontsize=16, pad=10)
+    ax_behavior.set_xlabel('')
+    
+    # 确保行为图和trace图水平对齐
+    ax_behavior.set_xlim(ax_trace.get_xlim())  # 确保与主图x轴范围一致
+    ax_behavior.set_anchor('SW')
+    
+    # 去除行为子图边框
+    ax_behavior.spines['top'].set_visible(False)
+    ax_behavior.spines['right'].set_visible(False)
+    ax_behavior.spines['bottom'].set_visible(False)
+    ax_behavior.spines['left'].set_visible(False)
+    
+    # 为每种行为绘制区间
+    for behavior, intervals in behavior_intervals.items():
+        behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(list(unique_behaviors).index(behavior) % 10))
+        
+        for start_time, end_time in intervals:
+            # 如果区间有宽度
+            if end_time - start_time > 0:  
+                # 在行为标记子图中绘制区间
+                rect = plt.Rectangle(
+                    (start_time, y_positions[behavior] - 0.4), 
+                    end_time - start_time, 0.8, 
+                    color=behavior_color, alpha=0.9, 
+                    ec='black'  # 添加黑色边框以增强可见度
+                )
+                ax_behavior.add_patch(rect)
+                
+                # 在trace图中添加区间边界垂直线
+                # 使用垂直线表示行为区间开始和结束
+                ax_trace.axvline(x=start_time, color='white', linestyle='--', linewidth=1.5, alpha=0.5)
+                ax_trace.axvline(x=end_time, color='white', linestyle='--', linewidth=1.5, alpha=0.5)
+        
+        # 添加到图例
+        legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
+    
+    # 添加图例
     legend = ax_behavior.legend(
         handles=legend_patches, 
         loc='upper right', 
-        fontsize=25, 
+        fontsize=12, 
         title='Behavior Types', 
-        title_fontsize=25
+        title_fontsize=14,
+        bbox_to_anchor=(1.0, 1.3)
     )
-    
-    # 仅在行为轴上方显示x轴刻度
-    ax_trace.xaxis.set_tick_params(labelbottom=True)
-    ax_behavior.xaxis.set_tick_params(labelbottom=False)
 
 # 生成标题，包含时间区间信息
 title_text = 'Traces with Increased Amplitude'
@@ -417,53 +409,69 @@ ax_trace_sorted.grid(False)
 
 # 如果有行为数据，再次绘制行为区间
 if has_behavior and len(unique_behaviors) > 0:
-    # 设置行为区域参数
-    ax_behavior_sorted.set_ylim(0, 1)
-    ax_behavior_sorted.set_xlim(ax_trace_sorted.get_xlim())
-    ax_behavior_sorted.set_yticks([])
+    # 创建图例补丁列表
+    legend_patches_sorted = []
     
-    # 再次收集行为变化点
-    behavior_change_points_sorted = set()
+    # 为每种行为绘制区间
+    y_positions_sorted = {}
+    max_position_sorted = len(unique_behaviors)
     
-    # 按行为堆叠显示区间
+    # 为每种行为分配Y轴位置
     for i, behavior in enumerate(unique_behaviors):
-        y_pos = 1.0 - (i + 1) / (total_behaviors + 1)
+        y_positions_sorted[behavior] = max_position_sorted - i
+    
+    # 设置Y轴范围和刻度位置
+    ax_behavior_sorted.set_ylim(0, max_position_sorted + 1)
+    ax_behavior_sorted.set_yticks([y_positions_sorted[b] for b in unique_behaviors])
+    ax_behavior_sorted.set_yticklabels(unique_behaviors, fontsize=12, fontweight='bold')
+    
+    # 移除X轴刻度，让它只在trace图上显示
+    ax_behavior_sorted.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+    ax_behavior_sorted.set_title('Behavior Intervals', fontsize=16, pad=10)
+    ax_behavior_sorted.set_xlabel('')
+    
+    # 确保行为图和trace图水平对齐
+    ax_behavior_sorted.set_xlim(ax_trace_sorted.get_xlim())
+    ax_behavior_sorted.set_anchor('SW')
+    
+    # 去除行为子图边框
+    ax_behavior_sorted.spines['top'].set_visible(False)
+    ax_behavior_sorted.spines['right'].set_visible(False)
+    ax_behavior_sorted.spines['bottom'].set_visible(False)
+    ax_behavior_sorted.spines['left'].set_visible(False)
+    
+    # 为每种行为绘制区间
+    for behavior, intervals in behavior_intervals.items():
+        behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(list(unique_behaviors).index(behavior) % 10))
         
-        # 绘制此行为的所有区间
-        for start, end in behavior_intervals[behavior]:
-            # 添加起点和终点到变化点集合
-            behavior_change_points_sorted.add(start)
-            behavior_change_points_sorted.add(end)
-            
-            # 创建矩形区域
-            rect = mpatches.Rectangle(
-                (start, y_pos - 0.1), 
-                end - start, 0.2,
-                edgecolor='none',
-                facecolor=color_map[behavior],
-                alpha=0.7
-            )
-            ax_behavior_sorted.add_patch(rect)
+        for start_time, end_time in intervals:
+            # 如果区间有宽度
+            if end_time - start_time > 0:  
+                # 在行为标记子图中绘制区间
+                rect = plt.Rectangle(
+                    (start_time, y_positions_sorted[behavior] - 0.4), 
+                    end_time - start_time, 0.8, 
+                    color=behavior_color, alpha=0.9, 
+                    ec='black'  # 添加黑色边框以增强可见度
+                )
+                ax_behavior_sorted.add_patch(rect)
+                
+                # 在trace图中添加区间边界垂直线
+                ax_trace_sorted.axvline(x=start_time, color='white', linestyle='--', linewidth=1.5, alpha=0.5)
+                ax_trace_sorted.axvline(x=end_time, color='white', linestyle='--', linewidth=1.5, alpha=0.5)
+        
+        # 添加到图例
+        legend_patches_sorted.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
     
-    # 在每个行为变化点处添加垂直虚线
-    for change_point in behavior_change_points_sorted:
-        # 在行为图中添加虚线
-        ax_behavior_sorted.axvline(x=change_point, color='gray', linestyle='--', linewidth=0.8, alpha=0.5)
-        # 在主图中也添加虚线
-        ax_trace_sorted.axvline(x=change_point, color='gray', linestyle='--', linewidth=0.8, alpha=0.5)
-    
-    # 添加行为图例
-    ax_behavior_sorted.legend(
-        handles=legend_patches,
-        loc='upper right',
-        fontsize=25,
-        title='Behavior Types',
-        title_fontsize=25
+    # 添加图例
+    legend_sorted = ax_behavior_sorted.legend(
+        handles=legend_patches_sorted, 
+        loc='upper right', 
+        fontsize=12, 
+        title='Behavior Types', 
+        title_fontsize=14,
+        bbox_to_anchor=(1.0, 1.3)
     )
-    
-    # 设置轴参数
-    ax_trace_sorted.xaxis.set_tick_params(labelbottom=True)
-    ax_behavior_sorted.xaxis.set_tick_params(labelbottom=False)
 
 # 生成标题
 sorted_title_text = 'Traces Sorted by First Calcium Event'
