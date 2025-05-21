@@ -4,7 +4,12 @@ from itertools import combinations # Add this import for combinations
 
 # Assuming data_loader, config, and plotting_utils are in the same directory (src)
 from data_loader import load_effect_sizes, load_neuron_positions
-from config import EFFECT_SIZE_THRESHOLD, BEHAVIOR_COLORS, MIXED_BEHAVIOR_COLORS #, TARGET_MIN_NEURONS, TARGET_MAX_NEURONS
+from config import (
+    EFFECT_SIZE_THRESHOLD, BEHAVIOR_COLORS, MIXED_BEHAVIOR_COLORS,
+    SHOW_BACKGROUND_NEURONS, BACKGROUND_NEURON_COLOR, 
+    BACKGROUND_NEURON_SIZE, BACKGROUND_NEURON_ALPHA,
+    STANDARD_KEY_NEURON_ALPHA, USE_STANDARD_ALPHA_FOR_UNSHARED_IN_SCHEME_B # New config imports
+)
 from plotting_utils import (
     plot_single_behavior_activity_map, 
     plot_shared_neurons_map,
@@ -194,9 +199,14 @@ if __name__ == "__main__":
                 plot_single_behavior_activity_map(
                     key_neurons_df=empty_df_for_plot,
                     behavior_name=behavior_name,
-                    behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'gray'), # Default to gray if color not in config
+                    behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'gray'),
                     title=plot_title,
-                    output_path=output_path
+                    output_path=output_path,
+                    all_neuron_positions_df=df_neuron_positions,
+                    show_background_neurons=SHOW_BACKGROUND_NEURONS,
+                    background_neuron_color=BACKGROUND_NEURON_COLOR,
+                    background_neuron_size=BACKGROUND_NEURON_SIZE,
+                    background_neuron_alpha=BACKGROUND_NEURON_ALPHA
                 )
                 continue
 
@@ -214,9 +224,14 @@ if __name__ == "__main__":
             plot_single_behavior_activity_map(
                 key_neurons_df=current_behavior_key_neurons_df,
                 behavior_name=behavior_name,
-                behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'gray'), # Default to gray if color not in config
+                behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'gray'),
                 title=plot_title,
-                output_path=output_path
+                output_path=output_path,
+                all_neuron_positions_df=df_neuron_positions,
+                show_background_neurons=SHOW_BACKGROUND_NEURONS,
+                background_neuron_color=BACKGROUND_NEURON_COLOR,
+                background_neuron_size=BACKGROUND_NEURON_SIZE,
+                background_neuron_alpha=BACKGROUND_NEURON_ALPHA
             )
 
         # --- Identify Shared Neurons & Generate Plots 4, 5, 6 ---
@@ -257,8 +272,14 @@ if __name__ == "__main__":
                 mixed_color=mixed_color,
                 title=plot_title_shared,
                 output_path=output_path_shared,
-                scheme=scheme_to_use 
-                # show_title=True by default
+                scheme=scheme_to_use,
+                all_neuron_positions_df=df_neuron_positions,
+                show_background_neurons=SHOW_BACKGROUND_NEURONS,
+                background_neuron_color=BACKGROUND_NEURON_COLOR,
+                background_neuron_size=BACKGROUND_NEURON_SIZE,
+                background_neuron_alpha=BACKGROUND_NEURON_ALPHA,
+                standard_key_neuron_alpha=STANDARD_KEY_NEURON_ALPHA, # Pass new config
+                use_standard_alpha_for_unshared_in_scheme_b=USE_STANDARD_ALPHA_FOR_UNSHARED_IN_SCHEME_B # Pass new config
             )
             
             # # To generate Scheme A as well, uncomment and modify this block:
@@ -315,8 +336,12 @@ if __name__ == "__main__":
                 behavior_name=behavior_name,
                 behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'grey'), # Default to grey if color not in config
                 title=plot_title_unique,
-                output_path=output_path_unique
-                # show_title=True by default
+                output_path=output_path_unique,
+                all_neuron_positions_df=df_neuron_positions,
+                show_background_neurons=SHOW_BACKGROUND_NEURONS,
+                background_neuron_color=BACKGROUND_NEURON_COLOR,
+                background_neuron_size=BACKGROUND_NEURON_SIZE,
+                background_neuron_alpha=BACKGROUND_NEURON_ALPHA
             )
         
         print("\nAll plots generated.")
