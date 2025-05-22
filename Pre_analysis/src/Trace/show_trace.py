@@ -10,7 +10,7 @@ import os
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/29790930糖水铁网糖水trace2.xlsx'
+    INPUT_FILE = '../../datasets/29800930糖水铁网trace2.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
