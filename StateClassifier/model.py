@@ -4,8 +4,8 @@
 该模块定义了用于脑网络状态分类的图卷积神经网络(GCN)模型架构，
 包括全局池化层和多层GCN分类器的实现。
 
-作者: SCN研究小组
-日期: 2023
+作者: Clade 4
+日期: 2025年5月23日
 """
 
 from torch_geometric.nn import GCNConv, SGConv
