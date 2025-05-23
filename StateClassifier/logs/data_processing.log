@@ -516,3 +516,619 @@
 2025-05-23 21:18:18,746 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
 2025-05-23 21:18:18,747 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
 2025-05-23 21:18:18,747 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:31:38,911 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:31:38,911 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:31:38,911 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:31:38,912 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:31:38,912 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:31:38,912 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:31:38,912 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:31:38,913 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:31:38,914 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:31:38,915 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:31:39,861 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:31:39,861 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:31:39,861 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:31:39,862 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:31:39,862 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:31:39,862 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:31:39,863 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:31:39,863 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:31:39,864 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:31:39,864 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:31:39,864 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:31:39,865 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:31:39,865 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:31:39,865 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:31:39,866 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:31:39,866 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:31:39,866 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:31:44,483 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:31:44,483 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:31:44,483 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:31:44,483 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:31:44,483 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:31:44,484 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:31:44,484 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:31:44,484 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:31:44,484 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:31:44,485 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:31:44,562 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:31:44,563 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:31:44,575 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:31:44,575 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:31:44,576 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:31:44,777 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:31:44,778 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:31:44,827 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:31:44,828 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:31:45,004 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:31:45,005 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:31:45,005 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:31:45,007 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:31:45,007 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:31:45,008 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:31:45,008 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:31:45,008 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:31:45,009 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:31:45,009 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:31:45,009 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:31:45,010 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:31:45,010 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:31:45,011 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:31:45,011 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:31:45,011 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:31:45,012 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:31:45,012 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:31:45,012 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:31:45,013 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:31:45,013 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:31:45,013 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:31:45,013 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:32:39,778 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:32:39,779 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:32:39,779 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:32:39,779 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:32:39,780 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:32:39,780 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:32:39,780 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:32:39,781 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:32:39,781 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:32:39,781 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:32:40,707 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:32:40,708 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:32:40,708 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:32:40,708 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:32:40,709 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:32:40,709 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:32:40,709 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:32:40,709 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:32:40,709 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:32:40,709 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:32:40,710 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:32:40,710 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:32:40,710 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:32:40,710 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:32:40,710 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:32:40,710 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:32:40,711 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:32:45,443 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:32:45,443 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:32:45,443 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:32:45,444 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:32:45,444 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:32:45,444 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:32:45,445 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:32:45,445 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:32:45,445 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:32:45,446 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:32:45,520 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:32:45,521 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:32:45,532 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:32:45,533 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:32:45,534 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:32:45,734 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:32:45,735 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:32:45,785 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:32:45,786 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:32:45,942 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:32:45,942 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:32:45,943 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:32:45,945 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:32:45,945 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:32:45,946 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:32:45,946 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:32:45,946 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:32:45,947 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:32:45,947 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:32:45,947 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:32:45,948 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:32:45,948 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:32:45,948 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:32:45,949 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:32:45,949 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:32:45,949 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:32:45,950 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:32:45,950 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:32:45,950 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:32:45,951 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:32:45,951 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:32:45,951 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:35:26,717 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:35:26,718 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:35:26,718 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:35:26,718 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:35:26,718 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:35:26,719 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:35:26,719 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:35:26,719 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:35:26,719 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:35:26,719 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:35:27,690 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:35:27,691 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:35:27,691 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:35:27,692 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:35:27,692 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:35:27,692 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:35:27,692 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:35:27,693 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:35:27,693 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:35:27,693 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:35:27,694 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:35:27,694 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:35:27,694 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:35:27,694 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:35:27,694 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:35:27,695 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:35:27,695 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:35:32,319 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:35:32,320 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:35:32,320 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:35:32,320 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:35:32,320 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:35:32,320 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:35:32,321 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:35:32,321 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:35:32,321 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:35:32,321 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:35:32,393 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:35:32,393 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:35:32,406 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:35:32,407 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:35:32,407 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:35:32,592 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:35:32,593 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:35:32,644 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:35:32,645 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:35:32,799 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:35:32,799 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:35:32,800 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:35:32,802 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:35:32,802 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:35:32,802 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:35:32,803 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:35:32,803 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:35:32,803 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:35:32,804 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:35:32,804 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:35:32,805 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:35:32,805 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:35:32,805 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:35:32,806 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:35:32,806 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:35:32,806 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:35:32,807 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:35:32,807 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:35:32,807 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:35:32,808 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:35:32,808 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:35:32,809 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:36:11,060 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:36:11,060 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:36:11,060 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:36:11,060 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:36:11,061 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:36:11,061 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:36:11,061 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:36:11,061 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:36:11,062 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:36:11,062 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:36:12,069 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:36:12,069 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:36:12,070 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:36:12,070 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:36:12,070 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:36:12,070 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:36:12,070 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:36:12,071 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:36:12,071 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:36:12,071 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:36:12,072 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:36:12,072 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:36:12,072 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:36:12,072 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:36:12,072 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:36:12,072 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:36:12,074 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:36:16,673 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:36:16,673 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:36:16,673 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:36:16,673 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:36:16,674 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:36:16,674 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:36:16,674 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:36:16,674 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:36:16,675 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:36:16,675 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:36:16,749 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:36:16,749 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:36:16,761 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:36:16,762 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:36:16,762 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:36:16,951 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:36:16,952 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:36:17,000 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:36:17,001 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:36:17,164 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:36:17,164 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:36:17,165 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:36:17,167 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:36:17,167 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:36:17,167 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:36:17,168 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:36:17,168 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:36:17,168 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:36:17,169 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:36:17,169 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:36:17,169 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:36:17,170 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:36:17,170 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:36:17,170 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:36:17,171 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:36:17,171 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:36:17,172 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:36:17,172 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:36:17,172 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:36:17,173 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:36:17,173 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:36:17,173 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:38:36,507 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:38:36,508 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:38:36,508 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:38:36,508 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:38:36,508 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:38:36,509 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:38:36,509 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:38:36,509 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:38:36,509 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:38:36,510 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:38:37,394 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:38:37,394 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:38:37,395 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:38:37,395 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:38:37,395 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:38:37,395 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:38:37,396 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:38:37,396 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:38:37,396 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:38:37,396 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:38:37,396 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:38:37,396 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:38:37,396 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:38:37,397 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:38:37,397 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:38:37,397 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:38:37,397 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:38:41,843 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:38:41,843 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:38:41,843 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:38:41,843 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:38:41,844 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:38:41,844 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:38:41,844 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:38:41,845 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:38:41,845 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:38:41,845 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:38:41,916 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:38:41,917 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:38:41,929 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:38:41,929 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:38:41,930 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:38:42,110 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:38:42,111 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:38:42,157 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:38:42,159 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:38:42,306 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:38:42,307 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:38:42,308 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:38:42,309 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:38:42,309 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:38:42,310 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:38:42,310 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:38:42,311 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:38:42,311 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:38:42,311 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:38:42,311 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:38:42,311 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:38:42,311 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:38:42,311 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:38:42,311 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:38:42,313 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:38:42,313 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:38:42,313 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:38:42,314 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:38:42,314 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:38:42,314 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:38:42,315 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:38:42,315 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:40:03,078 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:40:03,078 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:40:03,079 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:40:03,079 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:40:03,079 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:40:03,080 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:40:03,080 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:40:03,080 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:40:03,081 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:40:03,081 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:40:04,065 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:40:04,065 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:40:04,066 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:40:04,066 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:40:04,066 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:40:04,067 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:40:04,067 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:40:04,067 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:40:04,067 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:40:04,068 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:40:04,068 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:40:04,068 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:40:04,069 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:40:04,069 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:40:04,069 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:40:04,069 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:40:04,070 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:40:08,744 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:40:08,745 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:40:08,745 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:40:08,745 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:40:08,745 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:40:08,746 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:40:08,746 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:40:08,746 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:40:08,747 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:40:08,748 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:40:08,823 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:40:08,823 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:40:08,836 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:40:08,837 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:40:08,837 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:40:09,036 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:40:09,037 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:40:09,090 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:40:09,092 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:40:09,282 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:40:09,282 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:40:09,283 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:40:09,285 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:40:09,285 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:40:09,286 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:40:09,286 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:40:09,286 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:40:09,287 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:40:09,287 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:40:09,287 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:40:09,288 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:40:09,288 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:40:09,288 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:40:09,289 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:40:09,289 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:40:09,290 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:40:09,290 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:40:09,290 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:40:09,290 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:40:09,291 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:40:09,291 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:40:09,291 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:40:32,238 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:40:32,238 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:40:32,239 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:40:32,239 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:40:32,240 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:40:32,240 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:40:32,240 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:40:32,240 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:40:32,240 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:40:32,241 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:40:33,300 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:40:33,301 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:40:33,301 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:40:33,301 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:40:33,301 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:40:33,302 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:40:33,302 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:40:33,304 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:40:33,304 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:40:33,305 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:40:33,305 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:40:33,305 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:40:33,306 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:40:33,306 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:40:33,307 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:40:33,307 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:40:33,307 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:40:38,098 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:40:38,099 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:40:38,099 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:40:38,099 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:40:38,099 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:40:38,100 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:40:38,100 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:40:38,100 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:40:38,100 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:40:38,100 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:40:38,177 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:40:38,177 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:40:38,189 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:40:38,190 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:40:38,190 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:40:38,388 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:40:38,388 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:40:38,438 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:40:38,439 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:40:38,598 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:40:38,598 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:40:38,599 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:40:38,601 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:40:38,601 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:40:38,601 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:40:38,602 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:40:38,602 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:40:38,602 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:40:38,603 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:40:38,603 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:40:38,603 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:40:38,604 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:40:38,604 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:40:38,604 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:40:38,605 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:40:38,605 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:40:38,605 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:40:38,606 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:40:38,606 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:40:38,607 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:40:38,607 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:40:38,607 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:42:01,665 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:42:01,666 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:42:01,666 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:42:01,666 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:42:01,667 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:42:01,667 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:42:01,667 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:42:01,667 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:42:01,667 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:42:01,668 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:42:02,628 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:42:02,628 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:42:02,629 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:42:02,629 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:42:02,629 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:42:02,630 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:42:02,630 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:42:02,630 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:42:02,630 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:42:02,631 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:42:02,631 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:42:02,631 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:42:02,631 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:42:02,631 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:42:02,632 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:42:02,632 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:42:02,632 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:42:07,341 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:42:07,342 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:42:07,342 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:42:07,342 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:42:07,342 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:42:07,343 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:42:07,343 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:42:07,343 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:42:07,343 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:42:07,343 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:42:07,419 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:42:07,419 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:42:07,431 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:42:07,431 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:42:07,432 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:42:07,648 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:42:07,648 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:42:07,702 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:42:07,703 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:42:07,890 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:42:07,891 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:42:07,892 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:42:07,893 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:42:07,894 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:42:07,894 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:42:07,894 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:42:07,895 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:42:07,895 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:42:07,895 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:42:07,896 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:42:07,896 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:42:07,896 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:42:07,897 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:42:07,897 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:42:07,897 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:42:07,898 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:42:07,898 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:42:07,898 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:42:07,899 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:42:07,899 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:42:07,899 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:42:07,900 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results

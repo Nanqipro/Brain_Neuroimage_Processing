@@ -6,12 +6,15 @@
 
 作者: SCN研究小组
 日期: 2023
+改进版本: 增加PyTorch Geometric数据格式支持
 """
 
 import csv
 import numpy as np
 import torch
 import torch.utils.data as utils
+from torch_geometric.data import Data, DataLoader as GeometricDataLoader
+from config import config
 
 def load_data(path):
     """
@@ -86,9 +89,136 @@ def load_data(path):
 
     return edges, node_features, labels
 
-def get_dataset(data_path, train_propotion=0.6, valid_propotion=0.2, BATCH_SIZE=1):
+def create_geometric_data(node_features, edges, labels):
     """
-    准备训练、验证和测试数据集
+    将数据转换为PyTorch Geometric Data格式
+    
+    Parameters
+    ----------
+    node_features : np.ndarray
+        节点特征数组 [num_graphs, num_nodes, num_features]
+    edges : np.ndarray
+        边连接数组 [num_graphs, 2, num_edges]
+    labels : np.ndarray
+        图标签数组 [num_graphs]
+        
+    Returns
+    -------
+    list
+        PyTorch Geometric Data对象列表
+    """
+    data_list = []
+    
+    for i in range(len(labels)):
+        # 节点特征
+        x = torch.tensor(node_features[i], dtype=torch.float)
+        
+        # 边索引 - 转换为PyTorch Geometric格式 [2, num_edges]
+        edge_index = torch.tensor(edges[i], dtype=torch.long)
+        
+        # 图标签
+        y = torch.tensor(labels[i], dtype=torch.long)
+        
+        # 创建Data对象
+        data = Data(x=x, edge_index=edge_index, y=y)
+        data_list.append(data)
+    
+    return data_list
+
+
+def get_geometric_dataset(data_path=None, train_proportion=0.6, valid_proportion=0.2, batch_size=1):
+    """
+    准备PyTorch Geometric格式的训练、验证和测试数据集
+    
+    专门为先进模型设计的数据加载函数，支持PyTorch Geometric的Data格式
+    
+    Parameters
+    ----------
+    data_path : str, optional
+        数据文件所在的目录路径，默认使用config中的路径
+    train_proportion : float, optional
+        训练集所占比例，默认为0.6
+    valid_proportion : float, optional
+        验证集所占比例，默认为0.2
+    batch_size : int, optional
+        批次大小，默认为1
+        
+    Returns
+    -------
+    tuple
+        (train_loader, val_loader, test_loader) - PyTorch Geometric数据加载器
+    """
+    # 使用默认数据路径
+    if data_path is None:
+        data_path = str(config.DATA_DIR)
+    
+    # 加载原始数据
+    edges, node_features, labels = load_data(data_path)
+    
+    # 准备数据集分割索引
+    sample_size = labels.shape[0]
+    index = np.arange(sample_size, dtype=int)
+    np.random.seed(42)  # 使用固定种子确保可复现性
+    np.random.shuffle(index)
+    
+    # 按比例分割数据集
+    train_end = int(np.floor(sample_size * train_proportion))
+    valid_end = int(np.floor(sample_size * (train_proportion + valid_proportion)))
+    
+    train_index = index[:train_end]
+    valid_index = index[train_end:valid_end]
+    test_index = index[valid_end:]
+    
+    # 通过索引获取对应数据集
+    train_nodes = node_features[train_index]
+    train_edges = edges[train_index]
+    train_labels = labels[train_index]
+    
+    valid_nodes = node_features[valid_index]
+    valid_edges = edges[valid_index]
+    valid_labels = labels[valid_index]
+    
+    test_nodes = node_features[test_index]
+    test_edges = edges[test_index]
+    test_labels = labels[test_index]
+    
+    # 转换为PyTorch Geometric格式
+    train_data_list = create_geometric_data(train_nodes, train_edges, train_labels)
+    valid_data_list = create_geometric_data(valid_nodes, valid_edges, valid_labels)
+    test_data_list = create_geometric_data(test_nodes, test_edges, test_labels)
+    
+    # 创建PyTorch Geometric DataLoader
+    train_loader = GeometricDataLoader(train_data_list, batch_size=batch_size, shuffle=True)
+    valid_loader = GeometricDataLoader(valid_data_list, batch_size=batch_size, shuffle=False)
+    test_loader = GeometricDataLoader(test_data_list, batch_size=batch_size, shuffle=False)
+    
+    return train_loader, valid_loader, test_loader
+
+
+def get_dataset(data_path=None, train_propotion=0.6, valid_propotion=0.2, BATCH_SIZE=1):
+    """
+    智能数据集加载器 - 自动选择合适的数据格式
+    
+    这个函数会根据是否安装了torch_geometric来决定返回哪种格式的数据
+    为了保持向后兼容性，默认返回PyTorch Geometric格式（如果可用）
+    """
+    try:
+        # 尝试使用PyTorch Geometric格式（新的先进模型需要）
+        return get_geometric_dataset(
+            data_path=data_path or str(config.DATA_DIR),
+            train_proportion=train_propotion,
+            valid_proportion=valid_propotion,
+            batch_size=BATCH_SIZE
+        )
+    except ImportError:
+        # 如果PyTorch Geometric不可用，则使用传统格式
+        print("PyTorch Geometric不可用，使用传统数据格式")
+        return get_traditional_dataset(data_path, train_propotion, valid_propotion, BATCH_SIZE)
+
+
+def get_traditional_dataset(data_path, train_propotion=0.6, valid_propotion=0.2, BATCH_SIZE=1):
+    """
+    准备训练、验证和测试数据集（传统PyTorch格式）
     
     加载数据并按照指定比例分割为训练集、验证集和测试集，同时进行数据增强和批处理。
     

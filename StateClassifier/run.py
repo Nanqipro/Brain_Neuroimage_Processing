@@ -141,10 +141,10 @@ def test_modules_simple():
         
         # 直接导入和测试模块
         try:
-            from format_convert import format_convert
-            from mutual import mutual, find_optimal_delay
-            from phasespace import phasespace, estimate_embedding_params
-            from cellset2trim import cellset2trim, cellset2trim_dict, get_dataset_stats
+            from src.format_convert import format_convert
+            from src.mutual import mutual, find_optimal_delay
+            from src.phasespace import phasespace, estimate_embedding_params
+            from src.cellset2trim import cellset2trim, cellset2trim_dict, get_dataset_stats
             logger.info("✓ 所有核心模块导入成功")
         except ImportError as e:
             logger.error(f"✗ 模块导入失败: {e}")
