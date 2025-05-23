@@ -1609,3 +1609,563 @@ MultiLayerGCN(
 2025-05-23 21:08:46,249 - main - INFO - 训练技术: Focal Loss + AdamW + 学习率调度 + 早停 + 梯度裁剪
 2025-05-23 21:08:46,443 - __main__ - ERROR - ✗ 模型训练失败: Expected more than 1 value per channel when training, got input size torch.Size([1, 512])
 2025-05-23 21:08:46,445 - __main__ - ERROR - 操作失败
+2025-05-23 21:13:47,008 - __main__ - INFO - ============================================================
+2025-05-23 21:13:47,008 - __main__ - INFO - 开始数据处理流程
+2025-05-23 21:13:47,009 - __main__ - INFO - ============================================================
+2025-05-23 21:13:47,986 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:13:47,986 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:13:47,986 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:13:47,987 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:13:47,987 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:13:47,987 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:13:47,987 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:13:47,988 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:13:47,988 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:13:47,988 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:13:47,988 - excel_data_processor - INFO - 正在加载Excel数据文件: datasets\EMtrace01.xlsx
+2025-05-23 21:13:48,925 - excel_data_processor - INFO - ✓ 成功加载数据: 2999 个时间点, 43 个神经元
+2025-05-23 21:13:48,925 - excel_data_processor - INFO - 神经元列: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10']...
+2025-05-23 21:13:48,926 - excel_data_processor - INFO - 开始预处理钙离子数据...
+2025-05-23 21:13:48,930 - excel_data_processor - WARNING - 检测并处理了 247 个异常值
+2025-05-23 21:13:48,931 - excel_data_processor - INFO - 执行Z-score标准化...
+2025-05-23 21:13:48,933 - excel_data_processor - INFO - ✓ 数据预处理完成: (2999, 43) -> (2999, 43)
+2025-05-23 21:13:48,933 - excel_data_processor - INFO - 转换数据为SCN处理格式...
+2025-05-23 21:13:48,934 - excel_data_processor - INFO - 分段参数: 段长度=340, 步长=170
+2025-05-23 21:13:48,934 - excel_data_processor - INFO - ✓ 转换完成: 10 个神经元, 平均每个神经元 10.0 个时间段
+2025-05-23 21:13:48,935 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:13:48,936 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:13:48,936 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:13:48,936 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:13:48,936 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:13:48,937 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:13:48,937 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:13:48,937 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:13:48,937 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:13:48,938 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:13:48,938 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:13:48,938 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:13:48,939 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:13:48,939 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:13:48,939 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:13:48,939 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:13:48,939 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:13:53,426 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:13:53,426 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:13:53,427 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:13:53,427 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:13:53,427 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:13:53,427 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:13:53,428 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:13:53,428 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:13:53,428 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:13:53,428 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:13:53,499 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:13:53,500 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:13:53,512 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:13:53,512 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:13:53,513 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:13:53,702 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:13:53,703 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:13:53,755 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:13:53,756 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:13:53,916 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:13:53,916 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:13:53,917 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:13:53,919 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:13:53,919 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:13:53,919 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:13:53,920 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:13:53,920 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:13:53,920 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:13:53,921 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:13:53,922 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:13:53,922 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:13:53,922 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:13:53,923 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:13:53,923 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:13:53,923 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:13:53,923 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:13:53,924 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:13:53,924 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:13:53,924 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:13:53,925 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:13:53,925 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:13:53,925 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:13:53,926 - __main__ - INFO - ✓ 数据处理完成
+2025-05-23 21:13:53,926 - __main__ - INFO - 操作成功完成
+2025-05-23 21:14:13,873 - __main__ - INFO - ============================================================
+2025-05-23 21:14:13,874 - __main__ - INFO - 开始模型训练流程
+2025-05-23 21:14:13,874 - __main__ - INFO - ============================================================
+2025-05-23 21:14:18,272 - main - INFO - ================================================================================
+2025-05-23 21:14:18,273 - main - INFO - 脑网络状态分类器训练程序启动 - 改进版本
+2025-05-23 21:14:18,273 - main - INFO - 改进内容: Focal Loss + 早停 + 学习率调度 + 梯度裁剪
+2025-05-23 21:14:18,273 - main - INFO - ================================================================================
+2025-05-23 21:14:18,277 - main - INFO - ✓ 随机种子设置完成
+2025-05-23 21:14:18,279 - main - INFO - ✓ 使用GPU: NVIDIA GeForce RTX 4060
+2025-05-23 21:14:18,280 - main - INFO - 加载数据集...
+2025-05-23 21:14:18,334 - main - INFO - ✓ 数据集加载成功
+2025-05-23 21:14:18,335 - main - INFO -   - 训练集批次数: 240
+2025-05-23 21:14:18,335 - main - INFO -   - 验证集批次数: 20
+2025-05-23 21:14:18,335 - main - INFO -   - 测试集批次数: 19
+2025-05-23 21:14:18,376 - __main__ - ERROR - ✗ 模型训练失败: 'BatchNorm' object has no attribute 'weight'
+2025-05-23 21:14:18,376 - __main__ - ERROR - 操作失败
+2025-05-23 21:15:17,569 - __main__ - INFO - ============================================================
+2025-05-23 21:15:17,569 - __main__ - INFO - 开始数据处理流程
+2025-05-23 21:15:17,569 - __main__ - INFO - ============================================================
+2025-05-23 21:15:18,573 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:15:18,574 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:15:18,574 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:15:18,575 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:15:18,575 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:15:18,575 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:15:18,575 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:15:18,575 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:15:18,576 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:15:18,576 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:15:18,576 - excel_data_processor - INFO - 正在加载Excel数据文件: datasets\EMtrace01.xlsx
+2025-05-23 21:15:19,491 - excel_data_processor - INFO - ✓ 成功加载数据: 2999 个时间点, 43 个神经元
+2025-05-23 21:15:19,492 - excel_data_processor - INFO - 神经元列: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10']...
+2025-05-23 21:15:19,492 - excel_data_processor - INFO - 开始预处理钙离子数据...
+2025-05-23 21:15:19,499 - excel_data_processor - WARNING - 检测并处理了 247 个异常值
+2025-05-23 21:15:19,499 - excel_data_processor - INFO - 执行Z-score标准化...
+2025-05-23 21:15:19,502 - excel_data_processor - INFO - ✓ 数据预处理完成: (2999, 43) -> (2999, 43)
+2025-05-23 21:15:19,502 - excel_data_processor - INFO - 转换数据为SCN处理格式...
+2025-05-23 21:15:19,502 - excel_data_processor - INFO - 分段参数: 段长度=340, 步长=170
+2025-05-23 21:15:19,503 - excel_data_processor - INFO - ✓ 转换完成: 10 个神经元, 平均每个神经元 10.0 个时间段
+2025-05-23 21:15:19,504 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:15:19,505 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:15:19,505 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:15:19,505 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:15:19,506 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:15:19,506 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:15:19,506 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:15:19,507 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:15:19,507 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:15:19,507 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:15:19,507 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:15:19,507 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:15:19,508 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:15:19,508 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:15:19,508 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:15:19,508 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:15:19,508 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:15:24,088 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:15:24,088 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:15:24,088 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:15:24,089 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:15:24,089 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:15:24,089 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:15:24,089 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:15:24,090 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:15:24,090 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:15:24,090 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:15:24,162 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:15:24,163 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:15:24,175 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:15:24,176 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:15:24,176 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:15:24,372 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:15:24,373 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:15:24,423 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:15:24,425 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:15:24,599 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:15:24,599 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:15:24,600 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:15:24,601 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:15:24,602 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:15:24,602 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:15:24,603 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:15:24,603 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:15:24,603 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:15:24,604 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:15:24,604 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:15:24,604 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:15:24,605 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:15:24,605 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:15:24,606 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:15:24,606 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:15:24,607 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:15:24,607 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:15:24,608 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:15:24,608 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:15:24,609 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:15:24,609 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:15:24,609 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:15:24,610 - __main__ - INFO - ✓ 数据处理完成
+2025-05-23 21:15:24,610 - __main__ - INFO - 操作成功完成
+2025-05-23 21:15:48,024 - __main__ - INFO - ============================================================
+2025-05-23 21:15:48,024 - __main__ - INFO - 开始模型训练流程
+2025-05-23 21:15:48,025 - __main__ - INFO - ============================================================
+2025-05-23 21:15:52,491 - main - INFO - ================================================================================
+2025-05-23 21:15:52,492 - main - INFO - 脑网络状态分类器训练程序启动 - 改进版本
+2025-05-23 21:15:52,492 - main - INFO - 改进内容: Focal Loss + 早停 + 学习率调度 + 梯度裁剪
+2025-05-23 21:15:52,492 - main - INFO - ================================================================================
+2025-05-23 21:15:52,494 - main - INFO - ✓ 随机种子设置完成
+2025-05-23 21:15:52,497 - main - INFO - ✓ 使用GPU: NVIDIA GeForce RTX 4060
+2025-05-23 21:15:52,497 - main - INFO - 加载数据集...
+2025-05-23 21:15:52,552 - main - INFO - ✓ 数据集加载成功
+2025-05-23 21:15:52,552 - main - INFO -   - 训练集批次数: 240
+2025-05-23 21:15:52,553 - main - INFO -   - 验证集批次数: 20
+2025-05-23 21:15:52,553 - main - INFO -   - 测试集批次数: 19
+2025-05-23 21:15:52,682 - main - INFO - ✓ 模型创建成功
+2025-05-23 21:15:52,683 - main - INFO - 模型架构:
+MultiLayerGCN(
+  (conv_layers): ModuleList(
+    (0): GCNConv(3, 64)
+    (1): GCNConv(64, 128)
+    (2): GCNConv(128, 128)
+    (3): GCNConv(128, 64)
+  )
+  (batch_norms): ModuleList(
+    (0): BatchNorm(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (1-2): 2 x BatchNorm(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (3): BatchNorm(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  )
+  (pool): ImprovedGlobalPooling(
+    (max_pool): AdaptiveMaxPool1d(output_size=1)
+    (avg_pool): AdaptiveAvgPool1d(output_size=1)
+  )
+  (attention): AttentionLayer()
+  (classifier): Sequential(
+    (fc1): Linear(in_features=1152, out_features=512, bias=False)
+    (bn1): BatchNorm1d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (relu1): ELU(alpha=1.0)
+    (drop1): Dropout(p=0.5, inplace=False)
+    (fc2): Linear(in_features=512, out_features=256, bias=False)
+    (bn2): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (relu2): ELU(alpha=1.0)
+    (drop2): Dropout(p=0.5, inplace=False)
+    (fc3): Linear(in_features=256, out_features=128, bias=False)
+    (bn3): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (relu3): ELU(alpha=1.0)
+    (drop3): Dropout(p=0.5, inplace=False)
+    (fc_out): Linear(in_features=128, out_features=6, bias=True)
+  )
+)
+2025-05-23 21:15:52,684 - main - INFO - 模型参数总数: 790,726
+2025-05-23 21:15:52,684 - main - INFO - 可训练参数: 790,726
+2025-05-23 21:15:52,684 - main - INFO - 
+开始改进版模型训练...
+2025-05-23 21:15:52,684 - main - INFO - ✓ 使用Focal Loss处理类别不平衡问题
+2025-05-23 21:15:52,686 - main - INFO - 开始改进版训练，总共 160 个epoch
+2025-05-23 21:15:52,686 - main - INFO - 训练技术: Focal Loss + AdamW + 学习率调度 + 早停 + 梯度裁剪
+2025-05-23 21:15:52,874 - __main__ - ERROR - ✗ 模型训练失败: Expected more than 1 value per channel when training, got input size torch.Size([1, 512])
+2025-05-23 21:15:52,875 - __main__ - ERROR - 操作失败
+2025-05-23 21:18:11,421 - __main__ - INFO - ============================================================
+2025-05-23 21:18:11,422 - __main__ - INFO - 开始数据处理流程
+2025-05-23 21:18:11,422 - __main__ - INFO - ============================================================
+2025-05-23 21:18:12,566 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:18:12,566 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-23 21:18:12,567 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-23 21:18:12,567 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:18:12,567 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-23 21:18:12,567 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-23 21:18:12,568 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:18:12,568 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-23 21:18:12,568 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-23 21:18:12,568 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-23 21:18:12,569 - excel_data_processor - INFO - 正在加载Excel数据文件: datasets\EMtrace01.xlsx
+2025-05-23 21:18:13,543 - excel_data_processor - INFO - ✓ 成功加载数据: 2999 个时间点, 43 个神经元
+2025-05-23 21:18:13,543 - excel_data_processor - INFO - 神经元列: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10']...
+2025-05-23 21:18:13,543 - excel_data_processor - INFO - 开始预处理钙离子数据...
+2025-05-23 21:18:13,549 - excel_data_processor - WARNING - 检测并处理了 247 个异常值
+2025-05-23 21:18:13,549 - excel_data_processor - INFO - 执行Z-score标准化...
+2025-05-23 21:18:13,554 - excel_data_processor - INFO - ✓ 数据预处理完成: (2999, 43) -> (2999, 43)
+2025-05-23 21:18:13,554 - excel_data_processor - INFO - 转换数据为SCN处理格式...
+2025-05-23 21:18:13,554 - excel_data_processor - INFO - 分段参数: 段长度=340, 步长=170
+2025-05-23 21:18:13,555 - excel_data_processor - INFO - ✓ 转换完成: 10 个神经元, 平均每个神经元 10.0 个时间段
+2025-05-23 21:18:13,557 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-23 21:18:13,557 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-23 21:18:13,558 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-23 21:18:13,558 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-23 21:18:13,558 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-23 21:18:13,559 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-23 21:18:13,559 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-23 21:18:13,559 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-23 21:18:13,560 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-23 21:18:13,560 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-23 21:18:13,560 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-23 21:18:13,561 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-23 21:18:13,561 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-23 21:18:13,561 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-23 21:18:13,561 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:18:13,562 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-23 21:18:13,562 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-23 21:18:18,209 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-23 21:18:18,210 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-23 21:18:18,210 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:18:18,210 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-23 21:18:18,210 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-23 21:18:18,211 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-23 21:18:18,211 - scn_phase_space_process - INFO - ------------------------------
+2025-05-23 21:18:18,211 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-23 21:18:18,212 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-23 21:18:18,212 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-23 21:18:18,289 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-23 21:18:18,289 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-23 21:18:18,303 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-23 21:18:18,303 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-23 21:18:18,304 - scn_phase_space_process - INFO - 外部模块不可用，使用内置的改进标签生成方法...
+2025-05-23 21:18:18,509 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-23 21:18:18,509 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-23 21:18:18,559 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-23 21:18:18,561 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-23 21:18:18,737 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.224
+2025-05-23 21:18:18,737 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:18:18,738 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(21), np.int32(1): np.int64(28), np.int32(2): np.int64(13), np.int32(3): np.int64(13), np.int32(4): np.int64(9), np.int32(5): np.int64(16)}
+2025-05-23 21:18:18,740 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-23 21:18:18,740 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-23 21:18:18,741 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-23 21:18:18,741 - scn_phase_space_process - INFO - ============================================================
+2025-05-23 21:18:18,741 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-23 21:18:18,742 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-23 21:18:18,742 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-23 21:18:18,743 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-23 21:18:18,743 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-23 21:18:18,743 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-23 21:18:18,744 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-23 21:18:18,744 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-23 21:18:18,744 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-23 21:18:18,745 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-23 21:18:18,745 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-23 21:18:18,746 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-23 21:18:18,746 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-23 21:18:18,746 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-23 21:18:18,747 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-23 21:18:18,747 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-23 21:18:18,748 - __main__ - INFO - ✓ 数据处理完成
+2025-05-23 21:18:18,748 - __main__ - INFO - 操作成功完成
+2025-05-23 21:18:30,247 - __main__ - INFO - ============================================================
+2025-05-23 21:18:30,247 - __main__ - INFO - 开始模型训练流程
+2025-05-23 21:18:30,248 - __main__ - INFO - ============================================================
+2025-05-23 21:18:33,873 - __main__ - INFO - ============================================================
+2025-05-23 21:18:33,873 - __main__ - INFO - 开始模型训练流程
+2025-05-23 21:18:33,873 - __main__ - INFO - ============================================================
+2025-05-23 21:18:34,835 - main - INFO - ================================================================================
+2025-05-23 21:18:34,836 - main - INFO - 脑网络状态分类器训练程序启动 - 改进版本
+2025-05-23 21:18:34,836 - main - INFO - 改进内容: Focal Loss + 早停 + 学习率调度 + 梯度裁剪
+2025-05-23 21:18:34,837 - main - INFO - ================================================================================
+2025-05-23 21:18:34,839 - main - INFO - ✓ 随机种子设置完成
+2025-05-23 21:18:34,842 - main - INFO - ✓ 使用GPU: NVIDIA GeForce RTX 4060
+2025-05-23 21:18:34,842 - main - INFO - 加载数据集...
+2025-05-23 21:18:34,906 - main - INFO - ✓ 数据集加载成功
+2025-05-23 21:18:34,906 - main - INFO -   - 训练集批次数: 240
+2025-05-23 21:18:34,907 - main - INFO -   - 验证集批次数: 20
+2025-05-23 21:18:34,907 - main - INFO -   - 测试集批次数: 19
+2025-05-23 21:18:35,048 - main - INFO - ✓ 模型创建成功
+2025-05-23 21:18:35,049 - main - INFO - 模型架构:
+MultiLayerGCN(
+  (conv_layers): ModuleList(
+    (0): GCNConv(3, 64)
+    (1): GCNConv(64, 128)
+    (2): GCNConv(128, 128)
+    (3): GCNConv(128, 64)
+  )
+  (batch_norms): ModuleList(
+    (0): BatchNorm(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (1-2): 2 x BatchNorm(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (3): BatchNorm(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  )
+  (pool): ImprovedGlobalPooling(
+    (max_pool): AdaptiveMaxPool1d(output_size=1)
+    (avg_pool): AdaptiveAvgPool1d(output_size=1)
+  )
+  (attention): AttentionLayer()
+  (classifier): Sequential(
+    (fc1): Linear(in_features=1152, out_features=512, bias=False)
+    (ln1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+    (relu1): ELU(alpha=1.0)
+    (drop1): Dropout(p=0.5, inplace=False)
+    (fc2): Linear(in_features=512, out_features=256, bias=False)
+    (ln2): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+    (relu2): ELU(alpha=1.0)
+    (drop2): Dropout(p=0.5, inplace=False)
+    (fc3): Linear(in_features=256, out_features=128, bias=False)
+    (ln3): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+    (relu3): ELU(alpha=1.0)
+    (drop3): Dropout(p=0.5, inplace=False)
+    (fc_out): Linear(in_features=128, out_features=6, bias=True)
+  )
+)
+2025-05-23 21:18:35,050 - main - INFO - 模型参数总数: 790,726
+2025-05-23 21:18:35,050 - main - INFO - 可训练参数: 790,726
+2025-05-23 21:18:35,050 - main - INFO - 
+开始改进版模型训练...
+2025-05-23 21:18:35,050 - main - INFO - ✓ 使用Focal Loss处理类别不平衡问题
+2025-05-23 21:18:35,051 - main - INFO - 开始改进版训练，总共 160 个epoch
+2025-05-23 21:18:35,051 - main - INFO - 训练技术: Focal Loss + AdamW + 学习率调度 + 早停 + 梯度裁剪
+2025-05-23 21:18:37,612 - main - INFO - Epoch 1 训练损失: 2.1060
+2025-05-23 21:18:37,712 - main - INFO - Epoch 1/160 - 训练损失: 2.1060, 验证损失: 1.9960, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:38,487 - main - INFO - ================================================================================
+2025-05-23 21:18:38,488 - main - INFO - 脑网络状态分类器训练程序启动 - 改进版本
+2025-05-23 21:18:38,488 - main - INFO - 改进内容: Focal Loss + 早停 + 学习率调度 + 梯度裁剪
+2025-05-23 21:18:38,488 - main - INFO - ================================================================================
+2025-05-23 21:18:38,491 - main - INFO - ✓ 随机种子设置完成
+2025-05-23 21:18:38,494 - main - INFO - ✓ 使用GPU: NVIDIA GeForce RTX 4060
+2025-05-23 21:18:38,495 - main - INFO - 加载数据集...
+2025-05-23 21:18:38,559 - main - INFO - ✓ 数据集加载成功
+2025-05-23 21:18:38,560 - main - INFO -   - 训练集批次数: 240
+2025-05-23 21:18:38,560 - main - INFO -   - 验证集批次数: 20
+2025-05-23 21:18:38,560 - main - INFO -   - 测试集批次数: 19
+2025-05-23 21:18:38,696 - main - INFO - ✓ 模型创建成功
+2025-05-23 21:18:38,697 - main - INFO - 模型架构:
+MultiLayerGCN(
+  (conv_layers): ModuleList(
+    (0): GCNConv(3, 64)
+    (1): GCNConv(64, 128)
+    (2): GCNConv(128, 128)
+    (3): GCNConv(128, 64)
+  )
+  (batch_norms): ModuleList(
+    (0): BatchNorm(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (1-2): 2 x BatchNorm(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (3): BatchNorm(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  )
+  (pool): ImprovedGlobalPooling(
+    (max_pool): AdaptiveMaxPool1d(output_size=1)
+    (avg_pool): AdaptiveAvgPool1d(output_size=1)
+  )
+  (attention): AttentionLayer()
+  (classifier): Sequential(
+    (fc1): Linear(in_features=1152, out_features=512, bias=False)
+    (ln1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+    (relu1): ELU(alpha=1.0)
+    (drop1): Dropout(p=0.5, inplace=False)
+    (fc2): Linear(in_features=512, out_features=256, bias=False)
+    (ln2): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+    (relu2): ELU(alpha=1.0)
+    (drop2): Dropout(p=0.5, inplace=False)
+    (fc3): Linear(in_features=256, out_features=128, bias=False)
+    (ln3): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+    (relu3): ELU(alpha=1.0)
+    (drop3): Dropout(p=0.5, inplace=False)
+    (fc_out): Linear(in_features=128, out_features=6, bias=True)
+  )
+)
+2025-05-23 21:18:38,698 - main - INFO - 模型参数总数: 790,726
+2025-05-23 21:18:38,698 - main - INFO - 可训练参数: 790,726
+2025-05-23 21:18:38,699 - main - INFO - 
+开始改进版模型训练...
+2025-05-23 21:18:38,699 - main - INFO - ✓ 使用Focal Loss处理类别不平衡问题
+2025-05-23 21:18:38,700 - main - INFO - 开始改进版训练，总共 160 个epoch
+2025-05-23 21:18:38,701 - main - INFO - 训练技术: Focal Loss + AdamW + 学习率调度 + 早停 + 梯度裁剪
+2025-05-23 21:18:39,988 - main - INFO - Epoch 2 训练损失: 1.8712
+2025-05-23 21:18:40,079 - main - INFO - Epoch 2/160 - 训练损失: 1.8712, 验证损失: 1.5862, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:41,262 - main - INFO - Epoch 1 训练损失: 2.1060
+2025-05-23 21:18:41,373 - main - INFO - Epoch 1/160 - 训练损失: 2.1060, 验证损失: 1.9960, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:42,194 - main - INFO - Epoch 3 训练损失: 1.6418
+2025-05-23 21:18:42,304 - main - INFO - Epoch 3/160 - 训练损失: 1.6418, 验证损失: 1.5963, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:43,566 - main - INFO - Epoch 2 训练损失: 1.8712
+2025-05-23 21:18:43,684 - main - INFO - Epoch 2/160 - 训练损失: 1.8712, 验证损失: 1.5862, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:44,407 - main - INFO - Epoch 4 训练损失: 1.5663
+2025-05-23 21:18:44,511 - main - INFO - Epoch 4/160 - 训练损失: 1.5663, 验证损失: 1.6224, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:45,918 - main - INFO - Epoch 3 训练损失: 1.6418
+2025-05-23 21:18:46,019 - main - INFO - Epoch 3/160 - 训练损失: 1.6418, 验证损失: 1.5963, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:46,601 - main - INFO - Epoch 5 训练损失: 1.3733
+2025-05-23 21:18:46,703 - main - INFO - Epoch 5/160 - 训练损失: 1.3733, 验证损失: 1.3167, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:48,192 - main - INFO - Epoch 4 训练损失: 1.5663
+2025-05-23 21:18:48,301 - main - INFO - Epoch 4/160 - 训练损失: 1.5663, 验证损失: 1.6224, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:48,865 - main - INFO - Epoch 6 训练损失: 1.3509
+2025-05-23 21:18:48,971 - main - INFO - Epoch 6/160 - 训练损失: 1.3509, 验证损失: 1.7671, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:50,397 - main - INFO - Epoch 5 训练损失: 1.3733
+2025-05-23 21:18:50,501 - main - INFO - Epoch 5/160 - 训练损失: 1.3733, 验证损失: 1.3167, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:51,189 - main - INFO - Epoch 7 训练损失: 1.4330
+2025-05-23 21:18:51,285 - main - INFO - Epoch 7/160 - 训练损失: 1.4330, 验证损失: 1.2775, 验证准确率: 0.2000, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:52,650 - main - INFO - Epoch 6 训练损失: 1.3509
+2025-05-23 21:18:52,745 - main - INFO - Epoch 6/160 - 训练损失: 1.3509, 验证损失: 1.7671, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:53,485 - main - INFO - Epoch 8 训练损失: 1.2726
+2025-05-23 21:18:53,585 - main - INFO - Epoch 8/160 - 训练损失: 1.2726, 验证损失: 1.4163, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:55,714 - main - INFO - Epoch 9 训练损失: 1.2215
+2025-05-23 21:18:55,807 - main - INFO - Epoch 9/160 - 训练损失: 1.2215, 验证损失: 1.4956, 验证准确率: 0.0000, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:57,742 - main - INFO - Epoch 10 训练损失: 1.2095
+2025-05-23 21:18:57,827 - main - INFO - Epoch 10/160 - 训练损失: 1.2095, 验证损失: 1.2185, 验证准确率: 0.2500, 最佳准确率: 0.2500 (Epoch 1), 学习率: 1.00e-03
+2025-05-23 21:18:59,809 - main - INFO - Epoch 11 训练损失: 1.1343
+2025-05-23 21:18:59,891 - main - INFO - Epoch 11/160 - 训练损失: 1.1343, 验证损失: 1.6297, 验证准确率: 0.3000, 最佳准确率: 0.3000 (Epoch 11), 学习率: 1.00e-03
+2025-05-23 21:19:01,868 - main - INFO - Epoch 12 训练损失: 1.0938
+2025-05-23 21:19:01,955 - main - INFO - Epoch 12/160 - 训练损失: 1.0938, 验证损失: 2.0576, 验证准确率: 0.2500, 最佳准确率: 0.3000 (Epoch 11), 学习率: 1.00e-03
+2025-05-23 21:19:04,157 - main - INFO - Epoch 13 训练损失: 1.1324
+2025-05-23 21:19:04,263 - main - INFO - Epoch 13/160 - 训练损失: 1.1324, 验证损失: 2.1859, 验证准确率: 0.2500, 最佳准确率: 0.3000 (Epoch 11), 学习率: 1.00e-03
+2025-05-23 21:19:06,432 - main - INFO - Epoch 14 训练损失: 1.1596
+2025-05-23 21:19:06,531 - main - INFO - Epoch 14/160 - 训练损失: 1.1596, 验证损失: 2.2679, 验证准确率: 0.3500, 最佳准确率: 0.3500 (Epoch 14), 学习率: 1.00e-03
+2025-05-23 21:19:08,699 - main - INFO - Epoch 15 训练损失: 1.0992
+2025-05-23 21:19:08,788 - main - INFO - Epoch 15/160 - 训练损失: 1.0992, 验证损失: 1.8099, 验证准确率: 0.3500, 最佳准确率: 0.3500 (Epoch 14), 学习率: 1.00e-03
+2025-05-23 21:19:10,873 - main - INFO - Epoch 16 训练损失: 1.0791
+2025-05-23 21:19:10,958 - main - INFO - Epoch 16/160 - 训练损失: 1.0791, 验证损失: 1.7804, 验证准确率: 0.1000, 最佳准确率: 0.3500 (Epoch 14), 学习率: 5.00e-04
+2025-05-23 21:19:13,084 - main - INFO - Epoch 17 训练损失: 0.9496
+2025-05-23 21:19:13,168 - main - INFO - Epoch 17/160 - 训练损失: 0.9496, 验证损失: 3.4458, 验证准确率: 0.3500, 最佳准确率: 0.3500 (Epoch 14), 学习率: 5.00e-04
+2025-05-23 21:19:15,108 - main - INFO - Epoch 18 训练损失: 0.9028
+2025-05-23 21:19:15,197 - main - INFO - Epoch 18/160 - 训练损失: 0.9028, 验证损失: 2.3571, 验证准确率: 0.3000, 最佳准确率: 0.3500 (Epoch 14), 学习率: 5.00e-04
+2025-05-23 21:19:17,195 - main - INFO - Epoch 19 训练损失: 1.0666
+2025-05-23 21:19:17,284 - main - INFO - Epoch 19/160 - 训练损失: 1.0666, 验证损失: 3.5364, 验证准确率: 0.2500, 最佳准确率: 0.3500 (Epoch 14), 学习率: 5.00e-04
+2025-05-23 21:19:19,232 - main - INFO - Epoch 20 训练损失: 1.0057
+2025-05-23 21:19:19,326 - main - INFO - Epoch 20/160 - 训练损失: 1.0057, 验证损失: 2.9058, 验证准确率: 0.1000, 最佳准确率: 0.3500 (Epoch 14), 学习率: 5.00e-04
+2025-05-23 21:19:21,240 - main - INFO - Epoch 21 训练损失: 1.0581
+2025-05-23 21:19:21,344 - main - INFO - Epoch 21/160 - 训练损失: 1.0581, 验证损失: 3.1771, 验证准确率: 0.3500, 最佳准确率: 0.3500 (Epoch 14), 学习率: 5.00e-04
+2025-05-23 21:19:23,271 - main - INFO - Epoch 22 训练损失: 0.8824
+2025-05-23 21:19:23,370 - main - INFO - Epoch 22/160 - 训练损失: 0.8824, 验证损失: 3.1591, 验证准确率: 0.4000, 最佳准确率: 0.4000 (Epoch 22), 学习率: 2.50e-04
+2025-05-23 21:19:25,291 - main - INFO - Epoch 23 训练损失: 0.7788
+2025-05-23 21:19:25,376 - main - INFO - Epoch 23/160 - 训练损失: 0.7788, 验证损失: 3.4325, 验证准确率: 0.3000, 最佳准确率: 0.4000 (Epoch 22), 学习率: 2.50e-04
+2025-05-23 21:19:27,297 - main - INFO - Epoch 24 训练损失: 1.0164
+2025-05-23 21:19:27,393 - main - INFO - Epoch 24/160 - 训练损失: 1.0164, 验证损失: 3.4628, 验证准确率: 0.3000, 最佳准确率: 0.4000 (Epoch 22), 学习率: 2.50e-04
+2025-05-23 21:19:29,424 - main - INFO - Epoch 25 训练损失: 0.9079
+2025-05-23 21:19:29,515 - main - INFO - Epoch 25/160 - 训练损失: 0.9079, 验证损失: 3.6440, 验证准确率: 0.3500, 最佳准确率: 0.4000 (Epoch 22), 学习率: 2.50e-04
+2025-05-23 21:19:29,516 - main - INFO - 早停触发，在第 25 个epoch停止训练
+2025-05-23 21:19:29,516 - main - INFO - 最佳验证准确率: 0.4000 (Epoch 22)
+2025-05-23 21:19:29,524 - main - INFO - 最佳模型已保存至: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\best_scn.pt
+2025-05-23 21:19:29,525 - main - INFO - 
+在测试集上评估最终性能...
+2025-05-23 21:19:29,609 - main - INFO - ================================================================================
+2025-05-23 21:19:29,610 - main - INFO - 最终测试结果:
+2025-05-23 21:19:29,610 - main - INFO -   测试损失: 3.2128
+2025-05-23 21:19:29,611 - main - INFO -   测试准确率: 0.3158
+2025-05-23 21:19:29,611 - main - INFO -   测试平衡准确率: 0.1944
+2025-05-23 21:19:29,611 - main - INFO - ================================================================================
+2025-05-23 21:19:29,611 - main - INFO - 详细分类报告:
+2025-05-23 21:19:29,611 - main - INFO - 
+              precision    recall  f1-score   support
+
+        状态_0     0.1667    0.3333    0.2222         3
+        状态_1     0.5000    0.8333    0.6250         6
+        状态_2     0.0000    0.0000    0.0000         4
+        状态_3     0.0000    0.0000    0.0000         1
+        状态_4     0.0000    0.0000    0.0000         1
+        状态_5     0.0000    0.0000    0.0000         4
+
+    accuracy                         0.3158        19
+   macro avg     0.1111    0.1944    0.1412        19
+weighted avg     0.1842    0.3158    0.2325        19
+
+2025-05-23 21:19:29,611 - main - INFO - ================================================================================
+2025-05-23 21:19:29,611 - main - INFO - 性能分析:
+2025-05-23 21:19:29,611 - main - INFO -   最佳训练epoch: 22
+2025-05-23 21:19:29,612 - main - INFO -   最佳验证准确率: 0.4000
+2025-05-23 21:19:29,612 - main - INFO -   最终测试准确率: 0.3158
+2025-05-23 21:19:29,613 - main - INFO -   相对于随机分类的提升: 89.1%
+2025-05-23 21:19:29,613 - __main__ - INFO - ✓ 模型训练完成
+2025-05-23 21:19:29,613 - __main__ - INFO - 最终测试准确率: 0.3158
+2025-05-23 21:19:29,613 - __main__ - INFO - 平均类别准确率: 0.1944
+2025-05-23 21:19:29,613 - __main__ - INFO - 操作成功完成

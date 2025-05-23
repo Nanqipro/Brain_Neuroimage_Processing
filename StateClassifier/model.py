@@ -237,19 +237,19 @@ class MultiLayerGCN(nn.Module):
         self.classifier = nn.Sequential(OrderedDict([
             # 第一层
             ('fc1', nn.Linear(classifier_input_dim, 512, bias=False)),
-            ('bn1', nn.BatchNorm1d(512)),
+            ('ln1', nn.LayerNorm(512)),  # 使用LayerNorm替代BatchNorm1d
             ('relu1', nn.ELU()),  # ELU激活函数
             ('drop1', nn.Dropout(p=dropout)),
             
             # 第二层
             ('fc2', nn.Linear(512, 256, bias=False)),
-            ('bn2', nn.BatchNorm1d(256)),
+            ('ln2', nn.LayerNorm(256)),  # 使用LayerNorm替代BatchNorm1d
             ('relu2', nn.ELU()),
             ('drop2', nn.Dropout(p=dropout)),
             
             # 第三层
             ('fc3', nn.Linear(256, 128, bias=False)),
-            ('bn3', nn.BatchNorm1d(128)),
+            ('ln3', nn.LayerNorm(128)),  # 使用LayerNorm替代BatchNorm1d
             ('relu3', nn.ELU()),
             ('drop3', nn.Dropout(p=dropout)),
             
@@ -271,15 +271,26 @@ class MultiLayerGCN(nn.Module):
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
             elif isinstance(module, nn.BatchNorm1d):
-                # PyTorch标准BatchNorm1d
-                nn.init.ones_(module.weight)
-                nn.init.zeros_(module.bias)
-            elif isinstance(module, BatchNorm):
-                # PyTorch Geometric BatchNorm - 检查是否有这些参数
+                # 标准的BatchNorm1d层
                 if hasattr(module, 'weight') and module.weight is not None:
                     nn.init.ones_(module.weight)
                 if hasattr(module, 'bias') and module.bias is not None:
                     nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.LayerNorm):
+                # LayerNorm层初始化
+                if hasattr(module, 'weight') and module.weight is not None:
+                    nn.init.ones_(module.weight)
+                if hasattr(module, 'bias') and module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif isinstance(module, BatchNorm):
+                # PyTorch Geometric的BatchNorm层
+                # 检查是否有weight和bias属性
+                if hasattr(module, 'weight') and module.weight is not None:
+                    nn.init.ones_(module.weight)
+                if hasattr(module, 'bias') and module.bias is not None:
+                    nn.init.zeros_(module.bias)
+                # 有些PyTorch Geometric版本的BatchNorm可能没有这些属性
+                # 在这种情况下，跳过初始化
 
     def forward(self, adj, x):
         """
@@ -360,7 +371,7 @@ class LightweightGCN(nn.Module):
         # 简化的分类器
         self.classifier = nn.Sequential(
             nn.Linear(32 * 3 * 2, 64),  # 3层×2种池化
-            nn.BatchNorm1d(64),
+            nn.LayerNorm(64),  # 使用LayerNorm替代BatchNorm1d
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(64, num_classes)
