@@ -368,9 +368,9 @@ def generate_edges_csv(pred_num: int, xyz_len: int, output_path: str) -> None:
     logger.info(f"✓ {config.EDGES_CSV} 已保存到: {output_file}")
 
 
-def generate_graphs_csv(pred_num: int, output_path: str) -> None:
+def generate_graphs_csv(pred_num: int, output_path: str, xyz_trim: list = None) -> None:
     """
-    生成graphs.csv文件
+    生成graphs.csv文件 - 使用改进的标签生成方法
     
     Parameters
     ----------
@@ -378,13 +378,63 @@ def generate_graphs_csv(pred_num: int, output_path: str) -> None:
         图的数量
     output_path : str
         输出目录路径
+    xyz_trim : list, optional
+        裁剪后的相空间数据，用于智能标签生成
     """
     logger.info("生成 graphs.csv 文件...")
     
-    # 构建图的属性和标签
+    # 构建图的属性
     graph_id = np.arange(1, pred_num + 1)
     feat = ['1,0,0,0,0,0'] * pred_num  # 图特征
     
+    # 使用改进的标签生成方法
+    if xyz_trim is not None:
+        try:
+            from improved_labeling import generate_improved_labels
+            logger.info("使用改进的无监督聚类方法生成标签...")
+            label = generate_improved_labels(xyz_trim, pred_num, config.NUM_CLASSES)
+        except ImportError as e:
+            logger.warning(f"无法导入改进的标签生成模块: {e}")
+            logger.info("回退到传统的多样化标签生成...")
+            label = _generate_traditional_labels(pred_num)
+        except Exception as e:
+            logger.warning(f"改进标签生成失败: {e}")
+            logger.info("回退到传统的多样化标签生成...")
+            label = _generate_traditional_labels(pred_num)
+    else:
+        logger.info("缺少相空间数据，使用传统的多样化标签生成...")
+        label = _generate_traditional_labels(pred_num)
+    
+    # 记录标签分布信息
+    unique_labels, counts = np.unique(label, return_counts=True)
+    logger.info(f"最终标签分布: {dict(zip(unique_labels, counts))}")
+    
+    # 创建DataFrame并保存
+    df = pd.DataFrame({
+        'graph_id': graph_id,
+        'feat': feat,
+        'label': label
+    })
+    
+    output_file = os.path.join(output_path, config.GRAPHS_CSV)
+    df.to_csv(output_file, index=False)
+    logger.info(f"✓ {config.GRAPHS_CSV} 已保存到: {output_file}")
+
+
+def _generate_traditional_labels(pred_num: int) -> np.ndarray:
+    """
+    传统的多样化标签生成方法（备用方案）
+    
+    Parameters
+    ----------
+    pred_num : int
+        样本数量
+        
+    Returns
+    -------
+    np.ndarray
+        生成的标签
+    """
     # 生成0-5范围内的多样化标签用于6类分类
     # 使用伪随机分布确保各类别都有足够样本
     np.random.seed(config.RANDOM_SEED)  # 确保可重现性
@@ -413,22 +463,8 @@ def generate_graphs_csv(pred_num: int, output_path: str) -> None:
     
     # 打乱标签顺序以避免连续的类别块
     np.random.shuffle(labels)
-    label = np.array(labels, dtype=int)
     
-    # 记录标签分布信息
-    unique_labels, counts = np.unique(label, return_counts=True)
-    logger.info(f"标签分布: {dict(zip(unique_labels, counts))}")
-    
-    # 创建DataFrame并保存
-    df = pd.DataFrame({
-        'graph_id': graph_id,
-        'feat': feat,
-        'label': label
-    })
-    
-    output_file = os.path.join(output_path, config.GRAPHS_CSV)
-    df.to_csv(output_file, index=False)
-    logger.info(f"✓ {config.GRAPHS_CSV} 已保存到: {output_file}")
+    return np.array(labels, dtype=int)
 
 
 def generate_mock_data():
@@ -553,7 +589,7 @@ def main():
     try:
         generate_nodes_csv(xyz_trim, str(config.DATA_DIR))
         generate_edges_csv(pred_num, config.TRAJECTORY_LENGTH, str(config.DATA_DIR))
-        generate_graphs_csv(pred_num, str(config.DATA_DIR))
+        generate_graphs_csv(pred_num, str(config.DATA_DIR), xyz_trim)
         
         logger.info("\n" + "=" * 60)
         logger.info("数据处理流程全部完成!")

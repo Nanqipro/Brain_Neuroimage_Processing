@@ -424,3 +424,117 @@ A:
 - **v1.1.0** (2023): 添加GCN分类器和完整训练流程
 - **v1.2.0** (2023): 项目结构优化和文档完善
 - **v1.3.0** (2023): 添加配置管理和便捷运行脚本 
+
+## 故障排除
+
+### 常见问题及解决方案
+
+#### 1. 编码错误 (UnicodeDecodeError)
+**问题**: 运行 `python run.py --test` 时出现字符编码错误
+
+**解决方案**: 
+项目已内置编码问题的解决方案，会自动尝试多种编码方式：
+- 优先使用简化的直接测试方法
+- 自动检测系统编码并尝试多种编码格式
+- 如果所有编码都失败，使用二进制模式并安全解码
+
+如果仍有问题，可以手动设置环境变量：
+```bash
+# Windows
+set PYTHONIOENCODING=utf-8
+python run.py --test
+
+# 或者
+set PYTHONIOENCODING=gbk
+python run.py --test
+```
+
+#### 2. 训练准确率过低
+**问题**: 模型训练准确率只有10-20%
+
+**主要原因**:
+- 数据量不足 (总样本数<100)
+- 模型复杂度过高
+- 数据不平衡
+- 特征提取不当
+
+**解决方案**:
+1. **增加数据量**:
+   - 收集更多实验数据
+   - 使用数据增强技术
+   - 考虑减少分类类别数
+
+2. **简化模型**:
+   ```python
+   # 在config.py中调整
+   HIDDEN_DIM = 16        # 降低隐藏层维度
+   NUM_GCN_LAYERS = 2     # 减少GCN层数
+   DROPOUT_RATE = 0.2     # 降低Dropout
+   ```
+
+3. **优化训练参数**:
+   ```python
+   LEARNING_RATE = 0.01   # 提高学习率
+   NUM_EPOCHS = 50        # 减少训练轮数
+   ```
+
+#### 3. 内存不足错误
+**问题**: GPU内存溢出或系统内存不足
+
+**解决方案**:
+- 减少批次大小: `BATCH_SIZE = 1`
+- 降低轨迹长度: `TRAJECTORY_LENGTH = 100`
+- 减少处理的细胞数: `MAX_CELLS_PROCESS = 5`
+- 使用CPU训练: `DEVICE = "cpu"`
+
+#### 4. 数据文件读取错误
+**问题**: 无法读取Excel或MAT文件
+
+**解决方案**:
+- 检查文件路径是否正确
+- 确保安装了openpyxl: `pip install openpyxl`
+- 对于MAT文件，确保安装了scipy: `pip install scipy`
+- 检查文件格式是否正确
+
+#### 5. 模块导入错误
+**问题**: 找不到某些模块或函数
+
+**解决方案**:
+```bash
+# 安装缺失的依赖
+pip install torch torch-geometric
+pip install numpy pandas scipy matplotlib sklearn tqdm
+
+# 检查环境
+python run.py --check
+```
+
+## 开发团队
+
+- **作者**: SCN研究小组
+- **转换**: Clade 4 (MATLAB → Python)
+- **日期**: 2023-2025
+
+## 许可证
+
+本项目仅供学术研究使用。
+
+## 更新日志
+
+### v2.1.0 (2025-05-23)
+- ✅ 修复Windows系统字符编码问题
+- ✅ 添加简化的模块测试方法
+- ✅ 改进错误处理和日志记录
+- ✅ 优化数据处理流程
+- ✅ 添加详细的故障排除指南
+
+### v2.0.0
+- ✅ 完整的MATLAB到Python转换
+- ✅ 支持Excel和MAT数据格式
+- ✅ 实现多层GCN架构
+- ✅ 添加完整的日志系统
+- ✅ 统一的命令行接口
+
+---
+
+如有问题或建议，请联系开发团队或提交Issue。 
