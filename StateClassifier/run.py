@@ -28,12 +28,15 @@ def setup_logging(log_level: str = "INFO"):
     log_level : str
         日志级别
     """
+    # 确保logs目录存在
+    config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    
     logging.basicConfig(
         level=getattr(logging, log_level.upper()),
         format=config.LOG_FORMAT,
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler('scn_classifier.log', encoding='utf-8')
+            logging.FileHandler(config.MAIN_LOG_FILE, encoding='utf-8')
         ]
     )
 

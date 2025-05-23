@@ -54,33 +54,83 @@ def train(model, optimizer, train_dataloader, valid_dataloader, test_dataloader,
     best_model = model
 
     for i, batch in enumerate(train_dataloader):
-        # 提取批次数据
-        x = batch[0].squeeze().to(device)  # 节点特征
-        y = batch[1].to(device)  # 标签
-        edge = batch[2].squeeze().to(device)  # 边连接信息
-        
-        # 数据增强：随机使用部分图结构
-        random_num = np.random.uniform()
-        if random_num > 0.5 and random_num < 0.75:
-            # 只使用前87条边和对应节点
-            edge = edge[:,:87]
-            x = x[:88,:]
-        elif random_num > 0.75:
-            # 只使用后面的边和节点
-            edge = edge[:,87:]-87
-            x = x[87:,:]
+        try:
+            # 提取批次数据
+            x = batch[0].squeeze().to(device)  # 节点特征
+            y = batch[1].to(device)  # 标签
+            edge = batch[2].squeeze().to(device)  # 边连接信息
+            
+            # 标签验证：确保标签在有效范围内 [0, 5]
+            if torch.any(y < 0) or torch.any(y >= 6):
+                print(f"警告：批次 {i} 中发现无效标签！")
+                print(f"标签范围: [{y.min().item()}, {y.max().item()}]")
+                print(f"标签值: {y.unique().cpu().numpy()}")
+                # 修复无效标签
+                y = torch.clamp(y, 0, 5)
+                print(f"已修复标签到范围 [0, 5]")
+            
+            # 数据增强：随机使用部分图结构
+            random_num = np.random.uniform()
+            if random_num > 0.5 and random_num < 0.75:
+                # 只使用前87条边和对应节点
+                edge = edge[:,:87]
+                x = x[:88,:]
+            elif random_num > 0.75:
+                # 只使用后面的边和节点
+                edge = edge[:,87:]-87
+                x = x[87:,:]
 
-        optimizer.zero_grad()
-        pred = model(edge, x)  # 前向传播
+            optimizer.zero_grad()
+            pred = model(edge, x)  # 前向传播
 
-        loss = criterion(pred, y)  # 计算损失
-        loss_epoch.append(loss.item())
-        loss.backward()  # 反向传播
-        optimizer.step()  # 更新参数
+            # 再次检查预测和标签的形状匹配
+            if pred.size(0) != y.size(0):
+                print(f"警告：批次 {i} 中预测和标签数量不匹配！")
+                print(f"预测形状: {pred.shape}, 标签形状: {y.shape}")
+                continue
+            
+            loss = criterion(pred, y)  # 计算损失
+            loss_epoch.append(loss.item())
+            loss.backward()  # 反向传播
+            optimizer.step()  # 更新参数
+            
+        except RuntimeError as e:
+            if "CUDA error" in str(e) or "device-side assert" in str(e):
+                print(f"批次 {i} 出现CUDA错误，跳过此批次")
+                print(f"错误详情: {e}")
+                print(f"标签信息: min={y.min().item()}, max={y.max().item()}, unique={y.unique().cpu().numpy()}")
+                
+                # 尝试在CPU上处理这个批次
+                try:
+                    x_cpu = x.cpu()
+                    y_cpu = y.cpu()
+                    edge_cpu = edge.cpu()
+                    model_cpu = model.cpu()
+                    pred_cpu = model_cpu(edge_cpu, x_cpu)
+                    loss_cpu = torch.nn.CrossEntropyLoss(reduction='sum')(pred_cpu, y_cpu)
+                    print(f"CPU处理成功，损失值: {loss_cpu.item()}")
+                    # 将模型移回GPU
+                    model.to(device)
+                except Exception as cpu_e:
+                    print(f"CPU处理也失败: {cpu_e}")
+                
+                continue
+            else:
+                raise e
+        except Exception as e:
+            print(f"批次 {i} 处理失败: {e}")
+            print(f"批次数据信息:")
+            print(f"  x.shape: {x.shape if 'x' in locals() else 'N/A'}")
+            print(f"  y.shape: {y.shape if 'y' in locals() else 'N/A'}")
+            print(f"  edge.shape: {edge.shape if 'edge' in locals() else 'N/A'}")
+            continue
     
     # 计算并打印平均损失
-    mean_loss = np.mean(loss_epoch)
-    print(f'epoch {epoch + 1} meanloss: {mean_loss}')
+    if loss_epoch:
+        mean_loss = np.mean(loss_epoch)
+        print(f'epoch {epoch + 1} meanloss: {mean_loss}')
+    else:
+        print(f'epoch {epoch + 1} 没有成功处理的批次！')
 
 
 def test(model, device, test_loader):

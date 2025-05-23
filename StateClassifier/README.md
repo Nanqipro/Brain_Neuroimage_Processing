@@ -65,6 +65,48 @@ python run.py --config     # 查看配置参数
 python run.py --test       # 测试核心模块
 ```
 
+### 7. 日志管理 📋
+
+项目现在支持统一的日志管理系统，所有日志文件都保存在 `logs/` 目录下：
+
+**日志文件结构：**
+```
+StateClassifier/
+├── logs/                           # 日志目录
+│   ├── scn_classifier.log         # 主日志文件
+│   ├── data_processing.log        # 数据处理日志
+│   ├── model_training.log         # 模型训练日志
+│   └── backup_*/                   # 日志备份目录
+```
+
+**日志管理命令：**
+```bash
+# 查看所有日志文件
+python log_manager.py --list
+
+# 查看最新的主日志内容
+python log_manager.py --show
+
+# 查看指定日志文件
+python log_manager.py --show data_processing.log --lines 100
+
+# 清理30天前的旧日志
+python log_manager.py --clear 30
+
+# 备份当前日志文件
+python log_manager.py --backup
+
+# 创建日志目录
+python log_manager.py --create-dir
+```
+
+**日志配置特点：**
+- 🚀 **统一管理**: 所有模块使用统一的日志配置
+- 📊 **分类记录**: 不同功能模块分别记录日志
+- 💾 **双重输出**: 同时输出到控制台和文件
+- 🔧 **便捷管理**: 提供日志查看、清理、备份工具
+- 📋 **详细信息**: 包含时间戳、模块名、级别和消息
+
 ---
 
 ## 项目概述

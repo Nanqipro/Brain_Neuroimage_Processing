@@ -11,6 +11,7 @@
 
 import os
 from pathlib import Path
+import logging
 
 class Config:
     """
@@ -28,6 +29,7 @@ class Config:
     DATA_DIR = PROJECT_ROOT / "datasets"
     RESULT_DIR = PROJECT_ROOT / "results"
     SRC_DIR = PROJECT_ROOT / "src"
+    LOGS_DIR = PROJECT_ROOT / "logs"  # 日志目录
     
     # 输入数据文件
     INPUT_DATA_PATH = "datasets/EMtrace01.xlsx"
@@ -116,6 +118,11 @@ class Config:
     LOG_LEVEL = "INFO"  # 日志级别
     LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
+    # 日志文件路径
+    MAIN_LOG_FILE = LOGS_DIR / "scn_classifier.log"  # 主日志文件
+    PROCESSING_LOG_FILE = LOGS_DIR / "data_processing.log"  # 数据处理日志
+    TRAINING_LOG_FILE = LOGS_DIR / "model_training.log"  # 模型训练日志
+    
     # 进度条配置
     PROGRESS_BAR = True  # 是否显示进度条
     
@@ -133,9 +140,57 @@ class Config:
         """
         创建必要的目录结构
         """
-        directories = [cls.DATA_DIR, cls.RESULT_DIR]
+        directories = [cls.DATA_DIR, cls.RESULT_DIR, cls.LOGS_DIR]
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
+    
+    @classmethod
+    def setup_logging(cls, log_file_path: Path = None, module_name: str = "main"):
+        """
+        统一的日志配置方法
+        
+        Parameters
+        ----------
+        log_file_path : Path, optional
+            日志文件路径，如果为None则使用主日志文件
+        module_name : str, optional
+            模块名称，用于区分不同模块的日志
+        
+        Returns
+        -------
+        logging.Logger
+            配置好的日志记录器
+        """
+        # 确保logs目录存在
+        cls.LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # 如果没有指定日志文件，使用主日志文件
+        if log_file_path is None:
+            log_file_path = cls.MAIN_LOG_FILE
+        
+        # 清除现有的处理器（避免重复配置）
+        logger = logging.getLogger(module_name)
+        logger.handlers.clear()
+        
+        # 创建格式化器
+        formatter = logging.Formatter(cls.LOG_FORMAT)
+        
+        # 创建控制台处理器
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(getattr(logging, cls.LOG_LEVEL))
+        console_handler.setFormatter(formatter)
+        
+        # 创建文件处理器
+        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+        file_handler.setLevel(getattr(logging, cls.LOG_LEVEL))
+        file_handler.setFormatter(formatter)
+        
+        # 添加处理器到日志记录器
+        logger.addHandler(console_handler)
+        logger.addHandler(file_handler)
+        logger.setLevel(getattr(logging, cls.LOG_LEVEL))
+        
+        return logger
     
     @classmethod
     def validate_config(cls):

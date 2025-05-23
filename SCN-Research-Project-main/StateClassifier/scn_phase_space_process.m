@@ -12,7 +12,7 @@ clearvars; clc; close all; warning off; dbstop if error;
 addpath(genpath('./src'))  % 添加src目录到MATLAB路径
 
 %% 加载数据
-filePath = '../SCNData/Dataset1_SCNProject.mat';  % 输入文件路径，请根据实际情况修改
+filePath = './SCNData/Dataset1_SCNProject.mat';  % 输入文件路径，请根据实际情况修改
 frameRate = 0.67;  % 帧率，单位Hz
 outPath = './data';  % 输出目录路径
 mkdir(outPath)  % 创建输出目录

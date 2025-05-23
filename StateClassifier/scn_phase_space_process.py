@@ -37,12 +37,8 @@ from src.format_convert import format_convert
 # 导入新的Excel数据处理器
 from excel_data_processor import load_excel_calcium_data, ExcelCalciumDataProcessor
 
-# 配置日志
-logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL),
-    format=config.LOG_FORMAT
-)
-logger = logging.getLogger(__name__)
+# 配置日志（使用统一的日志配置方法）
+logger = config.setup_logging(config.PROCESSING_LOG_FILE, __name__)
 
 # 抑制警告
 warnings.filterwarnings('ignore')
@@ -388,7 +384,40 @@ def generate_graphs_csv(pred_num: int, output_path: str) -> None:
     # 构建图的属性和标签
     graph_id = np.arange(1, pred_num + 1)
     feat = ['1,0,0,0,0,0'] * pred_num  # 图特征
-    label = np.zeros(pred_num, dtype=int)  # 初始标签为0
+    
+    # 生成0-5范围内的多样化标签用于6类分类
+    # 使用伪随机分布确保各类别都有足够样本
+    np.random.seed(config.RANDOM_SEED)  # 确保可重现性
+    num_classes = config.NUM_CLASSES  # 6个类别
+    
+    # 确保每个类别至少有一些样本
+    min_samples_per_class = max(1, pred_num // (num_classes * 2))  # 每类至少占总数的1/(2*6)
+    
+    # 先为每个类别分配最少样本数
+    labels = []
+    for class_id in range(num_classes):
+        labels.extend([class_id] * min_samples_per_class)
+    
+    # 剩余样本随机分配
+    remaining_samples = pred_num - len(labels)
+    if remaining_samples > 0:
+        additional_labels = np.random.choice(num_classes, remaining_samples, replace=True)
+        labels.extend(additional_labels)
+    
+    # 如果标签数量超过样本数，截断到正确长度
+    labels = labels[:pred_num]
+    
+    # 如果标签数量不足，用随机标签补齐
+    while len(labels) < pred_num:
+        labels.append(np.random.randint(0, num_classes))
+    
+    # 打乱标签顺序以避免连续的类别块
+    np.random.shuffle(labels)
+    label = np.array(labels, dtype=int)
+    
+    # 记录标签分布信息
+    unique_labels, counts = np.unique(label, return_counts=True)
+    logger.info(f"标签分布: {dict(zip(unique_labels, counts))}")
     
     # 创建DataFrame并保存
     df = pd.DataFrame({

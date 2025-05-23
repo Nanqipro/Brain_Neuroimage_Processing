@@ -80,7 +80,7 @@ def load_data(path):
         graph_reader = csv.reader(graphfile)
         next(graph_reader)  # 跳过表头行
         for row in graph_reader:
-            labels.append(int(row[2])-1)  # 标签从0开始，所以减1
+            labels.append(int(row[2]))  # 直接使用标签值，不需要减1，因为CSV中已经是从0开始
 
     labels = np.array(labels)
 

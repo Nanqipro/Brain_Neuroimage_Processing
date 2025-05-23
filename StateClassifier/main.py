@@ -20,12 +20,8 @@ from utils import get_dataset
 from model import MultiLayerGCN
 from config import config
 
-# 配置日志
-logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL),
-    format=config.LOG_FORMAT
-)
-logger = logging.getLogger(__name__)
+# 配置日志（使用统一的日志配置方法）
+logger = config.setup_logging(config.TRAINING_LOG_FILE, __name__)
 
 
 def set_random_seeds():
