@@ -66,7 +66,7 @@ class Config:
     HIDDEN_DIM = 32  # 隐藏层维度
     NUM_GCN_LAYERS = 3  # GCN层数
     NUM_CLASSES = 6  # 分类类别数
-    DROPOUT_RATE = 0.5  # Dropout比率
+    DROPOUT_RATE = 0.3  # Dropout比率（降低以配合BatchNorm）
     
     # 池化参数
     POOLING_TYPE = "global"  # 池化类型: "global", "max", "mean"
@@ -74,12 +74,12 @@ class Config:
     # ==================== 训练配置 ====================
     
     # 训练参数
-    NUM_EPOCHS = 160  # 训练轮数
+    NUM_EPOCHS = 200  # 训练轮数（增加以配合早停机制）
     LEARNING_RATE = 0.001  # 初始学习率
     WEIGHT_DECAY = 1e-4  # L2正则化系数
     BATCH_SIZE = 1  # 批次大小
     
-    # 学习率调度
+    # 学习率调度（保留兼容性，但新训练器使用ReduceLROnPlateau）
     LR_DECAY_FACTOR = 0.75  # 学习率衰减因子
     LR_DECAY_STEP = 20  # 学习率衰减步长
     

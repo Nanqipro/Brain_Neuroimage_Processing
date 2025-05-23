@@ -6,12 +6,14 @@
 
 作者: Clade 4
 日期: 2025年5月23日
+改进版本: 增加Focal Loss、早停机制、学习率调度等先进训练技术
 """
 
 import torch
+import torch.nn.functional as F
 import random
 import numpy as np
-from sklearn.metrics import accuracy_score, balanced_accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, classification_report
 import logging
 import os
 
@@ -24,6 +26,120 @@ from config import config
 logger = config.setup_logging(config.TRAINING_LOG_FILE, __name__)
 
 
+class FocalLoss(torch.nn.Module):
+    """
+    Focal Loss - 处理类别不平衡问题
+    专门设计用来解决类别不平衡导致的训练问题
+    """
+    
+    def __init__(self, alpha=1, gamma=2, reduction='mean'):
+        """
+        初始化Focal Loss
+        
+        Parameters
+        ----------
+        alpha : float
+            平衡因子，用于调节正负样本的权重
+        gamma : float
+            聚焦参数，用于降低易分类样本的权重
+        reduction : str
+            损失聚合方式：'mean', 'sum', 'none'
+        """
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+        
+    def forward(self, inputs, targets):
+        """
+        前向传播计算Focal Loss
+        
+        Parameters
+        ----------
+        inputs : torch.Tensor
+            模型预测结果 (logits)
+        targets : torch.Tensor
+            真实标签
+            
+        Returns
+        -------
+        torch.Tensor
+            Focal Loss值
+        """
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1-pt)**self.gamma * ce_loss
+        
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+
+
+class EarlyStopping:
+    """
+    早停机制 - 防止过拟合并节省训练时间
+    """
+    
+    def __init__(self, patience=10, min_delta=0.001, restore_best_weights=True):
+        """
+        初始化早停机制
+        
+        Parameters
+        ----------
+        patience : int
+            耐心值，连续多少个epoch没有改进就停止
+        min_delta : float
+            最小改进量，小于此值不认为是改进
+        restore_best_weights : bool
+            是否恢复最佳权重
+        """
+        self.patience = patience
+        self.min_delta = min_delta
+        self.restore_best_weights = restore_best_weights
+        self.best_loss = None
+        self.counter = 0
+        self.best_weights = None
+        
+    def __call__(self, val_loss, model):
+        """
+        检查是否应该早停
+        
+        Parameters
+        ----------
+        val_loss : float
+            当前验证损失
+        model : nn.Module
+            当前模型
+            
+        Returns
+        -------
+        bool
+            是否应该早停
+        """
+        if self.best_loss is None:
+            self.best_loss = val_loss
+            self.save_checkpoint(model)
+        elif val_loss < self.best_loss - self.min_delta:
+            self.best_loss = val_loss
+            self.counter = 0
+            self.save_checkpoint(model)
+        else:
+            self.counter += 1
+            
+        if self.counter >= self.patience:
+            if self.restore_best_weights:
+                model.load_state_dict(self.best_weights)
+            return True
+        return False
+    
+    def save_checkpoint(self, model):
+        """保存最佳模型权重"""
+        self.best_weights = model.state_dict().copy()
+
+
 def set_random_seeds():
     """
     设置随机种子以确保结果可复现
@@ -34,9 +150,9 @@ def set_random_seeds():
     random.seed(config.RANDOM_SEED)
 
 
-def train_epoch(model, optimizer, train_dataloader, device, epoch):
+def train_epoch(model, optimizer, train_dataloader, device, epoch, criterion):
     """
-    训练单个epoch的函数
+    训练单个epoch的函数（改进版本）
     
     Parameters
     ----------
@@ -50,6 +166,8 @@ def train_epoch(model, optimizer, train_dataloader, device, epoch):
         计算设备(CPU/GPU)
     epoch : int
         当前训练轮次
+    criterion : torch.nn.Module
+        损失函数
         
     Returns
     -------
@@ -57,7 +175,6 @@ def train_epoch(model, optimizer, train_dataloader, device, epoch):
         该epoch的平均损失
     """
     model.train()
-    criterion = torch.nn.CrossEntropyLoss(reduction='sum')
     loss_epoch = []
     
     for i, batch in enumerate(train_dataloader):
@@ -66,16 +183,19 @@ def train_epoch(model, optimizer, train_dataloader, device, epoch):
         y = batch[1].to(device)  # 标签
         edge = batch[2].squeeze().to(device)  # 边连接信息
         
-        # 数据增强：随机使用部分图结构
+        # 改进的数据增强策略
         random_num = np.random.uniform()
-        if 0.5 < random_num < 0.75:
-            # 只使用前87条边和对应节点
-            edge = edge[:, :87]
-            x = x[:88, :]
-        elif random_num > 0.75:
-            # 只使用后面的边和节点
-            edge = edge[:, 87:] - 87
-            x = x[87:, :]
+        if 0.3 < random_num < 0.6:
+            # 随机丢弃一部分边（Edge Dropout）
+            num_edges = edge.shape[1]
+            keep_ratio = 0.8
+            keep_indices = np.random.choice(num_edges, int(num_edges * keep_ratio), replace=False)
+            edge = edge[:, keep_indices]
+            
+        elif 0.6 < random_num < 0.8:
+            # 节点特征噪声
+            noise = torch.randn_like(x) * 0.01
+            x = x + noise
 
         # 梯度清零
         optimizer.zero_grad()
@@ -87,20 +207,25 @@ def train_epoch(model, optimizer, train_dataloader, device, epoch):
         loss = criterion(pred, y)
         loss_epoch.append(loss.item())
         
-        # 反向传播和参数更新
+        # 反向传播
         loss.backward()
+        
+        # 梯度裁剪（防止梯度爆炸）
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        
+        # 参数更新
         optimizer.step()
     
     # 计算并返回平均损失
     mean_loss = np.mean(loss_epoch)
-    logger.info(f'Epoch {epoch + 1} 平均损失: {mean_loss:.4f}')
+    logger.info(f'Epoch {epoch + 1} 训练损失: {mean_loss:.4f}')
     
     return mean_loss
 
 
-def evaluate_model(model, device, data_loader):
+def evaluate_model(model, device, data_loader, criterion):
     """
-    评估模型性能的函数
+    评估模型性能的函数（改进版本）
     
     Parameters
     ----------
@@ -110,14 +235,15 @@ def evaluate_model(model, device, data_loader):
         计算设备(CPU/GPU)
     data_loader : DataLoader
         数据加载器
+    criterion : torch.nn.Module
+        损失函数
         
     Returns
     -------
     tuple
-        (平均损失, 整体准确率, 平均类别准确率)
+        (平均损失, 整体准确率, 平均类别准确率, 预测结果, 真实标签)
     """
     model.eval()
-    criterion = torch.nn.CrossEntropyLoss(reduction='sum')
     loss_values = []
     pred_scores = []
     true_scores = []
@@ -150,12 +276,12 @@ def evaluate_model(model, device, data_loader):
     overall_acc = accuracy_score(true_scores, pred_scores)
     avg_class_acc = balanced_accuracy_score(true_scores, pred_scores)
     
-    return mean_loss, overall_acc, avg_class_acc
+    return mean_loss, overall_acc, avg_class_acc, pred_scores, true_scores
 
 
 def train_model(model, train_dataloader, valid_dataloader, device):
     """
-    完整的模型训练流程
+    完整的模型训练流程（大幅改进版本）
     
     Parameters
     ----------
@@ -173,12 +299,26 @@ def train_model(model, train_dataloader, valid_dataloader, device):
     torch.nn.Module
         训练好的最佳模型
     """
-    # 设置优化器
-    optimizer = torch.optim.Adam(
+    # 使用Focal Loss处理类别不平衡
+    criterion = FocalLoss(alpha=1, gamma=2)
+    logger.info("✓ 使用Focal Loss处理类别不平衡问题")
+    
+    # 设置AdamW优化器（相比Adam有更好的泛化性能）
+    optimizer = torch.optim.AdamW(
         model.parameters(), 
         weight_decay=config.WEIGHT_DECAY, 
-        lr=config.LEARNING_RATE
+        lr=config.LEARNING_RATE,
+        betas=(0.9, 0.999),
+        eps=1e-8
     )
+    
+    # 学习率调度器：当验证损失不再下降时降低学习率
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=5, verbose=True, min_lr=1e-6
+    )
+    
+    # 早停机制
+    early_stopping = EarlyStopping(patience=15, min_delta=0.001)
     
     # 记录最佳性能
     best_acc = 0.0
@@ -186,21 +326,30 @@ def train_model(model, train_dataloader, valid_dataloader, device):
     best_avg_class_acc = 0.0
     best_model_state = None
     
-    logger.info(f"开始训练，总共 {config.NUM_EPOCHS} 个epoch")
+    # 训练历史记录
+    train_losses = []
+    val_losses = []
+    val_accs = []
+    
+    logger.info(f"开始改进版训练，总共 {config.NUM_EPOCHS} 个epoch")
+    logger.info("训练技术: Focal Loss + AdamW + 学习率调度 + 早停 + 梯度裁剪")
     
     # 训练循环
     for epoch in range(config.NUM_EPOCHS):
-        # 学习率衰减策略
-        if epoch > 0 and epoch % config.LR_DECAY_STEP == 0:
-            for param_group in optimizer.param_groups:
-                param_group['lr'] *= config.LR_DECAY_FACTOR
-            logger.info(f"学习率衰减至: {optimizer.param_groups[0]['lr']:.6f}")
-            
         # 训练一个epoch
-        train_loss = train_epoch(model, optimizer, train_dataloader, device, epoch)
+        train_loss = train_epoch(model, optimizer, train_dataloader, device, epoch, criterion)
         
         # 在验证集上评估
-        val_loss, val_acc, val_avg_class_acc = evaluate_model(model, device, valid_dataloader)
+        val_loss, val_acc, val_avg_class_acc, _, _ = evaluate_model(model, device, valid_dataloader, criterion)
+        
+        # 记录历史
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+        val_accs.append(val_acc)
+        
+        # 学习率调度
+        scheduler.step(val_loss)
+        current_lr = optimizer.param_groups[0]['lr']
         
         # 保存最佳模型
         if val_acc > best_acc:
@@ -215,10 +364,17 @@ def train_model(model, train_dataloader, valid_dataloader, device):
         logger.info(
             f"Epoch {epoch + 1}/{config.NUM_EPOCHS} - "
             f"训练损失: {train_loss:.4f}, "
+            f"验证损失: {val_loss:.4f}, "
             f"验证准确率: {val_acc:.4f}, "
             f"最佳准确率: {best_acc:.4f} (Epoch {best_epoch + 1}), "
-            f"最佳平均类别准确率: {best_avg_class_acc:.4f}"
+            f"学习率: {current_lr:.2e}"
         )
+        
+        # 早停检查
+        if early_stopping(val_loss, model):
+            logger.info(f"早停触发，在第 {epoch + 1} 个epoch停止训练")
+            logger.info(f"最佳验证准确率: {best_acc:.4f} (Epoch {best_epoch + 1})")
+            break
 
     # 保存最佳模型
     config.create_directories()
@@ -228,16 +384,55 @@ def train_model(model, train_dataloader, valid_dataloader, device):
     # 加载最佳模型状态
     model.load_state_dict(best_model_state)
     
-    return model
+    # 保存训练历史
+    training_history = {
+        'train_losses': train_losses,
+        'val_losses': val_losses,
+        'val_accs': val_accs,
+        'best_epoch': best_epoch,
+        'best_acc': best_acc
+    }
+    
+    return model, training_history
+
+
+def generate_detailed_report(true_labels, predictions, num_classes=6):
+    """
+    生成详细的分类报告
+    
+    Parameters
+    ----------
+    true_labels : np.ndarray
+        真实标签
+    predictions : np.ndarray
+        预测标签
+    num_classes : int
+        类别数量
+        
+    Returns
+    -------
+    str
+        详细的分类报告
+    """
+    target_names = [f'状态_{i}' for i in range(num_classes)]
+    report = classification_report(
+        true_labels, 
+        predictions, 
+        target_names=target_names,
+        digits=4
+    )
+    
+    return report
 
 
 def main():
     """
-    主函数，包含模型训练和评估的完整流程
+    主函数，包含模型训练和评估的完整流程（改进版本）
     """
-    logger.info("=" * 60)
-    logger.info("脑网络状态分类器训练程序启动")
-    logger.info("=" * 60)
+    logger.info("=" * 80)
+    logger.info("脑网络状态分类器训练程序启动 - 改进版本")
+    logger.info("改进内容: Focal Loss + 早停 + 学习率调度 + 梯度裁剪")
+    logger.info("=" * 80)
     
     # 设置随机种子
     set_random_seeds()
@@ -268,7 +463,7 @@ def main():
         logger.error(f"✗ 数据集加载失败: {e}")
         return
     
-    # 创建模型实例
+    # 创建改进的模型实例
     model = MultiLayerGCN(
         dropout=config.DROPOUT_RATE,
         num_classes=config.NUM_CLASSES
@@ -284,19 +479,38 @@ def main():
     logger.info(f"可训练参数: {trainable_params:,}")
     
     # 训练模型
-    logger.info("\n开始模型训练...")
-    trained_model = train_model(model, train_dataloader, valid_dataloader, device)
+    logger.info("\n开始改进版模型训练...")
+    trained_model, training_history = train_model(model, train_dataloader, valid_dataloader, device)
     
     # 在测试集上评估
     logger.info("\n在测试集上评估最终性能...")
-    test_loss, test_acc, test_avg_class_acc = evaluate_model(trained_model, device, test_dataloader)
+    criterion = FocalLoss(alpha=1, gamma=2)  # 使用相同的损失函数评估
+    test_loss, test_acc, test_avg_class_acc, test_predictions, test_labels = evaluate_model(
+        trained_model, device, test_dataloader, criterion
+    )
     
-    logger.info("=" * 60)
+    # 生成详细报告
+    detailed_report = generate_detailed_report(test_labels, test_predictions, config.NUM_CLASSES)
+    
+    logger.info("=" * 80)
     logger.info("最终测试结果:")
     logger.info(f"  测试损失: {test_loss:.4f}")
     logger.info(f"  测试准确率: {test_acc:.4f}")
-    logger.info(f"  平均类别准确率: {test_avg_class_acc:.4f}")
-    logger.info("=" * 60)
+    logger.info(f"  测试平衡准确率: {test_avg_class_acc:.4f}")
+    logger.info("=" * 80)
+    logger.info("详细分类报告:")
+    logger.info(f"\n{detailed_report}")
+    logger.info("=" * 80)
+    
+    # 计算性能提升
+    logger.info("性能分析:")
+    logger.info(f"  最佳训练epoch: {training_history['best_epoch'] + 1}")
+    logger.info(f"  最佳验证准确率: {training_history['best_acc']:.4f}")
+    logger.info(f"  最终测试准确率: {test_acc:.4f}")
+    
+    if test_acc > 0.167:  # 随机准确率为1/6 ≈ 0.167
+        improvement = (test_acc - 0.167) / 0.167 * 100
+        logger.info(f"  相对于随机分类的提升: {improvement:.1f}%")
     
     return trained_model, test_acc, test_avg_class_acc
 

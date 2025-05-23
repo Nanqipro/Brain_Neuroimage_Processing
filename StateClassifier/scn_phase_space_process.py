@@ -368,6 +368,189 @@ def generate_edges_csv(pred_num: int, xyz_len: int, output_path: str) -> None:
     logger.info(f"✓ {config.EDGES_CSV} 已保存到: {output_file}")
 
 
+def generate_improved_labels_simple(xyz_trim: list, pred_num: int, num_classes: int = 6) -> np.ndarray:
+    """
+    简化版的改进标签生成方法（内置于原文件中）
+    基于相空间轨迹的基本统计特征进行无监督聚类
+    
+    Parameters
+    ----------
+    xyz_trim : list
+        裁剪后的相空间数据
+    pred_num : int
+        预测样本数量
+    num_classes : int
+        类别数量
+        
+    Returns
+    -------
+    np.ndarray
+        改进的标签
+    """
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.decomposition import PCA
+    from scipy.stats import entropy
+    
+    logger.info("使用内置的改进标签生成方法...")
+    
+    # 提取所有有效样本
+    valid_samples = []
+    for cell_data in xyz_trim:
+        for trajectory in cell_data:
+            if trajectory is not None and len(trajectory) > 0:
+                valid_samples.append(trajectory)
+    
+    if len(valid_samples) == 0:
+        logger.warning("没有有效样本，使用随机标签")
+        return np.random.randint(0, num_classes, size=pred_num)
+    
+    # 限制样本数量
+    if len(valid_samples) > pred_num:
+        valid_samples = valid_samples[:pred_num]
+    
+    logger.info(f"处理 {len(valid_samples)} 个有效样本")
+    
+    # 提取特征
+    all_features = []
+    
+    for i, trajectory in enumerate(valid_samples):
+        features = []
+        
+        try:
+            if isinstance(trajectory, np.ndarray) and trajectory.ndim == 2:
+                # 相空间轨迹的基本统计特征
+                features.extend([
+                    np.mean(trajectory),                    # 均值
+                    np.std(trajectory),                     # 标准差
+                    np.var(trajectory),                     # 方差
+                    np.max(trajectory),                     # 最大值
+                    np.min(trajectory),                     # 最小值
+                    np.ptp(trajectory),                     # 峰峰值
+                ])
+                
+                # 轨迹几何特征
+                if len(trajectory) > 1:
+                    distances = np.linalg.norm(np.diff(trajectory, axis=0), axis=1)
+                    features.extend([
+                        np.mean(distances),                 # 平均步长
+                        np.std(distances),                  # 步长变异性
+                        np.sum(distances),                  # 总路径长度
+                    ])
+                else:
+                    features.extend([0, 0, 0])
+                
+                # 维度间相关性
+                if trajectory.shape[1] > 1:
+                    corr_matrix = np.corrcoef(trajectory.T)
+                    features.append(np.mean(corr_matrix[np.triu_indices_from(corr_matrix, k=1)]))
+                else:
+                    features.append(0)
+                
+                # 时间序列特征（使用第一个维度）
+                if trajectory.shape[1] > 0:
+                    signal = trajectory[:, 0]
+                    features.extend([
+                        len(signal),                        # 序列长度
+                        np.sum(signal**2),                  # 总能量
+                        np.sqrt(np.mean(signal**2)),        # RMS
+                    ])
+                    
+                    # 简单的熵估计
+                    try:
+                        hist, _ = np.histogram(signal, bins=10, density=True)
+                        hist = hist[hist > 0]
+                        features.append(entropy(hist))
+                    except:
+                        features.append(0)
+                
+            elif isinstance(trajectory, np.ndarray) and trajectory.ndim == 1:
+                # 一维时间序列
+                signal = trajectory
+                features.extend([
+                    np.mean(signal),
+                    np.std(signal),
+                    np.var(signal),
+                    np.max(signal),
+                    np.min(signal),
+                    np.ptp(signal),
+                    len(signal),
+                    np.sum(signal**2),
+                    np.sqrt(np.mean(signal**2)),
+                ])
+                
+                # 简单的熵估计
+                try:
+                    hist, _ = np.histogram(signal, bins=10, density=True)
+                    hist = hist[hist > 0]
+                    features.append(entropy(hist))
+                except:
+                    features.append(0)
+                
+                # 补齐特征到相同维度
+                features.extend([0, 0, 0, 0])  # 缺失的几何特征
+                
+        except Exception as e:
+            logger.warning(f"样本 {i} 特征提取失败: {e}")
+            # 使用零特征作为备选
+            features = [0] * 14  # 假设特征维度为14
+        
+        all_features.append(features)
+    
+    # 转换为numpy数组并处理无效值
+    feature_matrix = np.array(all_features)
+    feature_matrix = np.nan_to_num(feature_matrix, nan=0.0, posinf=1e6, neginf=-1e6)
+    
+    logger.info(f"特征矩阵形状: {feature_matrix.shape}")
+    
+    # 标准化特征
+    scaler = StandardScaler()
+    try:
+        features_scaled = scaler.fit_transform(feature_matrix)
+    except:
+        logger.warning("特征标准化失败，使用原始特征")
+        features_scaled = feature_matrix
+    
+    # 降维处理
+    if features_scaled.shape[1] > 8:
+        try:
+            pca = PCA(n_components=min(8, features_scaled.shape[0]-1))
+            features_scaled = pca.fit_transform(features_scaled)
+            logger.info(f"PCA降维: {feature_matrix.shape[1]} -> {features_scaled.shape[1]}")
+        except:
+            logger.warning("PCA降维失败，使用原始特征")
+    
+    # K-means聚类
+    try:
+        kmeans = KMeans(n_clusters=num_classes, random_state=42, n_init=10)
+        labels = kmeans.fit_predict(features_scaled)
+        
+        # 评估聚类质量
+        from sklearn.metrics import silhouette_score
+        if len(np.unique(labels)) > 1:
+            sil_score = silhouette_score(features_scaled, labels)
+            logger.info(f"聚类质量 - 轮廓系数: {sil_score:.3f}")
+        
+    except Exception as e:
+        logger.warning(f"K-means聚类失败: {e}，使用随机标签")
+        labels = np.random.randint(0, num_classes, size=len(valid_samples))
+    
+    # 确保标签数量正确
+    if len(labels) < pred_num:
+        # 补齐标签
+        additional_labels = np.random.choice(labels, pred_num - len(labels), replace=True)
+        labels = np.concatenate([labels, additional_labels])
+    elif len(labels) > pred_num:
+        # 截断标签
+        labels = labels[:pred_num]
+    
+    # 记录标签分布
+    unique_labels, counts = np.unique(labels, return_counts=True)
+    logger.info(f"改进标签分布: {dict(zip(unique_labels, counts))}")
+    
+    return labels
+
+
 def generate_graphs_csv(pred_num: int, output_path: str, xyz_trim: list = None) -> None:
     """
     生成graphs.csv文件 - 使用改进的标签生成方法
@@ -390,13 +573,14 @@ def generate_graphs_csv(pred_num: int, output_path: str, xyz_trim: list = None) 
     # 使用改进的标签生成方法
     if xyz_trim is not None:
         try:
+            # 首先尝试导入外部改进的标签生成
             from improved_labeling import generate_improved_labels
-            logger.info("使用改进的无监督聚类方法生成标签...")
+            logger.info("使用外部改进的无监督聚类方法生成标签...")
             label = generate_improved_labels(xyz_trim, pred_num, config.NUM_CLASSES)
-        except ImportError as e:
-            logger.warning(f"无法导入改进的标签生成模块: {e}")
-            logger.info("回退到传统的多样化标签生成...")
-            label = _generate_traditional_labels(pred_num)
+        except ImportError:
+            # 如果外部模块不可用，使用内置的简化版本
+            logger.info("外部模块不可用，使用内置的改进标签生成方法...")
+            label = generate_improved_labels_simple(xyz_trim, pred_num, config.NUM_CLASSES)
         except Exception as e:
             logger.warning(f"改进标签生成失败: {e}")
             logger.info("回退到传统的多样化标签生成...")
