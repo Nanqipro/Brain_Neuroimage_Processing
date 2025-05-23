@@ -229,8 +229,17 @@ class AdaptiveTrainer:
             verbose=True
         )
         
-        # 早停机制
-        self.early_stopping = EarlyStopping(patience=20, min_delta=0.001)
+        # 早停机制（根据配置决定是否启用）
+        if config.USE_EARLY_STOPPING:
+            self.early_stopping = EarlyStopping(
+                patience=config.EARLY_STOPPING_PATIENCE,
+                min_delta=config.EARLY_STOPPING_MIN_DELTA,
+                restore_best_weights=config.EARLY_STOPPING_RESTORE_BEST
+            )
+            logger.info(f"✓ 早停机制已启用 - 耐心值: {config.EARLY_STOPPING_PATIENCE}, 最小改进: {config.EARLY_STOPPING_MIN_DELTA}")
+        else:
+            self.early_stopping = None
+            logger.info("✓ 早停机制已禁用")
         
         # 训练历史
         self.train_history = {
@@ -357,7 +366,7 @@ class AdaptiveTrainer:
                           f"Val Balanced Acc: {val_balanced_acc:.4f} | LR: {current_lr:.6f}")
             
             # 早停检查
-            if self.early_stopping(val_loss, self.model):
+            if self.early_stopping and self.early_stopping(val_loss, self.model):
                 logger.info(f"早停触发，停止训练。最佳验证准确率: {best_val_acc:.4f}")
                 break
         
@@ -464,15 +473,33 @@ def main():
         logger.info(f"测试损失: {test_loss:.4f}")
         logger.info("="*60)
         
-        # 保存模型和训练历史
+        # 保存模型和训练历史到results文件夹
+        # 确保results目录存在
+        config.RESULT_DIR.mkdir(exist_ok=True)
+        
+        model_save_path = config.RESULT_DIR / 'advanced_brain_classifier.pth'
         torch.save({
             'model_state_dict': model.state_dict(),
             'train_history': train_history,
             'test_accuracy': test_acc,
-            'test_balanced_accuracy': test_balanced_acc
-        }, 'advanced_brain_classifier.pth')
+            'test_balanced_accuracy': test_balanced_acc,
+            'config': {
+                'num_epochs': config.NUM_EPOCHS,
+                'learning_rate': config.LEARNING_RATE,
+                'dropout_rate': config.DROPOUT_RATE,
+                'num_classes': config.NUM_CLASSES,
+                'use_early_stopping': config.USE_EARLY_STOPPING,
+                'early_stopping_patience': config.EARLY_STOPPING_PATIENCE,
+            },
+            'model_info': {
+                'model_type': 'MultiLayerGCN',
+                'total_parameters': sum(p.numel() for p in model.parameters()),
+                'trainable_parameters': sum(p.numel() for p in model.parameters() if p.requires_grad),
+            }
+        }, model_save_path)
         
-        logger.info("✅ 模型和结果已保存")
+        logger.info(f"✅ 模型和结果已保存到: {model_save_path}")
+        logger.info(f"📁 结果目录: {config.RESULT_DIR}")
         
         return test_acc
         

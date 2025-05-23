@@ -449,6 +449,9 @@ def show_config():
             ("学习率", config.LEARNING_RATE),
             ("批次大小", config.BATCH_SIZE),
             ("计算设备", config.DEVICE),
+            ("使用早停", "是" if config.USE_EARLY_STOPPING else "否"),
+            ("早停耐心值", config.EARLY_STOPPING_PATIENCE if config.USE_EARLY_STOPPING else "未使用"),
+            ("早停最小改进", config.EARLY_STOPPING_MIN_DELTA if config.USE_EARLY_STOPPING else "未使用"),
         ]),
         ("文件路径", [
             ("输入数据", config.INPUT_DATA_PATH),

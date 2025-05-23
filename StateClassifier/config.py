@@ -79,6 +79,12 @@ class Config:
     WEIGHT_DECAY = 1e-4  # L2正则化系数
     BATCH_SIZE = 1  # 批次大小
     
+    # 早停机制配置
+    USE_EARLY_STOPPING = True  # 是否使用早停机制
+    EARLY_STOPPING_PATIENCE = 50  # 早停耐心值（连续多少个epoch没有改进就停止）
+    EARLY_STOPPING_MIN_DELTA = 0.001  # 早停最小改进量
+    EARLY_STOPPING_RESTORE_BEST = True  # 是否恢复最佳权重
+    
     # 学习率调度
     LR_DECAY_FACTOR = 0.75  # 学习率衰减因子
     LR_DECAY_STEP = 20  # 学习率衰减步长
