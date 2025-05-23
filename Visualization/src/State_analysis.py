@@ -18,8 +18,8 @@
 - State V: 高频密集放电状态
 - State VI: 低频随机活动状态
 
-作者：AI助手
-日期：2024年
+作者：Clade 4
+日期：2025年5月23日
 """
 
 import numpy as np
