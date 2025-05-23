@@ -25,8 +25,8 @@ class Config:
     PROJECT_ROOT = Path(__file__).parent
     
     # 数据目录
-    DATA_DIR = PROJECT_ROOT / "data"
-    RESULT_DIR = PROJECT_ROOT / "result"
+    DATA_DIR = PROJECT_ROOT / "datasets"
+    RESULT_DIR = PROJECT_ROOT / "results"
     SRC_DIR = PROJECT_ROOT / "src"
     
     # 输入数据文件
