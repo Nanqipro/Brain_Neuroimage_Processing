@@ -165,7 +165,7 @@ def check_environment():
     # 检查必要的模块
     required_modules = [
         'numpy', 'pandas', 'scipy', 'matplotlib', 
-        'sklearn', 'tqdm', 'torch'
+        'sklearn', 'tqdm', 'torch', 'openpyxl'
     ]
     
     missing_modules = []
@@ -180,6 +180,19 @@ def check_environment():
         logger.info("请安装缺少的模块:")
         logger.info(f"pip install {' '.join(missing_modules)}")
         return False
+    
+    # 检查数据文件是否存在
+    if Path(config.INPUT_DATA_PATH).exists():
+        file_format = Path(config.INPUT_DATA_PATH).suffix.lower()
+        if file_format in ['.xlsx', '.xls']:
+            logger.info(f"✓ 检测到Excel数据文件: {config.INPUT_DATA_PATH}")
+        elif file_format == '.mat':
+            logger.info(f"✓ 检测到MAT数据文件: {config.INPUT_DATA_PATH}")
+        else:
+            logger.warning(f"未知数据文件格式: {file_format}")
+    else:
+        logger.warning(f"数据文件不存在: {config.INPUT_DATA_PATH}")
+        logger.info("将使用模拟数据进行演示")
     
     logger.info("✓ 运行环境检查通过")
     return True

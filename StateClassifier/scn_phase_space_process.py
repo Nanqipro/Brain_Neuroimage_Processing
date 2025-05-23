@@ -5,13 +5,13 @@
 
 该脚本用于处理脑神经元钙成像数据，将时间序列转换为相空间流形，并构建图数据集
 主要步骤包括：
-1. 加载原始钙信号数据
+1. 加载原始钙信号数据（支持Excel和MAT格式）
 2. 将钙成像时间序列转换为相空间流形(phase-space manifolds)
 3. 生成图数据集的节点、边和图属性文件
 
 作者: SCN研究小组 (原MATLAB版本)
-转换: Python版本
-日期: 2023
+转换: Python版本，增强Excel支持
+日期: 2025年5月23日
 """
 
 import numpy as np
@@ -34,6 +34,9 @@ from src.phasespace import phasespace
 from src.cellset2trim import cellset2trim
 from src.format_convert import format_convert
 
+# 导入新的Excel数据处理器
+from excel_data_processor import load_excel_calcium_data, ExcelCalciumDataProcessor
+
 # 配置日志
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL),
@@ -47,7 +50,7 @@ warnings.filterwarnings('ignore')
 
 def load_scn_data(file_path: str) -> dict:
     """
-    加载SCN数据文件
+    加载SCN数据文件（支持MAT格式，保持向后兼容性）
     
     Parameters
     ----------
@@ -61,11 +64,97 @@ def load_scn_data(file_path: str) -> dict:
     """
     try:
         data = scipy.io.loadmat(file_path)
-        logger.info(f"✓ 成功加载数据文件: {file_path}")
+        logger.info(f"✓ 成功加载MAT数据文件: {file_path}")
         return data
     except Exception as e:
-        logger.error(f"✗ 加载数据文件失败: {e}")
+        logger.error(f"✗ 加载MAT数据文件失败: {e}")
         sys.exit(1)
+
+
+def detect_input_format(file_path: str) -> str:
+    """
+    检测输入文件格式
+    
+    Parameters
+    ----------
+    file_path : str
+        文件路径
+        
+    Returns
+    -------
+    str
+        文件格式: 'excel' 或 'mat'
+    """
+    file_ext = Path(file_path).suffix.lower()
+    
+    if file_ext in ['.xlsx', '.xls']:
+        return 'excel'
+    elif file_ext == '.mat':
+        return 'mat'
+    else:
+        raise ValueError(f"不支持的文件格式: {file_ext}。支持的格式: .xlsx, .xls, .mat")
+
+
+def load_calcium_data(file_path: str) -> tuple:
+    """
+    智能加载钙离子数据（支持Excel和MAT格式）
+    
+    Parameters
+    ----------
+    file_path : str
+        数据文件路径
+        
+    Returns
+    -------
+    tuple
+        (F_set, data_info) - 钙信号数据集和信息字典
+    """
+    logger.info(f"正在检测和加载数据文件: {file_path}")
+    
+    # 检测文件格式
+    format_type = detect_input_format(file_path)
+    logger.info(f"检测到文件格式: {format_type}")
+    
+    if format_type == 'excel':
+        # 使用新的Excel处理器
+        logger.info("使用Excel数据处理器加载钙离子数据...")
+        F_set, data_info = load_excel_calcium_data(file_path)
+        
+        # 添加格式信息
+        data_info['数据格式'] = 'Excel'
+        data_info['处理器'] = 'ExcelCalciumDataProcessor'
+        
+        return F_set, data_info
+        
+    elif format_type == 'mat':
+        # 使用原有的MAT处理逻辑（保持向后兼容）
+        logger.info("使用MAT数据处理器加载数据...")
+        mat_data = load_scn_data(file_path)
+        
+        # 这里需要根据具体的MAT文件结构来解析
+        # 假设MAT文件包含名为'F_set'的变量
+        if 'F_set' in mat_data:
+            F_set = mat_data['F_set']
+        else:
+            # 如果没有F_set，尝试其他可能的变量名
+            possible_keys = [key for key in mat_data.keys() if not key.startswith('__')]
+            if possible_keys:
+                F_set = mat_data[possible_keys[0]]
+                logger.warning(f"未找到'F_set'变量，使用'{possible_keys[0]}'")
+            else:
+                raise ValueError("MAT文件中未找到有效的数据变量")
+        
+        data_info = {
+            '数据格式': 'MAT',
+            '文件路径': file_path,
+            '变量数量': len([k for k in mat_data.keys() if not k.startswith('__')]),
+            '主要变量': [k for k in mat_data.keys() if not k.startswith('__')][:5]
+        }
+        
+        return F_set, data_info
+    
+    else:
+        raise ValueError(f"不支持的文件格式: {format_type}")
 
 
 def find_first_local_minimum(mi_values: np.ndarray, default_value: int = 8) -> int:
@@ -344,38 +433,74 @@ def generate_mock_data():
 
 def main():
     """
-    主处理函数
+    主处理函数 - 支持Excel和MAT格式的钙离子数据
     """
     logger.info("=" * 60)
     logger.info("3D SCN数据处理流程 - Python版本")
+    logger.info("增强版本：支持Excel和MAT格式")
     logger.info("=" * 60)
     
     # 创建输出目录
     config.create_directories()
     logger.info(f"输出目录: {config.DATA_DIR}")
     
-    # 步骤1: 加载数据
-    logger.info("\n步骤1: 加载数据")
+    # 步骤1: 智能加载数据
+    logger.info("\n步骤1: 智能数据加载")
     logger.info("-" * 30)
     
     if not os.path.exists(config.INPUT_DATA_PATH):
         logger.warning(f"数据文件不存在: {config.INPUT_DATA_PATH}")
+        logger.info("生成模拟数据进行演示...")
         F_set = generate_mock_data()
+        data_info = {
+            '数据格式': '模拟数据',
+            '处理器': 'generate_mock_data',
+            '细胞数量': len(F_set),
+            '时间线数量': len(F_set[0]) if F_set else 0
+        }
     else:
-        data = load_scn_data(config.INPUT_DATA_PATH)
-        F_set = data['F_set']  # 假设数据中有F_set字段
+        try:
+            # 使用智能数据加载器
+            F_set, data_info = load_calcium_data(config.INPUT_DATA_PATH)
+            
+            # 打印数据信息
+            logger.info("数据加载信息:")
+            for key, value in data_info.items():
+                logger.info(f"  {key}: {value}")
+                
+        except Exception as e:
+            logger.error(f"✗ 数据加载失败: {e}")
+            logger.info("使用模拟数据作为备选...")
+            F_set = generate_mock_data()
+            data_info = {
+                '数据格式': '模拟数据(备选)',
+                '原因': str(e)
+            }
+    
+    # 验证数据有效性
+    if not F_set or len(F_set) == 0:
+        logger.error("✗ 没有有效的输入数据")
+        return
     
     # 步骤2: 将钙离子时间序列转换为相空间流形
     logger.info("\n步骤2: 相空间重构")
     logger.info("-" * 30)
     
-    trace_zs_set, xyz = process_calcium_signals_to_phasespace(F_set, config.FRAME_RATE)
+    try:
+        trace_zs_set, xyz = process_calcium_signals_to_phasespace(F_set, config.FRAME_RATE)
+    except Exception as e:
+        logger.error(f"✗ 相空间重构失败: {e}")
+        return
     
     # 步骤3: 裁剪相空间轨迹到统一长度
     logger.info("\n步骤3: 数据裁剪")
     logger.info("-" * 30)
     
-    xyz_trim = trim_phasespace_data(xyz)
+    try:
+        xyz_trim = trim_phasespace_data(xyz)
+    except Exception as e:
+        logger.error(f"✗ 数据裁剪失败: {e}")
+        return
     
     # 步骤4: 构建图数据集
     logger.info("\n步骤4: 构建图数据集")
@@ -389,6 +514,10 @@ def main():
     
     if pred_num == 0:
         logger.error("✗ 没有有效的相空间数据，无法生成图数据集")
+        logger.info("建议检查:")
+        logger.info("  1. 输入数据质量（是否包含有效的钙信号）")
+        logger.info("  2. 配置参数（MIN_SIGNAL_LENGTH, MAX_CELLS_PROCESS等）")
+        logger.info("  3. 数据预处理结果")
         return
     
     # 生成CSV文件
@@ -398,16 +527,31 @@ def main():
         generate_graphs_csv(pred_num, str(config.DATA_DIR))
         
         logger.info("\n" + "=" * 60)
-        logger.info("全部完成!")
+        logger.info("数据处理流程全部完成!")
         logger.info("=" * 60)
-        logger.info(f"生成的文件:")
+        logger.info(f"数据源信息:")
+        logger.info(f"  - 文件: {config.INPUT_DATA_PATH}")
+        logger.info(f"  - 格式: {data_info.get('数据格式', '未知')}")
+        logger.info(f"  - 处理器: {data_info.get('处理器', '未知')}")
+        logger.info(f"\n生成的文件:")
         logger.info(f"  - {config.DATA_DIR}/{config.NODES_CSV}")
         logger.info(f"  - {config.DATA_DIR}/{config.EDGES_CSV}")
         logger.info(f"  - {config.DATA_DIR}/{config.GRAPHS_CSV}")
-        logger.info(f"总共处理了 {pred_num} 个图样本")
+        logger.info(f"\n处理结果:")
+        logger.info(f"  - 总样本数量: {pred_num}")
+        logger.info(f"  - 轨迹长度: {config.TRAJECTORY_LENGTH}")
+        logger.info(f"  - 嵌入维度: {config.EMBEDDING_DIM}")
+        
+        # 添加下一步建议
+        logger.info(f"\n下一步操作:")
+        logger.info(f"  1. 检查生成的CSV文件质量")
+        logger.info(f"  2. 运行训练: python main.py 或 python run.py --train")
+        logger.info(f"  3. 查看训练结果: {config.RESULT_DIR}")
         
     except Exception as e:
         logger.error(f"✗ 生成CSV文件时出错: {e}")
+        import traceback
+        logger.error(f"详细错误信息:\n{traceback.format_exc()}")
         return
 
 

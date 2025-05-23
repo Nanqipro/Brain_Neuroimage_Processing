@@ -30,7 +30,7 @@ class Config:
     SRC_DIR = PROJECT_ROOT / "src"
     
     # 输入数据文件
-    INPUT_DATA_PATH = "../SCNData/Dataset1_SCNProject.mat"
+    INPUT_DATA_PATH = "datasets/EMtrace01.xlsx"
     
     # 输出文件名
     NODES_CSV = "nodes.csv"

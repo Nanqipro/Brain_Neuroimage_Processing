@@ -2,6 +2,13 @@
 
 基于图卷积神经网络(GCN)的脑神经元活动状态分类系统，专门用于处理和分析脑神经元钙成像数据。
 
+## 🆕 最新特性
+
+✅ **新增Excel数据支持** - 现在支持`.xlsx`和`.xls`格式的钙离子浓度数据  
+✅ **智能数据格式检测** - 自动识别Excel和MAT文件格式  
+✅ **增强的数据预处理** - 包含异常值检测、缺失值处理和Z-score标准化  
+✅ **改进的错误处理** - 更友好的错误提示和自动备选方案  
+
 ## 快速开始 🚀
 
 ### 1. 安装依赖
@@ -9,7 +16,33 @@
 pip install -r requirements.txt
 ```
 
-### 2. 运行完整流程
+### 2. 准备数据
+
+**支持的数据格式：**
+- **Excel格式** (推荐): `datasets/EMtrace01.xlsx`
+  - 必须包含`stamp`列作为时间戳
+  - 神经元数据列命名为`n1`, `n2`, `n3`...
+  - 数据为钙离子浓度的离散变化值
+
+- **MAT格式**: 传统MATLAB数据文件(保持向后兼容)
+
+**Excel数据格式示例：**
+```
+stamp | n1     | n2     | n3     | n4     | ...
+------|--------|--------|--------|--------|---------
+1     | -0.222 | 0.871  | 0.514  | -0.381 | ...
+2     | -0.445 | 0.465  | 0.393  | -0.421 | ...
+3     | -0.357 | 0.701  | 0.308  | -0.433 | ...
+...   | ...    | ...    | ...    | ...    | ...
+```
+
+### 3. 测试Excel数据处理器
+```bash
+# 测试Excel数据处理功能
+python test_excel_processor.py
+```
+
+### 4. 运行完整流程
 ```bash
 # 一键运行数据处理和模型训练
 python run.py --all
@@ -19,13 +52,13 @@ python run.py --process    # 数据处理
 python run.py --train      # 模型训练
 ```
 
-### 3. 查看结果
+### 5. 查看结果
 训练完成后，查看生成的文件：
-- `data/` - 图数据集文件
-- `result/` - 训练好的模型
+- `datasets/` - 图数据集文件
+- `results/` - 训练好的模型
 - `scn_classifier.log` - 详细日志
 
-### 4. 其他有用命令
+### 6. 其他有用命令
 ```bash
 python run.py --check      # 检查运行环境
 python run.py --config     # 查看配置参数
@@ -37,6 +70,12 @@ python run.py --test       # 测试核心模块
 ## 项目概述
 
 该项目包含完整的数据处理管道：从原始钙离子信号到相空间重构，再到图神经网络分类。主要应用于超交叉核(SCN)神经元活动状态的自动识别和分类。
+
+**🔧 技术特点：**
+- 支持多种数据格式输入(Excel、MAT)
+- 基于时间序列分析理论的相空间重构
+- 先进的图神经网络架构
+- 完整的端到端机器学习流水线
 
 ## 项目结构
 
@@ -50,19 +89,33 @@ StateClassifier/
 │   ├── cellset2trim.py          # 数据裁剪和标准化
 │   ├── test_all_modules.py      # 核心模块测试脚本
 │   └── README.md                # 核心模块详细说明
-├── scn_phase_space_process.py   # 主数据处理脚本
+├── excel_data_processor.py     # 🆕 Excel数据处理器
+├── test_excel_processor.py     # 🆕 Excel处理器测试脚本
+├── scn_phase_space_process.py   # 主数据处理脚本(增强Excel支持)
 ├── model.py                     # GCN模型定义
 ├── utils.py                     # 数据加载和预处理工具
 ├── main.py                      # 模型训练和评估主程序
 ├── config.py                    # 项目配置管理
-├── run.py                       # 便捷运行脚本
-├── requirements.txt             # 项目依赖
+├── run.py                       # 便捷运行脚本(增强环境检查)
+├── requirements.txt             # 项目依赖(增加openpyxl)
 └── README.md                    # 项目说明文档(本文件)
 ```
 
 ## 功能模块
 
-### 1. 数据处理模块 (`src/`)
+### 1. 🆕 Excel数据处理器 (`excel_data_processor.py`)
+
+**新增的核心功能模块**：
+
+- **`ExcelCalciumDataProcessor`**: 专门的Excel数据处理类
+  - 智能数据格式验证和加载
+  - 自动神经元列检测(n1, n2, n3...)
+  - 高级数据预处理(异常值检测、缺失值处理)
+  - SCN格式转换和分段处理
+
+- **`load_excel_calcium_data`**: 便捷的数据加载函数
+
+### 2. 数据处理模块 (`src/`)
 
 **核心算法模块**，从MATLAB代码转换而来：
 
@@ -71,23 +124,24 @@ StateClassifier/
 - **`cellset2trim.py`**: 数据裁剪工具，统一轨迹长度便于批处理
 - **`format_convert.py`**: 数据格式转换工具，支持CSV导出
 
-### 2. 主处理脚本 (`scn_phase_space_process.py`)
+### 3. 主处理脚本 (`scn_phase_space_process.py`)
 
-**端到端数据处理流程**：
-- 加载原始钙离子信号数据(.mat格式)
+**增强的端到端数据处理流程**：
+- 🆕 智能数据格式检测(Excel/MAT)
+- 🆕 增强的错误处理和自动备选方案
 - 执行Z-score标准化和相空间重构
 - 生成图数据集(nodes.csv, edges.csv, graphs.csv)
 
-### 3. 深度学习模块
+### 4. 深度学习模块
 
 - **`model.py`**: 多层GCN模型定义，包含全局池化和分类器
 - **`utils.py`**: 数据加载器和数据集分割工具
 - **`main.py`**: 模型训练、验证和测试主程序
 
-### 4. 配置和运行
+### 5. 配置和运行
 
 - **`config.py`**: 集中管理所有配置参数
-- **`run.py`**: 提供便捷的命令行接口
+- **`run.py`**: 提供便捷的命令行接口(增强环境检查)
 
 ## 安装依赖
 
@@ -103,16 +157,21 @@ pip install -r requirements.txt
 - `torch>=1.9.0` - 深度学习框架
 - `torch-geometric>=2.0.0` - 图神经网络
 - `tqdm>=4.60.0` - 进度条显示
+- `openpyxl>=3.0.0` - 🆕 Excel文件读写支持
 
 ## 使用方法
 
 ### 快速开始
 
-1. **准备数据**：将SCN钙成像数据保存为`.mat`格式
-2. **数据处理**：运行主处理脚本生成图数据集
-3. **模型训练**：使用生成的数据集训练GCN分类器
+1. **准备数据**：将钙成像数据保存为Excel格式(推荐)或MAT格式
+2. **测试数据**：运行Excel处理器测试脚本
+3. **数据处理**：运行主处理脚本生成图数据集
+4. **模型训练**：使用生成的数据集训练GCN分类器
 
 ```bash
+# 0. 🆕 测试Excel数据处理(推荐先运行)
+python test_excel_processor.py
+
 # 1. 数据处理 - 生成图数据集
 python run.py --process
 
@@ -125,6 +184,19 @@ python run.py --all
 
 ### 详细工作流程
 
+#### 🆕 步骤0: Excel数据测试
+
+```python
+# 测试Excel数据处理功能
+python test_excel_processor.py
+```
+
+该脚本将：
+- 验证Excel文件格式和内容
+- 测试数据加载和预处理功能
+- 验证SCN格式转换
+- 生成详细的测试报告
+
 #### 步骤1: 数据预处理
 
 ```python
@@ -133,16 +205,17 @@ python run.py --process
 ```
 
 该脚本将：
-- 加载原始钙信号数据
+- 🆕 智能检测和加载Excel/MAT数据
+- 🆕 执行高级数据预处理(异常值检测、缺失值处理)
 - 执行Z-score标准化
 - 计算最佳时间延迟参数
 - 进行3D相空间重构
 - 生成标准化的图数据集
 
 输出文件：
-- `data/nodes.csv` - 节点特征数据
-- `data/edges.csv` - 边连接信息
-- `data/graphs.csv` - 图标签数据
+- `datasets/nodes.csv` - 节点特征数据
+- `datasets/edges.csv` - 边连接信息
+- `datasets/graphs.csv` - 图标签数据
 
 #### 步骤2: 模型训练
 
@@ -162,6 +235,9 @@ python run.py --train
 ```bash
 # 测试数据处理模块
 python run.py --test
+
+# 🆕 测试Excel数据处理器
+python test_excel_processor.py
 
 # 显示可视化图表
 cd src/

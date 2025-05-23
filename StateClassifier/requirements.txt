@@ -20,6 +20,7 @@ seaborn>=0.11.0
 
 # 文件处理
 h5py>=3.1.0
+openpyxl>=3.0.0  # Excel文件读写支持
 
 # 类型检查支持
 typing_extensions>=4.0.0 
