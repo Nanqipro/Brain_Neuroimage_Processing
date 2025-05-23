@@ -235,7 +235,7 @@ def process_calcium_signals_to_phasespace(F_set: list, frame_rate: float) -> tup
                 trace_zs_set[ii][tt] = trace_zs
                 
                 # 计算互信息以确定最佳时间延迟tau
-                mi = mutual(trace_zs, max_delay=config.MAX_DELAY, num_bins=config.NUM_BINS)
+                mi = mutual(trace_zs, partitions=config.NUM_BINS, tau=config.MAX_DELAY)
                 
                 # 寻找互信息的第一个局部最小值
                 mini = find_first_local_minimum(mi, default_value=8)
