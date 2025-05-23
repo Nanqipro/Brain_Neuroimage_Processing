@@ -88,10 +88,9 @@ def run_model_training():
     try:
         # 导入并运行训练脚本
         from main import main as train_main
-        model, test_acc, test_avg_class_acc = train_main()
+        test_acc = train_main()  # main()只返回test_acc一个值
         logger.info("✓ 模型训练完成")
         logger.info(f"最终测试准确率: {test_acc:.4f}")
-        logger.info(f"平均类别准确率: {test_avg_class_acc:.4f}")
         return True
     except Exception as e:
         logger.error(f"✗ 模型训练失败: {e}")
