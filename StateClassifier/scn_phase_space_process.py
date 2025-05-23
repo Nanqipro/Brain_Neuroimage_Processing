@@ -24,13 +24,22 @@ import sys
 from pathlib import Path
 from tqdm import tqdm
 import warnings
+import logging
 
-# 导入本地模块
+# 导入项目配置和本地模块
+from config import config
 sys.path.append('./src')
 from src.mutual import mutual, find_optimal_delay
 from src.phasespace import phasespace
 from src.cellset2trim import cellset2trim
 from src.format_convert import format_convert
+
+# 配置日志
+logging.basicConfig(
+    level=getattr(logging, config.LOG_LEVEL),
+    format=config.LOG_FORMAT
+)
+logger = logging.getLogger(__name__)
 
 # 抑制警告
 warnings.filterwarnings('ignore')
@@ -52,10 +61,10 @@ def load_scn_data(file_path: str) -> dict:
     """
     try:
         data = scipy.io.loadmat(file_path)
-        print(f"✓ 成功加载数据文件: {file_path}")
+        logger.info(f"✓ 成功加载数据文件: {file_path}")
         return data
     except Exception as e:
-        print(f"✗ 加载数据文件失败: {e}")
+        logger.error(f"✗ 加载数据文件失败: {e}")
         sys.exit(1)
 
 
@@ -101,41 +110,49 @@ def process_calcium_signals_to_phasespace(F_set: list, frame_rate: float) -> tup
         (trace_zs_set, xyz) - 标准化数据和相空间坐标
     """
     cell_num, timeline = len(F_set), len(F_set[0])
-    print(f"数据维度: {cell_num} 个细胞, {timeline} 个时间线")
+    logger.info(f"数据维度: {cell_num} 个细胞, {timeline} 个时间线")
     
     # 初始化存储结构
     trace_zs_set = [[None for _ in range(timeline)] for _ in range(cell_num)]
     xyz = [[None for _ in range(timeline)] for _ in range(cell_num)]
     
-    print("开始处理钙信号数据...")
+    logger.info("开始处理钙信号数据...")
     
-    # 使用进度条显示处理进度
-    total_operations = min(10, cell_num) * timeline  # 原脚本只处理前10个细胞
-    pbar = tqdm(total=total_operations, desc="处理相空间重构")
+    # 使用配置中的参数
+    max_cells = min(config.MAX_CELLS_PROCESS, cell_num)
+    total_operations = max_cells * timeline
+    
+    pbar = tqdm(total=total_operations, desc="处理相空间重构", disable=not config.PROGRESS_BAR)
     
     for tt in range(timeline):
-        for ii in range(min(10, cell_num)):  # 只处理前10个细胞（保持与原脚本一致）
+        for ii in range(max_cells):  # 使用配置参数控制处理的细胞数量
             # 获取第ii个细胞在第tt个时间点的钙信号
             dat = F_set[ii][tt]
             
             if dat is not None and len(dat) > 0:
-                # Z-score标准化
-                trace_zs = zscore(dat)
+                # 验证信号长度
+                if len(dat) < config.MIN_SIGNAL_LENGTH:
+                    logger.warning(f"细胞{ii+1},时间线{tt+1} 信号长度过短: {len(dat)}")
+                    if not config.CONTINUE_ON_ERROR:
+                        break
+                    xyz[ii][tt] = None
+                    pbar.update(1)
+                    continue
                 
-                # 时间向量（虽然在相空间重构中不直接使用，但保持与原脚本一致）
-                x = np.linspace(1, len(trace_zs), len(trace_zs)) / frame_rate
+                # Z-score标准化
+                trace_zs = zscore(dat, axis=config.ZSCORE_AXIS)
                 
                 # 保存标准化数据
                 trace_zs_set[ii][tt] = trace_zs
                 
                 # 计算互信息以确定最佳时间延迟tau
-                mi = mutual(trace_zs)
+                mi = mutual(trace_zs, max_delay=config.MAX_DELAY, num_bins=config.NUM_BINS)
                 
                 # 寻找互信息的第一个局部最小值
                 mini = find_first_local_minimum(mi, default_value=8)
                 
                 # 设置相空间参数
-                dim = 3  # 嵌入维度(3D相空间)
+                dim = config.EMBEDDING_DIM  # 嵌入维度
                 tau = mini  # 使用互信息第一个局部最小值作为时间延迟
                 
                 # 进行相空间重构
@@ -143,18 +160,20 @@ def process_calcium_signals_to_phasespace(F_set: list, frame_rate: float) -> tup
                     y = phasespace(trace_zs, dim, tau)
                     xyz[ii][tt] = y
                 except ValueError as e:
-                    print(f"\n警告: 细胞{ii+1},时间线{tt+1} 相空间重构失败: {e}")
+                    logger.warning(f"细胞{ii+1},时间线{tt+1} 相空间重构失败: {e}")
+                    if not config.CONTINUE_ON_ERROR:
+                        break
                     xyz[ii][tt] = None
             
             pbar.update(1)
     
     pbar.close()
-    print("✓ 相空间重构完成")
+    logger.info("✓ 相空间重构完成")
     
     return trace_zs_set, xyz
 
 
-def trim_phasespace_data(xyz: list, xyz_len: int = 170) -> list:
+def trim_phasespace_data(xyz: list, xyz_len: int = None) -> list:
     """
     裁剪相空间轨迹到统一长度
     
@@ -162,20 +181,23 @@ def trim_phasespace_data(xyz: list, xyz_len: int = 170) -> list:
     ----------
     xyz : list
         相空间坐标数据
-    xyz_len : int, default=170
-        统一的轨迹长度
+    xyz_len : int, optional
+        统一的轨迹长度，如果为None则使用配置值
         
     Returns
     -------
     list
         裁剪后的相空间数据
     """
-    print(f"开始裁剪数据到统一长度: {xyz_len}")
+    if xyz_len is None:
+        xyz_len = config.TRAJECTORY_LENGTH
+    
+    logger.info(f"开始裁剪数据到统一长度: {xyz_len}")
     
     # 使用已转换的cellset2trim函数
     xyz_trim = cellset2trim(xyz, xyz_len)
     
-    print("✓ 数据裁剪完成")
+    logger.info("✓ 数据裁剪完成")
     return xyz_trim
 
 
@@ -190,7 +212,7 @@ def generate_nodes_csv(xyz_trim: list, output_path: str) -> None:
     output_path : str
         输出目录路径
     """
-    print("生成 nodes.csv 文件...")
+    logger.info("生成 nodes.csv 文件...")
     
     # 重塑数据为列向量
     forPred = [item for sublist in xyz_trim for item in sublist if item is not None]
@@ -200,7 +222,7 @@ def generate_nodes_csv(xyz_trim: list, output_path: str) -> None:
         raise ValueError("没有有效的相空间数据用于生成节点文件")
     
     # 获取轨迹长度（假设所有非空轨迹长度相同）
-    xyz_len = len(forPred[0]) if forPred[0] is not None else 170
+    xyz_len = len(forPred[0]) if forPred[0] is not None else config.TRAJECTORY_LENGTH
     
     # 构建节点ID和特征
     graph_id = np.repeat(np.arange(1, pred_num + 1), xyz_len)
@@ -211,8 +233,8 @@ def generate_nodes_csv(xyz_trim: list, output_path: str) -> None:
     
     # 进度条
     feat = []
-    print("转换节点特征格式...")
-    for i in tqdm(range(len(feat1)), desc="格式转换"):
+    logger.info("转换节点特征格式...")
+    for i in tqdm(range(len(feat1)), desc="格式转换", disable=not config.PROGRESS_BAR):
         feat.append(format_convert(feat1[i, :]))
     
     # 创建DataFrame并保存
@@ -222,9 +244,9 @@ def generate_nodes_csv(xyz_trim: list, output_path: str) -> None:
         'feat': feat
     })
     
-    output_file = os.path.join(output_path, 'nodes.csv')
+    output_file = os.path.join(output_path, config.NODES_CSV)
     df.to_csv(output_file, index=False)
-    print(f"✓ nodes.csv 已保存到: {output_file}")
+    logger.info(f"✓ {config.NODES_CSV} 已保存到: {output_file}")
 
 
 def generate_edges_csv(pred_num: int, xyz_len: int, output_path: str) -> None:
@@ -240,7 +262,7 @@ def generate_edges_csv(pred_num: int, xyz_len: int, output_path: str) -> None:
     output_path : str
         输出目录路径
     """
-    print("生成 edges.csv 文件...")
+    logger.info("生成 edges.csv 文件...")
     
     # 构建边的源节点和目标节点
     graph_id = np.repeat(np.arange(1, pred_num + 1), xyz_len - 1)
@@ -256,9 +278,9 @@ def generate_edges_csv(pred_num: int, xyz_len: int, output_path: str) -> None:
         'feat': feat.astype(int)
     })
     
-    output_file = os.path.join(output_path, 'edges.csv')
+    output_file = os.path.join(output_path, config.EDGES_CSV)
     df.to_csv(output_file, index=False)
-    print(f"✓ edges.csv 已保存到: {output_file}")
+    logger.info(f"✓ {config.EDGES_CSV} 已保存到: {output_file}")
 
 
 def generate_graphs_csv(pred_num: int, output_path: str) -> None:
@@ -272,7 +294,7 @@ def generate_graphs_csv(pred_num: int, output_path: str) -> None:
     output_path : str
         输出目录路径
     """
-    print("生成 graphs.csv 文件...")
+    logger.info("生成 graphs.csv 文件...")
     
     # 构建图的属性和标签
     graph_id = np.arange(1, pred_num + 1)
@@ -286,97 +308,106 @@ def generate_graphs_csv(pred_num: int, output_path: str) -> None:
         'label': label
     })
     
-    output_file = os.path.join(output_path, 'graphs.csv')
+    output_file = os.path.join(output_path, config.GRAPHS_CSV)
     df.to_csv(output_file, index=False)
-    print(f"✓ graphs.csv 已保存到: {output_file}")
+    logger.info(f"✓ {config.GRAPHS_CSV} 已保存到: {output_file}")
+
+
+def generate_mock_data():
+    """
+    生成模拟数据用于演示
+    
+    Returns
+    -------
+    list
+        模拟的F_set数据
+    """
+    logger.info("生成模拟数据进行演示...")
+    
+    # 生成模拟数据
+    np.random.seed(config.RANDOM_SEED)
+    cell_num, timeline = config.MAX_CELLS_PROCESS, 3
+    F_set = []
+    for i in range(cell_num):
+        cell_data = []
+        for j in range(timeline):
+            # 生成模拟的钙信号数据
+            signal_length = np.random.randint(200, 400)
+            calcium_signal = np.sin(np.linspace(0, 4*np.pi, signal_length)) + \
+                           0.1 * np.random.randn(signal_length)
+            cell_data.append(calcium_signal)
+        F_set.append(cell_data)
+    
+    logger.info(f"✓ 生成了 {cell_num} 个细胞, {timeline} 个时间线的模拟数据")
+    return F_set
 
 
 def main():
     """
     主处理函数
     """
-    print("=" * 60)
-    print("3D SCN数据处理流程 - Python版本")
-    print("=" * 60)
-    
-    # 配置参数
-    file_path = '../SCNData/Dataset1_SCNProject.mat'  # 输入文件路径，请根据实际情况修改
-    frame_rate = 0.67  # 帧率，单位Hz
-    output_path = './data'  # 输出目录路径
-    xyz_len = 170  # 经验确定的统一长度
+    logger.info("=" * 60)
+    logger.info("3D SCN数据处理流程 - Python版本")
+    logger.info("=" * 60)
     
     # 创建输出目录
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    print(f"输出目录: {output_path}")
+    config.create_directories()
+    logger.info(f"输出目录: {config.DATA_DIR}")
     
     # 步骤1: 加载数据
-    print("\n步骤1: 加载数据")
-    print("-" * 30)
+    logger.info("\n步骤1: 加载数据")
+    logger.info("-" * 30)
     
-    if not os.path.exists(file_path):
-        print(f"警告: 数据文件不存在: {file_path}")
-        print("生成模拟数据进行演示...")
-        
-        # 生成模拟数据
-        np.random.seed(42)
-        cell_num, timeline = 10, 3
-        F_set = []
-        for i in range(cell_num):
-            cell_data = []
-            for j in range(timeline):
-                # 生成模拟的钙信号数据
-                signal_length = np.random.randint(200, 400)
-                calcium_signal = np.sin(np.linspace(0, 4*np.pi, signal_length)) + \
-                               0.1 * np.random.randn(signal_length)
-                cell_data.append(calcium_signal)
-            F_set.append(cell_data)
+    if not os.path.exists(config.INPUT_DATA_PATH):
+        logger.warning(f"数据文件不存在: {config.INPUT_DATA_PATH}")
+        F_set = generate_mock_data()
     else:
-        data = load_scn_data(file_path)
+        data = load_scn_data(config.INPUT_DATA_PATH)
         F_set = data['F_set']  # 假设数据中有F_set字段
     
     # 步骤2: 将钙离子时间序列转换为相空间流形
-    print("\n步骤2: 相空间重构")
-    print("-" * 30)
+    logger.info("\n步骤2: 相空间重构")
+    logger.info("-" * 30)
     
-    trace_zs_set, xyz = process_calcium_signals_to_phasespace(F_set, frame_rate)
+    trace_zs_set, xyz = process_calcium_signals_to_phasespace(F_set, config.FRAME_RATE)
     
     # 步骤3: 裁剪相空间轨迹到统一长度
-    print("\n步骤3: 数据裁剪")
-    print("-" * 30)
+    logger.info("\n步骤3: 数据裁剪")
+    logger.info("-" * 30)
     
-    xyz_trim = trim_phasespace_data(xyz, xyz_len)
+    xyz_trim = trim_phasespace_data(xyz)
     
     # 步骤4: 构建图数据集
-    print("\n步骤4: 构建图数据集")
-    print("-" * 30)
+    logger.info("\n步骤4: 构建图数据集")
+    logger.info("-" * 30)
     
     # 计算有效样本数量
     forPred = [item for sublist in xyz_trim for item in sublist if item is not None]
     pred_num = len(forPred)
     
-    print(f"有效样本数量: {pred_num}")
+    logger.info(f"有效样本数量: {pred_num}")
     
     if pred_num == 0:
-        print("✗ 没有有效的相空间数据，无法生成图数据集")
+        logger.error("✗ 没有有效的相空间数据，无法生成图数据集")
         return
     
     # 生成CSV文件
     try:
-        generate_nodes_csv(xyz_trim, output_path)
-        generate_edges_csv(pred_num, xyz_len, output_path)
-        generate_graphs_csv(pred_num, output_path)
+        generate_nodes_csv(xyz_trim, str(config.DATA_DIR))
+        generate_edges_csv(pred_num, config.TRAJECTORY_LENGTH, str(config.DATA_DIR))
+        generate_graphs_csv(pred_num, str(config.DATA_DIR))
         
-        print("\n" + "=" * 60)
-        print("全部完成!")
-        print("=" * 60)
-        print(f"生成的文件:")
-        print(f"  - {output_path}/nodes.csv")
-        print(f"  - {output_path}/edges.csv") 
-        print(f"  - {output_path}/graphs.csv")
-        print(f"总共处理了 {pred_num} 个图样本")
+        logger.info("\n" + "=" * 60)
+        logger.info("全部完成!")
+        logger.info("=" * 60)
+        logger.info(f"生成的文件:")
+        logger.info(f"  - {config.DATA_DIR}/{config.NODES_CSV}")
+        logger.info(f"  - {config.DATA_DIR}/{config.EDGES_CSV}")
+        logger.info(f"  - {config.DATA_DIR}/{config.GRAPHS_CSV}")
+        logger.info(f"总共处理了 {pred_num} 个图样本")
         
     except Exception as e:
-        print(f"✗ 生成CSV文件时出错: {e}")
+        logger.error(f"✗ 生成CSV文件时出错: {e}")
         return
 
 
@@ -394,15 +425,23 @@ def validate_environment():
             missing_modules.append(module)
     
     if missing_modules:
-        print(f"✗ 缺少依赖模块: {missing_modules}")
-        print("请安装缺少的模块:")
-        print(f"pip install {' '.join(missing_modules)}")
+        logger.error(f"✗ 缺少依赖模块: {missing_modules}")
+        logger.info("请安装缺少的模块:")
+        logger.info(f"pip install {' '.join(missing_modules)}")
         return False
     
     return True
 
 
 if __name__ == "__main__":
+    # 验证配置
+    try:
+        config.validate_config()
+        logger.info("✓ 配置验证通过")
+    except Exception as e:
+        logger.error(f"✗ 配置验证失败: {e}")
+        sys.exit(1)
+    
     # 验证环境
     if not validate_environment():
         sys.exit(1)
@@ -410,9 +449,9 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n用户中断程序")
+        logger.info("\n用户中断程序")
     except Exception as e:
-        print(f"\n程序执行出错: {e}")
+        logger.error(f"\n程序执行出错: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1) 
