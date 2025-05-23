@@ -28,14 +28,23 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import signal
 from scipy.signal import find_peaks, peak_widths, welch
-from scipy.stats import entropy, mutual_info_score
+from scipy.stats import entropy
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE, UMAP
-from sklearn.metrics import silhouette_score, calinski_harabasz_score
+from sklearn.manifold import TSNE
+from sklearn.metrics import silhouette_score, calinski_harabasz_score, mutual_info_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
+
+# 尝试导入UMAP
+try:
+    from umap import UMAP
+    UMAP_AVAILABLE = True
+except ImportError:
+    UMAP_AVAILABLE = False
+    print("UMAP未安装，将使用PCA替代降维可视化")
+
 import warnings
 warnings.filterwarnings('ignore')
 import os
@@ -882,10 +891,10 @@ class EnhancedStateAnalyzer:
         features_pca = pca.fit_transform(features_scaled)
         
         # 尝试UMAP降维
-        try:
+        if UMAP_AVAILABLE:
             umap_reducer = UMAP(n_components=2, random_state=42)
             features_umap = umap_reducer.fit_transform(features_scaled)
-        except:
+        else:
             features_umap = features_pca  # 如果UMAP不可用，使用PCA结果
         
         plt.figure(figsize=(20, 8))
@@ -914,9 +923,9 @@ class EnhancedStateAnalyzer:
             plt.scatter(features_umap[mask, 0], features_umap[mask, 1], 
                        c=[colors[i]], label=f'State {label+1}', alpha=0.7, s=50)
         
-        plt.xlabel('UMAP 1')
-        plt.ylabel('UMAP 2')
-        plt.title('UMAP Dimensionality Reduction')
+        plt.xlabel('UMAP 1' if UMAP_AVAILABLE else 'PC1')
+        plt.ylabel('UMAP 2' if UMAP_AVAILABLE else 'PC2')
+        plt.title('UMAP Dimensionality Reduction' if UMAP_AVAILABLE else 'PCA Dimensionality Reduction (UMAP fallback)')
         plt.legend()
         plt.grid(True, alpha=0.3)
         
@@ -1137,11 +1146,11 @@ class EnhancedStateAnalyzer:
         freq_mask = (freqs >= low_freq) & (freqs <= high_freq)
         return np.trapz(psd[freq_mask], freqs[freq_mask])
     
-    def _sample_entropy(self, data: np.ndarray, m: int = 2, r: float = 0.2) -> float:
+    def _sample_entropy(self, data: np.ndarray) -> float:
         """计算样本熵"""
         try:
             from pyeeg import samp_entropy
-            return samp_entropy(data, m, r)
+            return samp_entropy(data, m=2, r=0.2)
         except ImportError:
             # 简化实现
             return entropy(np.histogram(data, bins=10)[0] + 1e-12)
@@ -1211,7 +1220,8 @@ class EnhancedStateAnalyzer:
         
         if len(counts) > 1:
             log_scales = np.log(scales[:len(counts)])
-            log_counts = np.log(counts + 1e-12)
+            counts_array = np.array(counts)  # 转换为numpy数组
+            log_counts = np.log(counts_array + 1e-12)
             fractal_dim = -np.polyfit(log_scales, log_counts, 1)[0]
             return max(1, min(2, fractal_dim))
         
@@ -1252,7 +1262,8 @@ class EnhancedStateAnalyzer:
                 separations.append(min_dist)
         
         if separations:
-            return np.mean(np.log(separations + 1e-12))
+            separations_array = np.array(separations)  # 转换为numpy数组
+            return np.mean(np.log(separations_array + 1e-12))
         
         return 0.0
     
@@ -1295,7 +1306,8 @@ class EnhancedStateAnalyzer:
         
         if len(fluctuations) > 1:
             log_scales = np.log(scales[:len(fluctuations)])
-            log_fluctuations = np.log(fluctuations + 1e-12)
+            fluctuations_array = np.array(fluctuations)  # 转换为numpy数组
+            log_fluctuations = np.log(fluctuations_array + 1e-12)
             alpha = np.polyfit(log_scales, log_fluctuations, 1)[0]
             return max(0.5, min(2.0, alpha))
         
