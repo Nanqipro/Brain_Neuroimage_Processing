@@ -86,11 +86,11 @@ def setup_logger(output_dir=None, prefix="element_extraction", capture_all_outpu
     logger.info(f"日志文件创建于: {log_file}")
     return logger
 
-def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth_window=65, 
-                             peak_distance=20, baseline_percentile=18, max_duration=800,
-                             detect_subpeaks=True, subpeak_prominence=0.3, 
-                             subpeak_width=12, subpeak_distance=18, params=None, 
-                             min_morphology_score=0.45, min_exp_decay_score=0.25,
+def detect_calcium_transients(data, fs=0.7, min_snr = 5.0, min_duration=18, smooth_window=41, 
+                             peak_distance=8, baseline_percentile=12, max_duration=800,
+                             detect_subpeaks=False, subpeak_prominence=0.2, 
+                             subpeak_width=8, subpeak_distance=12, params=None, 
+                             min_morphology_score=0.30, min_exp_decay_score=0.18,
                              filter_strength=1.0):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
@@ -598,7 +598,7 @@ def detect_calcium_transients(data, fs=1.0, min_snr=8.5, min_duration=25, smooth
     
     return transients, smoothed_data
 
-def extract_calcium_features(neuron_data, fs=1.0, visualize=False, detect_subpeaks=True, params=None, filter_strength=1.0):
+def extract_calcium_features(neuron_data, fs=0.7, visualize=False, detect_subpeaks=False, params=None, filter_strength=1.0):
     """
     从钙离子浓度数据中提取关键特征
     
@@ -948,187 +948,55 @@ def estimate_neuron_params(neuron_data, filter_strength=1.0):
     返回:
         params: 参数字典
     """
-    # 计算基本统计量
-    data_mean = np.mean(neuron_data)
-    data_std = np.std(neuron_data)
-    data_min = np.min(neuron_data)
-    data_max = np.max(neuron_data)
-    data_range = data_max - data_min
-    
-    # 更稳健的信噪比计算
-    # 使用最高5%和最低5%的数据来计算信号差异，更严格的信号范围判断
-    upper_percentile = np.percentile(neuron_data, 95)
-    lower_percentile = np.percentile(neuron_data, 5)
-    robust_range = upper_percentile - lower_percentile
-    
-    # 使用中位数绝对偏差(MAD)作为噪声度量
-    median_val = np.median(neuron_data)
-    mad = np.median(np.abs(neuron_data - median_val))
-    
-    # 更严格的信噪比计算
-    signal_noise_ratio = robust_range / (mad * 1.4826) if mad > 0 else 0
-    
-    # 评估数据的基线稳定性
-    sorted_data = np.sort(neuron_data)
-    lower_half = sorted_data[:len(sorted_data)//3]  # 使用下三分之一作为基线估计
-    baseline_variability = np.std(lower_half) / np.mean(lower_half) if np.mean(lower_half) > 0 else 0
-    
-    # 评估峰值特性
-    upper_percentile = np.percentile(neuron_data, 98)  # 更严格地只考虑最高的2%
-    lower_percentile = np.percentile(neuron_data, 15)  # 使用较低百分位估计基线
-    peak_intensity = (upper_percentile - lower_percentile) / data_std if data_std > 0 else 0
-    
-    # 进行初步峰值检测来评估信号特征
-    # 使用更严格的参数进行初步检测
-    from scipy.signal import find_peaks
-    peaks, _ = find_peaks(neuron_data, distance=25, prominence=data_std*2.0)
-    num_tentative_peaks = len(peaks)
-    
-    # 自适应参数配置，预先设置所有可能需要的默认参数，避免遗漏
+    # 直接返回用户在detect_calcium_transients函数中设定的细粒度参数
+    # 这些参数已经针对更细粒度的钙波检测进行了优化
     params = {
-        'min_snr': 8.0,
-        'min_duration': 20,
-        'smooth_window': 50,
-        'peak_distance': 30,
-        'baseline_percentile': 20,
-        'max_duration': 350,
-        'subpeak_prominence': 0.25,
-        'subpeak_width': 10,
-        'subpeak_distance': 15,
-        'min_morphology_score': 0.45,
-        'min_exp_decay_score': 0.25
+        'min_snr': 5.0,                    # 降低信噪比要求，检测更微弱的钙波
+        'min_duration': 18,                # 允许更短的钙波事件
+        'smooth_window': 41,               # 减少平滑，保留更多细节
+        'peak_distance': 8,                # 允许检测更密集的钙波
+        'baseline_percentile': 12,         # 使用更低的基线估计
+        'max_duration': 800,               # 保持较大的最大持续时间
+        'subpeak_prominence': 0.2,         # 降低子峰检测阈值
+        'subpeak_width': 8,                # 允许更窄的子峰
+        'subpeak_distance': 12,            # 允许更密集的子峰
+        'min_morphology_score': 0.30,     # 放宽形态要求
+        'min_exp_decay_score': 0.18       # 放宽衰减特性要求
     }
     
-    # 1. 根据filter_strength调整信噪比阈值，平衡过滤噪声和保留信号
-    base_snr = 0.0  # 基础信噪比阈值
-    
-    if num_tentative_peaks == 0:  
-        # 即使没有检测到峰值，也提高最低阈值，避免误检
-        base_snr = 4.0
-    elif num_tentative_peaks < 3: 
-        base_snr = 4.5
-    else:
-        # 根据信噪比使用折中的调整
-        if signal_noise_ratio < 2:
-            base_snr = 4.5
-        elif signal_noise_ratio < 3:
-            base_snr = 5.0
-        elif signal_noise_ratio < 4:
-            base_snr = 5.5
-        elif signal_noise_ratio < 5:
-            base_snr = 6.0
-        elif signal_noise_ratio < 7:
-            base_snr = 7.0
-        elif signal_noise_ratio < 10:
-            base_snr = 8.0
-        elif signal_noise_ratio < 15:
-            base_snr = 8.5
-        else:
-            base_snr = 9.0
-    
-    # 根据filter_strength调整最终SNR阈值
-    params['min_snr'] = base_snr * filter_strength
-    
-    # 2. 调整baseline_percentile，更准确地估计基线
-    if baseline_variability > 0.3:
-        # 对于基线不稳定的信号，使用更低的百分位以更准确地捕获真实基线
-        params['baseline_percentile'] = 10
-    elif baseline_variability > 0.2:
-        params['baseline_percentile'] = 12
-    elif baseline_variability < 0.1:
-        # 基线稳定时，可以使用更高的百分位数，避免误将低振幅波动视为信号
-        params['baseline_percentile'] = 30
-    else:
-        params['baseline_percentile'] = 20
-    
-    # 3. 根据filter_strength和baseline_variability调整平滑窗口
-    base_window = 0  # 基础窗口大小
-    
-    if baseline_variability > 0.35:
-        base_window = 121
-    elif baseline_variability > 0.25:
-        base_window = 101
-    elif baseline_variability > 0.15:
-        base_window = 81
-    elif baseline_variability < 0.1:
-        base_window = 51
-    else:
-        base_window = 65
-    
-    # 根据filter_strength调整窗口大小
-    if filter_strength > 1.0:
-        window_adjustment = int(base_window * (filter_strength - 1) * 0.5)
-        params['smooth_window'] = base_window + window_adjustment
-    elif filter_strength < 1.0:
-        window_adjustment = int(base_window * (1 - filter_strength) * 0.3)
-        params['smooth_window'] = max(21, base_window - window_adjustment)
-    
-    # 4. 提高peak_distance以减少近距离的多重检测
-    if peak_intensity > 8:
-        # 强峰值信号通常间隔更大，增加距离以避免多次检测同一事件
-        params['peak_distance'] = 45
-    elif peak_intensity > 5:
-        params['peak_distance'] = 40
-    elif peak_intensity > 3:
-        params['peak_distance'] = 35
-    else:
-        # 提高默认距离，减少相邻事件的虚假检测
-        params['peak_distance'] = 30
-    
-    # 5. 根据filter_strength和baseline_variability调整最小持续时间
-    base_duration = 0  # 基础持续时间
-    
-    if baseline_variability > 0.3:
-        base_duration = 35
-    elif baseline_variability > 0.2:
-        base_duration = 30
-    elif baseline_variability > 0.1:
-        base_duration = 28
-    else:
-        base_duration = 25
-    
-    # 根据filter_strength调整最小持续时间
-    if filter_strength > 1.0:
-        duration_adjustment = int(base_duration * (filter_strength - 1) * 0.6)
-        params['min_duration'] = base_duration + duration_adjustment
-    elif filter_strength < 1.0:
-        duration_adjustment = int(base_duration * (1 - filter_strength) * 0.4)
-        params['min_duration'] = max(10, base_duration - duration_adjustment)
+    # 根据filter_strength进行微调（保持原有的filter_strength功能）
+    if filter_strength != 1.0:
+        # 调整主要的检测阈值
+        params['min_snr'] *= filter_strength
+        params['min_morphology_score'] = min(0.9, params['min_morphology_score'] * filter_strength)
+        params['min_exp_decay_score'] = min(0.9, params['min_exp_decay_score'] * filter_strength)
         
-    # 6. 适度提高子峰检测的突出度要求
-    if peak_intensity > 6:
-        # 强信号中的子峰需要更明显才能被认为是有效子峰
-        params['subpeak_prominence'] = 0.35  # 适度提高要求
-    elif peak_intensity > 4:
-        params['subpeak_prominence'] = 0.32
-    else:
-        # 适度增加默认阈值，减少误检
-        params['subpeak_prominence'] = 0.3
-        
-    # 7. 适度调整子峰宽度和距离要求
-    params['subpeak_width'] = 15  # 适度增加子峰最小宽度
-    params['subpeak_distance'] = 18  # 适度增加子峰间最小距离
+        # 调整时间相关参数
+        if filter_strength > 1.0:
+            # 更严格的设置
+            params['min_duration'] = int(params['min_duration'] * (1 + (filter_strength - 1) * 0.5))
+            params['smooth_window'] = int(params['smooth_window'] * (1 + (filter_strength - 1) * 0.3))
+            params['peak_distance'] = int(params['peak_distance'] * (1 + (filter_strength - 1) * 0.2))
+            params['subpeak_prominence'] *= filter_strength
+            params['subpeak_width'] = int(params['subpeak_width'] * filter_strength)
+            params['subpeak_distance'] = int(params['subpeak_distance'] * filter_strength)
+        else:  # filter_strength < 1.0
+            # 更宽松的设置
+            params['min_duration'] = max(10, int(params['min_duration'] * filter_strength))
+            params['smooth_window'] = max(21, int(params['smooth_window'] * (1 - (1 - filter_strength) * 0.3)))
+            params['peak_distance'] = max(5, int(params['peak_distance'] * filter_strength))  # 降低下限至5，允许更密集检测
+            params['subpeak_prominence'] = max(0.1, params['subpeak_prominence'] * filter_strength)
+            params['subpeak_width'] = max(3, int(params['subpeak_width'] * filter_strength))
+            params['subpeak_distance'] = max(5, int(params['subpeak_distance'] * filter_strength))
     
-    # 10. 新增参数：形态评分阈值，根据filter_strength进行调整
-    base_morphology_score = 0.45
-    base_exp_decay_score = 0.25
-    
-    # 调整评分阈值
-    params['min_morphology_score'] = min(0.9, base_morphology_score * filter_strength)
-    params['min_exp_decay_score'] = min(0.9, base_exp_decay_score * filter_strength)
-        
-    # 8. 调整最大持续时间参数
-    if signal_noise_ratio > 10:
-        # 高信噪比的信号可能有较短的事件
-        params['max_duration'] = 300
-    else:
-        # 保持原有的最大持续时间
-        params['max_duration'] = 350
-        
-    # 9. 打印当前神经元的自适应参数，便于调试
-    print(f"  - 强化过滤参数: SNR={signal_noise_ratio:.2f}, min_snr={params['min_snr']}, "  
+    # 打印当前使用的细粒度参数，便于调试
+    print(f"  - 使用细粒度参数: min_snr={params['min_snr']:.2f}, "  
           f"baseline={params['baseline_percentile']}, min_duration={params['min_duration']}, "
-          f"smooth={params['smooth_window']}, peaks={num_tentative_peaks}")
+          f"smooth={params['smooth_window']}, peak_distance={params['peak_distance']}")
+    print(f"  - 形态评分阈值: morphology={params['min_morphology_score']:.2f}, "
+          f"exp_decay={params['min_exp_decay_score']:.2f}")
+    print(f"  - 子峰参数: prominence={params['subpeak_prominence']:.2f}, "
+          f"width={params['subpeak_width']}, distance={params['subpeak_distance']}")
     
     return params
 
@@ -1217,7 +1085,7 @@ if __name__ == "__main__":
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
-    parser.add_argument('--data', type=str, default='../datasets/processed_EMtrace.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/processed_EMtrace01.xlsx',
                         help='数据文件路径，支持.xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
