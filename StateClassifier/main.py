@@ -380,17 +380,20 @@ class AdaptiveTrainer:
 
 def create_advanced_model(config, device):
     """
-    创建先进的脑状态分类模型
+    创建针对小数据集优化的先进模型
     """
-    # 暂时使用改进的传统模型，避免复杂的维度问题
-    # 但集成先进的训练技术
-    model = MultiLayerGCN(
-        dropout=config.DROPOUT_RATE,
-        num_classes=config.NUM_CLASSES
+    from model import RegularizedLightweightGCN
+    
+    # 使用高度正则化的轻量级模型
+    model = RegularizedLightweightGCN(
+        input_features=config.INPUT_FEATURES,
+        hidden_dim=config.HIDDEN_DIM,
+        num_classes=config.NUM_CLASSES,
+        dropout=config.DROPOUT_RATE
     )
     
-    logger.info(f"创建改进模型，参数总数: {sum(p.numel() for p in model.parameters())}")
-    logger.info("使用MultiLayerGCN + 先进训练技术的组合")
+    logger.info(f"创建高度正则化轻量级模型，参数总数: {sum(p.numel() for p in model.parameters())}")
+    logger.info("使用RegularizedLightweightGCN + 先进正则化技术")
     return model
 
 

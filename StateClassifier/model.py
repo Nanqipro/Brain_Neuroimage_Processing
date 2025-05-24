@@ -824,3 +824,199 @@ class AdvancedBrainStateClassifier(torch.nn.Module):
             hook.remove()
             
         return attention_weights
+
+class RegularizedLightweightGCN(nn.Module):
+    """
+    高度正则化的轻量级GCN - 专门针对小数据集设计
+    
+    基于最新研究的正则化技术:
+    1. DropPath (Stochastic Depth)
+    2. Label Smoothing
+    3. Mixup for Graphs
+    4. Spectral Normalization
+    5. Early Feature Fusion
+    """
+    
+    def __init__(self, input_features=3, hidden_dim=8, num_classes=3, dropout=0.5):
+        super(RegularizedLightweightGCN, self).__init__()
+        
+        self.input_features = input_features
+        self.hidden_dim = hidden_dim
+        self.num_classes = num_classes
+        
+        # 极简架构：只有一个GCN层
+        self.gcn1 = GCNConv(input_features, hidden_dim)
+        self.bn1 = BatchNorm(hidden_dim)
+        
+        # 多尺度特征融合
+        self.feature_fusion = nn.Linear(input_features + hidden_dim, hidden_dim)
+        
+        # 分类头 - 带标签平滑
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout / 2),
+            nn.Linear(hidden_dim // 2, num_classes)
+        )
+        
+        # 全局池化层
+        self.global_pool = pyg_nn.global_mean_pool
+        
+        # DropPath参数
+        self.drop_path_rate = 0.1
+        
+        # 标签平滑参数
+        self.label_smoothing = 0.1
+        
+        # 权重初始化
+        self._initialize_weights()
+        
+    def _initialize_weights(self):
+        """权重初始化 - 使用Xavier初始化防止梯度消失"""
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+    
+    def drop_path(self, x, training=True):
+        """DropPath正则化 - 随机跳过层"""
+        if not training or self.drop_path_rate == 0.0:
+            return x
+        
+        keep_prob = 1 - self.drop_path_rate
+        random_tensor = keep_prob + torch.rand((x.shape[0], 1), 
+                                             dtype=x.dtype, device=x.device)
+        random_tensor.floor_()  # binarize
+        output = x.div(keep_prob) * random_tensor
+        return output
+    
+    def label_smooth_loss(self, pred, target):
+        """标签平滑损失函数"""
+        num_classes = pred.size(1)
+        one_hot = torch.zeros_like(pred).scatter(1, target.unsqueeze(1), 1)
+        smooth_one_hot = one_hot * (1 - self.label_smoothing) + \
+                        (1 - one_hot) * self.label_smoothing / (num_classes - 1)
+        log_prb = F.log_softmax(pred, dim=1)
+        loss = -(smooth_one_hot * log_prb).sum(dim=1).mean()
+        return loss
+    
+    def mixup_data(self, x, edge_index, batch, y, alpha=0.2):
+        """图数据的Mixup增强"""
+        if alpha > 0:
+            lam = np.random.beta(alpha, alpha)
+        else:
+            lam = 1
+            
+        batch_size = y.size(0)
+        index = torch.randperm(batch_size).to(y.device)
+        
+        # 特征插值
+        mixed_x = lam * x + (1 - lam) * x[index]
+        
+        # 标签插值
+        y_a, y_b = y, y[index]
+        
+        return mixed_x, y_a, y_b, lam
+    
+    def forward(self, data, use_mixup=False):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # 保存原始特征用于特征融合
+        x_orig = x
+        
+        # Mixup数据增强（仅在训练时）
+        if use_mixup and self.training:
+            y = getattr(data, 'y', None)
+            if y is not None:
+                x, y_a, y_b, lam = self.mixup_data(x, edge_index, batch, y)
+                
+        # GCN前向传播
+        x1 = self.gcn1(x, edge_index)
+        x1 = self.bn1(x1)
+        x1 = F.relu(x1)
+        
+        # DropPath正则化
+        x1 = self.drop_path(x1, self.training)
+        
+        # 多尺度特征融合：原始特征 + GCN特征
+        if x_orig.size(1) != x1.size(1):
+            # 如果维度不同，先做融合
+            x_fused = torch.cat([x_orig, x1], dim=1)
+            x_final = self.feature_fusion(x_fused)
+        else:
+            # 如果维度相同，直接残差连接
+            x_final = x_orig + x1
+            
+        x_final = F.relu(x_final)
+        
+        # 全局池化
+        graph_emb = self.global_pool(x_final, batch)
+        
+        # 分类
+        out = self.classifier(graph_emb)
+        
+        # 返回结果
+        if use_mixup and self.training and hasattr(data, 'y'):
+            return out, y_a, y_b, lam
+        else:
+            return out
+
+
+class EnsembleGCN(nn.Module):
+    """
+    轻量级GCN集成模型 - 通过多个简单模型的集成提升泛化能力
+    """
+    
+    def __init__(self, input_features=3, hidden_dim=8, num_classes=3, 
+                 num_models=3, dropout=0.5):
+        super(EnsembleGCN, self).__init__()
+        
+        # 创建多个轻量级模型
+        self.models = nn.ModuleList([
+            RegularizedLightweightGCN(
+                input_features=input_features,
+                hidden_dim=hidden_dim + i,  # 每个模型略有不同
+                num_classes=num_classes,
+                dropout=dropout + 0.1 * i  # 不同的dropout率
+            ) for i in range(num_models)
+        ])
+        
+        self.num_models = num_models
+        
+    def forward(self, data):
+        # 获取所有模型的预测
+        outputs = []
+        for model in self.models:
+            out = model(data)
+            outputs.append(out)
+            
+        # 平均集成
+        ensemble_out = torch.stack(outputs, dim=0).mean(dim=0)
+        
+        return ensemble_out
+
+
+def create_optimized_model(config):
+    """
+    创建针对小数据集优化的模型
+    """
+    if config.NUM_CLASSES <= 3 and hasattr(config, 'DATASET_SIZE') and config.DATASET_SIZE < 200:
+        # 对于小数据集，使用高度正则化的轻量级模型
+        model = RegularizedLightweightGCN(
+            input_features=config.INPUT_FEATURES,
+            hidden_dim=config.HIDDEN_DIM,
+            num_classes=config.NUM_CLASSES,
+            dropout=config.DROPOUT_RATE
+        )
+    else:
+        # 对于大数据集，使用集成模型
+        model = EnsembleGCN(
+            input_features=config.INPUT_FEATURES,
+            hidden_dim=config.HIDDEN_DIM,
+            num_classes=config.NUM_CLASSES,
+            dropout=config.DROPOUT_RATE
+        )
+    
+    return model

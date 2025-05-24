@@ -4737,3 +4737,333 @@ TypeError: EarlyStopping.__call__() missing 1 required positional argument: 'mod
 2025-05-24 15:39:15,700 - __main__ - INFO - ✓ 模型训练完成
 2025-05-24 15:39:15,700 - __main__ - INFO - 最终测试准确率: 0.2500
 2025-05-24 15:39:15,700 - __main__ - INFO - 操作成功完成
+2025-05-24 15:43:34,475 - __main__ - INFO - ============================================================
+2025-05-24 15:43:34,475 - __main__ - INFO - 开始数据处理流程
+2025-05-24 15:43:34,475 - __main__ - INFO - ============================================================
+2025-05-24 15:43:35,605 - scn_phase_space_process - INFO - ============================================================
+2025-05-24 15:43:35,605 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-24 15:43:35,605 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-24 15:43:35,606 - scn_phase_space_process - INFO - ============================================================
+2025-05-24 15:43:35,606 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-24 15:43:35,606 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-24 15:43:35,606 - scn_phase_space_process - INFO - ------------------------------
+2025-05-24 15:43:35,607 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-24 15:43:35,607 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-24 15:43:35,607 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-24 15:43:35,607 - excel_data_processor - INFO - 正在加载Excel数据文件: datasets\EMtrace01.xlsx
+2025-05-24 15:43:36,522 - excel_data_processor - INFO - ✓ 成功加载数据: 2999 个时间点, 43 个神经元
+2025-05-24 15:43:36,523 - excel_data_processor - INFO - 神经元列: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10']...
+2025-05-24 15:43:36,523 - excel_data_processor - INFO - 开始预处理钙离子数据...
+2025-05-24 15:43:36,528 - excel_data_processor - WARNING - 检测并处理了 247 个异常值
+2025-05-24 15:43:36,528 - excel_data_processor - INFO - 执行Z-score标准化...
+2025-05-24 15:43:36,533 - excel_data_processor - INFO - ✓ 数据预处理完成: (2999, 43) -> (2999, 43)
+2025-05-24 15:43:36,533 - excel_data_processor - INFO - 转换数据为SCN处理格式...
+2025-05-24 15:43:36,534 - excel_data_processor - INFO - 分段参数: 段长度=340, 步长=170
+2025-05-24 15:43:36,534 - excel_data_processor - INFO - ✓ 转换完成: 10 个神经元, 平均每个神经元 10.0 个时间段
+2025-05-24 15:43:36,536 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-24 15:43:36,536 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-24 15:43:36,536 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-24 15:43:36,536 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-24 15:43:36,538 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-24 15:43:36,538 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-24 15:43:36,538 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-24 15:43:36,538 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-24 15:43:36,538 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-24 15:43:36,538 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-24 15:43:36,538 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-24 15:43:36,539 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-24 15:43:36,539 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-24 15:43:36,540 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-24 15:43:36,540 - scn_phase_space_process - INFO - ------------------------------
+2025-05-24 15:43:36,540 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-24 15:43:36,540 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-24 15:43:41,155 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-24 15:43:41,155 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-24 15:43:41,155 - scn_phase_space_process - INFO - ------------------------------
+2025-05-24 15:43:41,156 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-24 15:43:41,156 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-24 15:43:41,156 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-24 15:43:41,156 - scn_phase_space_process - INFO - ------------------------------
+2025-05-24 15:43:41,157 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-24 15:43:41,157 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-24 15:43:41,157 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-24 15:43:41,232 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-24 15:43:41,232 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-24 15:43:41,243 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-24 15:43:41,243 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-24 15:43:41,243 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-24 15:43:41,443 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-24 15:43:41,443 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-24 15:43:41,496 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-24 15:43:41,498 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-24 15:43:42,404 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.261
+2025-05-24 15:43:42,405 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(28), np.int32(1): np.int64(34), np.int32(2): np.int64(38)}
+2025-05-24 15:43:42,405 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(28), np.int32(1): np.int64(34), np.int32(2): np.int64(38)}
+2025-05-24 15:43:42,407 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-24 15:43:42,408 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-24 15:43:42,408 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-24 15:43:42,408 - scn_phase_space_process - INFO - ============================================================
+2025-05-24 15:43:42,409 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-24 15:43:42,409 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-24 15:43:42,409 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-24 15:43:42,410 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-24 15:43:42,410 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-24 15:43:42,411 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-24 15:43:42,411 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-24 15:43:42,411 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-24 15:43:42,411 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-24 15:43:42,412 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-24 15:43:42,412 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-24 15:43:42,413 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-24 15:43:42,413 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-24 15:43:42,413 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-24 15:43:42,414 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-24 15:43:42,414 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-24 15:43:42,414 - __main__ - INFO - ✓ 数据处理完成
+2025-05-24 15:43:42,415 - __main__ - INFO - 操作成功完成
+2025-05-24 15:44:07,835 - __main__ - INFO - ============================================================
+2025-05-24 15:44:07,836 - __main__ - INFO - 开始模型训练流程
+2025-05-24 15:44:07,836 - __main__ - INFO - ============================================================
+2025-05-24 15:44:12,024 - main - INFO - ================================================================================
+2025-05-24 15:44:12,024 - main - INFO - 🧠 脑网络状态分类器 - 先进版本
+2025-05-24 15:44:12,024 - main - INFO - ================================================================================
+2025-05-24 15:44:12,025 - main - INFO - 使用设备: cuda
+2025-05-24 15:44:12,025 - main - INFO - 📊 加载数据集...
+2025-05-24 15:44:12,077 - main - INFO - 数据集加载完成 - 训练集: 60, 验证集: 20, 测试集: 20
+2025-05-24 15:44:12,077 - main - INFO - 🏗️  创建先进模型...
+2025-05-24 15:44:12,118 - main - INFO - 创建改进模型，参数总数: 790339
+2025-05-24 15:44:12,118 - main - INFO - 使用MultiLayerGCN + 先进训练技术的组合
+2025-05-24 15:44:12,205 - main - INFO - ✓ 早停机制已启用 - 耐心值: 50, 最小改进: 0.001
+2025-05-24 15:44:12,205 - main - INFO - 🚀 开始训练...
+2025-05-24 15:44:12,205 - main - INFO - 🚀 开始先进训练流程...
+2025-05-24 15:44:13,033 - main - INFO - Epoch   0 | Train Loss: 1.6694 | Train Acc: 0.2667 | Val Loss: 0.5087 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:13,593 - main - INFO - Epoch   1 | Train Loss: 0.8562 | Train Acc: 0.2500 | Val Loss: 0.5333 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:14,208 - main - INFO - Epoch   2 | Train Loss: 1.0730 | Train Acc: 0.4833 | Val Loss: 1.8376 | Val Acc: 0.3000 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:14,800 - main - INFO - Epoch   3 | Train Loss: 1.0817 | Train Acc: 0.4000 | Val Loss: 1.1522 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:15,360 - main - INFO - Epoch   4 | Train Loss: 1.0139 | Train Acc: 0.1833 | Val Loss: 0.5108 | Val Acc: 0.3000 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:15,913 - main - INFO - Epoch   5 | Train Loss: 0.9734 | Train Acc: 0.3333 | Val Loss: 0.5775 | Val Acc: 0.3000 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:16,488 - main - INFO - Epoch   6 | Train Loss: 0.7404 | Train Acc: 0.2167 | Val Loss: 0.5921 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:17,058 - main - INFO - Epoch   7 | Train Loss: 0.6823 | Train Acc: 0.3667 | Val Loss: 0.5230 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:17,643 - main - INFO - Epoch   8 | Train Loss: 0.6615 | Train Acc: 0.3333 | Val Loss: 1.1150 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:18,182 - main - INFO - Epoch   9 | Train Loss: 0.7140 | Train Acc: 0.3167 | Val Loss: 0.7367 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:18,762 - main - INFO - Epoch  10 | Train Loss: 0.6474 | Train Acc: 0.3000 | Val Loss: 0.6293 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.005000
+2025-05-24 15:44:24,090 - main - INFO - Epoch  20 | Train Loss: 0.5223 | Train Acc: 0.3500 | Val Loss: 0.5676 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.002500
+2025-05-24 15:44:29,787 - main - INFO - Epoch  30 | Train Loss: 0.5627 | Train Acc: 0.3833 | Val Loss: 0.5707 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.002500
+2025-05-24 15:44:35,713 - main - INFO - Epoch  40 | Train Loss: 0.5690 | Train Acc: 0.3667 | Val Loss: 0.5324 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001250
+2025-05-24 15:44:41,175 - main - INFO - Epoch  50 | Train Loss: 0.4473 | Train Acc: 0.4333 | Val Loss: 0.8765 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001250
+2025-05-24 15:44:46,768 - main - INFO - Epoch  60 | Train Loss: 0.5236 | Train Acc: 0.5333 | Val Loss: 0.9869 | Val Acc: 0.4500 | Val Balanced Acc: 0.4365 | LR: 0.001250
+2025-05-24 15:44:52,288 - main - INFO - Epoch  70 | Train Loss: 0.4645 | Train Acc: 0.6000 | Val Loss: 1.2540 | Val Acc: 0.4000 | Val Balanced Acc: 0.3968 | LR: 0.000625
+2025-05-24 15:44:57,735 - main - INFO - Epoch  80 | Train Loss: 0.2898 | Train Acc: 0.7167 | Val Loss: 1.7440 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.000313
+2025-05-24 15:45:03,095 - main - INFO - Epoch  90 | Train Loss: 0.3011 | Train Acc: 0.6833 | Val Loss: 2.0290 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.000313
+2025-05-24 15:45:06,805 - main - INFO - 早停触发，停止训练。最佳验证准确率: 0.5500
+2025-05-24 15:45:06,806 - main - INFO - 恢复最佳模型，验证准确率: 0.5500
+2025-05-24 15:45:06,806 - main - INFO - 🔍 测试最终性能...
+2025-05-24 15:45:06,900 - main - INFO - ============================================================
+2025-05-24 15:45:06,900 - main - INFO - 📊 最终结果:
+2025-05-24 15:45:06,900 - main - INFO - 测试准确率: 0.2500
+2025-05-24 15:45:06,900 - main - INFO - 平衡准确率: 0.2833
+2025-05-24 15:45:06,900 - main - INFO - 测试损失: 1.7429
+2025-05-24 15:45:06,900 - main - INFO - ============================================================
+2025-05-24 15:45:06,909 - main - INFO - ✅ 模型和结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\advanced_brain_classifier.pth
+2025-05-24 15:45:06,909 - main - INFO - 📁 结果目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-24 15:45:06,909 - __main__ - INFO - ✓ 模型训练完成
+2025-05-24 15:45:06,909 - __main__ - INFO - 最终测试准确率: 0.2500
+2025-05-24 15:45:06,910 - __main__ - INFO - 操作成功完成
+2025-05-24 15:51:05,119 - __main__ - INFO - ============================================================
+2025-05-24 15:51:05,120 - __main__ - INFO - 开始数据处理流程
+2025-05-24 15:51:05,120 - __main__ - INFO - ============================================================
+2025-05-24 15:51:06,142 - scn_phase_space_process - INFO - ============================================================
+2025-05-24 15:51:06,143 - scn_phase_space_process - INFO - 3D SCN数据处理流程 - Python版本
+2025-05-24 15:51:06,143 - scn_phase_space_process - INFO - 增强版本：支持Excel和MAT格式
+2025-05-24 15:51:06,143 - scn_phase_space_process - INFO - ============================================================
+2025-05-24 15:51:06,144 - scn_phase_space_process - INFO - 输出目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets
+2025-05-24 15:51:06,144 - scn_phase_space_process - INFO - 
+步骤1: 智能数据加载
+2025-05-24 15:51:06,144 - scn_phase_space_process - INFO - ------------------------------
+2025-05-24 15:51:06,145 - scn_phase_space_process - INFO - 正在检测和加载数据文件: datasets/EMtrace01.xlsx
+2025-05-24 15:51:06,145 - scn_phase_space_process - INFO - 检测到文件格式: excel
+2025-05-24 15:51:06,145 - scn_phase_space_process - INFO - 使用Excel数据处理器加载钙离子数据...
+2025-05-24 15:51:06,146 - excel_data_processor - INFO - 正在加载Excel数据文件: datasets\EMtrace01.xlsx
+2025-05-24 15:51:07,109 - excel_data_processor - INFO - ✓ 成功加载数据: 2999 个时间点, 43 个神经元
+2025-05-24 15:51:07,109 - excel_data_processor - INFO - 神经元列: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10']...
+2025-05-24 15:51:07,109 - excel_data_processor - INFO - 开始预处理钙离子数据...
+2025-05-24 15:51:07,116 - excel_data_processor - WARNING - 检测并处理了 247 个异常值
+2025-05-24 15:51:07,116 - excel_data_processor - INFO - 执行Z-score标准化...
+2025-05-24 15:51:07,119 - excel_data_processor - INFO - ✓ 数据预处理完成: (2999, 43) -> (2999, 43)
+2025-05-24 15:51:07,119 - excel_data_processor - INFO - 转换数据为SCN处理格式...
+2025-05-24 15:51:07,119 - excel_data_processor - INFO - 分段参数: 段长度=340, 步长=170
+2025-05-24 15:51:07,120 - excel_data_processor - INFO - ✓ 转换完成: 10 个神经元, 平均每个神经元 10.0 个时间段
+2025-05-24 15:51:07,122 - scn_phase_space_process - INFO - 数据加载信息:
+2025-05-24 15:51:07,122 - scn_phase_space_process - INFO -   文件路径: datasets\EMtrace01.xlsx
+2025-05-24 15:51:07,122 - scn_phase_space_process - INFO -   时间点数量: 2999
+2025-05-24 15:51:07,122 - scn_phase_space_process - INFO -   神经元数量: 43
+2025-05-24 15:51:07,122 - scn_phase_space_process - INFO -   数据形状: (2999, 43)
+2025-05-24 15:51:07,123 - scn_phase_space_process - INFO -   时间戳范围: 1 - 2999
+2025-05-24 15:51:07,124 - scn_phase_space_process - INFO -   神经元ID: ['n1', 'n2', 'n3', 'n4', 'n5', '...']
+2025-05-24 15:51:07,124 - scn_phase_space_process - INFO -   缺失值数量: 0
+2025-05-24 15:51:07,124 - scn_phase_space_process - INFO -   数据范围: -1.358 - 4.895
+2025-05-24 15:51:07,124 - scn_phase_space_process - INFO -   数据均值: -0.000
+2025-05-24 15:51:07,125 - scn_phase_space_process - INFO -   数据标准差: 0.578
+2025-05-24 15:51:07,125 - scn_phase_space_process - INFO -   数据格式: Excel
+2025-05-24 15:51:07,125 - scn_phase_space_process - INFO -   处理器: ExcelCalciumDataProcessor
+2025-05-24 15:51:07,125 - scn_phase_space_process - INFO - 
+步骤2: 相空间重构
+2025-05-24 15:51:07,125 - scn_phase_space_process - INFO - ------------------------------
+2025-05-24 15:51:07,126 - scn_phase_space_process - INFO - 数据维度: 10 个细胞, 10 个时间线
+2025-05-24 15:51:07,126 - scn_phase_space_process - INFO - 开始处理钙信号数据...
+2025-05-24 15:51:11,754 - scn_phase_space_process - INFO - ✓ 相空间重构完成
+2025-05-24 15:51:11,755 - scn_phase_space_process - INFO - 
+步骤3: 数据裁剪
+2025-05-24 15:51:11,755 - scn_phase_space_process - INFO - ------------------------------
+2025-05-24 15:51:11,755 - scn_phase_space_process - INFO - 开始裁剪数据到统一长度: 170
+2025-05-24 15:51:11,755 - scn_phase_space_process - INFO - ✓ 数据裁剪完成
+2025-05-24 15:51:11,756 - scn_phase_space_process - INFO - 
+步骤4: 构建图数据集
+2025-05-24 15:51:11,756 - scn_phase_space_process - INFO - ------------------------------
+2025-05-24 15:51:11,756 - scn_phase_space_process - INFO - 有效样本数量: 100
+2025-05-24 15:51:11,756 - scn_phase_space_process - INFO - 生成 nodes.csv 文件...
+2025-05-24 15:51:11,757 - scn_phase_space_process - INFO - 转换节点特征格式...
+2025-05-24 15:51:11,831 - scn_phase_space_process - INFO - ✓ nodes.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\nodes.csv
+2025-05-24 15:51:11,832 - scn_phase_space_process - INFO - 生成 edges.csv 文件...
+2025-05-24 15:51:11,844 - scn_phase_space_process - INFO - ✓ edges.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\edges.csv
+2025-05-24 15:51:11,844 - scn_phase_space_process - INFO - 生成 graphs.csv 文件...
+2025-05-24 15:51:11,845 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-24 15:51:12,046 - scn_phase_space_process - INFO - 使用内置的改进标签生成方法...
+2025-05-24 15:51:12,047 - scn_phase_space_process - INFO - 处理 100 个有效样本
+2025-05-24 15:51:12,097 - scn_phase_space_process - INFO - 特征矩阵形状: (100, 14)
+2025-05-24 15:51:12,099 - scn_phase_space_process - INFO - PCA降维: 14 -> 8
+2025-05-24 15:51:12,265 - scn_phase_space_process - INFO - 聚类质量 - 轮廓系数: 0.261
+2025-05-24 15:51:12,265 - scn_phase_space_process - INFO - 改进标签分布: {np.int32(0): np.int64(28), np.int32(1): np.int64(34), np.int32(2): np.int64(38)}
+2025-05-24 15:51:12,265 - scn_phase_space_process - INFO - 最终标签分布: {np.int32(0): np.int64(28), np.int32(1): np.int64(34), np.int32(2): np.int64(38)}
+2025-05-24 15:51:12,267 - scn_phase_space_process - INFO - ✓ graphs.csv 已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets\graphs.csv
+2025-05-24 15:51:12,268 - scn_phase_space_process - INFO - 
+============================================================
+2025-05-24 15:51:12,268 - scn_phase_space_process - INFO - 数据处理流程全部完成!
+2025-05-24 15:51:12,269 - scn_phase_space_process - INFO - ============================================================
+2025-05-24 15:51:12,269 - scn_phase_space_process - INFO - 数据源信息:
+2025-05-24 15:51:12,270 - scn_phase_space_process - INFO -   - 文件: datasets/EMtrace01.xlsx
+2025-05-24 15:51:12,270 - scn_phase_space_process - INFO -   - 格式: Excel
+2025-05-24 15:51:12,270 - scn_phase_space_process - INFO -   - 处理器: ExcelCalciumDataProcessor
+2025-05-24 15:51:12,271 - scn_phase_space_process - INFO - 
+生成的文件:
+2025-05-24 15:51:12,271 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/nodes.csv
+2025-05-24 15:51:12,271 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/edges.csv
+2025-05-24 15:51:12,272 - scn_phase_space_process - INFO -   - D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\datasets/graphs.csv
+2025-05-24 15:51:12,272 - scn_phase_space_process - INFO - 
+处理结果:
+2025-05-24 15:51:12,272 - scn_phase_space_process - INFO -   - 总样本数量: 100
+2025-05-24 15:51:12,272 - scn_phase_space_process - INFO -   - 轨迹长度: 170
+2025-05-24 15:51:12,273 - scn_phase_space_process - INFO -   - 嵌入维度: 3
+2025-05-24 15:51:12,273 - scn_phase_space_process - INFO - 
+下一步操作:
+2025-05-24 15:51:12,274 - scn_phase_space_process - INFO -   1. 检查生成的CSV文件质量
+2025-05-24 15:51:12,274 - scn_phase_space_process - INFO -   2. 运行训练: python main.py 或 python run.py --train
+2025-05-24 15:51:12,274 - scn_phase_space_process - INFO -   3. 查看训练结果: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-24 15:51:12,275 - __main__ - INFO - ✓ 数据处理完成
+2025-05-24 15:51:12,275 - __main__ - INFO - 操作成功完成
+2025-05-24 15:51:22,872 - __main__ - INFO - ============================================================
+2025-05-24 15:51:22,872 - __main__ - INFO - 开始模型训练流程
+2025-05-24 15:51:22,872 - __main__ - INFO - ============================================================
+2025-05-24 15:51:27,486 - main - INFO - ================================================================================
+2025-05-24 15:51:27,487 - main - INFO - 🧠 脑网络状态分类器 - 先进版本
+2025-05-24 15:51:27,487 - main - INFO - ================================================================================
+2025-05-24 15:51:27,487 - main - INFO - 使用设备: cuda
+2025-05-24 15:51:27,487 - main - INFO - 📊 加载数据集...
+2025-05-24 15:51:27,546 - main - INFO - 数据集加载完成 - 训练集: 60, 验证集: 20, 测试集: 20
+2025-05-24 15:51:27,546 - main - INFO - 🏗️  创建先进模型...
+2025-05-24 15:51:27,581 - main - INFO - 创建高度正则化轻量级模型，参数总数: 195
+2025-05-24 15:51:27,582 - main - INFO - 使用RegularizedLightweightGCN + 先进正则化技术
+2025-05-24 15:51:27,694 - main - INFO - ✓ 早停机制已启用 - 耐心值: 25, 最小改进: 0.005
+2025-05-24 15:51:27,694 - main - INFO - 🚀 开始训练...
+2025-05-24 15:51:27,694 - main - INFO - 🚀 开始先进训练流程...
+2025-05-24 15:51:28,391 - main - INFO - Epoch   0 | Train Loss: 0.6539 | Train Acc: 0.2333 | Val Loss: 0.4944 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:51:28,725 - main - INFO - Epoch   1 | Train Loss: 0.5811 | Train Acc: 0.3333 | Val Loss: 0.4848 | Val Acc: 0.4000 | Val Balanced Acc: 0.3889 | LR: 0.001000
+2025-05-24 15:51:29,043 - main - INFO - Epoch   2 | Train Loss: 0.5065 | Train Acc: 0.2833 | Val Loss: 0.4799 | Val Acc: 0.5500 | Val Balanced Acc: 0.5635 | LR: 0.001000
+2025-05-24 15:51:29,374 - main - INFO - Epoch   3 | Train Loss: 0.5120 | Train Acc: 0.3000 | Val Loss: 0.4823 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.001000
+2025-05-24 15:51:29,702 - main - INFO - Epoch   4 | Train Loss: 0.5310 | Train Acc: 0.1833 | Val Loss: 0.4866 | Val Acc: 0.3000 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:51:30,049 - main - INFO - Epoch   5 | Train Loss: 0.4933 | Train Acc: 0.3500 | Val Loss: 0.4910 | Val Acc: 0.4000 | Val Balanced Acc: 0.4286 | LR: 0.001000
+2025-05-24 15:51:30,537 - main - INFO - Epoch   6 | Train Loss: 0.4813 | Train Acc: 0.3667 | Val Loss: 0.4926 | Val Acc: 0.4000 | Val Balanced Acc: 0.4286 | LR: 0.001000
+2025-05-24 15:51:30,885 - main - INFO - Epoch   7 | Train Loss: 0.4710 | Train Acc: 0.4667 | Val Loss: 0.4927 | Val Acc: 0.5500 | Val Balanced Acc: 0.5714 | LR: 0.001000
+2025-05-24 15:51:31,225 - main - INFO - Epoch   8 | Train Loss: 0.4684 | Train Acc: 0.4167 | Val Loss: 0.4935 | Val Acc: 0.4000 | Val Balanced Acc: 0.4286 | LR: 0.001000
+2025-05-24 15:51:31,576 - main - INFO - Epoch   9 | Train Loss: 0.4622 | Train Acc: 0.4167 | Val Loss: 0.4920 | Val Acc: 0.5500 | Val Balanced Acc: 0.5714 | LR: 0.001000
+2025-05-24 15:51:31,901 - main - INFO - Epoch  10 | Train Loss: 0.4697 | Train Acc: 0.4833 | Val Loss: 0.4936 | Val Acc: 0.4000 | Val Balanced Acc: 0.4286 | LR: 0.001000
+2025-05-24 15:51:35,128 - main - INFO - Epoch  20 | Train Loss: 0.4860 | Train Acc: 0.4667 | Val Loss: 0.4903 | Val Acc: 0.4000 | Val Balanced Acc: 0.3889 | LR: 0.000500
+2025-05-24 15:51:37,051 - main - INFO - 早停触发，停止训练。最佳验证准确率: 0.6000
+2025-05-24 15:51:37,052 - main - INFO - 恢复最佳模型，验证准确率: 0.6000
+2025-05-24 15:51:37,052 - main - INFO - 🔍 测试最终性能...
+2025-05-24 15:51:37,104 - main - INFO - ============================================================
+2025-05-24 15:51:37,105 - main - INFO - 📊 最终结果:
+2025-05-24 15:51:37,105 - main - INFO - 测试准确率: 0.3000
+2025-05-24 15:51:37,105 - main - INFO - 平衡准确率: 0.2500
+2025-05-24 15:51:37,105 - main - INFO - 测试损失: 0.4810
+2025-05-24 15:51:37,106 - main - INFO - ============================================================
+2025-05-24 15:51:37,109 - main - INFO - ✅ 模型和结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\advanced_brain_classifier.pth
+2025-05-24 15:51:37,109 - main - INFO - 📁 结果目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-24 15:51:37,110 - __main__ - INFO - ✓ 模型训练完成
+2025-05-24 15:51:37,110 - __main__ - INFO - 最终测试准确率: 0.3000
+2025-05-24 15:51:37,110 - __main__ - INFO - 操作成功完成
+2025-05-24 15:53:07,602 - __main__ - INFO - ============================================================
+2025-05-24 15:53:07,602 - __main__ - INFO - 开始模型训练流程
+2025-05-24 15:53:07,602 - __main__ - INFO - ============================================================
+2025-05-24 15:53:11,994 - main - INFO - ================================================================================
+2025-05-24 15:53:11,994 - main - INFO - 🧠 脑网络状态分类器 - 先进版本
+2025-05-24 15:53:11,995 - main - INFO - ================================================================================
+2025-05-24 15:53:11,995 - main - INFO - 使用设备: cuda
+2025-05-24 15:53:11,995 - main - INFO - 📊 加载数据集...
+2025-05-24 15:53:12,050 - main - INFO - 数据集加载完成 - 训练集: 60, 验证集: 20, 测试集: 20
+2025-05-24 15:53:12,050 - main - INFO - 🏗️  创建先进模型...
+2025-05-24 15:53:12,086 - main - INFO - 创建高度正则化轻量级模型，参数总数: 195
+2025-05-24 15:53:12,086 - main - INFO - 使用RegularizedLightweightGCN + 先进正则化技术
+2025-05-24 15:53:12,155 - main - INFO - ✓ 早停机制已禁用
+2025-05-24 15:53:12,155 - main - INFO - 🚀 开始训练...
+2025-05-24 15:53:12,155 - main - INFO - 🚀 开始先进训练流程...
+2025-05-24 15:53:12,888 - main - INFO - Epoch   0 | Train Loss: 0.5553 | Train Acc: 0.2833 | Val Loss: 0.4868 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:13,251 - main - INFO - Epoch   1 | Train Loss: 0.5441 | Train Acc: 0.2667 | Val Loss: 0.4829 | Val Acc: 0.4000 | Val Balanced Acc: 0.3810 | LR: 0.001000
+2025-05-24 15:53:13,607 - main - INFO - Epoch   2 | Train Loss: 0.4837 | Train Acc: 0.3167 | Val Loss: 0.4832 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:13,959 - main - INFO - Epoch   3 | Train Loss: 0.4823 | Train Acc: 0.3833 | Val Loss: 0.4795 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:14,302 - main - INFO - Epoch   4 | Train Loss: 0.4690 | Train Acc: 0.4333 | Val Loss: 0.4789 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:14,662 - main - INFO - Epoch   5 | Train Loss: 0.4925 | Train Acc: 0.4167 | Val Loss: 0.4827 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:15,033 - main - INFO - Epoch   6 | Train Loss: 0.4706 | Train Acc: 0.4333 | Val Loss: 0.4831 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:15,382 - main - INFO - Epoch   7 | Train Loss: 0.5052 | Train Acc: 0.3667 | Val Loss: 0.4862 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:15,794 - main - INFO - Epoch   8 | Train Loss: 0.4573 | Train Acc: 0.4500 | Val Loss: 0.4842 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:16,231 - main - INFO - Epoch   9 | Train Loss: 0.5009 | Train Acc: 0.3833 | Val Loss: 0.4887 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:16,721 - main - INFO - Epoch  10 | Train Loss: 0.5083 | Train Acc: 0.4000 | Val Loss: 0.4889 | Val Acc: 0.3500 | Val Balanced Acc: 0.3333 | LR: 0.001000
+2025-05-24 15:53:20,948 - main - INFO - Epoch  20 | Train Loss: 0.4782 | Train Acc: 0.4500 | Val Loss: 0.4917 | Val Acc: 0.4500 | Val Balanced Acc: 0.4444 | LR: 0.000500
+2025-05-24 15:53:25,086 - main - INFO - Epoch  30 | Train Loss: 0.4200 | Train Acc: 0.5333 | Val Loss: 0.4846 | Val Acc: 0.4500 | Val Balanced Acc: 0.4524 | LR: 0.000500
+2025-05-24 15:53:29,583 - main - INFO - Epoch  40 | Train Loss: 0.4177 | Train Acc: 0.5500 | Val Loss: 0.4718 | Val Acc: 0.5000 | Val Balanced Acc: 0.5079 | LR: 0.000500
+2025-05-24 15:53:33,844 - main - INFO - Epoch  50 | Train Loss: 0.4790 | Train Acc: 0.4667 | Val Loss: 0.4495 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000500
+2025-05-24 15:53:38,321 - main - INFO - Epoch  60 | Train Loss: 0.4115 | Train Acc: 0.5667 | Val Loss: 0.4257 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000500
+2025-05-24 15:53:42,963 - main - INFO - Epoch  70 | Train Loss: 0.3467 | Train Acc: 0.6167 | Val Loss: 0.4263 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000500
+2025-05-24 15:53:46,983 - main - INFO - Epoch  80 | Train Loss: 0.4530 | Train Acc: 0.5500 | Val Loss: 0.4058 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000500
+2025-05-24 15:53:50,589 - main - INFO - Epoch  90 | Train Loss: 0.4263 | Train Acc: 0.5667 | Val Loss: 0.4003 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000500
+2025-05-24 15:53:54,372 - main - INFO - Epoch 100 | Train Loss: 0.4887 | Train Acc: 0.5833 | Val Loss: 0.3963 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000500
+2025-05-24 15:53:57,591 - main - INFO - Epoch 110 | Train Loss: 0.5492 | Train Acc: 0.5667 | Val Loss: 0.3948 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000500
+2025-05-24 15:54:00,483 - main - INFO - Epoch 120 | Train Loss: 0.4089 | Train Acc: 0.6000 | Val Loss: 0.3838 | Val Acc: 0.5500 | Val Balanced Acc: 0.5635 | LR: 0.000500
+2025-05-24 15:54:03,718 - main - INFO - Epoch 130 | Train Loss: 0.4557 | Train Acc: 0.5833 | Val Loss: 0.3821 | Val Acc: 0.5000 | Val Balanced Acc: 0.5079 | LR: 0.000500
+2025-05-24 15:54:06,831 - main - INFO - Epoch 140 | Train Loss: 0.5902 | Train Acc: 0.4333 | Val Loss: 0.3812 | Val Acc: 0.5000 | Val Balanced Acc: 0.5079 | LR: 0.000500
+2025-05-24 15:54:09,916 - main - INFO - Epoch 150 | Train Loss: 0.3976 | Train Acc: 0.5333 | Val Loss: 0.3709 | Val Acc: 0.5000 | Val Balanced Acc: 0.5079 | LR: 0.000500
+2025-05-24 15:54:13,104 - main - INFO - Epoch 160 | Train Loss: 0.5173 | Train Acc: 0.6333 | Val Loss: 0.4951 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000500
+2025-05-24 15:54:16,154 - main - INFO - Epoch 170 | Train Loss: 0.5722 | Train Acc: 0.6167 | Val Loss: 0.3819 | Val Acc: 0.4500 | Val Balanced Acc: 0.4524 | LR: 0.000250
+2025-05-24 15:54:19,212 - main - INFO - Epoch 180 | Train Loss: 0.4477 | Train Acc: 0.5333 | Val Loss: 0.4972 | Val Acc: 0.6000 | Val Balanced Acc: 0.6190 | LR: 0.000250
+2025-05-24 15:54:22,254 - main - INFO - Epoch 190 | Train Loss: 0.4435 | Train Acc: 0.5500 | Val Loss: 0.4118 | Val Acc: 0.3500 | Val Balanced Acc: 0.3651 | LR: 0.000125
+2025-05-24 15:54:25,044 - main - INFO - 恢复最佳模型，验证准确率: 0.6000
+2025-05-24 15:54:25,044 - main - INFO - 🔍 测试最终性能...
+2025-05-24 15:54:25,091 - main - INFO - ============================================================
+2025-05-24 15:54:25,091 - main - INFO - 📊 最终结果:
+2025-05-24 15:54:25,091 - main - INFO - 测试准确率: 0.4500
+2025-05-24 15:54:25,091 - main - INFO - 平衡准确率: 0.4238
+2025-05-24 15:54:25,091 - main - INFO - 测试损失: 0.3259
+2025-05-24 15:54:25,092 - main - INFO - ============================================================
+2025-05-24 15:54:25,094 - main - INFO - ✅ 模型和结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\advanced_brain_classifier.pth
+2025-05-24 15:54:25,094 - main - INFO - 📁 结果目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-24 15:54:25,095 - __main__ - INFO - ✓ 模型训练完成
+2025-05-24 15:54:25,095 - __main__ - INFO - 最终测试准确率: 0.4500
+2025-05-24 15:54:25,095 - __main__ - INFO - 操作成功完成

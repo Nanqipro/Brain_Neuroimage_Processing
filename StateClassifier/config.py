@@ -58,45 +58,46 @@ class Config:
     
     # 数据裁剪参数
     MAX_CELLS_PROCESS = 10  # 最大处理细胞数量
+    DATASET_SIZE = 100  # 估计数据集大小（用于模型选择）
     
     # ==================== 模型配置 ====================
     
-    # 网络架构参数
+    # 网络架构参数 - 大幅简化以提升泛化能力
     INPUT_FEATURES = 3  # 输入特征维度(x,y,z坐标)
-    HIDDEN_DIM = 16  # 隐藏层维度
-    NUM_GCN_LAYERS = 2  # GCN层数
-    NUM_CLASSES = 4  # 分类类别数（优化为4类以提高准确率）
-    DROPOUT_RATE = 0.3  # Dropout比率
+    HIDDEN_DIM = 8  # 隐藏层维度（从16大幅减少到8）
+    NUM_GCN_LAYERS = 1  # GCN层数（从2减少到1）
+    NUM_CLASSES = 3  # 分类类别数（优化为3类以提高准确率）
+    DROPOUT_RATE = 0.5  # Dropout比率（增加到0.5强化正则化）
     
     # 池化参数
     POOLING_TYPE = "global"  # 池化类型: "global", "max", "mean"
     
     # ==================== 训练配置 ====================
     
-    # 训练参数
-    NUM_EPOCHS = 160  # 训练轮数
-    LEARNING_RATE = 0.005  # 初始学习率
-    WEIGHT_DECAY = 1e-4  # L2正则化系数
+    # 训练参数 - 优化泛化能力
+    NUM_EPOCHS = 200  # 训练轮数（增加以允许更好收敛）
+    LEARNING_RATE = 0.001  # 初始学习率（降低以更稳定训练）
+    WEIGHT_DECAY = 5e-4  # L2正则化系数（增强正则化）
     BATCH_SIZE = 1  # 批次大小
     
-    # 早停机制配置
-    USE_EARLY_STOPPING = True  # 是否使用早停机制
-    EARLY_STOPPING_PATIENCE = 50  # 早停耐心值（连续多少个epoch没有改进就停止）
-    EARLY_STOPPING_MIN_DELTA = 0.001  # 早停最小改进量
+    # 早停机制配置 - 更严格的早停
+    USE_EARLY_STOPPING = False  # 是否使用早停机制
+    EARLY_STOPPING_PATIENCE = 25  # 早停耐心值（从50减少到25）
+    EARLY_STOPPING_MIN_DELTA = 0.005  # 早停最小改进量（提高阈值）
     EARLY_STOPPING_RESTORE_BEST = True  # 是否恢复最佳权重
     
-    # 学习率调度
-    LR_DECAY_FACTOR = 0.75  # 学习率衰减因子
-    LR_DECAY_STEP = 10  # 学习率衰减步长
+    # 学习率调度 - 更频繁衰减
+    LR_DECAY_FACTOR = 0.5  # 学习率衰减因子（更大衰减）
+    LR_DECAY_STEP = 8  # 学习率衰减步长（更频繁衰减）
     
     # 数据集分割比例
     TRAIN_RATIO = 0.6  # 训练集比例
     VALID_RATIO = 0.2  # 验证集比例
     TEST_RATIO = 0.2  # 测试集比例
     
-    # 数据增强参数
-    AUGMENTATION_FACTOR = 6  # 数据增强倍数
-    NOISE_STD = 0.3  # 噪声标准差
+    # 数据增强参数 - 增强泛化能力
+    AUGMENTATION_FACTOR = 8  # 数据增强倍数（增加到8倍）
+    NOISE_STD = 0.2  # 噪声标准差（降低到0.2，更温和的增强）
     
     # ==================== 设备配置 ====================
     
