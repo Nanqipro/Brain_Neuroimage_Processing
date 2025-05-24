@@ -2135,3 +2135,160 @@ TypeError: EarlyStopping.__call__() missing 1 required positional argument: 'mod
 2025-05-23 21:55:05,459 - main - INFO - 测试损失: 4.1814
 2025-05-23 21:55:05,460 - main - INFO - ============================================================
 2025-05-23 21:55:05,468 - main - INFO - ✅ 模型和结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\advanced_brain_classifier.pth
+2025-05-24 15:23:42,422 - main - INFO - ================================================================================
+2025-05-24 15:23:42,422 - main - INFO - 🧠 脑网络状态分类器 - 先进版本
+2025-05-24 15:23:42,422 - main - INFO - ================================================================================
+2025-05-24 15:23:42,422 - main - INFO - 使用设备: cuda
+2025-05-24 15:23:42,422 - main - INFO - 📊 加载数据集...
+2025-05-24 15:23:42,480 - main - INFO - 数据集加载完成 - 训练集: 60, 验证集: 20, 测试集: 20
+2025-05-24 15:23:42,480 - main - INFO - 🏗️  创建先进模型...
+2025-05-24 15:23:42,531 - main - INFO - 创建改进模型，参数总数: 790726
+2025-05-24 15:23:42,531 - main - INFO - 使用MultiLayerGCN + 先进训练技术的组合
+2025-05-24 15:23:42,628 - main - INFO - ✓ 早停机制已启用 - 耐心值: 50, 最小改进: 0.001
+2025-05-24 15:23:42,628 - main - INFO - 🚀 开始训练...
+2025-05-24 15:23:42,628 - main - INFO - 🚀 开始先进训练流程...
+2025-05-24 15:23:43,850 - main - INFO - Epoch   0 | Train Loss: 2.2577 | Train Acc: 0.3333 | Val Loss: 2.4685 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:44,528 - main - INFO - Epoch   1 | Train Loss: 2.1624 | Train Acc: 0.3167 | Val Loss: 1.7692 | Val Acc: 0.3000 | Val Balanced Acc: 0.2000 | LR: 0.001000
+2025-05-24 15:23:45,233 - main - INFO - Epoch   2 | Train Loss: 2.0673 | Train Acc: 0.1500 | Val Loss: 1.6399 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:45,881 - main - INFO - Epoch   3 | Train Loss: 1.9455 | Train Acc: 0.2500 | Val Loss: 1.5038 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:46,513 - main - INFO - Epoch   4 | Train Loss: 1.9525 | Train Acc: 0.2167 | Val Loss: 1.4696 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:47,140 - main - INFO - Epoch   5 | Train Loss: 1.8219 | Train Acc: 0.2333 | Val Loss: 1.4918 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:47,779 - main - INFO - Epoch   6 | Train Loss: 1.7910 | Train Acc: 0.2167 | Val Loss: 1.4747 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:48,409 - main - INFO - Epoch   7 | Train Loss: 1.6449 | Train Acc: 0.2833 | Val Loss: 1.3665 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:49,046 - main - INFO - Epoch   8 | Train Loss: 1.8075 | Train Acc: 0.1667 | Val Loss: 1.3758 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:49,649 - main - INFO - Epoch   9 | Train Loss: 1.5630 | Train Acc: 0.2667 | Val Loss: 1.4257 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:50,226 - main - INFO - Epoch  10 | Train Loss: 1.7188 | Train Acc: 0.2167 | Val Loss: 1.3183 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:23:56,494 - main - INFO - Epoch  20 | Train Loss: 1.3104 | Train Acc: 0.2333 | Val Loss: 1.4296 | Val Acc: 0.2500 | Val Balanced Acc: 0.1667 | LR: 0.001000
+2025-05-24 15:24:03,264 - main - INFO - Epoch  30 | Train Loss: 1.0135 | Train Acc: 0.4167 | Val Loss: 1.3397 | Val Acc: 0.2000 | Val Balanced Acc: 0.1333 | LR: 0.001000
+2025-05-24 15:24:10,458 - main - INFO - Epoch  40 | Train Loss: 0.9484 | Train Acc: 0.3667 | Val Loss: 1.5114 | Val Acc: 0.2000 | Val Balanced Acc: 0.1333 | LR: 0.000500
+2025-05-24 15:24:16,960 - main - INFO - Epoch  50 | Train Loss: 0.8496 | Train Acc: 0.4000 | Val Loss: 2.1608 | Val Acc: 0.2000 | Val Balanced Acc: 0.1333 | LR: 0.000500
+2025-05-24 15:24:22,906 - main - INFO - Epoch  60 | Train Loss: 0.7610 | Train Acc: 0.5167 | Val Loss: 3.0739 | Val Acc: 0.1000 | Val Balanced Acc: 0.0667 | LR: 0.000250
+2025-05-24 15:24:28,694 - main - INFO - Epoch  70 | Train Loss: 0.6306 | Train Acc: 0.6667 | Val Loss: 2.6624 | Val Acc: 0.1000 | Val Balanced Acc: 0.0889 | LR: 0.000125
+2025-05-24 15:24:29,401 - main - INFO - 早停触发，停止训练。最佳验证准确率: 0.3000
+2025-05-24 15:24:29,402 - main - INFO - 恢复最佳模型，验证准确率: 0.3000
+2025-05-24 15:24:29,402 - main - INFO - 🔍 测试最终性能...
+2025-05-24 15:24:29,501 - main - INFO - ============================================================
+2025-05-24 15:24:29,502 - main - INFO - 📊 最终结果:
+2025-05-24 15:24:29,502 - main - INFO - 测试准确率: 0.2500
+2025-05-24 15:24:29,502 - main - INFO - 平衡准确率: 0.2333
+2025-05-24 15:24:29,502 - main - INFO - 测试损失: 3.0464
+2025-05-24 15:24:29,503 - main - INFO - ============================================================
+2025-05-24 15:24:29,512 - main - INFO - ✅ 模型和结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\advanced_brain_classifier.pth
+2025-05-24 15:24:29,512 - main - INFO - 📁 结果目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-24 15:29:54,704 - main - INFO - ================================================================================
+2025-05-24 15:29:54,704 - main - INFO - 🧠 脑网络状态分类器 - 先进版本
+2025-05-24 15:29:54,704 - main - INFO - ================================================================================
+2025-05-24 15:29:54,704 - main - INFO - 使用设备: cuda
+2025-05-24 15:29:54,704 - main - INFO - 📊 加载数据集...
+2025-05-24 15:29:54,759 - main - INFO - 数据集加载完成 - 训练集: 60, 验证集: 20, 测试集: 20
+2025-05-24 15:29:54,759 - main - INFO - 🏗️  创建先进模型...
+2025-05-24 15:29:54,801 - main - INFO - 创建改进模型，参数总数: 790468
+2025-05-24 15:29:54,801 - main - INFO - 使用MultiLayerGCN + 先进训练技术的组合
+2025-05-24 15:29:54,888 - main - INFO - ✓ 早停机制已启用 - 耐心值: 50, 最小改进: 0.001
+2025-05-24 15:29:54,888 - main - INFO - 🚀 开始训练...
+2025-05-24 15:29:54,888 - main - INFO - 🚀 开始先进训练流程...
+2025-05-24 15:29:55,781 - main - INFO - Epoch   0 | Train Loss: 1.9232 | Train Acc: 0.2833 | Val Loss: 0.5968 | Val Acc: 0.5000 | Val Balanced Acc: 0.3869 | LR: 0.001000
+2025-05-24 15:29:56,424 - main - INFO - Epoch   1 | Train Loss: 2.0746 | Train Acc: 0.2000 | Val Loss: 1.6001 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:29:57,086 - main - INFO - Epoch   2 | Train Loss: 1.4499 | Train Acc: 0.3000 | Val Loss: 1.0577 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:29:57,716 - main - INFO - Epoch   3 | Train Loss: 1.3557 | Train Acc: 0.2167 | Val Loss: 1.0962 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:29:58,368 - main - INFO - Epoch   4 | Train Loss: 1.3448 | Train Acc: 0.2000 | Val Loss: 1.0240 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:29:59,011 - main - INFO - Epoch   5 | Train Loss: 1.3435 | Train Acc: 0.2833 | Val Loss: 0.8745 | Val Acc: 0.3500 | Val Balanced Acc: 0.2679 | LR: 0.001000
+2025-05-24 15:29:59,636 - main - INFO - Epoch   6 | Train Loss: 1.4154 | Train Acc: 0.2833 | Val Loss: 1.0162 | Val Acc: 0.0500 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:30:00,281 - main - INFO - Epoch   7 | Train Loss: 1.0429 | Train Acc: 0.2500 | Val Loss: 0.9687 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:30:00,931 - main - INFO - Epoch   8 | Train Loss: 1.1720 | Train Acc: 0.3333 | Val Loss: 0.7469 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:30:01,601 - main - INFO - Epoch   9 | Train Loss: 1.3560 | Train Acc: 0.1667 | Val Loss: 0.7915 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:30:02,225 - main - INFO - Epoch  10 | Train Loss: 1.0276 | Train Acc: 0.2333 | Val Loss: 1.0365 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:30:08,622 - main - INFO - Epoch  20 | Train Loss: 0.9865 | Train Acc: 0.4167 | Val Loss: 0.7561 | Val Acc: 0.2500 | Val Balanced Acc: 0.2083 | LR: 0.000500
+2025-05-24 15:30:15,113 - main - INFO - Epoch  30 | Train Loss: 0.7604 | Train Acc: 0.4167 | Val Loss: 0.8404 | Val Acc: 0.4500 | Val Balanced Acc: 0.3512 | LR: 0.000500
+2025-05-24 15:30:21,592 - main - INFO - Epoch  40 | Train Loss: 0.6225 | Train Acc: 0.5833 | Val Loss: 1.5407 | Val Acc: 0.5000 | Val Balanced Acc: 0.6071 | LR: 0.000250
+2025-05-24 15:30:28,411 - main - INFO - Epoch  50 | Train Loss: 1.0976 | Train Acc: 0.5500 | Val Loss: 1.9946 | Val Acc: 0.4000 | Val Balanced Acc: 0.5238 | LR: 0.000250
+2025-05-24 15:30:35,046 - main - INFO - Epoch  60 | Train Loss: 0.3215 | Train Acc: 0.8167 | Val Loss: 2.5347 | Val Acc: 0.3500 | Val Balanced Acc: 0.2738 | LR: 0.000125
+2025-05-24 15:30:41,344 - main - INFO - Epoch  70 | Train Loss: 0.2860 | Train Acc: 0.8667 | Val Loss: 2.5767 | Val Acc: 0.3500 | Val Balanced Acc: 0.2798 | LR: 0.000125
+2025-05-24 15:30:43,257 - main - INFO - 早停触发，停止训练。最佳验证准确率: 0.5000
+2025-05-24 15:30:43,258 - main - INFO - 恢复最佳模型，验证准确率: 0.5000
+2025-05-24 15:30:43,258 - main - INFO - 🔍 测试最终性能...
+2025-05-24 15:30:43,357 - main - INFO - ============================================================
+2025-05-24 15:30:43,357 - main - INFO - 📊 最终结果:
+2025-05-24 15:30:43,358 - main - INFO - 测试准确率: 0.3500
+2025-05-24 15:30:43,358 - main - INFO - 平衡准确率: 0.3500
+2025-05-24 15:30:43,358 - main - INFO - 测试损失: 2.5159
+2025-05-24 15:30:43,358 - main - INFO - ============================================================
+2025-05-24 15:30:43,368 - main - INFO - ✅ 模型和结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\advanced_brain_classifier.pth
+2025-05-24 15:30:43,368 - main - INFO - 📁 结果目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-24 15:31:20,095 - __main__ - INFO - ================================================================================
+2025-05-24 15:31:20,096 - __main__ - INFO - 🧠 脑网络状态分类器 - 先进版本
+2025-05-24 15:31:20,096 - __main__ - INFO - ================================================================================
+2025-05-24 15:31:20,096 - __main__ - INFO - 使用设备: cuda
+2025-05-24 15:31:20,096 - __main__ - INFO - 📊 加载数据集...
+2025-05-24 15:31:20,148 - __main__ - INFO - 数据集加载完成 - 训练集: 60, 验证集: 20, 测试集: 20
+2025-05-24 15:31:20,148 - __main__ - INFO - 🏗️  创建先进模型...
+2025-05-24 15:31:20,193 - __main__ - INFO - 创建改进模型，参数总数: 790468
+2025-05-24 15:31:20,193 - __main__ - INFO - 使用MultiLayerGCN + 先进训练技术的组合
+2025-05-24 15:31:20,281 - __main__ - INFO - ✓ 早停机制已启用 - 耐心值: 50, 最小改进: 0.001
+2025-05-24 15:31:20,281 - __main__ - INFO - 🚀 开始训练...
+2025-05-24 15:31:20,282 - __main__ - INFO - 🚀 开始先进训练流程...
+2025-05-24 15:31:21,177 - __main__ - INFO - Epoch   0 | Train Loss: 2.2985 | Train Acc: 0.2333 | Val Loss: 0.8856 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:21,828 - __main__ - INFO - Epoch   1 | Train Loss: 1.5653 | Train Acc: 0.2667 | Val Loss: 1.4760 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:22,450 - __main__ - INFO - Epoch   2 | Train Loss: 1.6122 | Train Acc: 0.3167 | Val Loss: 0.8039 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:23,080 - __main__ - INFO - Epoch   3 | Train Loss: 1.3368 | Train Acc: 0.3500 | Val Loss: 0.7917 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:23,712 - __main__ - INFO - Epoch   4 | Train Loss: 1.5428 | Train Acc: 0.2000 | Val Loss: 1.2060 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:24,349 - __main__ - INFO - Epoch   5 | Train Loss: 1.3692 | Train Acc: 0.1833 | Val Loss: 1.1617 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:24,958 - __main__ - INFO - Epoch   6 | Train Loss: 1.2402 | Train Acc: 0.2500 | Val Loss: 0.6605 | Val Acc: 0.3500 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:25,630 - __main__ - INFO - Epoch   7 | Train Loss: 1.4584 | Train Acc: 0.2167 | Val Loss: 0.8569 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:26,242 - __main__ - INFO - Epoch   8 | Train Loss: 1.0845 | Train Acc: 0.3000 | Val Loss: 0.8289 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:26,895 - __main__ - INFO - Epoch   9 | Train Loss: 1.0846 | Train Acc: 0.2833 | Val Loss: 1.5693 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:27,518 - __main__ - INFO - Epoch  10 | Train Loss: 1.2442 | Train Acc: 0.3500 | Val Loss: 0.9403 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:33,818 - __main__ - INFO - Epoch  20 | Train Loss: 1.1096 | Train Acc: 0.3167 | Val Loss: 0.8631 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001000
+2025-05-24 15:31:40,260 - __main__ - INFO - Epoch  30 | Train Loss: 0.9688 | Train Acc: 0.4667 | Val Loss: 1.7042 | Val Acc: 0.4000 | Val Balanced Acc: 0.3214 | LR: 0.000500
+2025-05-24 15:31:47,161 - __main__ - INFO - Epoch  40 | Train Loss: 0.7979 | Train Acc: 0.6000 | Val Loss: 2.4474 | Val Acc: 0.2500 | Val Balanced Acc: 0.2024 | LR: 0.000250
+2025-05-24 15:31:54,051 - __main__ - INFO - Epoch  50 | Train Loss: 0.5133 | Train Acc: 0.6833 | Val Loss: 2.6990 | Val Acc: 0.3500 | Val Balanced Acc: 0.2798 | LR: 0.000250
+2025-05-24 15:31:58,018 - __main__ - INFO - 早停触发，停止训练。最佳验证准确率: 0.5500
+2025-05-24 15:31:58,019 - __main__ - INFO - 恢复最佳模型，验证准确率: 0.5500
+2025-05-24 15:31:58,019 - __main__ - INFO - 🔍 测试最终性能...
+2025-05-24 15:31:58,122 - __main__ - INFO - ============================================================
+2025-05-24 15:31:58,122 - __main__ - INFO - 📊 最终结果:
+2025-05-24 15:31:58,122 - __main__ - INFO - 测试准确率: 0.3000
+2025-05-24 15:31:58,122 - __main__ - INFO - 平衡准确率: 0.3000
+2025-05-24 15:31:58,122 - __main__ - INFO - 测试损失: 2.4536
+2025-05-24 15:31:58,122 - __main__ - INFO - ============================================================
+2025-05-24 15:31:58,131 - __main__ - INFO - ✅ 模型和结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\advanced_brain_classifier.pth
+2025-05-24 15:31:58,131 - __main__ - INFO - 📁 结果目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results
+2025-05-24 15:38:36,796 - main - INFO - ================================================================================
+2025-05-24 15:38:36,797 - main - INFO - 🧠 脑网络状态分类器 - 先进版本
+2025-05-24 15:38:36,797 - main - INFO - ================================================================================
+2025-05-24 15:38:36,797 - main - INFO - 使用设备: cuda
+2025-05-24 15:38:36,797 - main - INFO - 📊 加载数据集...
+2025-05-24 15:38:36,850 - main - INFO - 数据集加载完成 - 训练集: 60, 验证集: 20, 测试集: 20
+2025-05-24 15:38:36,851 - main - INFO - 🏗️  创建先进模型...
+2025-05-24 15:38:36,893 - main - INFO - 创建改进模型，参数总数: 790468
+2025-05-24 15:38:36,893 - main - INFO - 使用MultiLayerGCN + 先进训练技术的组合
+2025-05-24 15:38:37,021 - main - INFO - ✓ 早停机制已启用 - 耐心值: 50, 最小改进: 0.001
+2025-05-24 15:38:37,021 - main - INFO - 🚀 开始训练...
+2025-05-24 15:38:37,021 - main - INFO - 🚀 开始先进训练流程...
+2025-05-24 15:38:37,965 - main - INFO - Epoch   0 | Train Loss: 2.4864 | Train Acc: 0.2333 | Val Loss: 1.6070 | Val Acc: 0.3500 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:38,610 - main - INFO - Epoch   1 | Train Loss: 1.5703 | Train Acc: 0.3000 | Val Loss: 1.2012 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:39,245 - main - INFO - Epoch   2 | Train Loss: 1.4043 | Train Acc: 0.3500 | Val Loss: 1.1261 | Val Acc: 0.3500 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:39,859 - main - INFO - Epoch   3 | Train Loss: 1.2897 | Train Acc: 0.2333 | Val Loss: 1.1683 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:40,513 - main - INFO - Epoch   4 | Train Loss: 1.1108 | Train Acc: 0.2667 | Val Loss: 1.6842 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:41,152 - main - INFO - Epoch   5 | Train Loss: 0.9431 | Train Acc: 0.2500 | Val Loss: 0.7889 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:41,815 - main - INFO - Epoch   6 | Train Loss: 1.0214 | Train Acc: 0.2833 | Val Loss: 1.1985 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:42,415 - main - INFO - Epoch   7 | Train Loss: 1.0667 | Train Acc: 0.2833 | Val Loss: 0.8329 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:43,042 - main - INFO - Epoch   8 | Train Loss: 1.0173 | Train Acc: 0.2833 | Val Loss: 1.6668 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:43,681 - main - INFO - Epoch   9 | Train Loss: 1.0795 | Train Acc: 0.3000 | Val Loss: 0.9326 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:44,311 - main - INFO - Epoch  10 | Train Loss: 0.9617 | Train Acc: 0.3333 | Val Loss: 1.2752 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:50,372 - main - INFO - Epoch  20 | Train Loss: 0.9588 | Train Acc: 0.3500 | Val Loss: 0.8903 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.005000
+2025-05-24 15:38:56,557 - main - INFO - Epoch  30 | Train Loss: 0.8635 | Train Acc: 0.3500 | Val Loss: 0.7797 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.002500
+2025-05-24 15:39:02,359 - main - INFO - Epoch  40 | Train Loss: 0.8414 | Train Acc: 0.3500 | Val Loss: 0.7940 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.002500
+2025-05-24 15:39:08,488 - main - INFO - Epoch  50 | Train Loss: 0.8251 | Train Acc: 0.3500 | Val Loss: 0.7662 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001250
+2025-05-24 15:39:13,978 - main - INFO - Epoch  60 | Train Loss: 0.8339 | Train Acc: 0.3000 | Val Loss: 0.9476 | Val Acc: 0.3000 | Val Balanced Acc: 0.2500 | LR: 0.001250
+2025-05-24 15:39:15,603 - main - INFO - 早停触发，停止训练。最佳验证准确率: 0.3500
+2025-05-24 15:39:15,604 - main - INFO - 恢复最佳模型，验证准确率: 0.3500
+2025-05-24 15:39:15,605 - main - INFO - 🔍 测试最终性能...
+2025-05-24 15:39:15,690 - main - INFO - ============================================================
+2025-05-24 15:39:15,690 - main - INFO - 📊 最终结果:
+2025-05-24 15:39:15,691 - main - INFO - 测试准确率: 0.2500
+2025-05-24 15:39:15,691 - main - INFO - 平衡准确率: 0.2500
+2025-05-24 15:39:15,691 - main - INFO - 测试损失: 0.8964
+2025-05-24 15:39:15,691 - main - INFO - ============================================================
+2025-05-24 15:39:15,699 - main - INFO - ✅ 模型和结果已保存到: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results\advanced_brain_classifier.pth
+2025-05-24 15:39:15,699 - main - INFO - 📁 结果目录: D:\GitHub_local\Brain_Neuroimage_Processing\StateClassifier\results

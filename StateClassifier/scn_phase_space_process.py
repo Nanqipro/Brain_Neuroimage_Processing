@@ -570,16 +570,11 @@ def generate_graphs_csv(pred_num: int, output_path: str, xyz_trim: list = None) 
     graph_id = np.arange(1, pred_num + 1)
     feat = ['1,0,0,0,0,0'] * pred_num  # 图特征
     
-    # 使用改进的标签生成方法
+    # 使用内置的改进标签生成方法
     if xyz_trim is not None:
         try:
-            # 首先尝试导入外部改进的标签生成
-            from improved_labeling import generate_improved_labels
-            logger.info("使用外部改进的无监督聚类方法生成标签...")
-            label = generate_improved_labels(xyz_trim, pred_num, config.NUM_CLASSES)
-        except ImportError:
-            # 如果外部模块不可用，使用内置的简化版本
-            logger.info("外部模块不可用，使用内置的改进标签生成方法...")
+            # 直接使用内置的改进标签生成方法
+            logger.info("使用内置的改进标签生成方法...")
             label = generate_improved_labels_simple(xyz_trim, pred_num, config.NUM_CLASSES)
         except Exception as e:
             logger.warning(f"改进标签生成失败: {e}")
@@ -622,7 +617,7 @@ def _generate_traditional_labels(pred_num: int) -> np.ndarray:
     # 生成0-5范围内的多样化标签用于6类分类
     # 使用伪随机分布确保各类别都有足够样本
     np.random.seed(config.RANDOM_SEED)  # 确保可重现性
-    num_classes = config.NUM_CLASSES  # 6个类别
+    num_classes = config.NUM_CLASSES  # 当前配置的类别数
     
     # 确保每个类别至少有一些样本
     min_samples_per_class = max(1, pred_num // (num_classes * 2))  # 每类至少占总数的1/(2*6)

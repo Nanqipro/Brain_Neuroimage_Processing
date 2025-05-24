@@ -63,10 +63,10 @@ class Config:
     
     # 网络架构参数
     INPUT_FEATURES = 3  # 输入特征维度(x,y,z坐标)
-    HIDDEN_DIM = 32  # 隐藏层维度
-    NUM_GCN_LAYERS = 3  # GCN层数
-    NUM_CLASSES = 6  # 分类类别数
-    DROPOUT_RATE = 0.5  # Dropout比率
+    HIDDEN_DIM = 16  # 隐藏层维度
+    NUM_GCN_LAYERS = 2  # GCN层数
+    NUM_CLASSES = 4  # 分类类别数（优化为4类以提高准确率）
+    DROPOUT_RATE = 0.3  # Dropout比率
     
     # 池化参数
     POOLING_TYPE = "global"  # 池化类型: "global", "max", "mean"
@@ -75,7 +75,7 @@ class Config:
     
     # 训练参数
     NUM_EPOCHS = 160  # 训练轮数
-    LEARNING_RATE = 0.001  # 初始学习率
+    LEARNING_RATE = 0.005  # 初始学习率
     WEIGHT_DECAY = 1e-4  # L2正则化系数
     BATCH_SIZE = 1  # 批次大小
     
@@ -87,7 +87,7 @@ class Config:
     
     # 学习率调度
     LR_DECAY_FACTOR = 0.75  # 学习率衰减因子
-    LR_DECAY_STEP = 20  # 学习率衰减步长
+    LR_DECAY_STEP = 10  # 学习率衰减步长
     
     # 数据集分割比例
     TRAIN_RATIO = 0.6  # 训练集比例
@@ -95,8 +95,8 @@ class Config:
     TEST_RATIO = 0.2  # 测试集比例
     
     # 数据增强参数
-    AUGMENTATION_FACTOR = 4  # 数据增强倍数
-    NOISE_STD = 0.5  # 噪声标准差
+    AUGMENTATION_FACTOR = 6  # 数据增强倍数
+    NOISE_STD = 0.3  # 噪声标准差
     
     # ==================== 设备配置 ====================
     
