@@ -86,11 +86,11 @@ def setup_logger(output_dir=None, prefix="element_extraction", capture_all_outpu
     logger.info(f"日志文件创建于: {log_file}")
     return logger
 
-def detect_calcium_transients(data, fs=0.7, min_snr = 5.0, min_duration=18, smooth_window=41, 
-                             peak_distance=8, baseline_percentile=12, max_duration=800,
-                             detect_subpeaks=False, subpeak_prominence=0.2, 
-                             subpeak_width=8, subpeak_distance=12, params=None, 
-                             min_morphology_score=0.30, min_exp_decay_score=0.18,
+def detect_calcium_transients(data, fs=0.7, min_snr = 3.5, min_duration=12, smooth_window=31, 
+                             peak_distance=5, baseline_percentile=8, max_duration=800,
+                             detect_subpeaks=False, subpeak_prominence=0.15, 
+                             subpeak_width=5, subpeak_distance=8, params=None, 
+                             min_morphology_score=0.20, min_exp_decay_score=0.12,
                              filter_strength=1.0):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
@@ -207,11 +207,11 @@ def detect_calcium_transients(data, fs=0.7, min_snr = 5.0, min_duration=18, smoo
     
     # 增加prominence参数来要求峰值必须明显突出于背景
     # 调整prominence_threshold，随filter_strength变化
-    prominence_factor = 1.8 * filter_strength  # 降低默认的prominence_factor以更好地捕获相邻峰值
+    prominence_factor = 1.2 * filter_strength  # 进一步降低prominence_factor以捕获更多微弱峰值
     prominence_threshold = noise_level * prominence_factor
     
     # 增加width参数来过滤太窄的峰值（可能是尖刺噪声）
-    min_width = min_duration // 5  # 稍微降低最小宽度要求，改为1/5而不是1/4
+    min_width = min_duration // 6  # 进一步降低最小宽度要求，改为1/6
     
     # 首次检测所有可能的峰值，使用较低的distance要求
     initial_peaks, peak_props = find_peaks(smoothed_data, height=threshold, 
@@ -248,7 +248,7 @@ def detect_calcium_transients(data, fs=0.7, min_snr = 5.0, min_duration=18, smoo
             
             # 如果谷值足够深（低于峰值高度的70%），则认为是两个独立的钙波，保留当前峰值
             # 否则，只保留较高的一个峰值
-            if valley_depth_ratio < 0.7:
+            if valley_depth_ratio < 0.8:
                 peaks.append(peak_idx)
             elif smoothed_data[peak_idx] > smoothed_data[last_peak]:
                 # 如果当前峰更高，替换上一个峰
@@ -315,19 +315,20 @@ def detect_calcium_transients(data, fs=0.7, min_snr = 5.0, min_duration=18, smoo
         if (end_idx - start_idx) < min_duration:
             continue
             
-        # 验证峰值形状 - 在信号尖峰处添加额外验证
+        # 验证峰值形状 - 在信号尖峰处添加额外验证（放宽要求以提高敏感度）
         # 计算峰值前后区域的斜率变化，检查是否符合典型钙爆发特征
         peak_region_start = max(start_idx, peak_idx - 5)
         peak_region_end = min(end_idx, peak_idx + 5)
         
         # 检查峰值前后的斜率变化，真实钙爆发通常在峰值处有明显的斜率变化
-        if peak_region_start < peak_idx and peak_idx < peak_region_end:
-            pre_slope = np.mean(np.diff(smoothed_data[peak_region_start:peak_idx+1]))
-            post_slope = np.mean(np.diff(smoothed_data[peak_idx:peak_region_end+1]))
-            
-            # 前斜率应为正（上升），后斜率应为负（下降）
-            if pre_slope <= 0 or post_slope >= 0:
-                continue  # 峰值前后斜率不符合预期，可能是噪声
+        # 注释掉严格的斜率验证，以提高检测敏感度
+        # if peak_region_start < peak_idx and peak_idx < peak_region_end:
+        #     pre_slope = np.mean(np.diff(smoothed_data[peak_region_start:peak_idx+1]))
+        #     post_slope = np.mean(np.diff(smoothed_data[peak_idx:peak_region_end+1]))
+        #     
+        #     # 前斜率应为正（上升），后斜率应为负（下降）
+        #     if pre_slope <= 0 or post_slope >= 0:
+        #         continue  # 峰值前后斜率不符合预期，可能是噪声
                 
         # 计算特征
         peak_value = smoothed_data[peak_idx]
@@ -432,18 +433,18 @@ def detect_calcium_transients(data, fs=0.7, min_snr = 5.0, min_duration=18, smoo
         # non_monotonic_ratio应该小，rise_smoothness应该小，
         # exp_decay_score应该大，duration_width_ratio在适当范围
         
-        # 定义理想的参数范围（折中的标准）
-        ideal_rise_decay_ratio = 0.28  # 理想的上升/衰减时间比例
-        min_asymmetry = 0.22  # 最小非对称度
-        max_non_monotonic = 0.25  # 上升沿非单调性最大允许值
-        ideal_duration_width_ratio = 2.6  # 理想的持续时间/宽度比
-        min_exp_decay_score = 0.25  # 最小指数衰减评分
+        # 定义理想的参数范围（更宽松的标准）
+        ideal_rise_decay_ratio = 0.35  # 放宽理想的上升/衰减时间比例，从0.28改为0.35
+        min_asymmetry = 0.15  # 降低最小非对称度要求，从0.22改为0.15
+        max_non_monotonic = 0.35  # 放宽上升沿非单调性最大允许值，从0.25改为0.35
+        ideal_duration_width_ratio = 3.0  # 调整理想的持续时间/宽度比，从2.6改为3.0
+        min_exp_decay_score = 0.15  # 降低最小指数衰减评分，从0.25改为0.15
         
-        # 计算各指标的评分
-        rise_decay_score = np.exp(-2 * abs(rise_decay_ratio - ideal_rise_decay_ratio)) if rise_decay_ratio < 1 else 0
+        # 计算各指标的评分（使用更宽松的评分函数）
+        rise_decay_score = np.exp(-1.5 * abs(rise_decay_ratio - ideal_rise_decay_ratio)) if rise_decay_ratio < 1.5 else 0  # 放宽上限和衰减系数
         asymmetry_score = min(asymmetry / min_asymmetry, 1) if min_asymmetry > 0 else 0
         monotonic_score = 1 - min(non_monotonic_ratio / max_non_monotonic, 1)
-        duration_ratio_score = np.exp(-0.5 * abs(duration_width_ratio - ideal_duration_width_ratio))
+        duration_ratio_score = np.exp(-0.3 * abs(duration_width_ratio - ideal_duration_width_ratio))  # 降低衰减系数
         
         # 综合形态评分 (0-1)，使用折中的权重配置
         morphology_score = (
@@ -455,7 +456,7 @@ def detect_calcium_transients(data, fs=0.7, min_snr = 5.0, min_duration=18, smoo
         )
         
         # 设置适中的形态评分阈值，过滤不符合典型钙波形态的峰值
-        min_morphology_score = 0.45  # 适中的最低形态评分要求
+        min_morphology_score = 0.25  # 进一步降低最低形态评分要求，从0.45降到0.25
         
         # 考虑总体形态评分和关键特征
         if morphology_score < min_morphology_score:
@@ -465,10 +466,10 @@ def detect_calcium_transients(data, fs=0.7, min_snr = 5.0, min_duration=18, smoo
         if exp_decay_score < min_exp_decay_score:  # 指数衰减特性是钙波的关键特征
             continue  # 跳过指数衰减不明显的峰值
             
-        if rise_decay_ratio > 0.8:  # 上升时间不应超过衰减时间的80%
+        if rise_decay_ratio > 1.2:  # 放宽上升时间要求，从0.8改为1.2
             continue  # 跳过上升过慢的峰值
             
-        if non_monotonic_ratio > 0.5:  # 允许50%的非单调性作为上限
+        if non_monotonic_ratio > 0.7:  # 放宽非单调性要求，从0.5改为0.7
             continue  # 跳过上升沿过于不规则的峰值
         
         # 检测波形的子峰值（如果启用）
@@ -951,17 +952,17 @@ def estimate_neuron_params(neuron_data, filter_strength=1.0):
     # 直接返回用户在detect_calcium_transients函数中设定的细粒度参数
     # 这些参数已经针对更细粒度的钙波检测进行了优化
     params = {
-        'min_snr': 5.0,                    # 降低信噪比要求，检测更微弱的钙波
-        'min_duration': 18,                # 允许更短的钙波事件
-        'smooth_window': 41,               # 减少平滑，保留更多细节
-        'peak_distance': 8,                # 允许检测更密集的钙波
-        'baseline_percentile': 12,         # 使用更低的基线估计
+        'min_snr': 3.5,                    # 降低信噪比要求，检测更微弱的钙波
+        'min_duration': 12,                # 允许更短的钙波事件
+        'smooth_window': 31,               # 减少平滑，保留更多细节
+        'peak_distance': 5,                # 允许检测更密集的钙波
+        'baseline_percentile': 8,         # 使用更低的基线估计
         'max_duration': 800,               # 保持较大的最大持续时间
-        'subpeak_prominence': 0.2,         # 降低子峰检测阈值
-        'subpeak_width': 8,                # 允许更窄的子峰
-        'subpeak_distance': 12,            # 允许更密集的子峰
-        'min_morphology_score': 0.30,     # 放宽形态要求
-        'min_exp_decay_score': 0.18       # 放宽衰减特性要求
+        'subpeak_prominence': 0.15,         # 降低子峰检测阈值
+        'subpeak_width': 5,                # 允许更窄的子峰
+        'subpeak_distance': 8,            # 允许更密集的子峰
+        'min_morphology_score': 0.20,     # 放宽形态要求
+        'min_exp_decay_score': 0.12       # 放宽衰减特性要求
     }
     
     # 根据filter_strength进行微调（保持原有的filter_strength功能）
