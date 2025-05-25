@@ -1877,7 +1877,7 @@ def visualize_burst_attributes_academic(df, labels=None, output_dir='../results'
             
             # 标记最佳K值
             max_gap_idx = np.argmax(gap_values)
-            axes[0, 0].plot(max_gap_idx + 1, gap_values[max_gap_idx], 'ro', markersize=8, color=academic_red)
+            axes[0, 0].plot(max_gap_idx + 1, gap_values[max_gap_idx], 'o', markersize=8, color=academic_red)
             axes[0, 0].annotate(f'K = {max_gap_idx + 1}', 
                               xy=(max_gap_idx + 1, gap_values[max_gap_idx]),
                               xytext=(max_gap_idx + 1 + 0.5, gap_values[max_gap_idx] + 0.01),
