@@ -18,6 +18,8 @@ import glob  # 导入用于文件路径模式匹配的模块
 import logging
 import datetime
 import sys
+from scipy import stats
+from scipy.spatial.distance import pdist, squareform
 
 # 初始化日志记录器
 def setup_logger(output_dir=None, prefix="cluster-integrate", capture_all_output=True):
@@ -183,7 +185,7 @@ def enhance_preprocess_data(df, feature_weights=None):
 
 def determine_optimal_k(features_scaled, max_k=10, output_dir='../results'):
     """
-    确定最佳聚类数
+    确定最佳聚类数（增强版，包含Gap Statistic方法）
     
     参数
     ----------
@@ -210,31 +212,73 @@ def determine_optimal_k(features_scaled, max_k=10, output_dir='../results'):
         inertia.append(kmeans.inertia_)
         silhouette_scores.append(silhouette_score(features_scaled, kmeans.labels_))
     
-    # 绘制肘部法则图
-    plt.figure(figsize=(12, 5))
+    # 计算Gap Statistic
+    try:
+        print("计算Gap Statistic...")
+        gap_values, optimal_k_gap = calculate_gap_statistic(features_scaled, max_k=max_k)
+        print(f"Gap Statistic建议的最佳聚类数: K = {optimal_k_gap}")
+    except Exception as e:
+        print(f"计算Gap Statistic时出错: {str(e)}")
+        gap_values = None
+        optimal_k_gap = None
     
-    plt.subplot(1, 2, 1)
-    plt.plot(range(2, max_k + 1), inertia, 'o-', color='blue')
-    plt.title('Elbow Method')
-    plt.xlabel('Number of Clusters (k)')
-    plt.ylabel('Inertia')
+    # 绘制三种方法的比较图
+    fig_width = 15 if gap_values is not None else 12
+    plt.figure(figsize=(fig_width, 5))
+    
+    n_subplots = 3 if gap_values is not None else 2
+    
+    # 肘部法则图
+    plt.subplot(1, n_subplots, 1)
+    plt.plot(range(2, max_k + 1), inertia, 'o-', color='blue', linewidth=2, markersize=6)
+    plt.title('Elbow Method', fontsize=12)
+    plt.xlabel('Number of Clusters (K)', fontsize=11)
+    plt.ylabel('Inertia', fontsize=11)
     plt.grid(False)
-    # 绘制轮廓系数图
-    plt.subplot(1, 2, 2)
-    plt.plot(range(2, max_k + 1), silhouette_scores, 'o-', color='green')
-    plt.title('Silhouette Score')
-    plt.xlabel('Number of Clusters (k)')
-    plt.ylabel('Silhouette Score')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    
+    # 轮廓系数图
+    plt.subplot(1, n_subplots, 2)
+    plt.plot(range(2, max_k + 1), silhouette_scores, 'o-', color='green', linewidth=2, markersize=6)
+    optimal_k_sil = silhouette_scores.index(max(silhouette_scores)) + 2
+    plt.plot(optimal_k_sil, max(silhouette_scores), 'ro', markersize=8)
+    plt.title('Silhouette Score', fontsize=12)
+    plt.xlabel('Number of Clusters (K)', fontsize=11)
+    plt.ylabel('Silhouette Score', fontsize=11)
     plt.grid(False)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    
+    # Gap Statistic图（如果计算成功）
+    if gap_values is not None:
+        plt.subplot(1, n_subplots, 3)
+        k_range = range(1, len(gap_values) + 1)
+        plt.plot(k_range, gap_values, 'o-', color='red', linewidth=2, markersize=6)
+        max_gap_idx = np.argmax(gap_values)
+        plt.plot(max_gap_idx + 1, gap_values[max_gap_idx], 'ro', markersize=8)
+        plt.title('Gap Statistic', fontsize=12)
+        plt.xlabel('Number of Clusters (K)', fontsize=11)
+        plt.ylabel('Gap Statistic', fontsize=11)
+        plt.grid(False)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+    
     plt.tight_layout()
     
     # 确保输出目录存在
     os.makedirs(output_dir, exist_ok=True)
-    plt.savefig(f'{output_dir}/optimal_k_determination.png', dpi=300)
+    plt.savefig(f'{output_dir}/optimal_k_determination_enhanced.png', dpi=300)
     
-    # 找到轮廓系数最高的k值
-    optimal_k = silhouette_scores.index(max(silhouette_scores)) + 2
-    print(f"基于轮廓系数，最佳聚类数为{optimal_k}")
+    # 综合决策：优先使用Gap Statistic，其次是轮廓系数
+    if optimal_k_gap is not None:
+        optimal_k = optimal_k_gap
+        print(f"采用Gap Statistic建议的最佳聚类数：K = {optimal_k}")
+    else:
+        optimal_k = silhouette_scores.index(max(silhouette_scores)) + 2
+        print(f"采用轮廓系数建议的最佳聚类数：K = {optimal_k}")
+    
+    print(f"轮廓系数建议：K = {optimal_k_sil}")
     
     return optimal_k
 
@@ -343,7 +387,7 @@ def visualize_clusters_2d(features_scaled, labels, feature_names, method='pca', 
 
 def visualize_feature_distribution(df, labels, output_dir='../results'):
     """
-    可视化各个簇的特征分布
+    可视化各个簇的特征分布（学术风格改进版）
     
     参数
     ----------
@@ -365,29 +409,53 @@ def visualize_feature_distribution(df, labels, output_dir='../results'):
     if -1 in np.unique(labels):  # DBSCAN可能有噪声点标记为-1
         n_clusters -= 1
     
-    # 设置图形尺寸
+    # 设置图形尺寸和学术风格
     fig, axes = plt.subplots(len(features), 1, figsize=(12, 4*len(features)))
+    
+    # 如果只有一个特征，确保axes是数组
+    if len(features) == 1:
+        axes = [axes]
+    
+    # 设置学术风格参数
+    plt.rcParams.update({
+        'font.size': 10,
+        'axes.linewidth': 1,
+        'xtick.major.width': 1,
+        'ytick.major.width': 1
+    })
     
     # 遍历每个特征并创建箱形图
     for i, feature in enumerate(features):
-        # 使用统一的聚类颜色方案
+        # 使用学术风格的颜色方案
         colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-        n_clusters = len(df_cluster['cluster'].unique())
         if n_clusters > len(colors):
             colors = colors * (n_clusters // len(colors) + 1)
-        palette = {i: colors[i] for i in range(n_clusters)}
-        sns.boxplot(x='cluster', y=feature, hue='cluster', data=df_cluster, ax=axes[i], palette=palette, legend=False)
-        axes[i].set_title(f'{feature} Distribution in Each Cluster')
-        axes[i].set_xlabel('Cluster')
-        axes[i].set_ylabel(feature)
-        # 移除网格线
+        palette = {j: colors[j] for j in range(n_clusters)}
+        
+        # 创建箱形图，使用更学术的样式
+        sns.boxplot(x='cluster', y=feature, hue='cluster', data=df_cluster, ax=axes[i], 
+                   palette=palette, legend=False, linewidth=1.5, fliersize=3)
+        
+        # 设置标题和标签（学术风格）
+        axes[i].set_title(f'{feature.title()} Distribution by Cluster', fontsize=12, fontweight='bold')
+        axes[i].set_xlabel('Cluster', fontsize=11)
+        axes[i].set_ylabel(f'{feature.title()}', fontsize=11)
+        
+        # 移除顶部和右侧边框（学术风格）
+        axes[i].spines['top'].set_visible(False)
+        axes[i].spines['right'].set_visible(False)
         axes[i].grid(False)
+        
+        # 添加轻微的背景色
+        axes[i].set_facecolor('#f8f9fa')
     
     plt.tight_layout()
     
     # 确保输出目录存在
     os.makedirs(output_dir, exist_ok=True)
-    plt.savefig(f'{output_dir}/cluster_feature_distribution.png', dpi=300)
+    plt.savefig(f'{output_dir}/cluster_feature_distribution_academic.png', dpi=300, bbox_inches='tight')
+    
+    print(f"学术风格特征分布图已保存到: {output_dir}/cluster_feature_distribution_academic.png")
 
 def analyze_clusters(df, labels, output_dir='../results'):
     """
@@ -1625,6 +1693,337 @@ def visualize_integrated_neuron_timeline(df, labels, neuron_map_path=None, outpu
         
         print(f"整合神经元钙波活动时间线图已保存到 {output_dir}/integrated_neuron_timeline{suffix}.png")
 
+def calculate_gap_statistic(features_scaled, max_k=10, n_refs=10, random_state=42):
+    """
+    计算Gap Statistic以确定最佳聚类数
+    
+    参数
+    ----------
+    features_scaled : numpy.ndarray
+        标准化后的特征数据
+    max_k : int, 可选
+        最大测试聚类数，默认为10
+    n_refs : int, 可选
+        参考数据集数量，默认为10
+    random_state : int, 可选
+        随机种子，默认为42
+        
+    返回
+    -------
+    gap_values : list
+        各K值的Gap Statistic值
+    optimal_k : int
+        最佳聚类数
+    """
+    np.random.seed(random_state)
+    
+    # 计算数据的边界
+    mins = features_scaled.min(axis=0)
+    maxs = features_scaled.max(axis=0)
+    
+    gaps = []
+    
+    for k in range(1, max_k + 1):
+        # 计算原始数据的聚类内平方和
+        if k == 1:
+            wk = np.sum(pdist(features_scaled) ** 2) / (2 * len(features_scaled))
+        else:
+            kmeans = KMeans(n_clusters=k, random_state=random_state, n_init=10)
+            labels = kmeans.fit_predict(features_scaled)
+            
+            wk = 0
+            for i in range(k):
+                cluster_data = features_scaled[labels == i]
+                if len(cluster_data) > 0:
+                    # 计算簇内点对距离平方和
+                    if len(cluster_data) > 1:
+                        wk += np.sum(pdist(cluster_data) ** 2) / (2 * len(cluster_data))
+        
+        # 生成参考数据集并计算期望值
+        ref_wks = []
+        for _ in range(n_refs):
+            # 生成均匀分布的参考数据
+            ref_data = np.random.uniform(mins, maxs, features_scaled.shape)
+            
+            if k == 1:
+                ref_wk = np.sum(pdist(ref_data) ** 2) / (2 * len(ref_data))
+            else:
+                ref_kmeans = KMeans(n_clusters=k, random_state=random_state, n_init=10)
+                ref_labels = ref_kmeans.fit_predict(ref_data)
+                
+                ref_wk = 0
+                for i in range(k):
+                    ref_cluster_data = ref_data[ref_labels == i]
+                    if len(ref_cluster_data) > 1:
+                        ref_wk += np.sum(pdist(ref_cluster_data) ** 2) / (2 * len(ref_cluster_data))
+            
+            ref_wks.append(np.log(ref_wk) if ref_wk > 0 else 0)
+        
+        # 计算Gap值
+        gap = np.mean(ref_wks) - np.log(wk) if wk > 0 else 0
+        gaps.append(gap)
+    
+    # 找到最佳K值（Gap Statistic最大值）
+    optimal_k = np.argmax(gaps) + 1
+    
+    return gaps, optimal_k
+
+def calculate_burst_intervals(df):
+    """
+    计算钙爆发间隔时间
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含钙爆发数据的数据框，需要包含neuron和start_idx字段
+        
+    返回
+    -------
+    intervals : list
+        所有钙爆发间隔时间列表
+    """
+    intervals = []
+    
+    # 按神经元分组计算间隔
+    for neuron in df['neuron'].unique():
+        neuron_data = df[df['neuron'] == neuron].sort_values('start_idx')
+        
+        if len(neuron_data) > 1:
+            # 计算连续钙爆发之间的间隔
+            start_times = neuron_data['start_idx'].values
+            intervals.extend(np.diff(start_times))
+    
+    return intervals
+
+def calculate_burst_frequency(df, total_time_seconds=None, sampling_freq=4.8):
+    """
+    计算每个神经元的钙爆发频率
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        包含钙爆发数据的数据框
+    total_time_seconds : float, 可选
+        总记录时间（秒），如果未提供则根据数据自动计算
+    sampling_freq : float, 可选
+        采样频率，默认4.8Hz
+        
+    返回
+    -------
+    frequencies : list
+        每个神经元的钙爆发频率（Hz）
+    """
+    frequencies = []
+    
+    # 如果没有提供总时间，根据数据计算
+    if total_time_seconds is None:
+        max_time_frames = df['start_idx'].max() + df['duration'].max()
+        total_time_seconds = max_time_frames / sampling_freq
+    
+    # 按神经元计算频率
+    for neuron in df['neuron'].unique():
+        neuron_data = df[df['neuron'] == neuron]
+        burst_count = len(neuron_data)
+        frequency = burst_count / total_time_seconds
+        frequencies.append(frequency)
+    
+    return frequencies
+
+def visualize_burst_attributes_academic(df, labels=None, output_dir='../results', features_scaled=None, max_k=10):
+    """
+    以学术论文风格可视化钙爆发特征分布，类似于参考图片的a-e子图
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        钙爆发数据
+    labels : numpy.ndarray, 可选
+        聚类标签，如果提供则会在图中显示聚类信息
+    output_dir : str, 可选
+        输出目录
+    features_scaled : numpy.ndarray, 可选
+        用于Gap Statistic计算的标准化特征数据
+    max_k : int, 可选
+        Gap Statistic计算的最大K值
+    """
+    print("正在生成学术风格的钙爆发特征可视化...")
+    
+    # 设置学术风格的参数
+    plt.style.use('default')  # 使用默认样式
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    
+    # 设置全局字体和样式
+    plt.rcParams.update({
+        'font.size': 10,
+        'axes.linewidth': 1,
+        'xtick.major.width': 1,
+        'ytick.major.width': 1,
+        'xtick.minor.width': 0.5,
+        'ytick.minor.width': 0.5
+    })
+    
+    # 颜色设置 - 使用学术论文常用的红色
+    academic_red = '#D62728'  # 学术红色
+    academic_blue = '#1F77B4'  # 学术蓝色
+    
+    # 子图a: Gap Statistic (如果提供了features_scaled)
+    if features_scaled is not None:
+        try:
+            print("计算Gap Statistic...")
+            gap_values, optimal_k_gap = calculate_gap_statistic(features_scaled, max_k=max_k)
+            
+            k_range = range(1, len(gap_values) + 1)
+            axes[0, 0].plot(k_range, gap_values, 'o-', color=academic_blue, linewidth=2, markersize=6)
+            
+            # 标记最佳K值
+            max_gap_idx = np.argmax(gap_values)
+            axes[0, 0].plot(max_gap_idx + 1, gap_values[max_gap_idx], 'ro', markersize=8, color=academic_red)
+            axes[0, 0].annotate(f'K = {max_gap_idx + 1}', 
+                              xy=(max_gap_idx + 1, gap_values[max_gap_idx]),
+                              xytext=(max_gap_idx + 1 + 0.5, gap_values[max_gap_idx] + 0.01),
+                              fontsize=10, ha='left')
+            
+            axes[0, 0].set_xlabel('Number of Clusters (K)', fontsize=12)
+            axes[0, 0].set_ylabel('Gap Statistic', fontsize=12)
+            axes[0, 0].set_title('a', fontsize=14, fontweight='bold', loc='left')
+            axes[0, 0].grid(False)
+            axes[0, 0].spines['top'].set_visible(False)
+            axes[0, 0].spines['right'].set_visible(False)
+            
+            print(f"Gap Statistic建议的最佳聚类数: K = {optimal_k_gap}")
+        except Exception as e:
+            print(f"计算Gap Statistic时出错: {str(e)}")
+            axes[0, 0].text(0.5, 0.5, 'Gap Statistic\nCalculation Failed', 
+                          ha='center', va='center', transform=axes[0, 0].transAxes)
+            axes[0, 0].set_title('a', fontsize=14, fontweight='bold', loc='left')
+    else:
+        axes[0, 0].text(0.5, 0.5, 'Gap Statistic\n(Requires feature data)', 
+                      ha='center', va='center', transform=axes[0, 0].transAxes)
+        axes[0, 0].set_title('a', fontsize=14, fontweight='bold', loc='left')
+    
+    # 子图b: Duration分布
+    if 'duration' in df.columns:
+        # 过滤异常值（大于300秒的数据）
+        duration_data = df['duration'][df['duration'] <= 300]
+        axes[0, 1].hist(duration_data, bins=30, color=academic_red, alpha=0.8, edgecolor='black', linewidth=0.5)
+        axes[0, 1].set_xlabel('Duration (s)', fontsize=12)
+        axes[0, 1].set_ylabel('Number of Observations', fontsize=12)
+        axes[0, 1].set_title('b', fontsize=14, fontweight='bold', loc='left')
+        axes[0, 1].grid(False)
+        axes[0, 1].spines['top'].set_visible(False)
+        axes[0, 1].spines['right'].set_visible(False)
+        
+        # 添加统计信息
+        n_excluded = len(df) - len(duration_data)
+        if n_excluded > 0:
+            axes[0, 1].text(0.98, 0.98, f'Excluded: {n_excluded} obs > 300s', 
+                          ha='right', va='top', transform=axes[0, 1].transAxes, 
+                          fontsize=8, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+    
+    # 子图c: Amplitude分布
+    if 'amplitude' in df.columns:
+        # 过滤异常值（大于3的数据）
+        amplitude_data = df['amplitude'][df['amplitude'] <= 3]
+        axes[0, 2].hist(amplitude_data, bins=30, color=academic_red, alpha=0.8, edgecolor='black', linewidth=0.5)
+        axes[0, 2].set_xlabel('Amplitude', fontsize=12)
+        axes[0, 2].set_ylabel('Number of Observations', fontsize=12)
+        axes[0, 2].set_title('c', fontsize=14, fontweight='bold', loc='left')
+        axes[0, 2].grid(False)
+        axes[0, 2].spines['top'].set_visible(False)
+        axes[0, 2].spines['right'].set_visible(False)
+        
+        # 添加统计信息
+        n_excluded = len(df) - len(amplitude_data)
+        if n_excluded > 0:
+            axes[0, 2].text(0.98, 0.98, f'Excluded: {n_excluded} obs > 3 ΔF/F', 
+                          ha='right', va='top', transform=axes[0, 2].transAxes, 
+                          fontsize=8, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+    
+    # 子图d: 钙爆发间隔时间分布
+    try:
+        intervals = calculate_burst_intervals(df)
+        if intervals:
+            # 过滤异常值（大于3000秒的数据）
+            intervals_filtered = [x for x in intervals if x <= 3000]
+            axes[1, 0].hist(intervals_filtered, bins=30, color=academic_red, alpha=0.8, edgecolor='black', linewidth=0.5)
+            axes[1, 0].set_xlabel('Inter-Ca²⁺ burst interval (s)', fontsize=12)
+            axes[1, 0].set_ylabel('Number of Observations', fontsize=12)
+            axes[1, 0].set_title('d', fontsize=14, fontweight='bold', loc='left')
+            axes[1, 0].grid(False)
+            axes[1, 0].spines['top'].set_visible(False)
+            axes[1, 0].spines['right'].set_visible(False)
+            
+            # 添加统计信息
+            n_excluded = len(intervals) - len(intervals_filtered)
+            if n_excluded > 0:
+                axes[1, 0].text(0.98, 0.98, f'Excluded: {n_excluded} obs > 3000s', 
+                              ha='right', va='top', transform=axes[1, 0].transAxes, 
+                              fontsize=8, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+            
+            print(f"计算了 {len(intervals)} 个钙爆发间隔，其中 {len(intervals_filtered)} 个在显示范围内")
+        else:
+            axes[1, 0].text(0.5, 0.5, 'No Intervals\nCalculated', 
+                          ha='center', va='center', transform=axes[1, 0].transAxes)
+            axes[1, 0].set_title('d', fontsize=14, fontweight='bold', loc='left')
+    except Exception as e:
+        print(f"计算钙爆发间隔时出错: {str(e)}")
+        axes[1, 0].text(0.5, 0.5, 'Interval Calculation\nFailed', 
+                      ha='center', va='center', transform=axes[1, 0].transAxes)
+        axes[1, 0].set_title('d', fontsize=14, fontweight='bold', loc='left')
+    
+    # 子图e: 钙爆发频率分布
+    try:
+        frequencies = calculate_burst_frequency(df)
+        if frequencies:
+            axes[1, 1].hist(frequencies, bins=20, color=academic_red, alpha=0.8, edgecolor='black', linewidth=0.5)
+            axes[1, 1].set_xlabel('Frequency (Hz)', fontsize=12)
+            axes[1, 1].set_ylabel('Number of Neurons', fontsize=12)
+            axes[1, 1].set_title('e', fontsize=14, fontweight='bold', loc='left')
+            axes[1, 1].grid(False)
+            axes[1, 1].spines['top'].set_visible(False)
+            axes[1, 1].spines['right'].set_visible(False)
+            
+            print(f"计算了 {len(frequencies)} 个神经元的钙爆发频率")
+        else:
+            axes[1, 1].text(0.5, 0.5, 'No Frequencies\nCalculated', 
+                          ha='center', va='center', transform=axes[1, 1].transAxes)
+            axes[1, 1].set_title('e', fontsize=14, fontweight='bold', loc='left')
+    except Exception as e:
+        print(f"计算钙爆发频率时出错: {str(e)}")
+        axes[1, 1].text(0.5, 0.5, 'Frequency Calculation\nFailed', 
+                      ha='center', va='center', transform=axes[1, 1].transAxes)
+        axes[1, 1].set_title('e', fontsize=14, fontweight='bold', loc='left')
+    
+    # 子图f: 如果有聚类信息，显示聚类统计
+    if labels is not None:
+        n_clusters = len(np.unique(labels))
+        cluster_counts = np.bincount(labels)
+        
+        bars = axes[1, 2].bar(range(n_clusters), cluster_counts, color=academic_blue, alpha=0.8, edgecolor='black', linewidth=0.5)
+        axes[1, 2].set_xlabel('Cluster', fontsize=12)
+        axes[1, 2].set_ylabel('Number of Events', fontsize=12)
+        axes[1, 2].set_title('f', fontsize=14, fontweight='bold', loc='left')
+        axes[1, 2].grid(False)
+        axes[1, 2].spines['top'].set_visible(False)
+        axes[1, 2].spines['right'].set_visible(False)
+        
+        # 添加数值标签
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            axes[1, 2].text(bar.get_x() + bar.get_width()/2., height + 0.01*max(cluster_counts),
+                          f'{int(height)}', ha='center', va='bottom', fontsize=9)
+    else:
+        axes[1, 2].text(0.5, 0.5, 'Cluster Distribution\n(Requires clustering)', 
+                      ha='center', va='center', transform=axes[1, 2].transAxes)
+        axes[1, 2].set_title('f', fontsize=14, fontweight='bold', loc='left')
+    
+    # 调整布局并保存
+    plt.tight_layout()
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig(f'{output_dir}/burst_attributes_academic_style.png', dpi=300, bbox_inches='tight')
+    
+    print(f"学术风格钙爆发特征图已保存到: {output_dir}/burst_attributes_academic_style.png")
+
 def main():
     """
     主函数
@@ -1652,6 +2051,7 @@ def main():
     parser.add_argument('--interactive', action='store_true', help='使用交互式绘图模式(需要安装plotly)')
     parser.add_argument('--use_timestamp', action='store_true', help='使用时间戳模式，如果数据中有timestamp字段')
     parser.add_argument('--sampling_freq', type=float, default=4.8, help='采样频率，默认为4.8Hz，用于帧索引转换为时间')
+    parser.add_argument('--academic_style', action='store_true', help='使用学术论文风格的可视化（参考图片风格）')
     args = parser.parse_args()
     
     # 设置输出目录
@@ -1816,6 +2216,13 @@ def main():
     except Exception as e:
         print(f"执行K-means聚类时出错: {str(e)}")
         return
+    
+    # 生成学术风格的钙爆发特征可视化（参考图片风格）
+    try:
+        visualize_burst_attributes_academic(df_clean, labels=kmeans_labels, output_dir=output_dir, 
+                                          features_scaled=features_scaled, max_k=10)
+    except Exception as e:
+        print(f"生成学术风格特征可视化时出错: {str(e)}")
     
     # 可视化聚类结果
     try:
