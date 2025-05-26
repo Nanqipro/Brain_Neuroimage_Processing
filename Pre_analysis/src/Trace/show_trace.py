@@ -10,15 +10,15 @@ import os
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/29800930糖水铁网trace2.xlsx'
+    INPUT_FILE = '../../datasets/EMtrace02_plus.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
     # Trace图的显示参数
-    TRACE_OFFSET = 35  # 不同神经元trace之间的垂直偏移量（仿照init_show.py中的值）
-    SCALING_FACTOR = 40  # 信号振幅缩放因子（仿照init_show.py）
+    TRACE_OFFSET = 60  # 不同神经元trace之间的垂直偏移量（增加间隔以改善可读性）
+    SCALING_FACTOR = 80  # 信号振幅缩放因子（增加振幅以提高信号可见性）
     MAX_NEURONS = 60    # 最大显示神经元数量（避免图表过于拥挤）
     TRACE_ALPHA = 0.8   # trace线的透明度
     LINE_WIDTH = 2.0    # trace线的宽度
@@ -112,14 +112,14 @@ sorted_trace_data = trace_data[sorted_neurons_by_first_peak]
 print("开始绘制原始顺序的Trace图...")
 if has_behavior and behavior_data.dropna().unique().size > 0:
     # 如果有行为数据，使用两行一列的布局
-    fig = plt.figure(figsize=(40, 15))
+    fig = plt.figure(figsize=(40, 25))
     # 使用GridSpec，并增加间距，解决tight_layout警告
     grid = GridSpec(2, 1, height_ratios=[1, 5], hspace=0.05, figure=fig)
     ax_behavior = fig.add_subplot(grid[0])
     ax_trace = fig.add_subplot(grid[1])
 else:
     # 没有行为数据，只创建一个图表
-    fig = plt.figure(figsize=(40, 15))
+    fig = plt.figure(figsize=(40, 25))
     ax_trace = fig.add_subplot(111)
 
 # 预定义颜色映射，与热图保持一致
@@ -273,8 +273,8 @@ if has_behavior and len(unique_behaviors) > 0:
                 
                 # 在trace图中添加区间边界垂直线
                 # 使用垂直线表示行为区间开始和结束
-                ax_trace.axvline(x=start_time, color='white', linestyle='--', linewidth=1.5, alpha=0.5)
-                ax_trace.axvline(x=end_time, color='white', linestyle='--', linewidth=1.5, alpha=0.5)
+                ax_trace.axvline(x=start_time, color='white', linestyle='--', linewidth=0.8, alpha=0.7)
+                ax_trace.axvline(x=end_time, color='white', linestyle='--', linewidth=0.8, alpha=0.7)
         
         # 添加到图例
         legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
@@ -338,13 +338,13 @@ plt.close()  # 关闭前一个图形
 
 if has_behavior and behavior_data.dropna().unique().size > 0:
     # 如果有行为数据，使用两行一列的布局
-    fig_sorted = plt.figure(figsize=(40, 15))
+    fig_sorted = plt.figure(figsize=(40, 25))
     grid_sorted = GridSpec(2, 1, height_ratios=[1, 5], hspace=0.05, figure=fig_sorted)
     ax_behavior_sorted = fig_sorted.add_subplot(grid_sorted[0])
     ax_trace_sorted = fig_sorted.add_subplot(grid_sorted[1])
 else:
     # 没有行为数据，只创建一个图表
-    fig_sorted = plt.figure(figsize=(40, 15))
+    fig_sorted = plt.figure(figsize=(40, 25))
     ax_trace_sorted = fig_sorted.add_subplot(111)
 
 # 绘制按钙爆发排序的Trace图
@@ -457,8 +457,8 @@ if has_behavior and len(unique_behaviors) > 0:
                 ax_behavior_sorted.add_patch(rect)
                 
                 # 在trace图中添加区间边界垂直线
-                ax_trace_sorted.axvline(x=start_time, color='white', linestyle='--', linewidth=1.5, alpha=0.5)
-                ax_trace_sorted.axvline(x=end_time, color='white', linestyle='--', linewidth=1.5, alpha=0.5)
+                ax_trace_sorted.axvline(x=start_time, color='white', linestyle='--', linewidth=0.8, alpha=0.7)
+                ax_trace_sorted.axvline(x=end_time, color='white', linestyle='--', linewidth=0.8, alpha=0.7)
         
         # 添加到图例
         legend_patches_sorted.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
