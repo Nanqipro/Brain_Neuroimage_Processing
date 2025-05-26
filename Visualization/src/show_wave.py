@@ -6,6 +6,7 @@
 
 该模块用于将每条神经元的钙离子波动数据可视化展现为图表，
 横坐标为时间戳（stamp），纵坐标为钙离子浓度。
+支持显示行为标签和行为时间段标记。
 """
 
 import os
@@ -14,6 +15,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.gridspec import GridSpec
+import matplotlib.patches as mpatches
 import seaborn as sns
 from typing import Union, List, Dict, Optional, Tuple
 
@@ -55,9 +58,10 @@ def load_data(file_path: str) -> pd.DataFrame:
     else:
         raise ValueError(f"不支持的文件格式: {file_path}")
 
-def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) -> Figure:
+def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None, 
+                        sampling_rate: float = 4.8) -> Figure:
     """
-    绘制单个神经元的钙离子波动图
+    绘制单个神经元的钙离子波动图，支持行为标签显示
     
     Parameters
     ----------
@@ -67,6 +71,8 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) 
         神经元ID，对应DataFrame中的列名
     save_dir : str, optional
         图像保存目录，默认为None（不保存）
+    sampling_rate : float, optional
+        采样频率，默认为4.8Hz（用于将时间戳转换为秒）
     
     Returns
     -------
@@ -76,39 +82,54 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) 
     if neuron_id not in df.columns:
         raise ValueError(f"神经元ID {neuron_id} 在数据中不存在")
     
-    # 创建图像
-    fig, ax = plt.subplots(figsize=(60, 15))
+    # 检查是否存在行为数据
+    has_behavior = 'behavior' in df.columns
+    behavior_data = None
+    
+    if has_behavior:
+        behavior_data = df['behavior']
+        print(f"检测到行为数据，将在图表中显示行为区间")
+    
+    # 创建图像布局
+    if has_behavior and behavior_data.dropna().unique().size > 0:
+        # 如果有行为数据，使用两行一列的布局
+        fig = plt.figure(figsize=(60, 20))
+        grid = GridSpec(2, 1, height_ratios=[1, 4], hspace=0.08, figure=fig)
+        ax_behavior = fig.add_subplot(grid[0])
+        ax_main = fig.add_subplot(grid[1])
+    else:
+        # 没有行为数据，只创建一个图表
+        fig, ax_main = plt.subplots(figsize=(60, 15))
+    
+    # 计算时间轴（从时间戳转换为秒）
+    time_seconds = df['stamp'] / sampling_rate
     
     # 绘制钙离子浓度变化曲线
-    ax.plot(df['stamp'], df[neuron_id], linewidth=2, color='#1f77b4')
+    ax_main.plot(time_seconds, df[neuron_id], linewidth=2, color='#1f77b4', 
+                 label='Calcium Signal')
     
     # 添加平滑曲线（移动平均）
     window_size = min(10, len(df) // 10)  # 根据数据长度调整窗口大小
     if window_size > 1:
         smooth_data = df[neuron_id].rolling(window=window_size, center=True).mean()
-        ax.plot(df['stamp'], smooth_data, linewidth=2.5, color='#ff7f0e', alpha=0.7, 
-                label=f'Smooth Curve (Window={window_size})')
+        ax_main.plot(time_seconds, smooth_data, linewidth=2.5, color='#ff7f0e', alpha=0.7, 
+                    label=f'Smooth Curve (Window={window_size})')
     
     # 设置图表样式和标题
-    ax.set_title(f'Neuron {neuron_id} Calcium Concentration Fluctuation', fontsize=50)
-    ax.set_xlabel('Timestamp (stamp)', fontsize=48)
-    ax.set_ylabel('Calcium Concentration', fontsize=48)
-    ax.grid(True, linestyle='--', alpha=0.7)
+    ax_main.set_title(f'Neuron {neuron_id} Calcium Concentration Fluctuation', fontsize=50)
+    ax_main.set_xlabel('Time (seconds)', fontsize=48)
+    ax_main.set_ylabel('Calcium Concentration', fontsize=48)
+    ax_main.grid(True, linestyle='--', alpha=0.7)
     
     # 设置坐标轴刻度标签的字体大小
-    ax.tick_params(axis='both', which='major', labelsize=40)  # 可以根据需要调整字体大小
+    ax_main.tick_params(axis='both', which='major', labelsize=40)
     
-    # 设置横坐标刻度，每100个stamp显示一个刻度，从0开始
-    stamps = df['stamp'].values
-    max_stamp = stamps.max()
-    step = 100  # 每100个stamp显示一个刻度
-    
-    # 计算刻度位置，从0开始，以step为间隔
-    tick_positions = np.arange(0, max_stamp + step, step)
-    
-    # 设置横坐标刻度
-    ax.set_xticks(tick_positions)
-    ax.tick_params(axis='x', rotation=30)  # 旋转刻度标签以防重叠
+    # 设置横坐标刻度，每100秒显示一个刻度
+    max_time = time_seconds.max()
+    step = 100  # 每100秒显示一个刻度
+    tick_positions = np.arange(0, max_time + step, step)
+    ax_main.set_xticks(tick_positions)
+    ax_main.tick_params(axis='x', rotation=30)  # 旋转刻度标签以防重叠
     
     # 突出显示极值点
     max_val = df[neuron_id].max()
@@ -116,37 +137,174 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None) 
     min_val = df[neuron_id].min()
     min_idx = df[neuron_id].idxmin()
     
-    ax.scatter(df.loc[max_idx, 'stamp'], max_val, color='red', s=100, zorder=5, 
-               label=f'Maximum: {max_val:.2f}')
-    ax.scatter(df.loc[min_idx, 'stamp'], min_val, color='green', s=100, zorder=5, 
-               label=f'Minimum: {min_val:.2f}')
+    ax_main.scatter(time_seconds.iloc[max_idx], max_val, color='red', s=100, zorder=5, 
+                   label=f'Maximum: {max_val:.2f}')
+    ax_main.scatter(time_seconds.iloc[min_idx], min_val, color='green', s=100, zorder=5, 
+                   label=f'Minimum: {min_val:.2f}')
     
     # 添加统计信息
     mean_val = df[neuron_id].mean()
     std_val = df[neuron_id].std()
     stats_text = f'Mean: {mean_val:.2f}\nStandard Deviation: {std_val:.2f}'
-    ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, fontsize=50, 
-            verticalalignment='top', bbox=dict(boxstyle='round', alpha=0.1))
+    ax_main.text(0.02, 0.97, stats_text, transform=ax_main.transAxes, fontsize=50, 
+                verticalalignment='top', bbox=dict(boxstyle='round', alpha=0.1))
     
     # 添加图例
-    ax.legend(loc='best', fontsize=30)  # 可以根据需要调整图例字体大小
+    ax_main.legend(loc='best', fontsize=30)
+    
+    # 处理行为数据（如果存在）
+    if has_behavior and behavior_data.dropna().unique().size > 0:
+        # 预定义颜色映射，与show_trace.py保持一致
+        fixed_color_map = {
+            'Crack-seeds-shells': '#FF9500',    # 明亮橙色
+            'Eat-feed': '#0066CC',              # 深蓝色
+            'Eat-seed-kernels': '#00CC00',      # 亮绿色
+            'Explore': '#FF0000',               # 鲜红色
+            'Explore-search-seeds': '#9900FF',  # 亮紫色
+            'Find-seeds': '#994C00',            # 深棕色
+            'Get-feed': '#FF00CC',              # 亮粉色
+            'Get-seeds': '#000000',             # 黑色
+            'Grab-seeds': '#AACC00',            # 亮黄绿色
+            'Groom': '#00CCFF',                 # 亮蓝绿色
+            'Smell-feed': '#66B3FF',            # 亮蓝色
+            'Smell-Get-seeds': '#33FF33',       # 鲜绿色
+            'Store-seeds': '#FF6666',           # 亮红色
+            'Water': '#CC99FF'                  # 亮紫色
+        }
+        
+        # 获取所有不同的行为标签
+        unique_behaviors = behavior_data.dropna().unique()
+        
+        # 处理行为区间数据
+        behavior_intervals = {}
+        for behavior in unique_behaviors:
+            behavior_intervals[behavior] = []
+        
+        # 找出每种行为的连续区间
+        current_behavior = None
+        start_time = None
+        
+        # 为了确保最后一个区间也被记录，将索引列表扩展一个元素
+        extended_index = list(df.index) + [None]
+        extended_stamps = list(df['stamp'].values) + [None]
+        extended_behaviors = list(behavior_data.values) + [None]
+        
+        for i, (idx, stamp, behavior) in enumerate(zip(extended_index, extended_stamps, extended_behaviors)):
+            # 最后一个元素特殊处理
+            if i == len(df):
+                if start_time is not None and current_behavior is not None:
+                    end_time = extended_stamps[i-1] / sampling_rate
+                    behavior_intervals[current_behavior].append((start_time, end_time))
+                break
+            
+            # 跳过空值
+            if pd.isna(behavior):
+                # 如果之前有行为，则结束当前区间
+                if start_time is not None and current_behavior is not None:
+                    end_time = stamp / sampling_rate
+                    behavior_intervals[current_behavior].append((start_time, end_time))
+                    start_time = None
+                    current_behavior = None
+                continue
+            
+            # 如果是新的行为类型或第一个行为
+            if behavior != current_behavior:
+                # 如果之前有行为，先结束当前区间
+                if start_time is not None and current_behavior is not None:
+                    end_time = stamp / sampling_rate
+                    behavior_intervals[current_behavior].append((start_time, end_time))
+                
+                # 开始新的行为区间
+                start_time = stamp / sampling_rate
+                current_behavior = behavior
+        
+        # 绘制行为标记
+        if len(unique_behaviors) > 0:
+            # 创建图例补丁列表
+            legend_patches = []
+            
+            # 为每种行为分配Y轴位置
+            y_positions = {}
+            max_position = len(unique_behaviors)
+            
+            for i, behavior in enumerate(unique_behaviors):
+                y_positions[behavior] = max_position - i
+            
+            # 设置行为子图的Y轴范围和刻度
+            ax_behavior.set_ylim(0, max_position + 1)
+            ax_behavior.set_yticks([y_positions[b] for b in unique_behaviors])
+            ax_behavior.set_yticklabels(unique_behaviors, fontsize=25, fontweight='bold')
+            
+            # 移除X轴刻度，让它只在主图上显示
+            ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+            ax_behavior.set_title('Behavior Intervals', fontsize=35, pad=10)
+            ax_behavior.set_xlabel('')
+            
+            # 确保行为图和主图水平对齐
+            ax_behavior.set_xlim(ax_main.get_xlim())
+            ax_behavior.set_anchor('SW')
+            
+            # 去除行为子图边框
+            ax_behavior.spines['top'].set_visible(False)
+            ax_behavior.spines['right'].set_visible(False)
+            ax_behavior.spines['bottom'].set_visible(False)
+            ax_behavior.spines['left'].set_visible(False)
+            
+            # 为每种行为绘制区间
+            for behavior, intervals in behavior_intervals.items():
+                behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(list(unique_behaviors).index(behavior) % 10))
+                
+                for start_time, end_time in intervals:
+                    # 如果区间有宽度
+                    if end_time - start_time > 0:  
+                        # 在行为标记子图中绘制区间
+                        rect = plt.Rectangle(
+                            (start_time, y_positions[behavior] - 0.4), 
+                            end_time - start_time, 0.8, 
+                            color=behavior_color, alpha=0.9, 
+                            ec='black'  # 添加黑色边框以增强可见度
+                        )
+                        ax_behavior.add_patch(rect)
+                        
+                        # 在主图中添加区间边界垂直线
+                        ax_main.axvline(x=start_time, color='gray', linestyle='--', linewidth=0.8, alpha=0.6)
+                        ax_main.axvline(x=end_time, color='gray', linestyle='--', linewidth=0.8, alpha=0.6)
+                
+                # 添加到图例
+                legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
+            
+            # 添加图例
+            legend = ax_behavior.legend(
+                handles=legend_patches, 
+                loc='upper right', 
+                fontsize=20, 
+                title='Behavior Types', 
+                title_fontsize=25,
+                bbox_to_anchor=(1.0, 1.3)
+            )
     
     # 调整布局
-    plt.tight_layout()
+    if has_behavior and behavior_data.dropna().unique().size > 0:
+        # 有行为图时的布局调整
+        plt.subplots_adjust(top=0.88, bottom=0.1, left=0.08, right=0.95, hspace=0.12)
+    else:
+        # 无行为图时的布局调整
+        plt.tight_layout()
     
     # 保存图像（如果指定了保存路径）
     if save_dir:
         os.makedirs(save_dir, exist_ok=True)
-        save_path = os.path.join(save_dir, f'neuron_{neuron_id}_calcium.png')
+        save_path = os.path.join(save_dir, f'neuron_{neuron_id}_calcium_with_behavior.png')
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"图像已保存至: {save_path}")
     
     return fig
 
 def plot_all_neurons(df: pd.DataFrame, save_dir: str = None, 
-                     exclude_cols: List[str] = ['stamp', 'behavior']) -> List[Figure]:
+                     exclude_cols: List[str] = ['stamp', 'behavior'],
+                     sampling_rate: float = 4.8) -> List[Figure]:
     """
-    绘制所有神经元的钙离子波动图
+    绘制所有神经元的钙离子波动图，支持行为标签显示
     
     Parameters
     ----------
@@ -156,6 +314,8 @@ def plot_all_neurons(df: pd.DataFrame, save_dir: str = None,
         图像保存目录，默认为None（由调用函数指定）
     exclude_cols : List[str], optional
         需要排除的列名列表，默认排除'stamp'和'behavior'列
+    sampling_rate : float, optional
+        采样频率，默认为4.8Hz（用于将时间戳转换为秒）
     
     Returns
     -------
@@ -175,7 +335,7 @@ def plot_all_neurons(df: pd.DataFrame, save_dir: str = None,
     figures = []
     for neuron_id in neuron_cols:
         try:
-            fig = plot_neuron_calcium(df, neuron_id, save_dir)
+            fig = plot_neuron_calcium(df, neuron_id, save_dir, sampling_rate)
             figures.append(fig)
             plt.close(fig)  # 关闭图像以释放内存
         except Exception as e:
@@ -239,13 +399,13 @@ def generate_summary_report(df: pd.DataFrame, save_path: str = None) -> None:
 def main():
     """
     主函数，用于处理命令行参数并执行可视化
-    支持批量处理多个文件
+    支持批量处理多个文件，支持行为标签显示
     """
     import argparse
     
-    parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具')
+    parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具（支持行为标签显示）')
     parser.add_argument('--data', type=str, nargs='+', 
-                        default=['../datasets/2979数据/csdsday3/processed_29791011csdsDAY3Openfield2024-12-06171458trace.xlsx'],
+                        default=['../datasets/processed_EMtrace02.xlsx'],
                         help='数据文件路径列表，支持.md, .csv, .xlsx格式，可提供多个文件路径')
     parser.add_argument('--output', type=str, default=None,
                         help='图像保存根目录，不指定则使用../results/')
@@ -253,6 +413,8 @@ def main():
                         help='指定要可视化的神经元ID，不指定则处理所有神经元')
     parser.add_argument('--report', action='store_true',
                         help='生成神经元统计摘要报告')
+    parser.add_argument('--sampling-rate', type=float, default=4.8,
+                        help='采样频率（Hz），用于将时间戳转换为秒，默认为4.8Hz')
     
     args = parser.parse_args()
     
@@ -280,10 +442,10 @@ def main():
             # 根据参数执行可视化
             if args.neuron:
                 print(f"正在为神经元 {args.neuron} 生成图像...")
-                plot_neuron_calcium(df, args.neuron, output_dir)
+                plot_neuron_calcium(df, args.neuron, output_dir, args.sampling_rate)
             else:
                 print("正在为所有神经元生成图像...")
-                plot_all_neurons(df, output_dir)
+                plot_all_neurons(df, output_dir, sampling_rate=args.sampling_rate)
             
             # 生成报告（如果需要）
             if args.report:
