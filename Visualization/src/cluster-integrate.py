@@ -2024,6 +2024,227 @@ def visualize_burst_attributes_academic(df, labels=None, output_dir='../results'
     
     print(f"学术风格钙爆发特征图已保存到: {output_dir}/burst_attributes_academic_style.png")
 
+def generate_individual_academic_figures(df, labels=None, output_dir='../results', features_scaled=None, max_k=10):
+    """
+    生成学术风格的单独子图文件，每个子图保存为独立的PNG文件
+    
+    参数
+    ----------
+    df : pandas.DataFrame
+        钙爆发数据
+    labels : numpy.ndarray, 可选
+        聚类标签
+    output_dir : str, 可选
+        输出目录
+    features_scaled : numpy.ndarray, 可选
+        用于Gap Statistic计算的标准化特征数据
+    max_k : int, 可选
+        Gap Statistic计算的最大K值
+    """
+    print("正在生成学术风格的单独子图文件...")
+    
+    # 确保输出目录存在
+    individual_dir = os.path.join(output_dir, 'individual_figures')
+    os.makedirs(individual_dir, exist_ok=True)
+    
+    # 设置学术风格的参数
+    plt.rcParams.update({
+        'font.size': 12,
+        'axes.linewidth': 1.5,
+        'xtick.major.width': 1.5,
+        'ytick.major.width': 1.5,
+        'figure.dpi': 300
+    })
+    
+    # 颜色设置
+    academic_red = '#D62728'
+    academic_blue = '#1F77B4'
+    
+    # 子图a: Gap Statistic
+    if features_scaled is not None:
+        try:
+            print("生成Gap Statistic单独图...")
+            plt.figure(figsize=(8, 6))
+            gap_values, optimal_k_gap = calculate_gap_statistic(features_scaled, max_k=max_k)
+            
+            k_range = range(1, len(gap_values) + 1)
+            plt.plot(k_range, gap_values, 'o-', color=academic_blue, linewidth=3, markersize=8)
+            
+            # 标记最佳K值
+            max_gap_idx = np.argmax(gap_values)
+            plt.plot(max_gap_idx + 1, gap_values[max_gap_idx], 'o', markersize=12, color=academic_red)
+            plt.annotate(f'K = {max_gap_idx + 1}', 
+                        xy=(max_gap_idx + 1, gap_values[max_gap_idx]),
+                        xytext=(max_gap_idx + 1 + 0.5, gap_values[max_gap_idx] + 0.01),
+                        fontsize=12, ha='left', fontweight='bold')
+            
+            plt.xlabel('Number of Clusters (K)', fontsize=14, fontweight='bold')
+            plt.ylabel('Gap Statistic', fontsize=14, fontweight='bold')
+            plt.title('Determining Number of Ca²⁺ Burst Clusters', fontsize=16, fontweight='bold', pad=20)
+            plt.grid(False)
+            plt.gca().spines['top'].set_visible(False)
+            plt.gca().spines['right'].set_visible(False)
+            plt.tight_layout()
+            plt.savefig(f'{individual_dir}/figure_a_gap_statistic.png', dpi=300, bbox_inches='tight')
+            plt.close()
+            
+        except Exception as e:
+            print(f"生成Gap Statistic图时出错: {str(e)}")
+    
+    # 子图b: Duration分布
+    if 'duration' in df.columns:
+        print("生成Duration分布单独图...")
+        plt.figure(figsize=(8, 6))
+        duration_data = df['duration'][df['duration'] <= 300]
+        
+        plt.hist(duration_data, bins=30, color=academic_red, alpha=0.8, edgecolor='black', linewidth=0.8)
+        plt.xlabel('Duration (s)', fontsize=14, fontweight='bold')
+        plt.ylabel('Number of Observations', fontsize=14, fontweight='bold')
+        plt.title('Duration of Ca²⁺ Bursts', fontsize=16, fontweight='bold', pad=20)
+        plt.grid(False)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        
+        # 添加统计信息
+        n_excluded = len(df) - len(duration_data)
+        if n_excluded > 0:
+            plt.text(0.98, 0.98, f'{n_excluded} observations with\nduration > 300 s omitted', 
+                    ha='right', va='top', transform=plt.gca().transAxes, 
+                    fontsize=10, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.9))
+        
+        plt.tight_layout()
+        plt.savefig(f'{individual_dir}/figure_b_duration_distribution.png', dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    # 子图c: Amplitude分布
+    if 'amplitude' in df.columns:
+        print("生成Amplitude分布单独图...")
+        plt.figure(figsize=(8, 6))
+        amplitude_data = df['amplitude'][df['amplitude'] <= 3]
+        
+        plt.hist(amplitude_data, bins=30, color=academic_red, alpha=0.8, edgecolor='black', linewidth=0.8)
+        plt.xlabel('Amplitude (ΔF/F)', fontsize=14, fontweight='bold')
+        plt.ylabel('Number of Observations', fontsize=14, fontweight='bold')
+        plt.title('Amplitude of Ca²⁺ Bursts', fontsize=16, fontweight='bold', pad=20)
+        plt.grid(False)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        
+        # 添加统计信息
+        n_excluded = len(df) - len(amplitude_data)
+        if n_excluded > 0:
+            plt.text(0.98, 0.98, f'{n_excluded} observations with\namplitude > 3 ΔF/F omitted', 
+                    ha='right', va='top', transform=plt.gca().transAxes, 
+                    fontsize=10, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.9))
+        
+        plt.tight_layout()
+        plt.savefig(f'{individual_dir}/figure_c_amplitude_distribution.png', dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    # 子图d: 钙爆发间隔时间分布
+    try:
+        print("生成间隔时间分布单独图...")
+        plt.figure(figsize=(8, 6))
+        intervals = calculate_burst_intervals(df)
+        
+        if intervals:
+            intervals_filtered = [x for x in intervals if x <= 3000]
+            plt.hist(intervals_filtered, bins=30, color=academic_red, alpha=0.8, edgecolor='black', linewidth=0.8)
+            plt.xlabel('Inter-Ca²⁺ Burst Interval (s)', fontsize=14, fontweight='bold')
+            plt.ylabel('Number of Observations', fontsize=14, fontweight='bold')
+            plt.title('Intervals Between Consecutive Ca²⁺ Bursts', fontsize=16, fontweight='bold', pad=20)
+            plt.grid(False)
+            plt.gca().spines['top'].set_visible(False)
+            plt.gca().spines['right'].set_visible(False)
+            
+            # 添加统计信息
+            n_excluded = len(intervals) - len(intervals_filtered)
+            if n_excluded > 0:
+                plt.text(0.98, 0.98, f'{n_excluded} observations with\ninterval > 3000 s omitted', 
+                        ha='right', va='top', transform=plt.gca().transAxes, 
+                        fontsize=10, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.9))
+            
+            # 添加数据信息
+            plt.text(0.02, 0.98, f'n = {len(intervals_filtered)} intervals from {len(df["neuron"].unique())} neurons', 
+                    ha='left', va='top', transform=plt.gca().transAxes, 
+                    fontsize=10, bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7))
+        
+        plt.tight_layout()
+        plt.savefig(f'{individual_dir}/figure_d_interval_distribution.png', dpi=300, bbox_inches='tight')
+        plt.close()
+        
+    except Exception as e:
+        print(f"生成间隔时间分布图时出错: {str(e)}")
+    
+    # 子图e: 钙爆发频率分布
+    try:
+        print("生成频率分布单独图...")
+        plt.figure(figsize=(8, 6))
+        frequencies = calculate_burst_frequency(df)
+        
+        if frequencies:
+            plt.hist(frequencies, bins=20, color=academic_red, alpha=0.8, edgecolor='black', linewidth=0.8)
+            plt.xlabel('Frequency (Hz)', fontsize=14, fontweight='bold')
+            plt.ylabel('Number of Neurons', fontsize=14, fontweight='bold')
+            plt.title('Frequency of Ca²⁺ Bursts in Individual Neurons', fontsize=16, fontweight='bold', pad=20)
+            plt.grid(False)
+            plt.gca().spines['top'].set_visible(False)
+            plt.gca().spines['right'].set_visible(False)
+            
+            # 添加统计信息
+            mean_freq = np.mean(frequencies)
+            plt.text(0.98, 0.98, f'Mean frequency: {mean_freq:.3f} Hz\nn = {len(frequencies)} neurons', 
+                    ha='right', va='top', transform=plt.gca().transAxes, 
+                    fontsize=10, bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7))
+        
+        plt.tight_layout()
+        plt.savefig(f'{individual_dir}/figure_e_frequency_distribution.png', dpi=300, bbox_inches='tight')
+        plt.close()
+        
+    except Exception as e:
+        print(f"生成频率分布图时出错: {str(e)}")
+    
+    # 子图f: 聚类分布统计
+    if labels is not None:
+        print("生成聚类分布单独图...")
+        plt.figure(figsize=(8, 6))
+        n_clusters = len(np.unique(labels))
+        cluster_counts = np.bincount(labels)
+        cluster_names = [f'Cluster {i+1}' for i in range(n_clusters)]
+        
+        bars = plt.bar(cluster_names, cluster_counts, color=academic_blue, alpha=0.8, edgecolor='black', linewidth=0.8)
+        plt.xlabel('Cluster', fontsize=14, fontweight='bold')
+        plt.ylabel('Number of Events', fontsize=14, fontweight='bold')
+        plt.title('Distribution of Ca²⁺ Burst Events Across Clusters', fontsize=16, fontweight='bold', pad=20)
+        plt.grid(False)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        
+        # 添加数值标签
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height + max(cluster_counts)*0.01,
+                    f'{int(height)}', ha='center', va='bottom', fontsize=11, fontweight='bold')
+        
+        # 旋转X轴标签以避免重叠
+        plt.xticks(rotation=45)
+        
+        plt.tight_layout()
+        plt.savefig(f'{individual_dir}/figure_f_cluster_distribution.png', dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    # 重置matplotlib参数
+    plt.rcParams.update(plt.rcParamsDefault)
+    
+    print(f"单独图表已保存到: {individual_dir}/")
+    print("生成的文件:")
+    print("  - figure_a_gap_statistic.png")
+    print("  - figure_b_duration_distribution.png") 
+    print("  - figure_c_amplitude_distribution.png")
+    print("  - figure_d_interval_distribution.png")
+    print("  - figure_e_frequency_distribution.png")
+    print("  - figure_f_cluster_distribution.png")
+
 def main():
     """
     主函数
@@ -2223,6 +2444,13 @@ def main():
                                           features_scaled=features_scaled, max_k=10)
     except Exception as e:
         print(f"生成学术风格特征可视化时出错: {str(e)}")
+    
+    # 生成单独的学术风格子图文件
+    try:
+        generate_individual_academic_figures(df_clean, labels=kmeans_labels, output_dir=output_dir,
+                                           features_scaled=features_scaled, max_k=10)
+    except Exception as e:
+        print(f"生成单独学术风格图表时出错: {str(e)}")
     
     # 可视化聚类结果
     try:
