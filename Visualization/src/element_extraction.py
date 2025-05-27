@@ -194,6 +194,21 @@ def detect_calcium_transients(data, fs=0.7, min_snr = 3.5, min_duration=12, smoo
         # 确保smooth_window是奇数
         if smooth_window % 2 == 0:
             smooth_window += 1
+        
+        # 确保smooth_window不超过数据长度
+        if smooth_window >= len(data):
+            # 如果数据长度太短，调整smooth_window为数据长度的一半（确保为奇数）
+            if len(data) <= 3:
+                # 数据点太少，无法进行有效分析
+                return [], data.copy()
+            else:
+                smooth_window = min(len(data) - 1, 
+                                  max(3, int(len(data) // 2)))
+                # 确保为奇数
+                if smooth_window % 2 == 0:
+                    smooth_window -= 1
+                print(f"  警告: 行为数据长度({len(data)})小于平滑窗口({smooth_window}原始值)，已调整为{smooth_window}")
+        
         smoothed_data = signal.savgol_filter(data, smooth_window, 3)
     else:
         smoothed_data = data.copy()
@@ -1079,6 +1094,130 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=1.0, save_path=No
     
     return all_transients_df, transient_id
 
+def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='behavior', fs=1.0, 
+                                      save_path=None, filter_strength=1.0, adaptive_params=True):
+    """
+    分析不同行为标签下神经元的钙波频次，并生成CSV表格
+    
+    参数
+    ----------
+    data_df : pandas.DataFrame
+        包含神经元数据和行为标签的DataFrame
+    neuron_columns : list of str
+        要处理的神经元列名列表
+    behavior_col : str, 可选
+        行为标签列名，默认为'behavior'
+    fs : float, 可选
+        采样频率，默认为1.0Hz
+    save_path : str, 可选
+        CSV文件保存路径，默认为None（不保存）
+    filter_strength : float, 可选
+        过滤强度系数(0.5-2.0)，控制检测灵敏度
+    adaptive_params : bool, 可选
+        是否为每个神经元使用自适应参数，默认为True
+        
+    返回
+    -------
+    freq_df : pandas.DataFrame
+        包含每个神经元在不同行为标签下钙波频次的DataFrame
+    """
+    # 确保数据中包含行为标签列
+    if behavior_col not in data_df.columns:
+        print(f"错误: 数据中不包含行为标签列 '{behavior_col}'")
+        return pd.DataFrame()
+    
+    # 获取所有行为类型
+    behaviors = data_df[behavior_col].unique()
+    print(f"数据中包含 {len(behaviors)} 种行为标签: {behaviors}")
+    
+    # 准备结果容器
+    frequency_data = []
+    
+    # 遍历所有神经元
+    for neuron in neuron_columns:
+        print(f"处理神经元 {neuron} 的钙波频次...")
+        neuron_data = data_df[neuron].values
+        
+        # 如果启用自适应参数，为每个神经元生成自定义参数
+        custom_params = None
+        if adaptive_params:
+            print(f"  估计神经元 {neuron} 的最优参数...")
+            custom_params = estimate_neuron_params(neuron_data, filter_strength)
+        
+        # 计算总体频次（整个时间序列）
+        total_transients, _ = detect_calcium_transients(neuron_data, fs=fs, 
+                                                     params=custom_params, 
+                                                     filter_strength=filter_strength)
+        total_time = len(neuron_data) / fs  # 总时间（秒）
+        total_freq = len(total_transients) / total_time if total_time > 0 else 0
+        
+        # 记录神经元的总体频次
+        neuron_result = {
+            'neuron': neuron,
+            'behavior': 'ALL',
+            'calcium_events': len(total_transients),
+            'duration_seconds': total_time,
+            'frequency_hz': total_freq
+        }
+        frequency_data.append(neuron_result)
+        
+        # 遍历每种行为标签
+        for behavior in behaviors:
+            # 获取该行为标签的索引
+            behavior_indices = data_df[data_df[behavior_col] == behavior].index
+            
+            if len(behavior_indices) > 0:
+                # 提取该行为下神经元数据
+                behavior_data = data_df.loc[behavior_indices, neuron].values
+                behavior_time = len(behavior_indices) / fs  # 行为持续时间（秒）
+                
+                # 检查行为数据长度是否足够进行分析
+                if len(behavior_data) < 10:  # 至少需要10个点才能进行有效分析
+                    print(f"  警告: 神经元 {neuron} 在行为 '{behavior}' 下的数据点({len(behavior_data)})太少，无法进行有效分析")
+                    # 记录没有检测到钙波的结果
+                    neuron_behavior_data = {
+                        'neuron': neuron,
+                        'behavior': behavior,
+                        'calcium_events': 0,
+                        'duration_seconds': behavior_time,
+                        'frequency_hz': 0
+                    }
+                    frequency_data.append(neuron_behavior_data)
+                    continue
+                
+                # 检测该行为下的钙爆发
+                try:
+                    behavior_transients, _ = detect_calcium_transients(behavior_data, fs=fs, 
+                                                                    params=custom_params,
+                                                                    filter_strength=filter_strength)
+                    behavior_freq = len(behavior_transients) / behavior_time if behavior_time > 0 else 0
+                except Exception as e:
+                    print(f"  错误: 无法分析神经元 {neuron} 在行为 '{behavior}' 下的钙波: {str(e)}")
+                    behavior_transients = []
+                    behavior_freq = 0
+                
+                # 记录该行为下的频次
+                neuron_behavior_data = {
+                    'neuron': neuron,
+                    'behavior': behavior,
+                    'calcium_events': len(behavior_transients),
+                    'duration_seconds': behavior_time,
+                    'frequency_hz': behavior_freq
+                }
+                frequency_data.append(neuron_behavior_data)
+    
+    # 创建DataFrame
+    freq_df = pd.DataFrame(frequency_data)
+    
+    # 如果指定了保存路径，则保存到CSV
+    if save_path:
+        # 确保保存目录存在
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        freq_df.to_csv(save_path, index=False)
+        print(f"成功将神经元钙波频次数据保存到: {save_path}")
+    
+    return freq_df
+
 if __name__ == "__main__":
     """
     从Excel文件加载神经元数据并进行特征提取的示例
@@ -1086,12 +1225,14 @@ if __name__ == "__main__":
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
-    parser.add_argument('--data', type=str, default='../datasets/processed_EMtrace01.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/processed_EMtrace02.xlsx',
                         help='数据文件路径，支持.xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
     parser.add_argument('--filter_strength', type=float, default=1.0,
                         help='过滤强度系数(0.5-2.0)。<1.0更宽松，>1.0更严格。默认为1.0')
+    parser.add_argument('--behavior_col', type=str, default='behavior',
+                        help='行为标签列名，不指定则不进行行为相关分析')
     args = parser.parse_args()
     
     # 检查文件是否存在
@@ -1114,10 +1255,8 @@ if __name__ == "__main__":
                 data_basename = os.path.basename(args.data)
                 dataset_name = os.path.splitext(data_basename)[0]
                 output_dir = f"../results/{dataset_name}"
-                save_path = f"{output_dir}/all_neurons_transients.xlsx"
             else:
                 output_dir = args.output
-                save_path = f"{output_dir}/all_neurons_transients.xlsx"
             
             print(f"输出目录设置为: {output_dir}")
             
@@ -1140,13 +1279,31 @@ if __name__ == "__main__":
             }
             
             # 分析并保存所有钙爆发数据，启用自适应参数
+            all_transients_path = f"{output_dir}/all_neurons_transients.xlsx"
             all_transients, next_id = analyze_all_neurons_transients(
-                df, neuron_columns, save_path=save_path, adaptive_params=True,
+                df, neuron_columns, save_path=all_transients_path, adaptive_params=True,
                 file_info=file_info, filter_strength=args.filter_strength
             )
             print(f"共检测到 {len(all_transients)} 个钙爆发")
             
+            # 如果指定了行为标签列，则进行行为相关分析
+            if args.behavior_col and args.behavior_col in df.columns:
+                print(f"\n执行行为相关分析，使用行为标签列: {args.behavior_col}")
+                behavior_freq_path = f"{output_dir}/behavior_calcium_frequency.csv"
+                freq_df = analyze_behavior_calcium_frequency(
+                    df, neuron_columns, behavior_col=args.behavior_col, fs=1.0,
+                    save_path=behavior_freq_path, filter_strength=args.filter_strength
+                )
+                print(f"成功生成行为钙波频次分析结果")
+            else:
+                if args.behavior_col:
+                    print(f"\n警告: 指定的行为标签列 '{args.behavior_col}' 不存在于数据中，跳过行为相关分析")
+                else:
+                    print("\n未指定行为标签列，跳过行为相关分析")
+            
         except Exception as e:
             print(f"加载或处理数据时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
     else:
         print(f"错误: 找不到数据文件 '{args.data}'，请检查文件路径")
