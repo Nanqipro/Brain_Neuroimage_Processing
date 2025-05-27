@@ -10,9 +10,9 @@ import os
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EMtrace02_plus.xlsx'
+    INPUT_FILE = '../../datasets/CSDS3-6-8_CD1后的高架/Day8EMtrace.xlsx'
     # 输出目录
-    OUTPUT_DIR = '../../graph/'
+    OUTPUT_DIR = '../../graph/CSDS3-6-8_CD1后的高架/'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳

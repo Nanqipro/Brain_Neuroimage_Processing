@@ -405,7 +405,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具（支持行为标签显示）')
     parser.add_argument('--data', type=str, nargs='+', 
-                        default=['../datasets/processed_EMtrace02.xlsx'],
+                        default=['../datasets/processed_Day8EMtrace.xlsx'],
                         help='数据文件路径列表，支持.md, .csv, .xlsx格式，可提供多个文件路径')
     parser.add_argument('--output', type=str, default=None,
                         help='图像保存根目录，不指定则使用../results/')
