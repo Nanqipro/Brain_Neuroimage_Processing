@@ -215,13 +215,17 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
         show_shadow: 是否显示标准差阴影区域
         sampling_rate: 采样频率(Hz)
     """
-    if cd1_index is None or cd1_index < n_stamps:
+    if cd1_index is None:
+        print("警告: 未找到CD1标签，无法绘制CD1前的图表")
+        return
+    
+    if cd1_index < n_stamps:
         print(f"警告: CD1标签前的数据不足{n_stamps}个时间戳，将使用所有可用数据")
         start_idx = 0
-        end_idx = cd1_index - 1 if cd1_index is not None else len(data) - 1
     else:
         start_idx = cd1_index - n_stamps
-        end_idx = cd1_index - 1
+    
+    end_idx = cd1_index - 1
     
     # 提取相关数据段
     plot_data = data.iloc[start_idx:end_idx+1].copy()
@@ -230,10 +234,10 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
     sampling_period = 1.0 / sampling_rate
     
     # 创建相对时间轴（以秒为单位，使用实际采样频率）
-    plot_data['relative_time'] = [(i * sampling_period) for i in range(len(plot_data))]
+    plot_data['relative_time'] = [((i - len(plot_data)) * sampling_period) for i in range(len(plot_data))]
     
-    # 创建图像
-    plt.figure(figsize=(12, 8))
+    # 创建图像，增加尺寸以避免布局问题
+    plt.figure(figsize=(14, 9))
     
     # 使用统一的颜色方案绘制三条曲线及其阴影区域
     # Group 1 - 绿色
@@ -258,7 +262,7 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
     plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps Before CD1', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-0.3, 0.5])
+    plt.ylim([-1, 1])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=plot_data['relative_time'].max(), color='k', linestyle='--', linewidth=3)
@@ -267,9 +271,11 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
     # 网格线
     plt.grid(False)
     
+    # 使用subplots_adjust替代tight_layout以避免布局警告
+    plt.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.12)
+    
     # 保存图像
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
     print(f"CD1前轨迹图已保存至: {output_path}")
@@ -305,8 +311,8 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
     # 创建相对时间轴（以秒为单位，使用实际采样频率）
     plot_data['relative_time'] = [(i * sampling_period) for i in range(len(plot_data))]
     
-    # 创建图像
-    plt.figure(figsize=(12, 8))
+    # 创建图像，增加尺寸以避免布局问题
+    plt.figure(figsize=(14, 9))
     
     # 使用统一的颜色方案绘制三条曲线及其阴影区域
     # Group 1 - 绿色
@@ -331,7 +337,7 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
     plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps After CD1', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-0.3, 0.5])
+    plt.ylim([-1, 1])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
@@ -340,9 +346,11 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
     # 网格线
     plt.grid(False)
     
+    # 使用subplots_adjust替代tight_layout以避免布局警告
+    plt.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.12)
+    
     # 保存图像
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
     print(f"CD1后轨迹图已保存至: {output_path}")
@@ -434,7 +442,7 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     plt.title(f'Comparison of Average Calcium Concentration of Neurons Before and After CD1 ({before_stamps}/{after_stamps} timestamps)', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-0.3, 0.5])
+    plt.ylim([-1, 0.1])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
@@ -489,74 +497,58 @@ def load_neuron_positions(file_path):
 
 def plot_neuron_topology(positions_df, group1_cols, group2_cols, group3_cols, output_path):
     """
-    绘制神经元空间拓扑图，按组标记不同颜色
+    绘制神经元拓扑分布图
     
     参数:
         positions_df: 包含神经元位置的DataFrame
-        group1_cols, group2_cols, group3_cols: 各组神经元列名
+        group1_cols: 第一组神经元列名列表
+        group2_cols: 第二组神经元列名列表  
+        group3_cols: 第三组神经元列名列表
         output_path: 输出图像路径
     """
-    if positions_df is None:
-        print("警告: 无法绘制神经元拓扑图，位置数据不可用")
-        return
+    # 创建图像，增加尺寸以避免布局问题
+    plt.figure(figsize=(14, 11))
     
-    # 创建图像
-    plt.figure(figsize=(10, 10))
-    
-    # 为每个组内的神经元创建标记
-    legend_elements = []
-    
-    # 处理第一组 - 绿色
-    group1_positions = positions_df[positions_df['neuron_id'].isin(group1_cols)]
-    if not group1_positions.empty:
-        plt.scatter(group1_positions['relative_x'], group1_positions['relative_y'], 
-                   color=GROUP_COLORS['group1'], s=200, label='Group 1')
-        legend_elements.append(Patch(facecolor=GROUP_COLORS['group1'], edgecolor='black', label='Group 1'))
+    # 分别绘制不同组的神经元
+    for _, row in positions_df.iterrows():
+        neuron_num = int(row['number'])
+        x, y = row['relative_x'], row['relative_y']
         
-        # 添加神经元ID标签
-        for _, row in group1_positions.iterrows():
-            plt.text(row['relative_x'], row['relative_y'], str(int(row['number'])), 
-                    fontsize=10, ha='center', va='center', color='white')
-    
-    # 处理第二组 - 黄色
-    group2_positions = positions_df[positions_df['neuron_id'].isin(group2_cols)]
-    if not group2_positions.empty:
-        plt.scatter(group2_positions['relative_x'], group2_positions['relative_y'], 
-                   color=GROUP_COLORS['group2'], s=200, label='Group 2')
-        legend_elements.append(Patch(facecolor=GROUP_COLORS['group2'], edgecolor='black', label='Group 2'))
+        # 确定神经元属于哪个组
+        if f'C{neuron_num}' in group1_cols:
+            color = GROUP_COLORS['group1']
+            label = 'Group 1' if f'C{neuron_num}' == group1_cols[0] else ""
+        elif f'C{neuron_num}' in group2_cols:
+            color = GROUP_COLORS['group2']
+            label = 'Group 2' if f'C{neuron_num}' == group2_cols[0] else ""
+        elif f'C{neuron_num}' in group3_cols:
+            color = GROUP_COLORS['group3']
+            label = 'Group 3' if f'C{neuron_num}' == group3_cols[0] else ""
+        else:
+            continue  # 跳过不在任何组中的神经元
+            
+        # 绘制神经元位置
+        plt.scatter(x, y, c=color, s=100, alpha=0.8, label=label)
         
-        # 添加神经元ID标签 - 黄色背景使用黑色标签更清晰
-        for _, row in group2_positions.iterrows():
-            plt.text(row['relative_x'], row['relative_y'], str(int(row['number'])), 
-                    fontsize=10, ha='center', va='center', color='black')
-    
-    # 处理第三组 - 黑色
-    group3_positions = positions_df[positions_df['neuron_id'].isin(group3_cols)]
-    if not group3_positions.empty:
-        plt.scatter(group3_positions['relative_x'], group3_positions['relative_y'], 
-                   color=GROUP_COLORS['group3'], s=200, label='Group 3')
-        legend_elements.append(Patch(facecolor=GROUP_COLORS['group3'], edgecolor='black', label='Group 3'))
-        
-        # 添加神经元ID标签
-        for _, row in group3_positions.iterrows():
-            plt.text(row['relative_x'], row['relative_y'], str(int(row['number'])), 
-                    fontsize=10, ha='center', va='center', color='white')
+        # 添加神经元编号标签
+        plt.annotate(str(neuron_num), (x, y), xytext=(5, 5), 
+                    textcoords='offset points', fontsize=8, 
+                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7))
     
     # 设置图表属性
-    plt.title('Neuron Spatial Topology Distribution (Colored by Group)', fontsize=16)
-    plt.xlabel('Relative X Coordinate', fontsize=14)
-    plt.ylabel('Relative Y Coordinate', fontsize=14)
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.xlim(0, 1)
+    plt.ylim(1, 0)  # y轴反转，因为图像坐标系
+    plt.xlabel('Relative X Position', fontsize=14)
+    plt.ylabel('Relative Y Position', fontsize=14)
+    plt.title('Neuron Topology Distribution by Groups', fontsize=16)
+    plt.legend(fontsize=12)
+    plt.grid(True, alpha=0.3)
     
-    # 保持坐标轴比例一致
-    plt.axis('equal')
-    
-    # 添加图例
-    plt.legend(handles=legend_elements, fontsize=12)
+    # 使用subplots_adjust替代tight_layout以避免布局警告
+    plt.subplots_adjust(left=0.1, right=0.95, top=0.9, bottom=0.12)
     
     # 保存图像
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
     print(f"神经元拓扑图已保存至: {output_path}")
