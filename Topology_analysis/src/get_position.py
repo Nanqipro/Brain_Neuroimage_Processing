@@ -27,12 +27,16 @@ matplotlib.rcParams['font.sans-serif'] = ['SimHei']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 class PointMarker:
-    def __init__(self, image_path: str):
+    def __init__(self, image_path: str, start_number: int = 1):
         """
-        Initialize the PointMarker with the given image path.
+        初始化 PointMarker，设置图像路径和相关参数
         
-        Args:
-            image_path (str): Path to the image file
+        Parameters
+        ----------
+        image_path : str
+            图像文件路径
+        start_number : int, optional
+            起始编号，默认为1
         """
         self.image_path = image_path
         self.img = mpimg.imread(image_path)
@@ -41,11 +45,12 @@ class PointMarker:
         self.clicked_points: Dict[int, Tuple[float, float]] = {}  # 使用字典存储点的编号和坐标
         self.point_plots: Dict[int, Line2D] = {}  # 使用字典存储点的编号和图形对象
         self.text_labels: Dict[int, Text] = {}  # 使用字典存储点的编号和文本对象
+        self.skipped_numbers: set = set()  # 存储被跳过的编号
         
-        self.current_number = 1  # 当前编号
+        self.current_number = start_number  # 当前编号，支持自定义起始值
         self.last_click_time = 0  # 用于检测双击
         self.last_click_pos = (None, None)  # 用于存储上次点击位置
-        self.double_click_threshold = 0.6  # 双击时间阈值（秒）
+        self.double_click_threshold = 0.3  # 双击时间阈值（秒），降低到0.3秒更容易触发
         
         # 拖动相关变量
         self.dragging = False
@@ -56,9 +61,9 @@ class PointMarker:
         self.setup_plot()
         
     def setup_plot(self) -> None:
-        """Set up the initial plot configuration."""
+        """设置初始绘图配置"""
         self.ax.imshow(self.img)
-        self.ax.set_title('请用左键标点，右键撤销上一次标点，双击跳过编号，拖动可调整点位 (关闭窗口结束)')
+        self.ax.set_title(f'请用左键标点，右键撤销上一次标点，快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
         self.fig.canvas.mpl_connect('button_press_event', self.onclick)
         self.fig.canvas.mpl_connect('button_release_event', self.onrelease)
         self.fig.canvas.mpl_connect('motion_notify_event', self.onmotion)
@@ -78,10 +83,12 @@ class PointMarker:
         
     def onclick(self, event) -> None:
         """
-        Handle mouse click events.
+        处理鼠标点击事件
         
-        Args:
-            event: MouseEvent object containing click information
+        Parameters
+        ----------
+        event : MouseEvent
+            包含点击信息的鼠标事件对象
         """
         if not event.inaxes:
             return
@@ -90,15 +97,21 @@ class PointMarker:
             current_time = time.time()
             current_pos = (event.xdata, event.ydata)
             
-            # 检查是否是快速连续点击
+            # 检查是否是快速连续点击（双击）
+            # 位置阈值调整为10像素，时间阈值为0.3秒
             is_consecutive_click = (current_time - self.last_click_time < self.double_click_threshold and
                              self.last_click_pos[0] is not None and
-                             abs(current_pos[0] - self.last_click_pos[0]) < 5 and
-                             abs(current_pos[1] - self.last_click_pos[1]) < 5)
+                             abs(current_pos[0] - self.last_click_pos[0]) < 10 and
+                             abs(current_pos[1] - self.last_click_pos[1]) < 10)
             
             if is_consecutive_click:
-                self.current_number += 1
-                print(f"跳过编号 {self.current_number - 1}")
+                # 双击时跳过当前编号
+                self.skipped_numbers.add(self.current_number)
+                print(f"跳过编号 {self.current_number}")
+                self._advance_to_next_available_number()
+                # 更新标题显示当前编号
+                self.ax.set_title(f'请用左键标点，右键撤销上一次标点，快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
+                plt.draw()
                 self.last_click_time = current_time
                 self.last_click_pos = current_pos
                 return
@@ -140,8 +153,25 @@ class PointMarker:
         
         plt.draw()
         
+    def _advance_to_next_available_number(self) -> None:
+        """
+        将当前编号推进到下一个可用的编号（跳过已被标记跳过的编号）
+        """
+        self.current_number += 1
+        while self.current_number in self.skipped_numbers or self.current_number in self.clicked_points:
+            self.current_number += 1
+        
     def _add_point(self, x: float, y: float) -> None:
-        """Add a new point to the plot."""
+        """
+        在图上添加新点
+        
+        Parameters
+        ----------
+        x : float
+            点的x坐标
+        y : float
+            点的y坐标
+        """
         self.clicked_points[self.current_number] = (x, y)
         point = self.ax.plot(x, y, 'ro', markersize=5)[0]
         self.point_plots[self.current_number] = point
@@ -150,7 +180,10 @@ class PointMarker:
                           fontsize=8, backgroundcolor='black')
         self.text_labels[self.current_number] = text
         
-        self.current_number += 1
+        print(f"已标记点 {self.current_number}")
+        self._advance_to_next_available_number()
+        # 更新标题显示当前编号
+        self.ax.set_title(f'请用左键标点，右键撤销上一次标点，快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
         plt.draw()
         
     def _remove_last_point(self) -> None:
@@ -169,7 +202,7 @@ class PointMarker:
         del self.point_plots[last_number]
         del self.text_labels[last_number]
         
-        # 更新当前编号
+        # 更新当前编号为被删除点的编号
         self.current_number = last_number
         
         plt.draw()
@@ -206,7 +239,16 @@ class PointMarker:
         if len(relative_points) > 0:
             np.savetxt(output_file, relative_points, delimiter=',',
                       header='number,relative_x,relative_y', comments='')
-            print(f"已保存标记点相对坐标至 {output_file}（共 {len(relative_points)} 个点，编号范围 {int(relative_points[0,0])} - {int(relative_points[-1,0])}）")
+            
+            skipped_count = len(self.skipped_numbers)
+            total_numbers_used = int(relative_points[-1,0]) if len(relative_points) > 0 else 0
+            
+            print(f"已保存标记点相对坐标至 {output_file}")
+            print(f"共标记 {len(relative_points)} 个点，跳过 {skipped_count} 个编号")
+            print(f"编号范围 {int(relative_points[0,0])} - {total_numbers_used}")
+            if skipped_count > 0:
+                print(f"跳过的编号: {sorted(self.skipped_numbers)}")
+                
             self._plot_relative_coordinates(relative_points)
         else:
             print("未标记任何点，不生成输出文件及相对坐标系散点图。")
@@ -246,11 +288,15 @@ class PointMarker:
         plt.show(block=True)
 
 def main():
-    """Main function to run the point marking tool."""
-    image_path = '../datasets/EMtrace01_Max.jpg'
-    output_file = '../datasets/EMtrace01_Max_position.csv'
+    """
+    主函数，运行点标记工具
+    """
+    image_path = '../datasets/0925homecagefamilarmice.png'
+    output_file = '../datasets/homecage_Max_position.csv'
+    start_number = 2  # 从编号2开始
     
-    marker = PointMarker(image_path)
+    print(f"开始标记工具，起始编号: {start_number}")
+    marker = PointMarker(image_path, start_number=start_number)
     plt.show(block=True)
     marker.save_coordinates(output_file)
 
