@@ -47,6 +47,9 @@ class PointMarker:
         self.text_labels: Dict[int, Text] = {}  # 使用字典存储点的编号和文本对象
         self.skipped_numbers: set = set()  # 存储被跳过的编号
         
+        # 操作历史记录 - 记录所有操作以支持撤销
+        self.operation_history: List[Dict] = []  # 操作历史列表
+        
         self.current_number = start_number  # 当前编号，支持自定义起始值
         self.last_click_time = 0  # 用于检测双击
         self.last_click_pos = (None, None)  # 用于存储上次点击位置
@@ -63,7 +66,7 @@ class PointMarker:
     def setup_plot(self) -> None:
         """设置初始绘图配置"""
         self.ax.imshow(self.img)
-        self.ax.set_title(f'请用左键标点，右键撤销上一次标点，快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
+        self.ax.set_title(f'请用左键标点，右键撤销上一次操作（包括跳过），快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
         self.fig.canvas.mpl_connect('button_press_event', self.onclick)
         self.fig.canvas.mpl_connect('button_release_event', self.onrelease)
         self.fig.canvas.mpl_connect('motion_notify_event', self.onmotion)
@@ -106,12 +109,7 @@ class PointMarker:
             
             if is_consecutive_click:
                 # 双击时跳过当前编号
-                self.skipped_numbers.add(self.current_number)
-                print(f"跳过编号 {self.current_number}")
-                self._advance_to_next_available_number()
-                # 更新标题显示当前编号
-                self.ax.set_title(f'请用左键标点，右键撤销上一次标点，快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
-                plt.draw()
+                self._skip_current_number()
                 self.last_click_time = current_time
                 self.last_click_pos = current_pos
                 return
@@ -129,7 +127,7 @@ class PointMarker:
             self.last_click_pos = current_pos
             
         elif event.button == 3:
-            self._remove_last_point()
+            self._undo_last_operation()
             
     def onrelease(self, event) -> None:
         """Handle mouse button release events."""
@@ -153,6 +151,27 @@ class PointMarker:
         
         plt.draw()
         
+    def _skip_current_number(self) -> None:
+        """
+        跳过当前编号并记录操作历史
+        """
+        skipped_number = self.current_number
+        self.skipped_numbers.add(skipped_number)
+        
+        # 记录跳过操作到历史中
+        operation = {
+            'type': 'skip',
+            'number': skipped_number,
+            'previous_current_number': skipped_number
+        }
+        self.operation_history.append(operation)
+        
+        print(f"跳过编号 {skipped_number}")
+        self._advance_to_next_available_number()
+        # 更新标题显示当前编号
+        self.ax.set_title(f'请用左键标点，右键撤销上一次操作（包括跳过），快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
+        plt.draw()
+        
     def _advance_to_next_available_number(self) -> None:
         """
         将当前编号推进到下一个可用的编号（跳过已被标记跳过的编号）
@@ -163,7 +182,7 @@ class PointMarker:
         
     def _add_point(self, x: float, y: float) -> None:
         """
-        在图上添加新点
+        在图上添加新点并记录操作历史
         
         Parameters
         ----------
@@ -172,40 +191,80 @@ class PointMarker:
         y : float
             点的y坐标
         """
-        self.clicked_points[self.current_number] = (x, y)
+        point_number = self.current_number
+        self.clicked_points[point_number] = (x, y)
         point = self.ax.plot(x, y, 'ro', markersize=5)[0]
-        self.point_plots[self.current_number] = point
+        self.point_plots[point_number] = point
         
-        text = self.ax.text(x+5, y, str(self.current_number), color='white', 
+        text = self.ax.text(x+5, y, str(point_number), color='white', 
                           fontsize=8, backgroundcolor='black')
-        self.text_labels[self.current_number] = text
+        self.text_labels[point_number] = text
         
-        print(f"已标记点 {self.current_number}")
+        # 记录添加点操作到历史中
+        operation = {
+            'type': 'add_point',
+            'number': point_number,
+            'coordinates': (x, y),
+            'previous_current_number': point_number
+        }
+        self.operation_history.append(operation)
+        
+        print(f"已标记点 {point_number}")
         self._advance_to_next_available_number()
         # 更新标题显示当前编号
-        self.ax.set_title(f'请用左键标点，右键撤销上一次标点，快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
+        self.ax.set_title(f'请用左键标点，右键撤销上一次操作（包括跳过），快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
+        plt.draw()
+        
+    def _undo_last_operation(self) -> None:
+        """撤销最后一个操作（可能是添加点或跳过编号）"""
+        if not self.operation_history:
+            print("没有可撤销的操作")
+            return
+            
+        last_operation = self.operation_history.pop()
+        
+        if last_operation['type'] == 'add_point':
+            # 撤销添加点操作
+            number = last_operation['number']
+            
+            # 移除点和标签
+            if number in self.point_plots:
+                self.point_plots[number].remove()
+                del self.point_plots[number]
+                
+            if number in self.text_labels:
+                self.text_labels[number].remove()
+                del self.text_labels[number]
+                
+            # 从字典中删除
+            if number in self.clicked_points:
+                del self.clicked_points[number]
+            
+            # 恢复当前编号
+            self.current_number = number
+            print(f"已撤销标记点 {number}")
+            
+        elif last_operation['type'] == 'skip':
+            # 撤销跳过编号操作
+            number = last_operation['number']
+            
+            # 从跳过集合中移除
+            if number in self.skipped_numbers:
+                self.skipped_numbers.remove(number)
+                
+            # 恢复当前编号
+            self.current_number = number
+            print(f"已撤销跳过编号 {number}")
+        
+        # 更新标题显示当前编号
+        self.ax.set_title(f'请用左键标点，右键撤销上一次操作（包括跳过），快速双击跳过编号，拖动可调整点位 (关闭窗口结束)\n当前编号: {self.current_number}')
         plt.draw()
         
     def _remove_last_point(self) -> None:
-        """Remove the last added point."""
-        if not self.clicked_points:
-            return
-            
-        last_number = max(self.clicked_points.keys())
-        
-        # 移除点和标签
-        self.point_plots[last_number].remove()
-        self.text_labels[last_number].remove()
-        
-        # 从字典中删除
-        del self.clicked_points[last_number]
-        del self.point_plots[last_number]
-        del self.text_labels[last_number]
-        
-        # 更新当前编号为被删除点的编号
-        self.current_number = last_number
-        
-        plt.draw()
+        """
+        移除最后添加的点（保留此方法以兼容性，实际调用_undo_last_operation）
+        """
+        self._undo_last_operation()
         
     def get_relative_coordinates(self) -> np.ndarray:
         """
