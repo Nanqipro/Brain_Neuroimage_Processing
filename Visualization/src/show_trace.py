@@ -95,9 +95,13 @@ def group_neurons(data):
     
     # 定义homecage分组
     # 定义神经元分组 homecage
-    group1 = ['n4', 'n41', 'n43', 'n34', 'n13', 'n33', 'n27', 'n12']
+     # 定义神经元分组
+    group1 = ['n25', 'n2', 'n40', 'n22',  'n37', 
+              'n3', 'n24', 'n36', 'n21', 'n32', 'n26', 'n39']
     
-    group2 = ['n37', 'n30', 'n17', 'n20', 'n18', 'n32', 'n31', 'n21', 'n25', 'n11', 'n10', 'n29', 'n7', 'n22']
+    group2 = ['n18', 'n14', 'n29', 'n7', 'n38', 'n10', 'n19', 'n23', 
+              'n17', 'n11', 'n5', 'n20', 'n30', 'n33', 'n34', 'n27']
+
 
 
     # 按Day6分组
@@ -258,7 +262,7 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
     plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps Before CD1', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-1, 1])
+    plt.ylim([-0.5, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=plot_data['relative_time'].max(), color='k', linestyle='--', linewidth=3)
@@ -331,7 +335,7 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
     plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps After CD1', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-1, 1])
+    plt.ylim([-0.5, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
@@ -434,7 +438,7 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     plt.title(f'Comparison of Average Calcium Concentration of Neurons Before and After CD1 ({before_stamps}/{after_stamps} timestamps)', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-1, 1])
+    plt.ylim([-0.5, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
