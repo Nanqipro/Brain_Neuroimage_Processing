@@ -374,6 +374,15 @@ ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontsize=14, fontweight
 # 修改X轴标签（时间戳）的字体大小和粗细
 ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=14, fontweight='bold')
 
+# 设置X轴刻度，从0开始，以100为间隔（参考heatmap_sort.py的横坐标处理方法）
+numpoints = sorted_day6_data.shape[0]  # 获取数据点的总数
+xtick_positions = np.arange(0, numpoints, 100)  # 生成从0开始，间隔为100的刻度位置
+xtick_labels = xtick_positions  # 刻度标签就是位置值
+
+# 设置X轴刻度位置和标签
+ax_heatmap.set_xticks(xtick_positions)
+ax_heatmap.set_xticklabels(xtick_labels, fontsize=14, fontweight='bold', rotation=45)
+
 # 应用紧凑布局
 # 不使用tight_layout()，因为它与GridSpec布局不兼容
 # 而是使用之前设置的subplots_adjust()已经足够调整布局
