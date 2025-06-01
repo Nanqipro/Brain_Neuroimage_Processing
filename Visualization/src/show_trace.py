@@ -262,7 +262,7 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
     plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps Before CD1', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-0.5, 0.5])
+    plt.ylim([-0.6, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=plot_data['relative_time'].max(), color='k', linestyle='--', linewidth=3)
@@ -335,7 +335,7 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
     plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps After CD1', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-0.5, 0.5])
+    plt.ylim([-0.6, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
@@ -438,7 +438,7 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     plt.title(f'Comparison of Average Calcium Concentration of Neurons Before and After CD1 ({before_stamps}/{after_stamps} timestamps)', fontsize=16)
     
     # 设置统一的y轴范围
-    plt.ylim([-0.5, 0.5])
+    plt.ylim([-0.6, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
