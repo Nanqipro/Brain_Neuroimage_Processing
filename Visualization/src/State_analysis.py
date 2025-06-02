@@ -75,18 +75,27 @@ except ImportError:
     PLOTLY_AVAILABLE = False
     print("Plotly未安装，将只使用matplotlib进行可视化")
 
-# 设置中文字体支持和数学符号处理
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
-plt.rcParams['font.family'] = ['sans-serif']
-
-# 额外的字体配置
+# 强力抑制所有matplotlib字体警告
 import matplotlib
-matplotlib.rcParams['mathtext.fontset'] = 'stix'  # 数学公式字体
-matplotlib.rcParams['mathtext.default'] = 'regular'  # 数学文本样式
+matplotlib.use('Agg')  # 使用非交互式后端
+import matplotlib.pyplot as plt
 
-# 禁用字体相关警告
-warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
+# 设置matplotlib字体和警告配置
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial']
+plt.rcParams['axes.unicode_minus'] = False  # 完全禁用Unicode负号
+plt.rcParams['font.family'] = ['sans-serif']
+plt.rcParams['mathtext.fontset'] = 'dejavusans'  # 使用DejaVu字体集
+plt.rcParams['mathtext.default'] = 'regular'
+plt.rcParams['text.usetex'] = False  # 禁用LaTeX渲染
+
+# 禁用所有相关警告
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', module='matplotlib')
+
+# 设置matplotlib日志级别
+matplotlib_logger = logging.getLogger('matplotlib')
+matplotlib_logger.setLevel(logging.ERROR)
 
 
 class PhaseSpaceAnalyzer:
@@ -910,70 +919,73 @@ class EnhancedStateAnalyzer:
     def _plot_enhanced_feature_analysis(self, features: np.ndarray, feature_names: List[str], 
                                       labels: np.ndarray, output_dir: str) -> None:
         """绘制增强特征分析图"""
-        # PCA和UMAP降维可视化
-        pca = PCA(n_components=2)
-        features_scaled = StandardScaler().fit_transform(features)
-        features_pca = pca.fit_transform(features_scaled)
-        
-        # 尝试UMAP降维
-        if UMAP_AVAILABLE:
-            umap_reducer = UMAP(n_components=2, random_state=42)
-            features_umap = umap_reducer.fit_transform(features_scaled)
-        else:
-            features_umap = features_pca  # 如果UMAP不可用，使用PCA结果
-        
-        plt.figure(figsize=(20, 8))
-        
-        unique_labels = sorted(set(labels))
-        colors = [list(self.state_colors.values())[i] if i < len(self.state_colors) 
-                 else plt.cm.Set3(i) for i in unique_labels]
-        
-        # PCA可视化
-        plt.subplot(1, 3, 1)
-        for i, label in enumerate(unique_labels):
-            mask = labels == label
-            plt.scatter(features_pca[mask, 0], features_pca[mask, 1], 
-                       c=[colors[i]], label=f'State {label+1}', alpha=0.7, s=50)
-        
-        plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)')
-        plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)')
-        plt.title('PCA Dimensionality Reduction')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        
-        # UMAP可视化
-        plt.subplot(1, 3, 2)
-        for i, label in enumerate(unique_labels):
-            mask = labels == label
-            plt.scatter(features_umap[mask, 0], features_umap[mask, 1], 
-                       c=[colors[i]], label=f'State {label+1}', alpha=0.7, s=50)
-        
-        plt.xlabel('UMAP 1' if UMAP_AVAILABLE else 'PC1')
-        plt.ylabel('UMAP 2' if UMAP_AVAILABLE else 'PC2')
-        plt.title('UMAP Dimensionality Reduction' if UMAP_AVAILABLE else 'PCA Dimensionality Reduction (UMAP fallback)')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        
-        # 特征重要性分析
-        plt.subplot(1, 3, 3)
-        
-        # 使用随机森林评估特征重要性
-        rf = RandomForestClassifier(n_estimators=100, random_state=42)
-        rf.fit(features_scaled, labels)
-        
-        feature_importance = rf.feature_importances_
-        sorted_idx = np.argsort(feature_importance)[-15:]  # 显示前15个重要特征
-        
-        plt.barh(range(len(sorted_idx)), feature_importance[sorted_idx])
-        plt.yticks(range(len(sorted_idx)), [feature_names[i] for i in sorted_idx])
-        plt.xlabel('Feature Importance')
-        plt.title('Top 15 Important Features (Random Forest)')
-        plt.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'enhanced_feature_analysis.png'), 
-                   dpi=300, bbox_inches='tight')
-        plt.close()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            # PCA和UMAP降维可视化
+            pca = PCA(n_components=2)
+            features_scaled = StandardScaler().fit_transform(features)
+            features_pca = pca.fit_transform(features_scaled)
+            
+            # 尝试UMAP降维
+            if UMAP_AVAILABLE:
+                umap_reducer = UMAP(n_components=2, random_state=42)
+                features_umap = umap_reducer.fit_transform(features_scaled)
+            else:
+                features_umap = features_pca  # 如果UMAP不可用，使用PCA结果
+            
+            plt.figure(figsize=(20, 8))
+            
+            unique_labels = sorted(set(labels))
+            colors = [list(self.state_colors.values())[i] if i < len(self.state_colors) 
+                     else plt.cm.Set3(i) for i in unique_labels]
+            
+            # PCA可视化
+            plt.subplot(1, 3, 1)
+            for i, label in enumerate(unique_labels):
+                mask = labels == label
+                plt.scatter(features_pca[mask, 0], features_pca[mask, 1], 
+                           c=[colors[i]], label=f'State {label+1}', alpha=0.7, s=50)
+            
+            plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)')
+            plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)')
+            plt.title('PCA Dimensionality Reduction')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            # UMAP可视化
+            plt.subplot(1, 3, 2)
+            for i, label in enumerate(unique_labels):
+                mask = labels == label
+                plt.scatter(features_umap[mask, 0], features_umap[mask, 1], 
+                           c=[colors[i]], label=f'State {label+1}', alpha=0.7, s=50)
+            
+            plt.xlabel('UMAP 1' if UMAP_AVAILABLE else 'PC1')
+            plt.ylabel('UMAP 2' if UMAP_AVAILABLE else 'PC2')
+            plt.title('UMAP Dimensionality Reduction' if UMAP_AVAILABLE else 'PCA Dimensionality Reduction (UMAP fallback)')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            # 特征重要性分析
+            plt.subplot(1, 3, 3)
+            
+            # 使用随机森林评估特征重要性
+            rf = RandomForestClassifier(n_estimators=100, random_state=42)
+            rf.fit(features_scaled, labels)
+            
+            feature_importance = rf.feature_importances_
+            sorted_idx = np.argsort(feature_importance)[-15:]  # 显示前15个重要特征
+            
+            plt.barh(range(len(sorted_idx)), feature_importance[sorted_idx])
+            plt.yticks(range(len(sorted_idx)), [feature_names[i] for i in sorted_idx])
+            plt.xlabel('Feature Importance')
+            plt.title('Top 15 Important Features (Random Forest)')
+            plt.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'enhanced_feature_analysis.png'), 
+                       dpi=300, bbox_inches='tight')
+            plt.close()
     
     # 保持原有的可视化方法
     def _plot_state_waveforms(self, data: pd.DataFrame, labels: np.ndarray, 
@@ -1428,39 +1440,45 @@ class EnhancedStateAnalyzer:
     def _plot_state_heatmap(self, data: pd.DataFrame, labels: np.ndarray, 
                            neuron_names: List[str], output_dir: str) -> None:
         """绘制状态热图，显示不同神经元在时间上的状态分布"""
-        self.logger.info("生成状态热图...")
-        
-        # 创建状态矩阵（简化版，基于神经元的状态标签）
-        unique_states = sorted(set(labels))
-        state_matrix = np.zeros((len(unique_states), len(neuron_names)))
-        
-        for i, state in enumerate(unique_states):
-            state_neurons = [j for j, label in enumerate(labels) if label == state]
-            for j in state_neurons:
-                state_matrix[i, j] = 1
-        
-        plt.figure(figsize=(15, 8))
-        sns.heatmap(state_matrix, 
-                   xticklabels=[f'{name}' for name in neuron_names[::max(1, len(neuron_names)//20)]], 
-                   yticklabels=[f'State {s+1}' for s in unique_states],
-                   cmap='YlOrRd', 
-                   cbar_kws={'label': 'State Assignment'})
-        
-        plt.title('Neuron State Assignment Heatmap', fontsize=16, fontweight='bold')
-        plt.xlabel('Neurons')
-        plt.ylabel('States')
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'state_heatmap.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成状态热图...")
+            
+            # 创建状态矩阵（简化版，基于神经元的状态标签）
+            unique_states = sorted(set(labels))
+            state_matrix = np.zeros((len(unique_states), len(neuron_names)))
+            
+            for i, state in enumerate(unique_states):
+                state_neurons = [j for j, label in enumerate(labels) if label == state]
+                for j in state_neurons:
+                    state_matrix[i, j] = 1
+            
+            plt.figure(figsize=(15, 8))
+            sns.heatmap(state_matrix, 
+                       xticklabels=[f'{name}' for name in neuron_names[::max(1, len(neuron_names)//20)]], 
+                       yticklabels=[f'State {s+1}' for s in unique_states],
+                       cmap='YlOrRd', 
+                       cbar_kws={'label': 'State Assignment'})
+            
+            plt.title('Neuron State Assignment Heatmap', fontsize=16, fontweight='bold')
+            plt.xlabel('Neurons')
+            plt.ylabel('States')
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'state_heatmap.png'), dpi=300, bbox_inches='tight')
+            plt.close()
 
     def _plot_temporal_dynamics(self, data: pd.DataFrame, labels: np.ndarray, 
                                neuron_names: List[str], output_dir: str) -> None:
         """绘制时间动态特性分析"""
-        self.logger.info("生成时间动态特性分析...")
-        
-        unique_states = sorted(set(labels))
-        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成时间动态特性分析...")
+            
+            unique_states = sorted(set(labels))
+            fig, axes = plt.subplots(2, 2, figsize=(16, 12))
         
         # 1. 每种状态的平均活动强度随时间变化
         ax1 = axes[0, 0]
@@ -1542,10 +1560,14 @@ class EnhancedStateAnalyzer:
     def _plot_frequency_analysis(self, data: pd.DataFrame, labels: np.ndarray, 
                                 neuron_names: List[str], output_dir: str) -> None:
         """绘制频率域分析"""
-        self.logger.info("生成频率域分析...")
-        
-        unique_states = sorted(set(labels))
-        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        # 局部抑制字体警告
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成频率域分析...")
+            
+            unique_states = sorted(set(labels))
+            fig, axes = plt.subplots(2, 2, figsize=(16, 12))
         
         # 1. 功率谱密度对比
         ax1 = axes[0, 0]
@@ -1651,131 +1673,137 @@ class EnhancedStateAnalyzer:
     def _plot_correlation_matrix(self, data: pd.DataFrame, labels: np.ndarray, 
                                 neuron_names: List[str], output_dir: str) -> None:
         """绘制神经元相关性矩阵"""
-        self.logger.info("生成相关性矩阵...")
-        
-        unique_states = sorted(set(labels))
-        
-        # 为每种状态生成相关性矩阵
-        fig, axes = plt.subplots(2, 2, figsize=(20, 16))
-        axes = axes.flatten()
-        
-        for i, state in enumerate(unique_states):
-            if i >= 4:  # 最多显示4个状态
-                break
-                
-            state_neurons = [neuron_names[j] for j, label in enumerate(labels) if label == state]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
             
-            if len(state_neurons) > 1:
-                # 计算该状态神经元之间的相关性
-                state_data = data[state_neurons]
-                correlation_matrix = state_data.corr()
+            self.logger.info("生成相关性矩阵...")
+            
+            unique_states = sorted(set(labels))
+            
+            # 为每种状态生成相关性矩阵
+            fig, axes = plt.subplots(2, 2, figsize=(20, 16))
+            axes = axes.flatten()
+            
+            for i, state in enumerate(unique_states):
+                if i >= 4:  # 最多显示4个状态
+                    break
+                    
+                state_neurons = [neuron_names[j] for j, label in enumerate(labels) if label == state]
                 
-                ax = axes[i]
-                sns.heatmap(correlation_matrix, 
-                           annot=False, 
-                           cmap='coolwarm', 
-                           center=0,
-                           square=True,
-                           ax=ax,
-                           cbar_kws={'label': 'Correlation Coefficient'})
-                
-                ax.set_title(f'State {state+1} Neuron Correlation Matrix\n({len(state_neurons)} neurons)', 
-                           fontweight='bold')
-                ax.set_xlabel('Neurons')
-                ax.set_ylabel('Neurons')
-            else:
-                axes[i].text(0.5, 0.5, f'State {state+1}\nInsufficient neurons\nfor correlation analysis', 
-                           ha='center', va='center', transform=axes[i].transAxes, fontsize=12)
-                axes[i].set_xlim(0, 1)
-                axes[i].set_ylim(0, 1)
-        
-        # 移除多余的子图
-        for i in range(len(unique_states), 4):
-            axes[i].remove()
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'correlation_matrices.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+                if len(state_neurons) > 1:
+                    # 计算该状态神经元之间的相关性
+                    state_data = data[state_neurons]
+                    correlation_matrix = state_data.corr()
+                    
+                    ax = axes[i]
+                    sns.heatmap(correlation_matrix, 
+                               annot=False, 
+                               cmap='coolwarm', 
+                               center=0,
+                               square=True,
+                               ax=ax,
+                               cbar_kws={'label': 'Correlation Coefficient'})
+                    
+                    ax.set_title(f'State {state+1} Neuron Correlation Matrix\n({len(state_neurons)} neurons)', 
+                               fontweight='bold')
+                    ax.set_xlabel('Neurons')
+                    ax.set_ylabel('Neurons')
+                else:
+                    axes[i].text(0.5, 0.5, f'State {state+1}\nInsufficient neurons\nfor correlation analysis', 
+                               ha='center', va='center', transform=axes[i].transAxes, fontsize=12)
+                    axes[i].set_xlim(0, 1)
+                    axes[i].set_ylim(0, 1)
+            
+            # 移除多余的子图
+            for i in range(len(unique_states), 4):
+                axes[i].remove()
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'correlation_matrices.png'), dpi=300, bbox_inches='tight')
+            plt.close()
 
     def _plot_state_transitions(self, data: pd.DataFrame, labels: np.ndarray, 
                                neuron_names: List[str], output_dir: str) -> None:
         """绘制状态转换分析（基于信号的时间窗口分析）"""
-        self.logger.info("生成状态转换分析...")
-        
-        # 选择几个代表性神经元进行时间窗口分析
-        unique_states = sorted(set(labels))
-        selected_neurons = []
-        
-        for state in unique_states:
-            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
-            if state_neurons:
-                selected_neurons.append(np.random.choice(state_neurons))
-        
-        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        axes = axes.flatten()
-        
-        for i, neuron in enumerate(selected_neurons[:4]):
-            signal = data[neuron].values
-            state = labels[neuron_names.index(neuron)]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
             
-            # 滑动窗口分析，检测局部状态变化
-            window_size = int(self.sampling_rate * 10)  # 10秒窗口
-            step_size = int(window_size / 2)
+            self.logger.info("生成状态转换分析...")
             
-            windows = []
-            window_states = []
+            # 选择几个代表性神经元进行时间窗口分析
+            unique_states = sorted(set(labels))
+            selected_neurons = []
             
-            for start in range(0, len(signal) - window_size, step_size):
-                window = signal[start:start + window_size]
+            for state in unique_states:
+                state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+                if state_neurons:
+                    selected_neurons.append(np.random.choice(state_neurons))
+            
+            fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+            axes = axes.flatten()
+            
+            for i, neuron in enumerate(selected_neurons[:4]):
+                signal = data[neuron].values
+                state = labels[neuron_names.index(neuron)]
                 
-                # 简单的状态分类：基于活动强度
-                mean_activity = np.mean(window)
-                std_activity = np.std(window)
+                # 滑动窗口分析，检测局部状态变化
+                window_size = int(self.sampling_rate * 10)  # 10秒窗口
+                step_size = int(window_size / 2)
                 
-                if mean_activity > np.mean(signal) + np.std(signal):
-                    window_state = 'High Activity'
-                elif mean_activity < np.mean(signal) - 0.5 * np.std(signal):
-                    window_state = 'Low Activity'
-                else:
-                    window_state = 'Medium Activity'
+                windows = []
+                window_states = []
                 
-                windows.append(start / self.sampling_rate)
-                window_states.append(window_state)
+                for start in range(0, len(signal) - window_size, step_size):
+                    window = signal[start:start + window_size]
+                    
+                    # 简单的状态分类：基于活动强度
+                    mean_activity = np.mean(window)
+                    std_activity = np.std(window)
+                    
+                    if mean_activity > np.mean(signal) + np.std(signal):
+                        window_state = 'High Activity'
+                    elif mean_activity < np.mean(signal) - 0.5 * np.std(signal):
+                        window_state = 'Low Activity'
+                    else:
+                        window_state = 'Medium Activity'
+                    
+                    windows.append(start / self.sampling_rate)
+                    window_states.append(window_state)
+                
+                ax = axes[i]
+                
+                # 绘制原始信号
+                time = np.arange(len(signal)) / self.sampling_rate
+                ax.plot(time, signal, color='lightgray', alpha=0.7, label='Signal')
+                
+                # 绘制状态变化
+                colors = {'High Activity': 'red', 'Medium Activity': 'blue', 'Low Activity': 'green'}
+                
+                for j, (window_time, window_state) in enumerate(zip(windows, window_states)):
+                    if j < len(windows) - 1:
+                        ax.axvspan(window_time, windows[j+1], 
+                                 color=colors[window_state], alpha=0.3, label=window_state if j == 0 else "")
+                
+                ax.set_title(f'{neuron} (State {state+1}) - Temporal Activity Patterns', fontweight='bold')
+                ax.set_xlabel('Time (s)')
+                ax.set_ylabel('Calcium Concentration')
+                
+                # 只在第一个子图中显示图例
+                if i == 0:
+                    handles, labels_legend = ax.get_legend_handles_labels()
+                    unique_labels = []
+                    unique_handles = []
+                    for handle, label in zip(handles, labels_legend):
+                        if label not in unique_labels:
+                            unique_labels.append(label)
+                            unique_handles.append(handle)
+                    ax.legend(unique_handles, unique_labels)
+                
+                ax.grid(True, alpha=0.3)
             
-            ax = axes[i]
-            
-            # 绘制原始信号
-            time = np.arange(len(signal)) / self.sampling_rate
-            ax.plot(time, signal, color='lightgray', alpha=0.7, label='Signal')
-            
-            # 绘制状态变化
-            colors = {'High Activity': 'red', 'Medium Activity': 'blue', 'Low Activity': 'green'}
-            
-            for j, (window_time, window_state) in enumerate(zip(windows, window_states)):
-                if j < len(windows) - 1:
-                    ax.axvspan(window_time, windows[j+1], 
-                             color=colors[window_state], alpha=0.3, label=window_state if j == 0 else "")
-            
-            ax.set_title(f'{neuron} (State {state+1}) - Temporal Activity Patterns', fontweight='bold')
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel('Calcium Concentration')
-            
-            # 只在第一个子图中显示图例
-            if i == 0:
-                handles, labels_legend = ax.get_legend_handles_labels()
-                unique_labels = []
-                unique_handles = []
-                for handle, label in zip(handles, labels_legend):
-                    if label not in unique_labels:
-                        unique_labels.append(label)
-                        unique_handles.append(handle)
-                ax.legend(unique_handles, unique_labels)
-            
-            ax.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'state_transitions.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'state_transitions.png'), dpi=300, bbox_inches='tight')
+            plt.close()
 
     def _create_interactive_visualizations(self, data: pd.DataFrame, labels: np.ndarray, 
                                          neuron_names: List[str], features: np.ndarray,
