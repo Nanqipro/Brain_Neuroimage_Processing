@@ -1,0 +1,53 @@
+2025-06-02 17:09:36,874 - EnhancedStateAnalyzer - INFO - 日志文件创建于: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\../logs\enhanced_state_analysis_20250602-170936.log
+2025-06-02 17:09:36,875 - EnhancedStateAnalyzer - INFO - 增强版神经元状态分析器初始化完成 - 时间窗口: 30.0秒, 重叠率: 0.5
+2025-06-02 17:09:36,875 - EnhancedStateAnalyzer - INFO - 正在加载数据: ../datasets/processed_EMtrace01.xlsx
+2025-06-02 17:09:37,821 - EnhancedStateAnalyzer - INFO - 数据加载完成，共 2999 行, 45 列
+2025-06-02 17:09:37,821 - EnhancedStateAnalyzer - INFO - 识别到 43 个神经元: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10']...
+2025-06-02 17:09:37,821 - EnhancedStateAnalyzer - INFO - === 进行时间窗口动态状态分析 ===
+2025-06-02 17:09:37,822 - EnhancedStateAnalyzer - INFO - 使用先进GCN分析方法
+2025-06-02 17:09:37,822 - EnhancedStateAnalyzer - INFO - 开始先进GCN分析...
+2025-06-02 17:09:41,238 - EnhancedStateAnalyzer - INFO - 开始训练先进GCN模型...
+2025-06-02 17:10:53,822 - EnhancedStateAnalyzer - INFO - 计算时间统计信息...
+2025-06-02 17:10:53,825 - EnhancedStateAnalyzer - INFO - 状态分布统计:
+2025-06-02 17:10:53,825 - EnhancedStateAnalyzer - INFO -   State 1: 415 窗口 (24.1%)
+2025-06-02 17:10:53,825 - EnhancedStateAnalyzer - INFO -   State 2: 414 窗口 (24.1%)
+2025-06-02 17:10:53,825 - EnhancedStateAnalyzer - INFO -   State 3: 319 窗口 (18.5%)
+2025-06-02 17:10:53,825 - EnhancedStateAnalyzer - INFO -   State 4: 572 窗口 (33.3%)
+2025-06-02 17:10:53,825 - EnhancedStateAnalyzer - INFO - 分析状态转换模式...
+2025-06-02 17:10:53,847 - EnhancedStateAnalyzer - INFO - 主要状态转换模式:
+2025-06-02 17:10:53,847 - EnhancedStateAnalyzer - INFO -   State 4 → State 4: 201 次
+2025-06-02 17:10:53,847 - EnhancedStateAnalyzer - INFO -   State 4 → State 2: 144 次
+2025-06-02 17:10:53,847 - EnhancedStateAnalyzer - INFO -   State 2 → State 4: 133 次
+2025-06-02 17:10:53,847 - EnhancedStateAnalyzer - INFO -   State 1 → State 4: 129 次
+2025-06-02 17:10:53,847 - EnhancedStateAnalyzer - INFO -   State 4 → State 1: 124 次
+2025-06-02 17:10:53,848 - EnhancedStateAnalyzer - INFO -   State 1 → State 1: 122 次
+2025-06-02 17:10:53,848 - EnhancedStateAnalyzer - INFO -   State 2 → State 2: 108 次
+2025-06-02 17:10:53,848 - EnhancedStateAnalyzer - INFO -   State 3 → State 4: 96 次
+2025-06-02 17:10:53,849 - EnhancedStateAnalyzer - INFO -   State 1 → State 2: 94 次
+2025-06-02 17:10:53,849 - EnhancedStateAnalyzer - INFO -   State 4 → State 3: 89 次
+2025-06-02 17:10:53,849 - EnhancedStateAnalyzer - INFO - 先进GCN分析完成，共分析 1720 个增强时序图
+2025-06-02 17:10:53,849 - EnhancedStateAnalyzer - INFO - 平均图节点数: 142.0
+2025-06-02 17:10:53,850 - EnhancedStateAnalyzer - INFO - 平均图边数: 1438.6
+2025-06-02 17:10:53,850 - EnhancedStateAnalyzer - INFO - 特征维度: 9
+2025-06-02 17:10:53,854 - EnhancedStateAnalyzer - INFO - 开始基于时间窗口提取神经元特征...
+2025-06-02 17:12:53,041 - EnhancedStateAnalyzer - INFO - 时间窗口特征提取完成，共提取 53 个特征，43 个神经元，1720 个时间窗口
+2025-06-02 17:12:53,042 - EnhancedStateAnalyzer - INFO - 开始时间窗口状态可视化...
+2025-06-02 17:12:53,042 - EnhancedStateAnalyzer - INFO - 生成神经元状态时间线...
+2025-06-02 17:12:55,040 - EnhancedStateAnalyzer - INFO - 生成状态转换矩阵...
+2025-06-02 17:12:55,434 - EnhancedStateAnalyzer - INFO - 生成状态持续时间分布...
+2025-06-02 17:12:56,102 - EnhancedStateAnalyzer - INFO - 生成神经元状态多样性分析...
+2025-06-02 17:12:57,194 - EnhancedStateAnalyzer - INFO - 生成时间窗口状态热图...
+2025-06-02 17:12:58,342 - EnhancedStateAnalyzer - INFO - 生成代表性状态波形...
+2025-06-02 17:12:59,528 - EnhancedStateAnalyzer - INFO - 生成交互式时间线...
+2025-06-02 17:13:05,413 - EnhancedStateAnalyzer - INFO - 时间窗口状态可视化完成
+2025-06-02 17:13:05,413 - EnhancedStateAnalyzer - INFO - 保存时间窗口分析结果到: ../results/temporal_state_analysis/temporal_neuron_states_analysis.xlsx
+2025-06-02 17:13:07,460 - EnhancedStateAnalyzer - INFO - 
+=== 时间窗口分析结果摘要 ===
+2025-06-02 17:13:07,460 - EnhancedStateAnalyzer - INFO - 总时间窗口数: 1720
+2025-06-02 17:13:07,461 - EnhancedStateAnalyzer - INFO - 分析神经元数: 43
+2025-06-02 17:13:07,461 - EnhancedStateAnalyzer - INFO - 识别状态数: 4
+2025-06-02 17:13:07,462 - EnhancedStateAnalyzer - INFO - 神经元状态多样性: 平均 4.00 种状态/神经元
+2025-06-02 17:13:07,462 - EnhancedStateAnalyzer - INFO - 状态切换最多的神经元: n1 (4 种状态)
+2025-06-02 17:13:07,462 - EnhancedStateAnalyzer - INFO - 平均图节点数: 142.0
+2025-06-02 17:13:07,463 - EnhancedStateAnalyzer - INFO - 平均图边数: 1438.6
+2025-06-02 17:13:07,463 - EnhancedStateAnalyzer - INFO - 图特征维度: 9

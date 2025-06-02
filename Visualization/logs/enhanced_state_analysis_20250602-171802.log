@@ -1,0 +1,9 @@
+2025-06-02 17:18:02,162 - EnhancedStateAnalyzer - INFO - 日志文件创建于: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\../logs\enhanced_state_analysis_20250602-171802.log
+2025-06-02 17:18:02,162 - EnhancedStateAnalyzer - INFO - 增强版神经元状态分析器初始化完成 - 时间窗口: 30.0秒, 重叠率: 0.5
+2025-06-02 17:18:02,162 - EnhancedStateAnalyzer - INFO - === 验证GCN功能 ===
+2025-06-02 17:18:03,290 - EnhancedStateAnalyzer - INFO - 使用真正的GCN网络进行图聚类...
+2025-06-02 17:18:03,321 - EnhancedStateAnalyzer - INFO - 开始训练GCN模型...
+2025-06-02 17:18:04,503 - EnhancedStateAnalyzer - INFO - GCN聚类完成
+2025-06-02 17:18:04,504 - EnhancedStateAnalyzer - INFO - 最终训练准确率: 1.0000
+2025-06-02 17:18:04,504 - EnhancedStateAnalyzer - INFO - 最终验证准确率: 0.2500
+2025-06-02 17:18:04,504 - EnhancedStateAnalyzer - INFO - 最终测试准确率: 0.2500

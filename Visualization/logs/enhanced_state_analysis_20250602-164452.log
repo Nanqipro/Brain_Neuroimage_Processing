@@ -1,0 +1,23 @@
+2025-06-02 16:44:52,976 - EnhancedStateAnalyzer - INFO - 日志文件创建于: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\../logs\enhanced_state_analysis_20250602-164452.log
+2025-06-02 16:44:52,977 - EnhancedStateAnalyzer - INFO - 增强版神经元状态分析器初始化完成 - 时间窗口: 60.0秒, 重叠率: 0.5
+2025-06-02 16:44:52,977 - EnhancedStateAnalyzer - INFO - 开始时间窗口状态分析...
+2025-06-02 16:44:52,977 - EnhancedStateAnalyzer - INFO - 开始基于时间窗口提取神经元特征...
+2025-06-02 16:45:04,277 - EnhancedStateAnalyzer - INFO - 时间窗口特征提取完成，共提取 53 个特征，5 个神经元，95 个时间窗口
+2025-06-02 16:45:04,278 - EnhancedStateAnalyzer - INFO - 使用 ensemble 方法识别 4 种神经元状态...
+2025-06-02 16:45:04,457 - EnhancedStateAnalyzer - INFO - 聚类质量评估 - 轮廓系数: 0.461, Calinski-Harabasz指数: 73.133
+2025-06-02 16:45:04,457 - EnhancedStateAnalyzer - INFO - 状态识别完成，识别出 4 种状态
+2025-06-02 16:45:04,459 - EnhancedStateAnalyzer - INFO - 计算时间统计信息...
+2025-06-02 16:45:04,462 - EnhancedStateAnalyzer - INFO - 状态分布统计:
+2025-06-02 16:45:04,462 - EnhancedStateAnalyzer - INFO -   State 1: 25 窗口 (26.3%)
+2025-06-02 16:45:04,463 - EnhancedStateAnalyzer - INFO -   State 2: 20 窗口 (21.1%)
+2025-06-02 16:45:04,463 - EnhancedStateAnalyzer - INFO -   State 3: 30 窗口 (31.6%)
+2025-06-02 16:45:04,464 - EnhancedStateAnalyzer - INFO -   State 4: 20 窗口 (21.1%)
+2025-06-02 16:45:04,464 - EnhancedStateAnalyzer - INFO - 分析状态转换模式...
+2025-06-02 16:45:04,469 - EnhancedStateAnalyzer - INFO - 主要状态转换模式:
+2025-06-02 16:45:04,470 - EnhancedStateAnalyzer - INFO -   State 3 → State 3: 25 次
+2025-06-02 16:45:04,470 - EnhancedStateAnalyzer - INFO -   State 1 → State 1: 20 次
+2025-06-02 16:45:04,470 - EnhancedStateAnalyzer - INFO -   State 2 → State 2: 15 次
+2025-06-02 16:45:04,471 - EnhancedStateAnalyzer - INFO -   State 4 → State 4: 15 次
+2025-06-02 16:45:04,471 - EnhancedStateAnalyzer - INFO -   State 1 → State 2: 5 次
+2025-06-02 16:45:04,471 - EnhancedStateAnalyzer - INFO -   State 2 → State 3: 5 次
+2025-06-02 16:45:04,472 - EnhancedStateAnalyzer - INFO -   State 3 → State 4: 5 次

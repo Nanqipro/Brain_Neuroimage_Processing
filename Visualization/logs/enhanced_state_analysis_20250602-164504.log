@@ -1,0 +1,7 @@
+2025-06-02 16:45:04,473 - EnhancedStateAnalyzer - INFO - 日志文件创建于: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\../logs\enhanced_state_analysis_20250602-164504.log
+2025-06-02 16:45:04,473 - EnhancedStateAnalyzer - INFO - 增强版神经元状态分析器初始化完成 - 时间窗口: 30.0秒, 重叠率: 0.5
+2025-06-02 16:45:04,474 - EnhancedStateAnalyzer - INFO - 开始提取传统综合神经元特征...
+2025-06-02 16:45:08,318 - EnhancedStateAnalyzer - INFO - 传统特征提取完成，共提取 53 个特征，5 个神经元
+2025-06-02 16:45:08,319 - EnhancedStateAnalyzer - INFO - 使用 ensemble 方法识别 4 种神经元状态...
+2025-06-02 16:45:08,495 - EnhancedStateAnalyzer - INFO - 聚类质量评估 - 轮廓系数: 0.069, Calinski-Harabasz指数: 1.972
+2025-06-02 16:45:08,495 - EnhancedStateAnalyzer - INFO - 状态识别完成，识别出 4 种状态

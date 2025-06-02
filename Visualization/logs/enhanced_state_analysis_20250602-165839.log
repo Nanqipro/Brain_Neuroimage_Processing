@@ -1,0 +1,7 @@
+2025-06-02 16:58:39,828 - EnhancedStateAnalyzer - INFO - 日志文件创建于: D:\GitHub_local\Brain_Neuroimage_Processing\Visualization\src\../logs\enhanced_state_analysis_20250602-165839.log
+2025-06-02 16:58:39,829 - EnhancedStateAnalyzer - INFO - 增强版神经元状态分析器初始化完成 - 时间窗口: 30.0秒, 重叠率: 0.5
+2025-06-02 16:58:39,829 - EnhancedStateAnalyzer - INFO - === 验证GCN功能 ===
+2025-06-02 16:58:40,709 - EnhancedStateAnalyzer - INFO - 使用真正的GCN网络进行图聚类...
+2025-06-02 16:58:40,754 - EnhancedStateAnalyzer - INFO - 开始训练GCN模型...
+2025-06-02 16:58:40,821 - EnhancedStateAnalyzer - ERROR - GCN聚类过程中出错: mat1 and mat2 shapes cannot be multiplied (1960x192 and 64x32)
+2025-06-02 16:58:40,822 - EnhancedStateAnalyzer - WARNING - 回退到KMeans方法
