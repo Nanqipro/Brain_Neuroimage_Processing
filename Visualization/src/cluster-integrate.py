@@ -605,6 +605,42 @@ def visualize_neuron_cluster_distribution(df, labels, k_value=None, output_dir='
     # 计算每个神经元不同簇的数量
     cluster_counts = df_cluster.groupby(['neuron', 'cluster']).size().unstack().fillna(0)
     
+    # 修复神经元排序问题：按照数值顺序排序而不是字符串顺序
+    def extract_neuron_number(neuron_name):
+        """
+        从神经元名称中提取数字用于排序
+        
+        参数
+        ----------
+        neuron_name : str or int
+            神经元名称，可能是 'n1', '1', 1 等格式
+            
+        返回
+        -------
+        int
+            提取的数字
+        """
+        if isinstance(neuron_name, (int, float)):
+            return int(neuron_name)
+        elif isinstance(neuron_name, str):
+            # 移除前缀 'n' 并提取数字
+            if neuron_name.startswith('n') and neuron_name[1:].isdigit():
+                return int(neuron_name[1:])
+            elif neuron_name.isdigit():
+                return int(neuron_name)
+            else:
+                # 如果无法提取数字，则返回一个很大的数以确保排在最后
+                return 999999
+        else:
+            return 999999
+    
+    # 获取所有神经元名称并按数值排序
+    neuron_names = cluster_counts.index.tolist()
+    neuron_names_sorted = sorted(neuron_names, key=extract_neuron_number)
+    
+    # 重新排序cluster_counts的行
+    cluster_counts = cluster_counts.reindex(neuron_names_sorted)
+    
     # 绘制堆叠条形图
     ax = cluster_counts.plot(kind='bar', stacked=True, figsize=(12, 6), colormap='tab10')
     ax.set_title(f'Cluster Distribution for Different Neurons (k={len(np.unique(labels))})')
@@ -627,6 +663,7 @@ def visualize_neuron_cluster_distribution(df, labels, k_value=None, output_dir='
     
     plt.savefig(filename, dpi=300)
     print(f"神经元聚类分布图已保存到: {filename}")
+    print(f"神经元排序已修正，按数值顺序排列: {neuron_names_sorted[:10]}...")  # 显示前10个用于确认
 
 def visualize_wave_type_distribution(df, labels, output_dir='../results'):
     """
