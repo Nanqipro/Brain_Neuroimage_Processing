@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-增强版神经元放电状态分析模块
+增强版神经元放电状态分析模块（支持时间窗口动态状态分析）
 
 该模块融合了StateClassifier中的先进方法，包括：
 - 相空间重构技术，将时间序列转换为3D相空间流形
 - 图卷积网络(GCN)进行状态分类
 - 时序图构建方法
 - 多特征融合分析
+- **时间窗口动态状态分析**：一个神经元可以在不同时间段表现出不同的放电状态
 
 基于4种典型神经元放电状态：
 - State I: 高频连续振荡状态
@@ -18,6 +19,7 @@
 
 作者：Clade 4
 日期：2025年5月23日
+版本：2.0 - 支持时间窗口动态分析
 """
 
 import numpy as np
@@ -96,6 +98,108 @@ warnings.filterwarnings('ignore', module='matplotlib')
 # 设置matplotlib日志级别
 matplotlib_logger = logging.getLogger('matplotlib')
 matplotlib_logger.setLevel(logging.ERROR)
+
+
+class TimeWindowAnalyzer:
+    """
+    时间窗口分析器类
+    
+    支持将神经元信号分割成多个时间窗口，分析每个窗口的状态
+    """
+    
+    def __init__(self, window_duration: float = 30.0, overlap_ratio: float = 0.5, 
+                 sampling_rate: float = 4.8):
+        """
+        初始化时间窗口分析器
+        
+        Parameters
+        ----------
+        window_duration : float
+            时间窗口长度（秒），默认30秒
+        overlap_ratio : float
+            窗口重叠比例，默认0.5（50%重叠）
+        sampling_rate : float
+            采样频率，默认4.8Hz
+        """
+        self.window_duration = window_duration
+        self.overlap_ratio = overlap_ratio
+        self.sampling_rate = sampling_rate
+        self.window_size = int(window_duration * sampling_rate)
+        self.step_size = int(self.window_size * (1 - overlap_ratio))
+    
+    def split_signal_to_windows(self, signal: np.ndarray) -> Tuple[List[np.ndarray], List[float]]:
+        """
+        将信号分割成多个时间窗口
+        
+        Parameters
+        ----------
+        signal : np.ndarray
+            输入信号
+            
+        Returns
+        -------
+        Tuple[List[np.ndarray], List[float]]
+            窗口信号列表, 窗口起始时间列表
+        """
+        windows = []
+        start_times = []
+        
+        # 确保窗口大小不超过信号长度
+        if len(signal) < self.window_size:
+            # 如果信号太短，直接返回整个信号作为一个窗口
+            windows.append(signal)
+            start_times.append(0.0)
+            return windows, start_times
+        
+        for start_idx in range(0, len(signal) - self.window_size + 1, self.step_size):
+            end_idx = start_idx + self.window_size
+            window = signal[start_idx:end_idx]
+            start_time = start_idx / self.sampling_rate
+            
+            windows.append(window)
+            start_times.append(start_time)
+        
+        return windows, start_times
+    
+    def extract_window_features(self, window: np.ndarray, feature_extractor) -> Dict[str, float]:
+        """
+        提取单个窗口的特征
+        
+        Parameters
+        ----------
+        window : np.ndarray
+            时间窗口信号
+        feature_extractor : object
+            特征提取器对象
+            
+        Returns
+        -------
+        Dict[str, float]
+            窗口特征字典
+        """
+        # 提取传统特征
+        temporal_features = feature_extractor.extract_temporal_features(window)
+        frequency_features = feature_extractor.extract_frequency_features(window)
+        nonlinear_features = feature_extractor.extract_nonlinear_features(window)
+        morphological_features = feature_extractor.extract_morphological_features(window)
+        
+        # 提取相空间特征
+        phase_space_features = feature_extractor.extract_phase_space_features(window)
+        
+        # 提取图特征
+        graph_features = feature_extractor.extract_graph_features(window)
+        
+        # 合并所有特征
+        all_features = {
+            **temporal_features, 
+            **frequency_features,
+            **nonlinear_features, 
+            **morphological_features,
+            **phase_space_features,
+            **graph_features
+        }
+        
+        return all_features
 
 
 class PhaseSpaceAnalyzer:
@@ -408,12 +512,14 @@ class TemporalGraphBuilder:
 
 class EnhancedStateAnalyzer:
     """
-    增强版神经元状态分析器
+    增强版神经元状态分析器（支持时间窗口动态分析）
     
     融合了相空间重构、图卷积网络和传统机器学习方法
+    现在支持时间窗口分析，一个神经元可以在不同时间段表现出不同的放电状态
     """
     
-    def __init__(self, sampling_rate: float = 4.8, logger: Optional[logging.Logger] = None):
+    def __init__(self, sampling_rate: float = 4.8, window_duration: float = 30.0, 
+                 overlap_ratio: float = 0.5, logger: Optional[logging.Logger] = None):
         """
         初始化增强版状态分析器
         
@@ -421,15 +527,26 @@ class EnhancedStateAnalyzer:
         ----------
         sampling_rate : float
             采样频率，默认为4.8Hz
+        window_duration : float
+            时间窗口长度（秒），默认30秒
+        overlap_ratio : float
+            窗口重叠比例，默认0.5（50%重叠）
         logger : logging.Logger, optional
             日志记录器，默认为None
         """
         self.sampling_rate = sampling_rate
+        self.window_duration = window_duration
+        self.overlap_ratio = overlap_ratio
         self.logger = logger or self._setup_logger()
         
         # 初始化子模块
         self.phase_analyzer = PhaseSpaceAnalyzer()
         self.graph_builder = TemporalGraphBuilder()
+        self.time_window_analyzer = TimeWindowAnalyzer(
+            window_duration=window_duration,
+            overlap_ratio=overlap_ratio,
+            sampling_rate=sampling_rate
+        )
         
         # 状态定义
         self.state_definitions = {
@@ -447,7 +564,7 @@ class EnhancedStateAnalyzer:
             'State IV': '#4169E1'    # 皇家蓝
         }
         
-        self.logger.info("增强版神经元状态分析器初始化完成")
+        self.logger.info(f"增强版神经元状态分析器初始化完成 - 时间窗口: {window_duration}秒, 重叠率: {overlap_ratio}")
     
     def _setup_logger(self, output_dir: Optional[str] = None) -> logging.Logger:
         """设置日志记录器"""
@@ -507,9 +624,9 @@ class EnhancedStateAnalyzer:
             self.logger.error(f"数据加载失败: {str(e)}")
             raise
     
-    def extract_comprehensive_features(self, data: pd.DataFrame) -> Tuple[np.ndarray, List[str], List[str]]:
+    def extract_windowed_features(self, data: pd.DataFrame) -> Tuple[np.ndarray, List[str], pd.DataFrame]:
         """
-        提取综合特征，包括传统特征和相空间特征
+        基于时间窗口提取特征
         
         Parameters
         ----------
@@ -518,10 +635,10 @@ class EnhancedStateAnalyzer:
             
         Returns
         -------
-        Tuple[np.ndarray, List[str], List[str]]
-            特征矩阵, 特征名称列表, 神经元名称列表
+        Tuple[np.ndarray, List[str], pd.DataFrame]
+            特征矩阵, 特征名称列表, 窗口信息DataFrame
         """
-        self.logger.info("开始提取综合神经元特征...")
+        self.logger.info("开始基于时间窗口提取神经元特征...")
         
         # 识别神经元列
         neuron_columns = [col for col in data.columns 
@@ -529,216 +646,125 @@ class EnhancedStateAnalyzer:
         
         feature_list = []
         feature_names = None
+        window_info_list = []
         
         for neuron in neuron_columns:
             signal_data = data[neuron].values
             
-            # 提取传统特征
-            temporal_features = self.extract_temporal_features(signal_data)
-            frequency_features = self.extract_frequency_features(signal_data)
-            nonlinear_features = self.extract_nonlinear_features(signal_data)
-            morphological_features = self.extract_morphological_features(signal_data)
+            # 将信号分割成时间窗口
+            windows, start_times = self.time_window_analyzer.split_signal_to_windows(signal_data)
             
-            # 提取相空间特征
-            phase_space_features = self.extract_phase_space_features(signal_data)
-            
-            # 提取图特征
-            graph_features = self.extract_graph_features(signal_data)
-            
-            # 合并所有特征
-            all_features = {
-                **temporal_features, 
-                **frequency_features,
-                **nonlinear_features, 
-                **morphological_features,
-                **phase_space_features,
-                **graph_features
-            }
-            
-            if feature_names is None:
-                feature_names = list(all_features.keys())
-            
-            feature_list.append(list(all_features.values()))
+            for window_idx, (window, start_time) in enumerate(zip(windows, start_times)):
+                # 提取窗口特征
+                window_features = self.time_window_analyzer.extract_window_features(window, self)
+                
+                if feature_names is None:
+                    feature_names = list(window_features.keys())
+                
+                feature_list.append(list(window_features.values()))
+                
+                # 记录窗口信息
+                window_info_list.append({
+                    'neuron_id': neuron,
+                    'window_idx': window_idx,
+                    'start_time': start_time,
+                    'end_time': start_time + self.window_duration,
+                    'duration': self.window_duration
+                })
         
         features_matrix = np.array(feature_list)
+        window_info_df = pd.DataFrame(window_info_list)
         
-        self.logger.info(f"综合特征提取完成，共提取 {len(feature_names)} 个特征，{len(neuron_columns)} 个神经元")
+        self.logger.info(f"时间窗口特征提取完成，共提取 {len(feature_names)} 个特征，"
+                        f"{len(neuron_columns)} 个神经元，{len(window_info_df)} 个时间窗口")
         
-        return features_matrix, feature_names, neuron_columns
+        return features_matrix, feature_names, window_info_df
+
+    def analyze_temporal_states(self, data: pd.DataFrame, method: str = 'ensemble', 
+                              n_states: int = 4) -> Tuple[np.ndarray, pd.DataFrame]:
+        """
+        进行时间窗口状态分析
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            神经元钙离子浓度数据
+        method : str
+            分类方法
+        n_states : int
+            预期状态数量
+            
+        Returns
+        -------
+        Tuple[np.ndarray, pd.DataFrame]
+            状态标签数组, 包含详细信息的结果DataFrame
+        """
+        self.logger.info("开始时间窗口状态分析...")
+        
+        # 提取时间窗口特征
+        features, feature_names, window_info_df = self.extract_windowed_features(data)
+        
+        # 状态识别
+        labels = self.identify_states_enhanced(features, method=method, n_states=n_states)
+        
+        # 创建结果DataFrame
+        results_df = window_info_df.copy()
+        results_df['state_label'] = labels
+        results_df['state_name'] = [f'State {label+1}' for label in labels]
+        
+        # 添加状态描述
+        state_descriptions = {i: desc for i, desc in enumerate(self.state_definitions.values())}
+        results_df['state_description'] = results_df['state_label'].map(state_descriptions)
+        
+        # 计算状态统计信息
+        self._calculate_temporal_statistics(results_df)
+        
+        return labels, results_df
+
+    def _calculate_temporal_statistics(self, results_df: pd.DataFrame) -> None:
+        """计算时间相关的统计信息"""
+        self.logger.info("计算时间统计信息...")
+        
+        # 每个神经元的状态分布
+        neuron_stats = results_df.groupby('neuron_id')['state_label'].agg(['count', 'nunique']).reset_index()
+        neuron_stats.columns = ['neuron_id', 'total_windows', 'unique_states']
+        
+        # 每种状态的时间占比
+        state_stats = results_df.groupby('state_name').size().reset_index(name='window_count')
+        state_stats['time_percentage'] = state_stats['window_count'] / len(results_df) * 100
+        
+        self.logger.info(f"状态分布统计:")
+        for _, row in state_stats.iterrows():
+            self.logger.info(f"  {row['state_name']}: {row['window_count']} 窗口 ({row['time_percentage']:.1f}%)")
+        
+        # 状态转换统计
+        self._analyze_state_transitions(results_df)
     
-    def extract_phase_space_features(self, signal_data: np.ndarray) -> Dict[str, float]:
-        """提取相空间特征"""
-        # 进行相空间重构
-        phase_space = self.phase_analyzer.phase_space_reconstruction(signal_data)
+    def _analyze_state_transitions(self, results_df: pd.DataFrame) -> None:
+        """分析状态转换模式"""
+        self.logger.info("分析状态转换模式...")
         
-        # 从相空间中提取特征
-        return self.phase_analyzer.extract_phase_space_features(phase_space)
-    
-    def extract_graph_features(self, signal_data: np.ndarray) -> Dict[str, float]:
-        """提取图特征"""
-        features = {}
+        transition_counts = {}
         
-        # 构建时序图
-        graphs = self.graph_builder.build_temporal_graph(signal_data)
-        
-        if graphs:
-            # 计算图的基本统计特征
-            all_node_features = np.concatenate(graphs, axis=0)
+        for neuron in results_df['neuron_id'].unique():
+            neuron_data = results_df[results_df['neuron_id'] == neuron].sort_values('window_idx')
+            states = neuron_data['state_label'].values
             
-            features['graph_mean_node_value'] = np.mean(all_node_features[:, 0])
-            features['graph_std_node_value'] = np.std(all_node_features[:, 0])
-            features['graph_max_node_value'] = np.max(all_node_features[:, 0])
-            features['graph_min_node_value'] = np.min(all_node_features[:, 0])
-            
-            # 计算图的连通性特征
-            features['graph_num_windows'] = len(graphs)
-            features['graph_avg_window_size'] = np.mean([len(g) for g in graphs])
-            
-            # 计算节点特征的变异性
-            if all_node_features.shape[1] > 1:
-                features['graph_first_diff_mean'] = np.mean(all_node_features[:, 1])
-                features['graph_first_diff_std'] = np.std(all_node_features[:, 1])
-            else:
-                features['graph_first_diff_mean'] = 0.0
-                features['graph_first_diff_std'] = 0.0
+            for i in range(len(states) - 1):
+                from_state = states[i]
+                to_state = states[i + 1]
+                transition = (from_state, to_state)
                 
-            if all_node_features.shape[1] > 2:
-                features['graph_second_diff_mean'] = np.mean(all_node_features[:, 2])
-                features['graph_second_diff_std'] = np.std(all_node_features[:, 2])
-            else:
-                features['graph_second_diff_mean'] = 0.0
-                features['graph_second_diff_std'] = 0.0
-        else:
-            # 如果无法构建图，返回默认值
-            features.update({
-                'graph_mean_node_value': 0.0,
-                'graph_std_node_value': 0.0,
-                'graph_max_node_value': 0.0,
-                'graph_min_node_value': 0.0,
-                'graph_num_windows': 0,
-                'graph_avg_window_size': 0.0,
-                'graph_first_diff_mean': 0.0,
-                'graph_first_diff_std': 0.0,
-                'graph_second_diff_mean': 0.0,
-                'graph_second_diff_std': 0.0
-            })
+                if transition not in transition_counts:
+                    transition_counts[transition] = 0
+                transition_counts[transition] += 1
         
-        return features
-    
-    # 保持原有的特征提取方法
-    def extract_temporal_features(self, signal_data: np.ndarray) -> Dict[str, float]:
-        """提取时域特征"""
-        features = {}
-        
-        # 基础统计特征
-        features['mean'] = np.mean(signal_data)
-        features['std'] = np.std(signal_data)
-        features['var'] = np.var(signal_data)
-        features['skewness'] = self._calculate_skewness(signal_data)
-        features['kurtosis'] = self._calculate_kurtosis(signal_data)
-        
-        # 动态特征
-        features['peak_count'] = self._count_peaks(signal_data)
-        features['peak_amplitude_mean'] = self._mean_peak_amplitude(signal_data)
-        features['peak_amplitude_std'] = self._std_peak_amplitude(signal_data)
-        features['inter_peak_interval_mean'] = self._mean_inter_peak_interval(signal_data)
-        features['inter_peak_interval_std'] = self._std_inter_peak_interval(signal_data)
-        
-        # 活动性特征
-        features['activity_rate'] = self._calculate_activity_rate(signal_data)
-        features['burst_rate'] = self._calculate_burst_rate(signal_data)
-        features['silence_periods'] = self._calculate_silence_periods(signal_data)
-        
-        # 变异性特征
-        features['coefficient_variation'] = features['std'] / features['mean'] if features['mean'] > 0 else 0
-        features['range_value'] = np.max(signal_data) - np.min(signal_data)
-        
-        return features
-    
-    def extract_frequency_features(self, signal_data: np.ndarray) -> Dict[str, float]:
-        """提取频域特征"""
-        features = {}
-        
-        # 计算功率谱密度
-        freqs, psd = welch(signal_data, fs=self.sampling_rate, nperseg=min(256, len(signal_data)//4))
-        
-        # 主导频率
-        features['dominant_frequency'] = freqs[np.argmax(psd)]
-        
-        # 频带功率
-        features['low_freq_power'] = self._band_power(freqs, psd, 0, 0.5)      # 0-0.5Hz
-        features['mid_freq_power'] = self._band_power(freqs, psd, 0.5, 1.5)    # 0.5-1.5Hz  
-        features['high_freq_power'] = self._band_power(freqs, psd, 1.5, 2.4)   # 1.5-2.4Hz
-        
-        # 频域统计特征
-        features['spectral_centroid'] = np.sum(freqs * psd) / np.sum(psd)
-        features['spectral_bandwidth'] = np.sqrt(np.sum(((freqs - features['spectral_centroid']) ** 2) * psd) / np.sum(psd))
-        features['spectral_entropy'] = entropy(psd + 1e-12)
-        
-        return features
-    
-    def extract_nonlinear_features(self, signal_data: np.ndarray) -> Dict[str, float]:
-        """提取非线性特征"""
-        features = {}
-        
-        # 样本熵
-        features['sample_entropy'] = self._sample_entropy(signal_data)
-        
-        # 零交叉率
-        features['zero_crossing_rate'] = self._zero_crossing_rate(signal_data)
-        
-        # Hurst指数（长程相关性）
-        features['hurst_exponent'] = self._hurst_exponent(signal_data)
-        
-        # 分形维数
-        features['fractal_dimension'] = self._fractal_dimension(signal_data)
-        
-        # Lyapunov指数（混沌性）
-        features['lyapunov_exponent'] = self._lyapunov_exponent(signal_data)
-        
-        # 去趋势波动分析
-        features['dfa_alpha'] = self._detrended_fluctuation_analysis(signal_data)
-        
-        return features
-    
-    def extract_morphological_features(self, signal_data: np.ndarray) -> Dict[str, float]:
-        """提取形态学特征"""
-        features = {}
-        
-        # 峰值特征
-        peaks, _ = find_peaks(signal_data, height=np.mean(signal_data) + np.std(signal_data))
-        
-        if len(peaks) > 0:
-            # 峰值宽度
-            widths, _, _, _ = peak_widths(signal_data, peaks, rel_height=0.5)
-            features['peak_width_mean'] = np.mean(widths)
-            features['peak_width_std'] = np.std(widths)
-            
-            # 峰值突出度
-            prominences, _, _ = signal.peak_prominences(signal_data, peaks)
-            features['peak_prominence_mean'] = np.mean(prominences)
-            features['peak_prominence_std'] = np.std(prominences)
-            
-            # 上升/下降时间
-            features['rise_time_mean'] = self._calculate_rise_times(signal_data, peaks)
-            features['decay_time_mean'] = self._calculate_decay_times(signal_data, peaks)
-        else:
-            # 如果没有检测到峰值，设置默认值
-            features.update({
-                'peak_width_mean': 0, 'peak_width_std': 0,
-                'peak_prominence_mean': 0, 'peak_prominence_std': 0,
-                'rise_time_mean': 0, 'decay_time_mean': 0
-            })
-        
-        # 波形规律性
-        features['regularity_index'] = self._calculate_regularity_index(signal_data)
-        
-        # 突发检测
-        features['burst_duration_mean'] = self._calculate_burst_duration(signal_data)
-        features['burst_intensity_mean'] = self._calculate_burst_intensity(signal_data)
-        
-        return features
-    
+        # 输出主要转换模式
+        sorted_transitions = sorted(transition_counts.items(), key=lambda x: x[1], reverse=True)
+        self.logger.info("主要状态转换模式:")
+        for (from_state, to_state), count in sorted_transitions[:10]:
+            self.logger.info(f"  State {from_state+1} → State {to_state+1}: {count} 次")
+
     def identify_states_enhanced(self, features: np.ndarray, method: str = 'ensemble', 
                                n_states: int = 4) -> np.ndarray:
         """
@@ -1913,15 +1939,692 @@ class EnhancedStateAnalyzer:
         
         fig.write_html(os.path.join(output_dir, 'interactive_feature_importance.html'))
 
+    def extract_phase_space_features(self, signal_data: np.ndarray) -> Dict[str, float]:
+        """提取相空间特征"""
+        # 进行相空间重构
+        phase_space = self.phase_analyzer.phase_space_reconstruction(signal_data)
+        
+        # 从相空间中提取特征
+        return self.phase_analyzer.extract_phase_space_features(phase_space)
+    
+    def extract_graph_features(self, signal_data: np.ndarray) -> Dict[str, float]:
+        """提取图特征"""
+        features = {}
+        
+        # 构建时序图
+        graphs = self.graph_builder.build_temporal_graph(signal_data)
+        
+        if graphs:
+            # 计算图的基本统计特征
+            all_node_features = np.concatenate(graphs, axis=0)
+            
+            features['graph_mean_node_value'] = np.mean(all_node_features[:, 0])
+            features['graph_std_node_value'] = np.std(all_node_features[:, 0])
+            features['graph_max_node_value'] = np.max(all_node_features[:, 0])
+            features['graph_min_node_value'] = np.min(all_node_features[:, 0])
+            
+            # 计算图的连通性特征
+            features['graph_num_windows'] = len(graphs)
+            features['graph_avg_window_size'] = np.mean([len(g) for g in graphs])
+            
+            # 计算节点特征的变异性
+            if all_node_features.shape[1] > 1:
+                features['graph_first_diff_mean'] = np.mean(all_node_features[:, 1])
+                features['graph_first_diff_std'] = np.std(all_node_features[:, 1])
+            else:
+                features['graph_first_diff_mean'] = 0.0
+                features['graph_first_diff_std'] = 0.0
+                
+            if all_node_features.shape[1] > 2:
+                features['graph_second_diff_mean'] = np.mean(all_node_features[:, 2])
+                features['graph_second_diff_std'] = np.std(all_node_features[:, 2])
+            else:
+                features['graph_second_diff_mean'] = 0.0
+                features['graph_second_diff_std'] = 0.0
+        else:
+            # 如果无法构建图，返回默认值
+            features.update({
+                'graph_mean_node_value': 0.0,
+                'graph_std_node_value': 0.0,
+                'graph_max_node_value': 0.0,
+                'graph_min_node_value': 0.0,
+                'graph_num_windows': 0,
+                'graph_avg_window_size': 0.0,
+                'graph_first_diff_mean': 0.0,
+                'graph_first_diff_std': 0.0,
+                'graph_second_diff_mean': 0.0,
+                'graph_second_diff_std': 0.0
+            })
+        
+        return features
+    
+    # 保持原有的特征提取方法
+    def extract_temporal_features(self, signal_data: np.ndarray) -> Dict[str, float]:
+        """提取时域特征"""
+        features = {}
+        
+        # 基础统计特征
+        features['mean'] = np.mean(signal_data)
+        features['std'] = np.std(signal_data)
+        features['var'] = np.var(signal_data)
+        features['skewness'] = self._calculate_skewness(signal_data)
+        features['kurtosis'] = self._calculate_kurtosis(signal_data)
+        
+        # 动态特征
+        features['peak_count'] = self._count_peaks(signal_data)
+        features['peak_amplitude_mean'] = self._mean_peak_amplitude(signal_data)
+        features['peak_amplitude_std'] = self._std_peak_amplitude(signal_data)
+        features['inter_peak_interval_mean'] = self._mean_inter_peak_interval(signal_data)
+        features['inter_peak_interval_std'] = self._std_inter_peak_interval(signal_data)
+        
+        # 活动性特征
+        features['activity_rate'] = self._calculate_activity_rate(signal_data)
+        features['burst_rate'] = self._calculate_burst_rate(signal_data)
+        features['silence_periods'] = self._calculate_silence_periods(signal_data)
+        
+        # 变异性特征
+        features['coefficient_variation'] = features['std'] / features['mean'] if features['mean'] > 0 else 0
+        features['range_value'] = np.max(signal_data) - np.min(signal_data)
+        
+        return features
+    
+    def extract_frequency_features(self, signal_data: np.ndarray) -> Dict[str, float]:
+        """提取频域特征"""
+        features = {}
+        
+        # 计算功率谱密度
+        freqs, psd = welch(signal_data, fs=self.sampling_rate, nperseg=min(256, len(signal_data)//4))
+        
+        # 主导频率
+        features['dominant_frequency'] = freqs[np.argmax(psd)]
+        
+        # 频带功率
+        features['low_freq_power'] = self._band_power(freqs, psd, 0, 0.5)      # 0-0.5Hz
+        features['mid_freq_power'] = self._band_power(freqs, psd, 0.5, 1.5)    # 0.5-1.5Hz  
+        features['high_freq_power'] = self._band_power(freqs, psd, 1.5, 2.4)   # 1.5-2.4Hz
+        
+        # 频域统计特征
+        features['spectral_centroid'] = np.sum(freqs * psd) / np.sum(psd)
+        features['spectral_bandwidth'] = np.sqrt(np.sum(((freqs - features['spectral_centroid']) ** 2) * psd) / np.sum(psd))
+        features['spectral_entropy'] = entropy(psd + 1e-12)
+        
+        return features
+    
+    def extract_nonlinear_features(self, signal_data: np.ndarray) -> Dict[str, float]:
+        """提取非线性特征"""
+        features = {}
+        
+        # 样本熵
+        features['sample_entropy'] = self._sample_entropy(signal_data)
+        
+        # 零交叉率
+        features['zero_crossing_rate'] = self._zero_crossing_rate(signal_data)
+        
+        # Hurst指数（长程相关性）
+        features['hurst_exponent'] = self._hurst_exponent(signal_data)
+        
+        # 分形维数
+        features['fractal_dimension'] = self._fractal_dimension(signal_data)
+        
+        # Lyapunov指数（混沌性）
+        features['lyapunov_exponent'] = self._lyapunov_exponent(signal_data)
+        
+        # 去趋势波动分析
+        features['dfa_alpha'] = self._detrended_fluctuation_analysis(signal_data)
+        
+        return features
+    
+    def extract_morphological_features(self, signal_data: np.ndarray) -> Dict[str, float]:
+        """提取形态学特征"""
+        features = {}
+        
+        # 峰值特征
+        peaks, _ = find_peaks(signal_data, height=np.mean(signal_data) + np.std(signal_data))
+        
+        if len(peaks) > 0:
+            # 峰值宽度
+            widths, _, _, _ = peak_widths(signal_data, peaks, rel_height=0.5)
+            features['peak_width_mean'] = np.mean(widths)
+            features['peak_width_std'] = np.std(widths)
+            
+            # 峰值突出度
+            prominences, _, _ = signal.peak_prominences(signal_data, peaks)
+            features['peak_prominence_mean'] = np.mean(prominences)
+            features['peak_prominence_std'] = np.std(prominences)
+            
+            # 上升/下降时间
+            features['rise_time_mean'] = self._calculate_rise_times(signal_data, peaks)
+            features['decay_time_mean'] = self._calculate_decay_times(signal_data, peaks)
+        else:
+            # 如果没有检测到峰值，设置默认值
+            features.update({
+                'peak_width_mean': 0, 'peak_width_std': 0,
+                'peak_prominence_mean': 0, 'peak_prominence_std': 0,
+                'rise_time_mean': 0, 'decay_time_mean': 0
+            })
+        
+        # 波形规律性
+        features['regularity_index'] = self._calculate_regularity_index(signal_data)
+        
+        # 突发检测
+        features['burst_duration_mean'] = self._calculate_burst_duration(signal_data)
+        features['burst_intensity_mean'] = self._calculate_burst_intensity(signal_data)
+        
+        return features
+
+    def visualize_temporal_states(self, data: pd.DataFrame, results_df: pd.DataFrame, 
+                                 output_dir: str = '../results') -> None:
+        """时间窗口状态可视化"""
+        self.logger.info("开始时间窗口状态可视化...")
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 1. 绘制神经元状态时间线
+        self._plot_neuron_state_timeline(data, results_df, output_dir)
+        
+        # 2. 绘制状态转换矩阵
+        self._plot_state_transition_matrix(results_df, output_dir)
+        
+        # 3. 绘制状态持续时间分布
+        self._plot_state_duration_distribution(results_df, output_dir)
+        
+        # 4. 绘制神经元状态多样性分析
+        self._plot_neuron_state_diversity(results_df, output_dir)
+        
+        # 5. 绘制时间窗口状态热图
+        self._plot_temporal_state_heatmap(results_df, output_dir)
+        
+        # 6. 绘制代表性状态波形
+        self._plot_representative_state_waveforms(data, results_df, output_dir)
+        
+        # 7. 如果可用，生成交互式时间线
+        if PLOTLY_AVAILABLE:
+            self._create_interactive_timeline(data, results_df, output_dir)
+        
+        self.logger.info("时间窗口状态可视化完成")
+    
+    def _plot_neuron_state_timeline(self, data: pd.DataFrame, results_df: pd.DataFrame, 
+                                   output_dir: str) -> None:
+        """绘制神经元状态时间线"""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成神经元状态时间线...")
+            
+            # 选择前6个神经元进行可视化
+            neurons = results_df['neuron_id'].unique()[:6]
+            
+            fig, axes = plt.subplots(len(neurons), 1, figsize=(16, 2.5 * len(neurons)), sharex=True)
+            if len(neurons) == 1:
+                axes = [axes]
+            
+            colors = [list(self.state_colors.values())[i] for i in range(4)]
+            
+            for idx, neuron in enumerate(neurons):
+                ax = axes[idx]
+                
+                # 获取该神经元的状态数据
+                neuron_states = results_df[results_df['neuron_id'] == neuron].sort_values('window_idx')
+                
+                # 绘制原始信号
+                signal = data[neuron].values
+                time_signal = np.arange(len(signal)) / self.sampling_rate
+                ax.plot(time_signal, signal, color='lightgray', alpha=0.7, linewidth=0.8, label='Signal')
+                
+                # 绘制状态区域
+                for _, row in neuron_states.iterrows():
+                    color = colors[row['state_label']] if row['state_label'] < len(colors) else 'gray'
+                    ax.axvspan(row['start_time'], row['end_time'], 
+                             color=color, alpha=0.3, label=f"State {row['state_label']+1}" if idx == 0 else "")
+                
+                ax.set_ylabel(f'{neuron}\nConcentration', fontsize=10)
+                ax.grid(True, alpha=0.3)
+                
+                # 只在第一个子图显示图例
+                if idx == 0:
+                    handles, labels = ax.get_legend_handles_labels()
+                    unique_labels = []
+                    unique_handles = []
+                    for handle, label in zip(handles, labels):
+                        if label not in unique_labels:
+                            unique_labels.append(label)
+                            unique_handles.append(handle)
+                    ax.legend(unique_handles, unique_labels, loc='upper right', fontsize=8)
+            
+            axes[-1].set_xlabel('Time (s)', fontsize=12)
+            plt.suptitle('Neuron State Timeline Analysis', fontsize=16, fontweight='bold')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'neuron_state_timeline.png'), dpi=300, bbox_inches='tight')
+            plt.close()
+    
+    def _plot_state_transition_matrix(self, results_df: pd.DataFrame, output_dir: str) -> None:
+        """绘制状态转换矩阵"""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成状态转换矩阵...")
+            
+            # 计算转换矩阵
+            unique_states = sorted(results_df['state_label'].unique())
+            n_states = len(unique_states)
+            transition_matrix = np.zeros((n_states, n_states))
+            
+            for neuron in results_df['neuron_id'].unique():
+                neuron_data = results_df[results_df['neuron_id'] == neuron].sort_values('window_idx')
+                states = neuron_data['state_label'].values
+                
+                for i in range(len(states) - 1):
+                    from_state = states[i]
+                    to_state = states[i + 1]
+                    transition_matrix[from_state, to_state] += 1
+            
+            # 归一化
+            row_sums = transition_matrix.sum(axis=1, keepdims=True)
+            row_sums[row_sums == 0] = 1  # 避免除零
+            transition_matrix_norm = transition_matrix / row_sums
+            
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(transition_matrix_norm, 
+                       annot=True, 
+                       fmt='.3f',
+                       cmap='Blues',
+                       xticklabels=[f'State {s+1}' for s in unique_states],
+                       yticklabels=[f'State {s+1}' for s in unique_states],
+                       cbar_kws={'label': 'Transition Probability'})
+            
+            plt.title('State Transition Matrix', fontsize=16, fontweight='bold')
+            plt.xlabel('To State')
+            plt.ylabel('From State')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'state_transition_matrix.png'), dpi=300, bbox_inches='tight')
+            plt.close()
+    
+    def _plot_state_duration_distribution(self, results_df: pd.DataFrame, output_dir: str) -> None:
+        """绘制状态持续时间分布"""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成状态持续时间分布...")
+            
+            # 计算连续状态的持续时间
+            state_durations = []
+            state_labels = []
+            
+            for neuron in results_df['neuron_id'].unique():
+                neuron_data = results_df[results_df['neuron_id'] == neuron].sort_values('window_idx')
+                
+                current_state = None
+                current_duration = 0
+                
+                for _, row in neuron_data.iterrows():
+                    if current_state == row['state_label']:
+                        current_duration += row['duration']
+                    else:
+                        if current_state is not None:
+                            state_durations.append(current_duration)
+                            state_labels.append(f'State {current_state+1}')
+                        current_state = row['state_label']
+                        current_duration = row['duration']
+                
+                # 添加最后一个状态
+                if current_state is not None:
+                    state_durations.append(current_duration)
+                    state_labels.append(f'State {current_state+1}')
+            
+            # 创建DataFrame
+            duration_df = pd.DataFrame({'State': state_labels, 'Duration': state_durations})
+            
+            plt.figure(figsize=(12, 8))
+            
+            # 箱线图
+            plt.subplot(2, 1, 1)
+            sns.boxplot(data=duration_df, x='State', y='Duration')
+            plt.title('State Duration Distribution (Box Plot)', fontweight='bold')
+            plt.ylabel('Duration (s)')
+            
+            # 直方图
+            plt.subplot(2, 1, 2)
+            unique_states = duration_df['State'].unique()
+            colors = [list(self.state_colors.values())[i] for i in range(len(unique_states))]
+            
+            for i, state in enumerate(unique_states):
+                state_data = duration_df[duration_df['State'] == state]['Duration']
+                plt.hist(state_data, alpha=0.7, label=state, color=colors[i], bins=20)
+            
+            plt.title('State Duration Distribution (Histogram)', fontweight='bold')
+            plt.xlabel('Duration (s)')
+            plt.ylabel('Frequency')
+            plt.legend()
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'state_duration_distribution.png'), dpi=300, bbox_inches='tight')
+            plt.close()
+    
+    def _plot_neuron_state_diversity(self, results_df: pd.DataFrame, output_dir: str) -> None:
+        """绘制神经元状态多样性分析"""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成神经元状态多样性分析...")
+            
+            # 计算每个神经元的状态多样性
+            neuron_diversity = []
+            
+            for neuron in results_df['neuron_id'].unique():
+                neuron_data = results_df[results_df['neuron_id'] == neuron]
+                
+                # 状态计数
+                state_counts = neuron_data['state_label'].value_counts()
+                total_windows = len(neuron_data)
+                
+                # 计算Shannon熵作为多样性指标
+                probabilities = state_counts / total_windows
+                shannon_entropy = -np.sum(probabilities * np.log2(probabilities + 1e-10))
+                
+                # 计算状态切换次数
+                states = neuron_data.sort_values('window_idx')['state_label'].values
+                switches = np.sum(np.diff(states) != 0)
+                
+                neuron_diversity.append({
+                    'neuron_id': neuron,
+                    'unique_states': len(state_counts),
+                    'shannon_entropy': shannon_entropy,
+                    'state_switches': switches,
+                    'switch_rate': switches / (total_windows - 1) if total_windows > 1 else 0
+                })
+            
+            diversity_df = pd.DataFrame(neuron_diversity)
+            
+            fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+            
+            # 唯一状态数分布
+            axes[0, 0].hist(diversity_df['unique_states'], bins=range(1, 6), alpha=0.7, color='skyblue')
+            axes[0, 0].set_title('Distribution of Unique States per Neuron', fontweight='bold')
+            axes[0, 0].set_xlabel('Number of Unique States')
+            axes[0, 0].set_ylabel('Number of Neurons')
+            
+            # Shannon熵分布
+            axes[0, 1].hist(diversity_df['shannon_entropy'], bins=20, alpha=0.7, color='lightgreen')
+            axes[0, 1].set_title('State Diversity (Shannon Entropy)', fontweight='bold')
+            axes[0, 1].set_xlabel('Shannon Entropy')
+            axes[0, 1].set_ylabel('Number of Neurons')
+            
+            # 状态切换次数
+            axes[1, 0].hist(diversity_df['state_switches'], bins=20, alpha=0.7, color='salmon')
+            axes[1, 0].set_title('State Switches per Neuron', fontweight='bold')
+            axes[1, 0].set_xlabel('Number of State Switches')
+            axes[1, 0].set_ylabel('Number of Neurons')
+            
+            # 切换率 vs 多样性
+            scatter = axes[1, 1].scatter(diversity_df['switch_rate'], diversity_df['shannon_entropy'], 
+                                       alpha=0.7, c=diversity_df['unique_states'], cmap='viridis')
+            axes[1, 1].set_title('Switch Rate vs State Diversity', fontweight='bold')
+            axes[1, 1].set_xlabel('State Switch Rate')
+            axes[1, 1].set_ylabel('Shannon Entropy')
+            plt.colorbar(scatter, ax=axes[1, 1], label='Unique States')
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'neuron_state_diversity.png'), dpi=300, bbox_inches='tight')
+            plt.close()
+    
+    def _plot_temporal_state_heatmap(self, results_df: pd.DataFrame, output_dir: str) -> None:
+        """绘制时间窗口状态热图"""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成时间窗口状态热图...")
+            
+            # 选择前20个神经元
+            neurons = results_df['neuron_id'].unique()[:20]
+            max_window = results_df['window_idx'].max()
+            
+            # 创建状态矩阵
+            state_matrix = np.full((len(neurons), max_window + 1), -1)
+            
+            for i, neuron in enumerate(neurons):
+                neuron_data = results_df[results_df['neuron_id'] == neuron]
+                for _, row in neuron_data.iterrows():
+                    state_matrix[i, row['window_idx']] = row['state_label']
+            
+            # 创建自定义颜色映射
+            cmap = plt.cm.Set3
+            
+            plt.figure(figsize=(16, 10))
+            im = plt.imshow(state_matrix, aspect='auto', cmap=cmap, vmin=0, vmax=3)
+            
+            plt.title('Temporal State Heatmap (Neurons vs Time Windows)', fontsize=16, fontweight='bold')
+            plt.xlabel('Time Window Index')
+            plt.ylabel('Neurons')
+            plt.yticks(range(len(neurons)), [f'{n}' for n in neurons])
+            
+            # 创建颜色条
+            cbar = plt.colorbar(im, ticks=[0, 1, 2, 3])
+            cbar.set_label('State')
+            cbar.set_ticklabels(['State 1', 'State 2', 'State 3', 'State 4'])
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'temporal_state_heatmap.png'), dpi=300, bbox_inches='tight')
+            plt.close()
+    
+    def _plot_representative_state_waveforms(self, data: pd.DataFrame, results_df: pd.DataFrame, 
+                                           output_dir: str) -> None:
+        """绘制代表性状态波形"""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            self.logger.info("生成代表性状态波形...")
+            
+            unique_states = sorted(results_df['state_label'].unique())
+            
+            fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+            axes = axes.flatten()
+            
+            for i, state in enumerate(unique_states):
+                if i >= 4:
+                    break
+                
+                ax = axes[i]
+                
+                # 获取该状态的代表性窗口
+                state_windows = results_df[results_df['state_label'] == state]
+                
+                # 随机选择几个窗口
+                selected_windows = state_windows.sample(min(5, len(state_windows)))
+                
+                colors = plt.cm.Set3(np.linspace(0, 1, len(selected_windows)))
+                
+                for (_, row), color in zip(selected_windows.iterrows(), colors):
+                    neuron = row['neuron_id']
+                    start_idx = int(row['start_time'] * self.sampling_rate)
+                    end_idx = int(row['end_time'] * self.sampling_rate)
+                    
+                    if start_idx < len(data[neuron]) and end_idx <= len(data[neuron]):
+                        window_signal = data[neuron].iloc[start_idx:end_idx].values
+                        time_window = np.arange(len(window_signal)) / self.sampling_rate
+                        
+                        ax.plot(time_window, window_signal, color=color, alpha=0.7, 
+                               linewidth=1.5, label=f'{neuron} (t={row["start_time"]:.1f}s)')
+                
+                state_desc = list(self.state_definitions.values())[state] if state < len(self.state_definitions) else "Unknown State"
+                ax.set_title(f'State {state + 1}: {state_desc}', fontsize=12, fontweight='bold')
+                ax.set_xlabel('Time (s)')
+                ax.set_ylabel('Calcium Concentration')
+                ax.legend(fontsize=8)
+                ax.grid(True, alpha=0.3)
+            
+            # 移除多余的子图
+            for i in range(len(unique_states), 4):
+                axes[i].remove()
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 'representative_state_waveforms.png'), 
+                       dpi=300, bbox_inches='tight')
+            plt.close()
+    
+    def _create_interactive_timeline(self, data: pd.DataFrame, results_df: pd.DataFrame, 
+                                   output_dir: str) -> None:
+        """创建交互式时间线（使用Plotly）"""
+        if not PLOTLY_AVAILABLE:
+            return
+        
+        self.logger.info("生成交互式时间线...")
+        
+        # 选择前3个神经元进行交互式可视化
+        neurons = results_df['neuron_id'].unique()[:3]
+        
+        fig = make_subplots(
+            rows=len(neurons), cols=1,
+            subplot_titles=[f'Neuron {neuron} State Timeline' for neuron in neurons],
+            shared_xaxes=True,
+            vertical_spacing=0.1
+        )
+        
+        colors = ['red', 'gold', 'green', 'blue']
+        
+        for idx, neuron in enumerate(neurons):
+            # 添加原始信号
+            signal = data[neuron].values
+            time_signal = np.arange(len(signal)) / self.sampling_rate
+            
+            fig.add_trace(
+                go.Scatter(
+                    x=time_signal,
+                    y=signal,
+                    mode='lines',
+                    name=f'{neuron} Signal',
+                    line=dict(color='lightgray', width=1),
+                    hovertemplate='Time: %{x:.2f}s<br>Concentration: %{y:.3f}<extra></extra>',
+                    showlegend=(idx == 0)
+                ),
+                row=idx+1, col=1
+            )
+            
+            # 添加状态区域
+            neuron_states = results_df[results_df['neuron_id'] == neuron].sort_values('window_idx')
+            
+            for _, row in neuron_states.iterrows():
+                color = colors[row['state_label']] if row['state_label'] < len(colors) else 'gray'
+                
+                fig.add_vrect(
+                    x0=row['start_time'], x1=row['end_time'],
+                    fillcolor=color, opacity=0.3,
+                    line_width=0,
+                    row=idx+1, col=1
+                )
+        
+        fig.update_layout(
+            title='Interactive Neuron State Timeline',
+            height=200 * len(neurons),
+            showlegend=True
+        )
+        
+        fig.update_xaxes(title_text='Time (s)', row=len(neurons), col=1)
+        fig.update_yaxes(title_text='Calcium Concentration')
+        
+        fig.write_html(os.path.join(output_dir, 'interactive_timeline.html'))
+    
+    def save_temporal_results(self, results_df: pd.DataFrame, features: np.ndarray,
+                            feature_names: List[str], output_path: str) -> None:
+        """保存时间窗口分析结果"""
+        self.logger.info(f"保存时间窗口分析结果到: {output_path}")
+        
+        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+            # 保存主要结果
+            results_df.to_excel(writer, sheet_name='Temporal State Analysis', index=False)
+            
+            # 保存神经元状态统计
+            neuron_stats = results_df.groupby('neuron_id').agg({
+                'state_label': ['count', 'nunique'],
+                'duration': 'sum'
+            }).round(3)
+            neuron_stats.columns = ['Total_Windows', 'Unique_States', 'Total_Duration']
+            neuron_stats.reset_index().to_excel(writer, sheet_name='Neuron Statistics', index=False)
+            
+            # 保存状态统计
+            state_stats = results_df.groupby('state_name').agg({
+                'neuron_id': 'nunique',
+                'window_idx': 'count',
+                'duration': 'sum'
+            }).round(3)
+            state_stats.columns = ['Unique_Neurons', 'Window_Count', 'Total_Duration']
+            state_stats.reset_index().to_excel(writer, sheet_name='State Statistics', index=False)
+            
+            # 保存特征数据（窗口级别）
+            features_df = pd.DataFrame(features, columns=feature_names)
+            window_features = pd.concat([
+                results_df[['neuron_id', 'window_idx', 'start_time', 'state_label']],
+                features_df
+            ], axis=1)
+            window_features.to_excel(writer, sheet_name='Window Features', index=False)
+
+    def extract_comprehensive_features_traditional(self, data: pd.DataFrame) -> Tuple[np.ndarray, List[str], List[str]]:
+        """
+        提取传统综合特征（基于整个信号，保持兼容性）
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            神经元钙离子浓度数据
+            
+        Returns
+        -------
+        Tuple[np.ndarray, List[str], List[str]]
+            特征矩阵, 特征名称列表, 神经元名称列表
+        """
+        self.logger.info("开始提取传统综合神经元特征...")
+        
+        # 识别神经元列
+        neuron_columns = [col for col in data.columns 
+                         if col.startswith('n') and col[1:].isdigit()]
+        
+        feature_list = []
+        feature_names = None
+        
+        for neuron in neuron_columns:
+            signal_data = data[neuron].values
+            
+            # 提取传统特征
+            temporal_features = self.extract_temporal_features(signal_data)
+            frequency_features = self.extract_frequency_features(signal_data)
+            nonlinear_features = self.extract_nonlinear_features(signal_data)
+            morphological_features = self.extract_morphological_features(signal_data)
+            
+            # 提取相空间特征
+            phase_space_features = self.extract_phase_space_features(signal_data)
+            
+            # 提取图特征
+            graph_features = self.extract_graph_features(signal_data)
+            
+            # 合并所有特征
+            all_features = {
+                **temporal_features, 
+                **frequency_features,
+                **nonlinear_features, 
+                **morphological_features,
+                **phase_space_features,
+                **graph_features
+            }
+            
+            if feature_names is None:
+                feature_names = list(all_features.keys())
+            
+            feature_list.append(list(all_features.values()))
+        
+        features_matrix = np.array(feature_list)
+        
+        self.logger.info(f"传统特征提取完成，共提取 {len(feature_names)} 个特征，{len(neuron_columns)} 个神经元")
+        
+        return features_matrix, feature_names, neuron_columns
+
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description='增强版神经元放电状态分析')
+    parser = argparse.ArgumentParser(description='增强版神经元放电状态分析（支持时间窗口动态分析）')
     parser.add_argument('--input', type=str, 
                        default='../datasets/processed_EMtrace01.xlsx',
                        help='输入数据文件路径')
     parser.add_argument('--output-dir', type=str, 
-                       default='../results/enhanced_state_analysis/',
+                       default='../results/temporal_state_analysis/',
                        help='输出目录')
     parser.add_argument('--method', type=str, default='ensemble',
                        choices=['kmeans', 'dbscan', 'ensemble', 'gcn'],
@@ -1930,6 +2633,13 @@ def main():
                        help='预期状态数量')
     parser.add_argument('--sampling-rate', type=float, default=4.8,
                        help='采样频率(Hz)')
+    parser.add_argument('--window-duration', type=float, default=30.0,
+                       help='时间窗口长度（秒）')
+    parser.add_argument('--overlap-ratio', type=float, default=0.5,
+                       help='窗口重叠比例（0-1）')
+    parser.add_argument('--analysis-mode', type=str, default='temporal',
+                       choices=['temporal', 'traditional'],
+                       help='分析模式：temporal(时间窗口分析) 或 traditional(传统全信号分析)')
     
     args = parser.parse_args()
     
@@ -1937,31 +2647,78 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
     # 初始化增强版分析器
-    analyzer = EnhancedStateAnalyzer(sampling_rate=args.sampling_rate)
+    analyzer = EnhancedStateAnalyzer(
+        sampling_rate=args.sampling_rate,
+        window_duration=args.window_duration,
+        overlap_ratio=args.overlap_ratio
+    )
     
     try:
         # 加载数据
         data = analyzer.load_data(args.input)
         
-        # 提取综合特征
-        features, feature_names, neuron_names = analyzer.extract_comprehensive_features(data)
-        
-        # 识别状态
-        labels = analyzer.identify_states_enhanced(features, method=args.method, 
-                                                 n_states=args.n_states)
-        
-        # 增强版可视化
-        analyzer.visualize_enhanced_states(data, labels, neuron_names, args.output_dir)
-        
-        # 保存增强结果
-        output_file = os.path.join(args.output_dir, 'enhanced_neuron_states_analysis.xlsx')
-        analyzer.save_enhanced_results(data, labels, neuron_names, features, 
-                                     feature_names, output_file)
-        
-        print(f"增强版神经元状态分析完成！结果保存在: {args.output_dir}")
+        if args.analysis_mode == 'temporal':
+            # 时间窗口分析模式（推荐）
+            analyzer.logger.info("=== 进行时间窗口动态状态分析 ===")
+            
+            # 进行时间窗口状态分析
+            labels, results_df = analyzer.analyze_temporal_states(
+                data, method=args.method, n_states=args.n_states
+            )
+            
+            # 提取特征用于保存
+            features, feature_names, _ = analyzer.extract_windowed_features(data)
+            
+            # 时间窗口可视化
+            analyzer.visualize_temporal_states(data, results_df, args.output_dir)
+            
+            # 保存时间窗口分析结果
+            output_file = os.path.join(args.output_dir, 'temporal_neuron_states_analysis.xlsx')
+            analyzer.save_temporal_results(results_df, features, feature_names, output_file)
+            
+            # 输出关键统计信息
+            analyzer.logger.info("\n=== 时间窗口分析结果摘要 ===")
+            analyzer.logger.info(f"总时间窗口数: {len(results_df)}")
+            analyzer.logger.info(f"分析神经元数: {results_df['neuron_id'].nunique()}")
+            analyzer.logger.info(f"识别状态数: {results_df['state_label'].nunique()}")
+            
+            # 每个神经元的状态多样性
+            neuron_diversity = results_df.groupby('neuron_id')['state_label'].nunique()
+            analyzer.logger.info(f"神经元状态多样性: 平均 {neuron_diversity.mean():.2f} 种状态/神经元")
+            analyzer.logger.info(f"状态切换最多的神经元: {neuron_diversity.idxmax()} ({neuron_diversity.max()} 种状态)")
+            
+            print(f"\n🎉 时间窗口神经元状态分析完成！")
+            print(f"📊 结果保存在: {args.output_dir}")
+            print(f"📈 共分析了 {results_df['neuron_id'].nunique()} 个神经元的 {len(results_df)} 个时间窗口")
+            print(f"🔍 识别出 {results_df['state_label'].nunique()} 种不同的放电状态")
+            
+        else:
+            # 传统分析模式（兼容原有功能）
+            analyzer.logger.info("=== 进行传统全信号状态分析 ===")
+            
+            # 提取综合特征（原有方法，基于整个信号）
+            features, feature_names, neuron_names = analyzer.extract_comprehensive_features_traditional(data)
+            
+            # 识别状态
+            labels = analyzer.identify_states_enhanced(features, method=args.method, 
+                                                     n_states=args.n_states)
+            
+            # 传统可视化
+            analyzer.visualize_enhanced_states(data, labels, neuron_names, args.output_dir)
+            
+            # 保存传统分析结果
+            output_file = os.path.join(args.output_dir, 'traditional_neuron_states_analysis.xlsx')
+            analyzer.save_enhanced_results(data, labels, neuron_names, features, 
+                                         feature_names, output_file)
+            
+            print(f"\n🎉 传统神经元状态分析完成！")
+            print(f"📊 结果保存在: {args.output_dir}")
+            print(f"📈 共分析了 {len(neuron_names)} 个神经元")
+            print(f"🔍 识别出 {len(set(labels))} 种不同的放电状态")
         
     except Exception as e:
         analyzer.logger.error(f"分析过程中出现错误: {str(e)}")
+        print(f"❌ 分析失败: {str(e)}")
         raise
 
 
