@@ -72,7 +72,7 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
     save_dir : str, optional
         图像保存目录，默认为None（不保存）
     sampling_rate : float, optional
-        采样频率，默认为4.8Hz（用于将时间戳转换为秒）
+        采样频率，默认为4.8Hz（保留参数以保持兼容性，但现在横坐标使用时间戳）
     
     Returns
     -------
@@ -101,33 +101,43 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
         # 没有行为数据，只创建一个图表
         fig, ax_main = plt.subplots(figsize=(60, 15))
     
-    # 计算时间轴（从时间戳转换为秒）
-    time_seconds = df['stamp'] / sampling_rate
+    # 使用时间戳作为横坐标
+    time_stamps = df['stamp']
     
     # 绘制钙离子浓度变化曲线
-    ax_main.plot(time_seconds, df[neuron_id], linewidth=2, color='#1f77b4', 
+    ax_main.plot(time_stamps, df[neuron_id], linewidth=2, color='#1f77b4', 
                  label='Calcium Signal')
     
     # 添加平滑曲线（移动平均）
     window_size = min(10, len(df) // 10)  # 根据数据长度调整窗口大小
     if window_size > 1:
         smooth_data = df[neuron_id].rolling(window=window_size, center=True).mean()
-        ax_main.plot(time_seconds, smooth_data, linewidth=2.5, color='#ff7f0e', alpha=0.7, 
+        ax_main.plot(time_stamps, smooth_data, linewidth=2.5, color='#ff7f0e', alpha=0.7, 
                     label=f'Smooth Curve (Window={window_size})')
     
     # 设置图表样式和标题
     ax_main.set_title(f'Neuron {neuron_id} Calcium Concentration Fluctuation', fontsize=50)
-    ax_main.set_xlabel('Time (seconds)', fontsize=48)
+    ax_main.set_xlabel('Time (stamps)', fontsize=48)
     ax_main.set_ylabel('Calcium Concentration', fontsize=48)
     ax_main.grid(True, linestyle='--', alpha=0.7)
     
     # 设置坐标轴刻度标签的字体大小
     ax_main.tick_params(axis='both', which='major', labelsize=40)
     
-    # 设置横坐标刻度，每100秒显示一个刻度
-    max_time = time_seconds.max()
-    step = 100  # 每100秒显示一个刻度
-    tick_positions = np.arange(0, max_time + step, step)
+    # 设置横坐标刻度，根据时间戳范围自动调整刻度间隔
+    max_stamp = time_stamps.max()
+    min_stamp = time_stamps.min()
+    stamp_range = max_stamp - min_stamp
+    
+    # 根据时间戳范围动态设置刻度间隔
+    if stamp_range > 10000:
+        step = 500  # 大范围时每500个时间戳显示一个刻度
+    elif stamp_range > 5000:
+        step = 200  # 中等范围时每200个时间戳显示一个刻度
+    else:
+        step = 100  # 小范围时每100个时间戳显示一个刻度
+    
+    tick_positions = np.arange(min_stamp, max_stamp + step, step)
     ax_main.set_xticks(tick_positions)
     ax_main.tick_params(axis='x', rotation=30)  # 旋转刻度标签以防重叠
     
@@ -137,9 +147,9 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
     min_val = df[neuron_id].min()
     min_idx = df[neuron_id].idxmin()
     
-    ax_main.scatter(time_seconds.iloc[max_idx], max_val, color='red', s=100, zorder=5, 
+    ax_main.scatter(time_stamps.iloc[max_idx], max_val, color='red', s=100, zorder=5, 
                    label=f'Maximum: {max_val:.2f}')
-    ax_main.scatter(time_seconds.iloc[min_idx], min_val, color='green', s=100, zorder=5, 
+    ax_main.scatter(time_stamps.iloc[min_idx], min_val, color='green', s=100, zorder=5, 
                    label=f'Minimum: {min_val:.2f}')
     
     # 添加统计信息
@@ -182,7 +192,7 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
         
         # 找出每种行为的连续区间
         current_behavior = None
-        start_time = None
+        start_stamp = None
         
         # 为了确保最后一个区间也被记录，将索引列表扩展一个元素
         extended_index = list(df.index) + [None]
@@ -192,30 +202,30 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
         for i, (idx, stamp, behavior) in enumerate(zip(extended_index, extended_stamps, extended_behaviors)):
             # 最后一个元素特殊处理
             if i == len(df):
-                if start_time is not None and current_behavior is not None:
-                    end_time = extended_stamps[i-1] / sampling_rate
-                    behavior_intervals[current_behavior].append((start_time, end_time))
+                if start_stamp is not None and current_behavior is not None:
+                    end_stamp = extended_stamps[i-1]
+                    behavior_intervals[current_behavior].append((start_stamp, end_stamp))
                 break
             
             # 跳过空值
             if pd.isna(behavior):
                 # 如果之前有行为，则结束当前区间
-                if start_time is not None and current_behavior is not None:
-                    end_time = stamp / sampling_rate
-                    behavior_intervals[current_behavior].append((start_time, end_time))
-                    start_time = None
+                if start_stamp is not None and current_behavior is not None:
+                    end_stamp = stamp
+                    behavior_intervals[current_behavior].append((start_stamp, end_stamp))
+                    start_stamp = None
                     current_behavior = None
                 continue
             
             # 如果是新的行为类型或第一个行为
             if behavior != current_behavior:
                 # 如果之前有行为，先结束当前区间
-                if start_time is not None and current_behavior is not None:
-                    end_time = stamp / sampling_rate
-                    behavior_intervals[current_behavior].append((start_time, end_time))
+                if start_stamp is not None and current_behavior is not None:
+                    end_stamp = stamp
+                    behavior_intervals[current_behavior].append((start_stamp, end_stamp))
                 
                 # 开始新的行为区间
-                start_time = stamp / sampling_rate
+                start_stamp = stamp
                 current_behavior = behavior
         
         # 绘制行为标记
@@ -254,21 +264,21 @@ def plot_neuron_calcium(df: pd.DataFrame, neuron_id: str, save_dir: str = None,
             for behavior, intervals in behavior_intervals.items():
                 behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(list(unique_behaviors).index(behavior) % 10))
                 
-                for start_time, end_time in intervals:
+                for start_stamp, end_stamp in intervals:
                     # 如果区间有宽度
-                    if end_time - start_time > 0:  
+                    if end_stamp - start_stamp > 0:  
                         # 在行为标记子图中绘制区间
                         rect = plt.Rectangle(
-                            (start_time, y_positions[behavior] - 0.4), 
-                            end_time - start_time, 0.8, 
+                            (start_stamp, y_positions[behavior] - 0.4), 
+                            end_stamp - start_stamp, 0.8, 
                             color=behavior_color, alpha=0.9, 
                             ec='black'  # 添加黑色边框以增强可见度
                         )
                         ax_behavior.add_patch(rect)
                         
                         # 在主图中添加区间边界垂直线
-                        ax_main.axvline(x=start_time, color='gray', linestyle='--', linewidth=0.8, alpha=0.6)
-                        ax_main.axvline(x=end_time, color='gray', linestyle='--', linewidth=0.8, alpha=0.6)
+                        ax_main.axvline(x=start_stamp, color='gray', linestyle='--', linewidth=0.8, alpha=0.6)
+                        ax_main.axvline(x=end_stamp, color='gray', linestyle='--', linewidth=0.8, alpha=0.6)
                 
                 # 添加到图例
                 legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
@@ -405,7 +415,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='神经元钙离子波动可视化工具（支持行为标签显示）')
     parser.add_argument('--data', type=str, nargs='+', 
-                        default=['../datasets/processed_Day8EMtrace.xlsx'],
+                        default=['../datasets/processed_EMtrace02.xlsx'],
                         help='数据文件路径列表，支持.md, .csv, .xlsx格式，可提供多个文件路径')
     parser.add_argument('--output', type=str, default=None,
                         help='图像保存根目录，不指定则使用../results/')
@@ -414,7 +424,7 @@ def main():
     parser.add_argument('--report', action='store_true',
                         help='生成神经元统计摘要报告')
     parser.add_argument('--sampling-rate', type=float, default=4.8,
-                        help='采样频率（Hz），用于将时间戳转换为秒，默认为4.8Hz')
+                        help='采样频率（Hz），现在仅用于保持兼容性，横坐标已改为时间戳，默认为4.8Hz')
     
     args = parser.parse_args()
     
