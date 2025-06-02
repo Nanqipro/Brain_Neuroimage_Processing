@@ -13,6 +13,16 @@ import matplotlib.pyplot as plt
 from State_analysis import EnhancedStateAnalyzer
 import os
 
+# 设置matplotlib字体配置以避免字体警告
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+plt.rcParams['font.family'] = ['sans-serif']
+
+# 额外的字体配置
+import matplotlib
+matplotlib.rcParams['mathtext.fontset'] = 'stix'
+matplotlib.rcParams['mathtext.default'] = 'regular'
+
 def generate_test_data(n_neurons: int = 100, n_timepoints: int = 1000, n_states: int = 4) -> pd.DataFrame:
     """
     生成测试用的神经元钙离子浓度数据

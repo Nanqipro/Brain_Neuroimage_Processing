@@ -75,9 +75,18 @@ except ImportError:
     PLOTLY_AVAILABLE = False
     print("Plotly未安装，将只使用matplotlib进行可视化")
 
-# 设置中文字体支持
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
-plt.rcParams['axes.unicode_minus'] = False
+# 设置中文字体支持和数学符号处理
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+plt.rcParams['font.family'] = ['sans-serif']
+
+# 额外的字体配置
+import matplotlib
+matplotlib.rcParams['mathtext.fontset'] = 'stix'  # 数学公式字体
+matplotlib.rcParams['mathtext.default'] = 'regular'  # 数学文本样式
+
+# 禁用字体相关警告
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
 
 
 class PhaseSpaceAnalyzer:
