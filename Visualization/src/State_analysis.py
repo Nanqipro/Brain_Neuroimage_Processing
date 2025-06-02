@@ -10,13 +10,11 @@
 - 时序图构建方法
 - 多特征融合分析
 
-基于6种典型神经元放电状态：
+基于4种典型神经元放电状态：
 - State I: 高频连续振荡状态
 - State II: 规律性脉冲放电状态  
 - State III: 间歇性突发状态
 - State IV: 不规律波动状态
-- State V: 高频密集放电状态
-- State VI: 低频随机活动状态
 
 作者：Clade 4
 日期：2025年5月23日
@@ -65,6 +63,17 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
     print("PyTorch Geometric未安装，将使用传统机器学习方法")
+
+# 导入额外的可视化库
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    from plotly.subplots import make_subplots
+    import plotly.offline as pyo
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    print("Plotly未安装，将只使用matplotlib进行可视化")
 
 # 设置中文字体支持
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
@@ -409,9 +418,7 @@ class EnhancedStateAnalyzer:
             'State I': '高频连续振荡状态',
             'State II': '规律性脉冲放电状态',
             'State III': '间歇性突发状态',
-            'State IV': '不规律波动状态', 
-            'State V': '高频密集放电状态',
-            'State VI': '低频随机活动状态'
+            'State IV': '不规律波动状态'
         }
         
         # 状态颜色映射
@@ -419,9 +426,7 @@ class EnhancedStateAnalyzer:
             'State I': '#8B0000',    # 深红色
             'State II': '#FFD700',   # 金黄色
             'State III': '#228B22',  # 森林绿
-            'State IV': '#4169E1',   # 皇家蓝
-            'State V': '#8A2BE2',    # 蓝紫色
-            'State VI': '#696969'    # 暗灰色
+            'State IV': '#4169E1'    # 皇家蓝
         }
         
         self.logger.info("增强版神经元状态分析器初始化完成")
@@ -717,7 +722,7 @@ class EnhancedStateAnalyzer:
         return features
     
     def identify_states_enhanced(self, features: np.ndarray, method: str = 'ensemble', 
-                               n_states: int = 6) -> np.ndarray:
+                               n_states: int = 4) -> np.ndarray:
         """
         使用增强方法识别神经元放电状态
         
@@ -728,7 +733,7 @@ class EnhancedStateAnalyzer:
         method : str
             分类方法，可选'kmeans', 'dbscan', 'ensemble', 'gcn'
         n_states : int
-            预期状态数量，默认为6
+            预期状态数量，默认为4
             
         Returns
         -------
@@ -814,11 +819,11 @@ class EnhancedStateAnalyzer:
         # 选择几个代表性神经元进行相空间可视化
         unique_states = sorted(set(labels))
         
-        fig = plt.figure(figsize=(20, 12))
+        fig = plt.figure(figsize=(16, 12))
         
         plot_idx = 1
         for state in unique_states:
-            if plot_idx > 6:  # 最多显示6个状态
+            if plot_idx > 4:  # 最多显示4个状态
                 break
                 
             # 找到该状态的神经元
@@ -834,7 +839,7 @@ class EnhancedStateAnalyzer:
                 
                 if phase_space.size > 0 and phase_space.shape[1] >= 3:
                     # 3D相空间图
-                    ax = fig.add_subplot(2, 3, plot_idx, projection='3d')
+                    ax = fig.add_subplot(2, 2, plot_idx, projection='3d')
                     
                     # 使用状态颜色
                     color = list(self.state_colors.values())[state] if state < len(self.state_colors) else 'blue'
@@ -879,6 +884,17 @@ class EnhancedStateAnalyzer:
         # 4. 绘制增强特征分析
         features, feature_names, _ = self.extract_comprehensive_features(data)
         self._plot_enhanced_feature_analysis(features, feature_names, labels, output_dir)
+        
+        # 5. 新增可视化功能
+        self._plot_state_heatmap(data, labels, neuron_names, output_dir)
+        self._plot_temporal_dynamics(data, labels, neuron_names, output_dir)
+        self._plot_frequency_analysis(data, labels, neuron_names, output_dir)
+        self._plot_correlation_matrix(data, labels, neuron_names, output_dir)
+        self._plot_state_transitions(data, labels, neuron_names, output_dir)
+        
+        # 6. 如果可用，生成交互式可视化
+        if PLOTLY_AVAILABLE:
+            self._create_interactive_visualizations(data, labels, neuron_names, features, feature_names, output_dir)
         
         self.logger.info("增强版状态可视化完成")
     
@@ -954,13 +970,13 @@ class EnhancedStateAnalyzer:
     def _plot_state_waveforms(self, data: pd.DataFrame, labels: np.ndarray, 
                              neuron_names: List[str], output_dir: str) -> None:
         """绘制每种状态的典型波形"""
-        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
         axes = axes.flatten()
         
         unique_states = sorted(set(labels))
         
         for i, state in enumerate(unique_states):
-            if i >= 6:  # 最多显示6种状态
+            if i >= 4:  # 最多显示4种状态
                 break
                 
             # 找到该状态的神经元
@@ -981,15 +997,17 @@ class EnhancedStateAnalyzer:
                     ax.plot(time, signal, color=color, alpha=0.7, 
                            linewidth=1.5, label=neuron)
                 
-                ax.set_title(f'State {state + 1}: {self.state_definitions.get(f"State {chr(65+state)}", "Unknown State")}',
+                # 修改状态描述访问方式
+                state_desc = list(self.state_definitions.values())[state] if state < len(self.state_definitions) else "Unknown State"
+                ax.set_title(f'State {state + 1}: {state_desc}',
                            fontsize=12, fontweight='bold')
                 ax.set_xlabel('Time (s)')
                 ax.set_ylabel('Calcium Concentration')
                 ax.legend(fontsize=8)
                 ax.grid(True, alpha=0.3)
         
-        # 移除多余的子图
-        for i in range(len(unique_states), 6):
+        # 移除多余的子图（如果状态数少于4）
+        for i in range(len(unique_states), 4):
             axes[i].remove()
         
         plt.tight_layout()
@@ -1398,6 +1416,466 @@ class EnhancedStateAnalyzer:
         
         return 0.0
 
+    def _plot_state_heatmap(self, data: pd.DataFrame, labels: np.ndarray, 
+                           neuron_names: List[str], output_dir: str) -> None:
+        """绘制状态热图，显示不同神经元在时间上的状态分布"""
+        self.logger.info("生成状态热图...")
+        
+        # 创建状态矩阵（简化版，基于神经元的状态标签）
+        unique_states = sorted(set(labels))
+        state_matrix = np.zeros((len(unique_states), len(neuron_names)))
+        
+        for i, state in enumerate(unique_states):
+            state_neurons = [j for j, label in enumerate(labels) if label == state]
+            for j in state_neurons:
+                state_matrix[i, j] = 1
+        
+        plt.figure(figsize=(15, 8))
+        sns.heatmap(state_matrix, 
+                   xticklabels=[f'{name}' for name in neuron_names[::max(1, len(neuron_names)//20)]], 
+                   yticklabels=[f'State {s+1}' for s in unique_states],
+                   cmap='YlOrRd', 
+                   cbar_kws={'label': 'State Assignment'})
+        
+        plt.title('Neuron State Assignment Heatmap', fontsize=16, fontweight='bold')
+        plt.xlabel('Neurons')
+        plt.ylabel('States')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'state_heatmap.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
+    def _plot_temporal_dynamics(self, data: pd.DataFrame, labels: np.ndarray, 
+                               neuron_names: List[str], output_dir: str) -> None:
+        """绘制时间动态特性分析"""
+        self.logger.info("生成时间动态特性分析...")
+        
+        unique_states = sorted(set(labels))
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        
+        # 1. 每种状态的平均活动强度随时间变化
+        ax1 = axes[0, 0]
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            if state_neurons:
+                # 计算该状态神经元的平均信号
+                state_signals = [data[neuron].values for neuron in state_neurons]
+                mean_signal = np.mean(state_signals, axis=0)
+                
+                time = np.arange(len(mean_signal)) / self.sampling_rate
+                color = list(self.state_colors.values())[state]
+                ax1.plot(time, mean_signal, color=color, label=f'State {state+1}', alpha=0.8)
+        
+        ax1.set_title('Average Activity Over Time by State', fontweight='bold')
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Average Calcium Concentration')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # 2. 状态活动强度的箱线图
+        ax2 = axes[0, 1]
+        state_intensities = []
+        state_labels_plot = []
+        
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            for neuron in state_neurons:
+                signal = data[neuron].values
+                state_intensities.append(np.mean(signal))
+                state_labels_plot.append(f'State {state+1}')
+        
+        df_intensity = pd.DataFrame({'State': state_labels_plot, 'Intensity': state_intensities})
+        sns.boxplot(data=df_intensity, x='State', y='Intensity', ax=ax2)
+        ax2.set_title('Activity Intensity Distribution by State', fontweight='bold')
+        ax2.set_ylabel('Mean Calcium Concentration')
+        
+        # 3. 峰值频率分析
+        ax3 = axes[1, 0]
+        peak_frequencies = []
+        state_labels_peaks = []
+        
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            for neuron in state_neurons:
+                signal = data[neuron].values
+                peaks, _ = find_peaks(signal, height=np.mean(signal) + np.std(signal))
+                peak_freq = len(peaks) / (len(signal) / self.sampling_rate)  # peaks per second
+                peak_frequencies.append(peak_freq)
+                state_labels_peaks.append(f'State {state+1}')
+        
+        df_peaks = pd.DataFrame({'State': state_labels_peaks, 'Peak_Frequency': peak_frequencies})
+        sns.boxplot(data=df_peaks, x='State', y='Peak_Frequency', ax=ax3)
+        ax3.set_title('Peak Frequency by State', fontweight='bold')
+        ax3.set_ylabel('Peaks per Second')
+        
+        # 4. 变异系数分析
+        ax4 = axes[1, 1]
+        cvs = []
+        state_labels_cv = []
+        
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            for neuron in state_neurons:
+                signal = data[neuron].values
+                cv = np.std(signal) / np.mean(signal) if np.mean(signal) > 0 else 0
+                cvs.append(cv)
+                state_labels_cv.append(f'State {state+1}')
+        
+        df_cv = pd.DataFrame({'State': state_labels_cv, 'CV': cvs})
+        sns.boxplot(data=df_cv, x='State', y='CV', ax=ax4)
+        ax4.set_title('Coefficient of Variation by State', fontweight='bold')
+        ax4.set_ylabel('Coefficient of Variation')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'temporal_dynamics.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
+    def _plot_frequency_analysis(self, data: pd.DataFrame, labels: np.ndarray, 
+                                neuron_names: List[str], output_dir: str) -> None:
+        """绘制频率域分析"""
+        self.logger.info("生成频率域分析...")
+        
+        unique_states = sorted(set(labels))
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        
+        # 1. 功率谱密度对比
+        ax1 = axes[0, 0]
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            if state_neurons:
+                all_psds = []
+                for neuron in state_neurons[:5]:  # 最多选择5个代表性神经元
+                    signal = data[neuron].values
+                    freqs, psd = welch(signal, fs=self.sampling_rate, nperseg=min(256, len(signal)//4))
+                    all_psds.append(psd)
+                
+                mean_psd = np.mean(all_psds, axis=0)
+                color = list(self.state_colors.values())[state]
+                ax1.semilogy(freqs, mean_psd, color=color, label=f'State {state+1}', alpha=0.8)
+        
+        ax1.set_title('Power Spectral Density by State', fontweight='bold')
+        ax1.set_xlabel('Frequency (Hz)')
+        ax1.set_ylabel('Power Spectral Density')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # 2. 主导频率分布
+        ax2 = axes[0, 1]
+        dominant_freqs = []
+        state_labels_freq = []
+        
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            for neuron in state_neurons:
+                signal = data[neuron].values
+                freqs, psd = welch(signal, fs=self.sampling_rate, nperseg=min(256, len(signal)//4))
+                dominant_freq = freqs[np.argmax(psd)]
+                dominant_freqs.append(dominant_freq)
+                state_labels_freq.append(f'State {state+1}')
+        
+        df_freq = pd.DataFrame({'State': state_labels_freq, 'Dominant_Frequency': dominant_freqs})
+        sns.boxplot(data=df_freq, x='State', y='Dominant_Frequency', ax=ax2)
+        ax2.set_title('Dominant Frequency Distribution', fontweight='bold')
+        ax2.set_ylabel('Dominant Frequency (Hz)')
+        
+        # 3. 频带功率分析
+        ax3 = axes[1, 0]
+        freq_bands = ['Low (0-0.5Hz)', 'Mid (0.5-1.5Hz)', 'High (1.5-2.4Hz)']
+        band_powers = {band: [] for band in freq_bands}
+        state_labels_bands = {band: [] for band in freq_bands}
+        
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            for neuron in state_neurons:
+                signal = data[neuron].values
+                freqs, psd = welch(signal, fs=self.sampling_rate, nperseg=min(256, len(signal)//4))
+                
+                low_power = self._band_power(freqs, psd, 0, 0.5)
+                mid_power = self._band_power(freqs, psd, 0.5, 1.5)
+                high_power = self._band_power(freqs, psd, 1.5, 2.4)
+                
+                band_powers['Low (0-0.5Hz)'].append(low_power)
+                band_powers['Mid (0.5-1.5Hz)'].append(mid_power)
+                band_powers['High (1.5-2.4Hz)'].append(high_power)
+                
+                for band in freq_bands:
+                    state_labels_bands[band].append(f'State {state+1}')
+        
+        # 合并数据
+        all_powers = []
+        all_states = []
+        all_bands = []
+        
+        for band in freq_bands:
+            all_powers.extend(band_powers[band])
+            all_states.extend(state_labels_bands[band])
+            all_bands.extend([band] * len(band_powers[band]))
+        
+        df_bands = pd.DataFrame({'State': all_states, 'Power': all_powers, 'Band': all_bands})
+        sns.boxplot(data=df_bands, x='State', y='Power', hue='Band', ax=ax3)
+        ax3.set_title('Frequency Band Power Distribution', fontweight='bold')
+        ax3.set_ylabel('Power')
+        
+        # 4. 频谱重心分析
+        ax4 = axes[1, 1]
+        centroids = []
+        state_labels_centroid = []
+        
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            for neuron in state_neurons:
+                signal = data[neuron].values
+                freqs, psd = welch(signal, fs=self.sampling_rate, nperseg=min(256, len(signal)//4))
+                centroid = np.sum(freqs * psd) / np.sum(psd)
+                centroids.append(centroid)
+                state_labels_centroid.append(f'State {state+1}')
+        
+        df_centroid = pd.DataFrame({'State': state_labels_centroid, 'Spectral_Centroid': centroids})
+        sns.boxplot(data=df_centroid, x='State', y='Spectral_Centroid', ax=ax4)
+        ax4.set_title('Spectral Centroid by State', fontweight='bold')
+        ax4.set_ylabel('Spectral Centroid (Hz)')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'frequency_analysis.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
+    def _plot_correlation_matrix(self, data: pd.DataFrame, labels: np.ndarray, 
+                                neuron_names: List[str], output_dir: str) -> None:
+        """绘制神经元相关性矩阵"""
+        self.logger.info("生成相关性矩阵...")
+        
+        unique_states = sorted(set(labels))
+        
+        # 为每种状态生成相关性矩阵
+        fig, axes = plt.subplots(2, 2, figsize=(20, 16))
+        axes = axes.flatten()
+        
+        for i, state in enumerate(unique_states):
+            if i >= 4:  # 最多显示4个状态
+                break
+                
+            state_neurons = [neuron_names[j] for j, label in enumerate(labels) if label == state]
+            
+            if len(state_neurons) > 1:
+                # 计算该状态神经元之间的相关性
+                state_data = data[state_neurons]
+                correlation_matrix = state_data.corr()
+                
+                ax = axes[i]
+                sns.heatmap(correlation_matrix, 
+                           annot=False, 
+                           cmap='coolwarm', 
+                           center=0,
+                           square=True,
+                           ax=ax,
+                           cbar_kws={'label': 'Correlation Coefficient'})
+                
+                ax.set_title(f'State {state+1} Neuron Correlation Matrix\n({len(state_neurons)} neurons)', 
+                           fontweight='bold')
+                ax.set_xlabel('Neurons')
+                ax.set_ylabel('Neurons')
+            else:
+                axes[i].text(0.5, 0.5, f'State {state+1}\nInsufficient neurons\nfor correlation analysis', 
+                           ha='center', va='center', transform=axes[i].transAxes, fontsize=12)
+                axes[i].set_xlim(0, 1)
+                axes[i].set_ylim(0, 1)
+        
+        # 移除多余的子图
+        for i in range(len(unique_states), 4):
+            axes[i].remove()
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'correlation_matrices.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
+    def _plot_state_transitions(self, data: pd.DataFrame, labels: np.ndarray, 
+                               neuron_names: List[str], output_dir: str) -> None:
+        """绘制状态转换分析（基于信号的时间窗口分析）"""
+        self.logger.info("生成状态转换分析...")
+        
+        # 选择几个代表性神经元进行时间窗口分析
+        unique_states = sorted(set(labels))
+        selected_neurons = []
+        
+        for state in unique_states:
+            state_neurons = [neuron_names[i] for i, label in enumerate(labels) if label == state]
+            if state_neurons:
+                selected_neurons.append(np.random.choice(state_neurons))
+        
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        axes = axes.flatten()
+        
+        for i, neuron in enumerate(selected_neurons[:4]):
+            signal = data[neuron].values
+            state = labels[neuron_names.index(neuron)]
+            
+            # 滑动窗口分析，检测局部状态变化
+            window_size = int(self.sampling_rate * 10)  # 10秒窗口
+            step_size = int(window_size / 2)
+            
+            windows = []
+            window_states = []
+            
+            for start in range(0, len(signal) - window_size, step_size):
+                window = signal[start:start + window_size]
+                
+                # 简单的状态分类：基于活动强度
+                mean_activity = np.mean(window)
+                std_activity = np.std(window)
+                
+                if mean_activity > np.mean(signal) + np.std(signal):
+                    window_state = 'High Activity'
+                elif mean_activity < np.mean(signal) - 0.5 * np.std(signal):
+                    window_state = 'Low Activity'
+                else:
+                    window_state = 'Medium Activity'
+                
+                windows.append(start / self.sampling_rate)
+                window_states.append(window_state)
+            
+            ax = axes[i]
+            
+            # 绘制原始信号
+            time = np.arange(len(signal)) / self.sampling_rate
+            ax.plot(time, signal, color='lightgray', alpha=0.7, label='Signal')
+            
+            # 绘制状态变化
+            colors = {'High Activity': 'red', 'Medium Activity': 'blue', 'Low Activity': 'green'}
+            
+            for j, (window_time, window_state) in enumerate(zip(windows, window_states)):
+                if j < len(windows) - 1:
+                    ax.axvspan(window_time, windows[j+1], 
+                             color=colors[window_state], alpha=0.3, label=window_state if j == 0 else "")
+            
+            ax.set_title(f'{neuron} (State {state+1}) - Temporal Activity Patterns', fontweight='bold')
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Calcium Concentration')
+            
+            # 只在第一个子图中显示图例
+            if i == 0:
+                handles, labels_legend = ax.get_legend_handles_labels()
+                unique_labels = []
+                unique_handles = []
+                for handle, label in zip(handles, labels_legend):
+                    if label not in unique_labels:
+                        unique_labels.append(label)
+                        unique_handles.append(handle)
+                ax.legend(unique_handles, unique_labels)
+            
+            ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'state_transitions.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
+    def _create_interactive_visualizations(self, data: pd.DataFrame, labels: np.ndarray, 
+                                         neuron_names: List[str], features: np.ndarray,
+                                         feature_names: List[str], output_dir: str) -> None:
+        """创建交互式可视化（使用Plotly）"""
+        if not PLOTLY_AVAILABLE:
+            return
+            
+        self.logger.info("生成交互式可视化...")
+        
+        # 1. 交互式3D散点图（PCA降维）
+        pca = PCA(n_components=3)
+        features_scaled = StandardScaler().fit_transform(features)
+        features_pca = pca.fit_transform(features_scaled)
+        
+        unique_states = sorted(set(labels))
+        colors = [f'rgb({int(c[1:3], 16)}, {int(c[3:5], 16)}, {int(c[5:7], 16)})' 
+                 for c in list(self.state_colors.values())[:len(unique_states)]]
+        
+        fig = go.Figure()
+        
+        for i, state in enumerate(unique_states):
+            mask = labels == state
+            fig.add_trace(go.Scatter3d(
+                x=features_pca[mask, 0],
+                y=features_pca[mask, 1],
+                z=features_pca[mask, 2],
+                mode='markers',
+                name=f'State {state+1}',
+                marker=dict(size=5, color=colors[i]),
+                text=[neuron_names[j] for j in range(len(neuron_names)) if mask[j]],
+                hovertemplate='<b>%{text}</b><br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<br>PC3: %{z:.2f}<extra></extra>'
+            ))
+        
+        fig.update_layout(
+            title='Interactive 3D PCA Visualization of Neuron States',
+            scene=dict(
+                xaxis_title=f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)',
+                yaxis_title=f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)',
+                zaxis_title=f'PC3 ({pca.explained_variance_ratio_[2]:.1%} variance)'
+            ),
+            width=800,
+            height=600
+        )
+        
+        fig.write_html(os.path.join(output_dir, 'interactive_3d_pca.html'))
+        
+        # 2. 交互式时间序列图
+        fig = make_subplots(
+            rows=len(unique_states), cols=1,
+            subplot_titles=[f'State {s+1} Representative Signals' for s in unique_states],
+            shared_xaxes=True
+        )
+        
+        for i, state in enumerate(unique_states):
+            state_neurons = [neuron_names[j] for j, label in enumerate(labels) if label == state]
+            if state_neurons:
+                selected_neuron = np.random.choice(state_neurons)
+                signal = data[selected_neuron].values
+                time = np.arange(len(signal)) / self.sampling_rate
+                
+                fig.add_trace(
+                    go.Scatter(
+                        x=time,
+                        y=signal,
+                        mode='lines',
+                        name=f'{selected_neuron} (State {state+1})',
+                        line=dict(color=colors[i]),
+                        hovertemplate='Time: %{x:.2f}s<br>Concentration: %{y:.3f}<extra></extra>'
+                    ),
+                    row=i+1, col=1
+                )
+        
+        fig.update_layout(
+            title='Interactive Time Series by State',
+            height=200 * len(unique_states),
+            showlegend=True
+        )
+        
+        fig.update_xaxes(title_text='Time (s)', row=len(unique_states), col=1)
+        fig.update_yaxes(title_text='Calcium Concentration')
+        
+        fig.write_html(os.path.join(output_dir, 'interactive_timeseries.html'))
+        
+        # 3. 交互式特征重要性图
+        rf = RandomForestClassifier(n_estimators=100, random_state=42)
+        rf.fit(features_scaled, labels)
+        
+        feature_importance = rf.feature_importances_
+        sorted_idx = np.argsort(feature_importance)[-20:]  # 显示前20个重要特征
+        
+        fig = go.Figure(go.Bar(
+            x=feature_importance[sorted_idx],
+            y=[feature_names[i] for i in sorted_idx],
+            orientation='h',
+            marker_color='rgba(55, 128, 191, 0.7)',
+            hovertemplate='Feature: %{y}<br>Importance: %{x:.4f}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            title='Interactive Feature Importance Analysis',
+            xaxis_title='Feature Importance',
+            yaxis_title='Features',
+            height=600,
+            margin=dict(l=200)
+        )
+        
+        fig.write_html(os.path.join(output_dir, 'interactive_feature_importance.html'))
+
 
 def main():
     """主函数"""
@@ -1411,7 +1889,7 @@ def main():
     parser.add_argument('--method', type=str, default='ensemble',
                        choices=['kmeans', 'dbscan', 'ensemble', 'gcn'],
                        help='聚类方法')
-    parser.add_argument('--n-states', type=int, default=6,
+    parser.add_argument('--n-states', type=int, default=4,
                        help='预期状态数量')
     parser.add_argument('--sampling-rate', type=float, default=4.8,
                        help='采样频率(Hz)')
