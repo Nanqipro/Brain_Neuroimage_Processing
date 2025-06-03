@@ -47,33 +47,56 @@
     *   示例: `{'Close': 'red', 'Middle': 'green', 'Open': 'blue'}`
 *   `MIXED_BEHAVIOR_COLORS`: 定义了行为对共享神经元在Scheme B图中的混合颜色。
     *   键为按字母顺序排序的行为名称元组。
-    *   示例: ` {('Close', 'Middle'): 'yellow', ('Close', 'Open'): 'magenta', ...}`
+    *   示例: ` {'Close', 'Middle'): 'yellow', ('Close', 'Open'): 'magenta', ...}`
+
+*   `STANDARD_KEY_NEURON_ALPHA` (浮点数, 默认 `0.7`): 关键神经元（在不进行特殊淡化处理时）的标准透明度。
+
+*   `SHOW_BACKGROUND_NEURONS` (布尔值, 默认 `True`): 控制是否在图中绘制所有神经元作为背景点。设置为 `False` 则只绘制关键/共享/特有神经元。
+*   `BACKGROUND_NEURON_COLOR` (字符串, 默认 `'lightgray'`): 背景神经元的颜色。
+*   `BACKGROUND_NEURON_SIZE` (整数, 默认 `75`): 背景神经元的标记点大小。(之前是20，已根据用户反馈调整)
+*   `BACKGROUND_NEURON_ALPHA` (浮点数, 默认 `0.3`): 背景神经元的透明度。
+
+*   `USE_STANDARD_ALPHA_FOR_UNSHARED_IN_SCHEME_B` (布尔值, 默认 `True`): 在"两行为间共享的关键神经元图 (Scheme B)"中，控制非共享的关键神经元是否使用 `STANDARD_KEY_NEURON_ALPHA` (即不淡化)。设置为 `False` 则会使用一个较低的透明度值 (由 `plotting_utils.py` 中 `plot_shared_neurons_map` 函数的 `alpha_non_shared` 参数定义，默认为0.3) 来淡化显示这些非共享神经元。
 
 ## 绘图功能及选项 (`src/plotting_utils.py`)
 
-脚本会生成以下9种图表：
+脚本会生成以下主要的图表（部分图表现在会组合显示）：
 
-1.  **图1-3: 单一行为的关键神经元图**
+1.  **图1-3: 单一行为的关键神经元图** (独立文件仍会生成)
     *   文件名示例: `plot_close_key_neurons.png`
     *   显示特定行为中，效应大小超过阈值的关键神经元在其相对位置的分布。
     *   选项 (`plot_single_behavior_activity_map` 函数):
-        *   `show_title` (布尔值, 默认 `True`): 控制是否显示图表标题。可在 `main_emtrace01_analysis.py` 中调用时修改。
+        *   `show_title` (布尔值, 默认 `True`): 控制是否显示图表标题。
+        *   `show_background_neurons` (布尔值, 通过 `config.py` 中的 `SHOW_BACKGROUND_NEURONS` 控制): 是否显示所有神经元作为背景。
 
-2.  **图4-6: 两行为间共享的关键神经元图**
+2.  **图4-6: 两行为间共享的关键神经元图** (独立文件仍会生成)
     *   文件名示例: `plot_shared_close_middle_schemeB.png`
     *   显示两两行为之间共享的关键神经元。
     *   选项 (`plot_shared_neurons_map` 函数):
         *   `scheme` (字符串, 默认 `'B'`):
             *   `'A'`: 仅显示共享的神经元。
-            *   `'B'`: 显示两个行为的所有关键神经元（非共享部分半透明），并高亮显示共享的神经元（颜色混合、标记点更大、边框更粗）。
+            *   `'B'`: 显示两个行为的所有关键神经元，并高亮显示共享的神经元。默认情况下（通过 `USE_STANDARD_ALPHA_FOR_UNSHARED_IN_SCHEME_B` 配置为 `True`），非共享的关键神经元将以其标准透明度显示。如果该配置设为 `False`，则非共享部分会以较低透明度进行淡化处理。
         *   `show_title` (布尔值, 默认 `True`): 控制是否显示图表标题。
+        *   `show_background_neurons` (布尔值, 通过 `config.py` 中的 `SHOW_BACKGROUND_NEURONS` 控制): 是否显示所有神经元作为背景。
         *   可在 `main_emtrace01_analysis.py` 中修改 `scheme_to_use` 变量来切换方案，或为不同方案生成不同的图。
 
-3.  **图7-9: 单一行为的特有关键神经元图**
+3.  **图7-9: 单一行为的特有关键神经元图** (独立文件仍会生成)
     *   文件名示例: `plot_unique_close_neurons.png`
     *   显示仅在特定行为中效应大小超过阈值，而不存在于其他行为关键神经元列表中的特有神经元。
     *   选项 (`plot_unique_neurons_map` 函数):
         *   `show_title` (布尔值, 默认 `True`): 控制是否显示图表标题。
+        *   `show_background_neurons` (布尔值, 通过 `config.py` 中的 `SHOW_BACKGROUND_NEURONS` 控制): 是否显示所有神经元作为背景。
+
+4.  **新增组合图: 3x3 网格汇总图**
+    *   文件名: `plot_all_behaviors_3x3_grid.png`
+    *   将上述9种核心分析图表（3个单一行为，3个两两共享，3个单一特有）排列在一个3x3的网格中显示。
+        *   **第一行**: 展示三个主要行为各自的关键神经元分布（例如：Close Key, Middle Key, Open Key）。
+        *   **第二行**: 展示两两行为间的共享关键神经元（例如：Close-Middle Shared, Close-Open Shared, Middle-Open Shared），默认使用Scheme B。
+        *   **第三行**: 展示三个主要行为各自的特有关键神经元（例如：Close Unique, Middle Unique, Open Unique）。
+    *   每个子图都包含其原始的标题和图例（字体会略微缩小以适应组合布局）。
+    *   组合图具有一个主标题，概括显示内容。
+    *   此图提供了一个全面的、并列比较所有关键神经元分析结果的视图。
+    *   *注意*: 独立生成的9个图表文件仍然会按原样保存。
 
 ## 未来可能的扩展
 

@@ -1,4 +1,4 @@
-# 有放入Open-arm-probe的数据进行热图绘制
+# 有放入CD1的数据进行热图绘制
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -13,7 +13,7 @@ from scipy import stats
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EMtrace01.xlsx'
+    INPUT_FILE = '../../datasets/No.297920240925homecagefamilarmice.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort_'
     # 时间戳区间默认值（None表示不限制）
@@ -170,22 +170,8 @@ unique_behaviors = []
 
 # 只有当behavior列存在时才处理行为标签
 if has_behavior:
-    print("数据中包含 behavior 列")
-    print(f"behavior 列的数据类型: {frame_lost.dtype}")
-    print(f"behavior 列的总长度: {len(frame_lost)}")
-    print(f"behavior 列中非空值的数量: {frame_lost.count()}")
-    
     # 获取所有不同的行为标签
     unique_behaviors = frame_lost.dropna().unique()
-    print(f"找到的所有唯一行为标签 ({len(unique_behaviors)} 个):")
-    for i, behavior in enumerate(unique_behaviors):
-        behavior_count = (frame_lost == behavior).sum()
-        print(f"  {i+1}. '{behavior}' (出现 {behavior_count} 次)")
-    
-    # 检查是否有包含 'probe' 或 'arm' 的标签
-    probe_related = [b for b in unique_behaviors if 'probe' in str(b).lower() or 'arm' in str(b).lower()]
-    if probe_related:
-        print(f"包含 'probe' 或 'arm' 的行为标签: {probe_related}")
     
     # 对frame_lost进行处理，找出每种行为连续出现时的第一个时间点
     previous_behavior = None
@@ -201,12 +187,6 @@ if has_behavior:
             behavior_indices[behavior].append(timestamp)
         
         previous_behavior = behavior
-    
-    print(f"处理后的行为索引字典包含 {len(behavior_indices)} 种行为:")
-    for behavior, timestamps in behavior_indices.items():
-        print(f"  '{behavior}': {len(timestamps)} 次出现，时间戳: {timestamps}")
-else:
-    print("警告: 数据中没有找到 'behavior' 列")
 
 # **步骤5：绘制热图并标注所有事件**
 
@@ -227,31 +207,27 @@ if has_behavior and len(unique_behaviors) > 0:
     colors = plt.cm.tab20(np.linspace(0, 1, len(unique_behaviors)))
     color_map = {behavior: colors[i] for i, behavior in enumerate(unique_behaviors)}
 
-    # 只标注Open-arm-probe行为
-    if 'Open-arm-probe' in behavior_indices:
-        print(f"找到 Open-arm-probe 行为出现 {len(behavior_indices['Open-arm-probe'])} 次:")
-        for i, behavior_time in enumerate(behavior_indices['Open-arm-probe']):
-            print(f"  第 {i+1} 次: 时间戳 {behavior_time}")
+    # 只标注CD1行为
+    if 'CD1' in behavior_indices:
+        for behavior_time in behavior_indices['CD1']:
             # 检查行为时间是否在排序后的数据索引中
             if behavior_time in sorted_day6_data.index:
                 # 获取对应的绘图位置
                 position = sorted_day6_data.index.get_loc(behavior_time)
                 # 绘制垂直线，白色虚线
                 ax.axvline(x=position, color='white', linestyle='--', linewidth=2)
-                print(f"    -> 已标注在位置 {position}")
-            else:
-                print(f"    -> 时间戳 {behavior_time} 不在数据范围内，跳过标注")
-    else:
-        print("警告: 数据中没有找到 'Open-arm-probe' 行为")
+                # 添加文本标签，放在热图外部并使用黑色字体
+                plt.text(position + 0.5, -5, 'CD1', 
+                        color='black', rotation=90, verticalalignment='top', fontsize=30, fontweight='bold')
 
-# # 在第426个时间戳位置添加白色虚线
-# # 检查数据中是否有足够的时间戳
-# if len(sorted_day6_data.index) > 426:
-#     # 绘制垂直线，白色虚线
-#     ax.axvline(x=426, color='white', linestyle='--', linewidth=4)
+# 在第426个时间戳位置添加白色虚线
+# 检查数据中是否有足够的时间戳
+if len(sorted_day6_data.index) > 426:
+    # 绘制垂直线，白色虚线
+    ax.axvline(x=426, color='white', linestyle='--', linewidth=4)
 
 # 生成标题，包含排序方式和时间区间信息
-title_text = f'EMtrace01({sort_method_str})'
+title_text = f'No.297920240925homecagefamilarmice({sort_method_str})'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -277,7 +253,7 @@ ax.set_xticklabels(xtick_labels, fontsize=20)
 plt.tight_layout()
 
 # 构建输出文件名，包含排序方式和时间区间信息
-output_filename = f"{Config.OUTPUT_PREFIX}EMtrace01_{Config.SORT_METHOD}"
+output_filename = f"{Config.OUTPUT_PREFIX}No.297920240925homecagefamilarmice_{Config.SORT_METHOD}"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()

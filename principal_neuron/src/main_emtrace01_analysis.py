@@ -13,7 +13,8 @@ from config import (
 from plotting_utils import (
     plot_single_behavior_activity_map, 
     plot_shared_neurons_map,
-    plot_unique_neurons_map # Import the new plotting function for unique neurons
+    plot_unique_neurons_map,
+    plot_combined_9_grid # Import the new 3x3 grid plotting function
 )
 
 import matplotlib.pyplot as plt
@@ -186,164 +187,154 @@ if __name__ == "__main__":
         # Get key neurons based on the threshold
         key_neurons_by_behavior = get_key_neurons(df_effect_sizes_transformed, EFFECT_SIZE_THRESHOLD)
         
-        # --- Plots 1, 2, 3: Single Behavior Key Neurons ---
-        print("\nGenerating plots for single behavior key neurons...")
-        for behavior_name, neuron_ids in key_neurons_by_behavior.items():
-            if not neuron_ids: # Check if the list of neuron IDs is empty
-                print(f"No key neurons for '{behavior_name}' at threshold {EFFECT_SIZE_THRESHOLD}. Skipping plot.")
-                # Optionally, call plotting function which handles empty df to create a placeholder plot
-                empty_df_for_plot = pd.DataFrame(columns=['NeuronID', 'x', 'y'])
-                plot_title = f"Key Neurons for '{behavior_name}' (No neurons found)"
-                file_name = f"plot_{behavior_name.lower()}_key_neurons.png"
-                output_path = os.path.join(OUTPUT_DIR, file_name)
-                plot_single_behavior_activity_map(
-                    key_neurons_df=empty_df_for_plot,
-                    behavior_name=behavior_name,
-                    behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'gray'),
-                    title=plot_title,
-                    output_path=output_path,
-                    all_neuron_positions_df=df_neuron_positions,
-                    show_background_neurons=SHOW_BACKGROUND_NEURONS,
-                    background_neuron_color=BACKGROUND_NEURON_COLOR,
-                    background_neuron_size=BACKGROUND_NEURON_SIZE,
-                    background_neuron_alpha=BACKGROUND_NEURON_ALPHA
-                )
-                continue
+        # --- Prepare data for 3x3 Combined Plot ---
+        print("\nPreparing data for 3x3 combined plot...")
+        plot_configurations_for_3x3 = []
 
-            # Filter positions for the current behavior's key neurons
-            current_behavior_key_neurons_df = df_neuron_positions[df_neuron_positions['NeuronID'].isin(neuron_ids)]
-            
-            if current_behavior_key_neurons_df.empty and neuron_ids:
-                 print(f"Warning: Neuron IDs {neuron_ids} found for behavior '{behavior_name}', but no positions found in position data.")
-                 # Plot with a message or skip
+        # Common parameters for many plots
+        common_plot_params = {
+            'all_neuron_positions_df': df_neuron_positions,
+            'show_background_neurons': SHOW_BACKGROUND_NEURONS,
+            'background_neuron_color': BACKGROUND_NEURON_COLOR,
+            'background_neuron_size': BACKGROUND_NEURON_SIZE,
+            'background_neuron_alpha': BACKGROUND_NEURON_ALPHA,
+            'show_title': True # Titles in subplots are desired
+        }
 
-            plot_title = f"Key Neurons for '{behavior_name}' Behavior (Effect Size >= {EFFECT_SIZE_THRESHOLD})"
-            file_name = f"plot_{behavior_name.lower()}_key_neurons.png" # e.g., plot_close_key_neurons.png
-            output_path = os.path.join(OUTPUT_DIR, file_name)
-            
-            plot_single_behavior_activity_map(
-                key_neurons_df=current_behavior_key_neurons_df,
-                behavior_name=behavior_name,
-                behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'gray'),
-                title=plot_title,
-                output_path=output_path,
-                all_neuron_positions_df=df_neuron_positions,
-                show_background_neurons=SHOW_BACKGROUND_NEURONS,
-                background_neuron_color=BACKGROUND_NEURON_COLOR,
-                background_neuron_size=BACKGROUND_NEURON_SIZE,
-                background_neuron_alpha=BACKGROUND_NEURON_ALPHA
-            )
+        # Parameters specific to single and unique plots (they have key_neuron_size and key_neuron_alpha)
+        single_unique_plot_params = {
+            **common_plot_params,
+            'key_neuron_size': 150,
+            'key_neuron_alpha': STANDARD_KEY_NEURON_ALPHA
+        }
 
-        # --- Identify Shared Neurons & Generate Plots 4, 5, 6 ---
-        print("\nIdentifying shared key neurons and generating plots (Scheme B by default)...")
-        behavior_names = list(key_neurons_by_behavior.keys())
+        # Parameters specific to shared plots (they don't have key_neuron_size and key_neuron_alpha)
+        shared_plot_params = {
+            'all_neuron_positions_df': df_neuron_positions,
+            'show_background_neurons': SHOW_BACKGROUND_NEURONS,
+            'background_neuron_color': BACKGROUND_NEURON_COLOR,
+            'background_neuron_size': BACKGROUND_NEURON_SIZE,
+            'background_neuron_alpha': BACKGROUND_NEURON_ALPHA,
+            'show_title': True,
+            'standard_key_neuron_alpha': STANDARD_KEY_NEURON_ALPHA,
+            'use_standard_alpha_for_unshared_in_scheme_b': USE_STANDARD_ALPHA_FOR_UNSHARED_IN_SCHEME_B,
+            'alpha_non_shared': 0.3,
+            'shared_marker_size_factor': 1.5
+        }
+
+        # Ensure a consistent order for behaviors (e.g., Close, Middle, Open)
+        ordered_behavior_names = [b for b in BEHAVIOR_COLORS.keys() if b in key_neurons_by_behavior]
+        if len(ordered_behavior_names) < 3 and len(key_neurons_by_behavior.keys()) ==3:
+             # Fallback if BEHAVIOR_COLORS doesn't cover all, though it should
+             ordered_behavior_names = list(key_neurons_by_behavior.keys())[:3]
+        elif len(ordered_behavior_names) != len(key_neurons_by_behavior.keys()):
+            print("Warning: Behavior order for 3x3 grid might be inconsistent or incomplete based on BEHAVIOR_COLORS keys.")
+            # If partial, fill up to 3 with remaining from key_neurons_by_behavior
+            missing_behaviors = [b for b in key_neurons_by_behavior.keys() if b not in ordered_behavior_names]
+            ordered_behavior_names.extend(missing_behaviors)
         
-        for pair in combinations(behavior_names, 2):
-            b1, b2 = pair
-            ids1 = set(key_neurons_by_behavior[b1])
-            ids2 = set(key_neurons_by_behavior[b2])
+        temp_key_dfs = {} # To store key DFs for behaviors
+        for behavior_name in ordered_behavior_names:
+            neuron_ids = key_neurons_by_behavior.get(behavior_name, [])
+            df = df_neuron_positions[df_neuron_positions['NeuronID'].isin(neuron_ids)] if neuron_ids else pd.DataFrame(columns=['NeuronID', 'x', 'y'])
+            temp_key_dfs[behavior_name] = df
+
+        # Row 1: Single behavior plots
+        for behavior_name in ordered_behavior_names:
+            params_single = {
+                **single_unique_plot_params,
+                'key_neurons_df': temp_key_dfs[behavior_name],
+                'behavior_name': behavior_name,
+                'behavior_color': BEHAVIOR_COLORS.get(behavior_name, 'gray'),
+                'title': f'{behavior_name} Key' # Simpler title for subplot
+            }
+            plot_configurations_for_3x3.append({'plot_type': 'single', 'params': params_single})
+
+        # Row 2: Shared neuron plots (e.g., Close-Middle, Close-Open, Middle-Open)
+        # Ensure consistent pairing order for title and mixed_color_key
+        behavior_pairs = list(combinations(ordered_behavior_names, 2))
+        for b1, b2 in behavior_pairs: # This generates 3 pairs if ordered_behavior_names has 3 items
+            ids1 = set(key_neurons_by_behavior.get(b1, []))
+            ids2 = set(key_neurons_by_behavior.get(b2, []))
             shared_ids_list = sorted(list(ids1.intersection(ids2)))
-            print(f"Shared neurons between '{b1}' and '{b2}': {len(shared_ids_list)} {shared_ids_list}")
-
-            b1_all_key_neuron_ids = key_neurons_by_behavior[b1]
-            b2_all_key_neuron_ids = key_neurons_by_behavior[b2]
-
-            df_b1_all_key_neurons = df_neuron_positions[df_neuron_positions['NeuronID'].isin(b1_all_key_neuron_ids)]
-            df_b2_all_key_neurons = df_neuron_positions[df_neuron_positions['NeuronID'].isin(b2_all_key_neuron_ids)]
-            df_shared_key_neurons = df_neuron_positions[df_neuron_positions['NeuronID'].isin(shared_ids_list)]
-
-            # Ensure consistent key for MIXED_BEHAVIOR_COLORS
+            
+            df_b1_all_key = temp_key_dfs[b1]
+            df_b2_all_key = temp_key_dfs[b2]
+            df_shared_key = df_neuron_positions[df_neuron_positions['NeuronID'].isin(shared_ids_list)]
+            
             mixed_color_key = tuple(sorted((b1, b2)))
-            mixed_color = MIXED_BEHAVIOR_COLORS.get(mixed_color_key, 'purple') # Default to purple if not in config
-
-            # For Scheme B (default)
-            scheme_to_use = 'B'
-            file_name_shared = f"plot_shared_{b1.lower()}_{b2.lower()}_scheme{scheme_to_use}.png" 
-            output_path_shared = os.path.join(OUTPUT_DIR, file_name_shared)
-            plot_title_shared = f"Key Neurons: {b1} & {b2} (Shared Highlighted - Scheme {scheme_to_use})"
-            
-            plot_shared_neurons_map(
-                behavior1_name=b1, behavior2_name=b2,
-                behavior1_all_key_neurons_df=df_b1_all_key_neurons, 
-                behavior2_all_key_neurons_df=df_b2_all_key_neurons,
-                shared_key_neurons_df=df_shared_key_neurons,
-                color1=BEHAVIOR_COLORS[b1],
-                color2=BEHAVIOR_COLORS[b2],
-                mixed_color=mixed_color,
-                title=plot_title_shared,
-                output_path=output_path_shared,
-                scheme=scheme_to_use,
-                all_neuron_positions_df=df_neuron_positions,
-                show_background_neurons=SHOW_BACKGROUND_NEURONS,
-                background_neuron_color=BACKGROUND_NEURON_COLOR,
-                background_neuron_size=BACKGROUND_NEURON_SIZE,
-                background_neuron_alpha=BACKGROUND_NEURON_ALPHA,
-                standard_key_neuron_alpha=STANDARD_KEY_NEURON_ALPHA, # Pass new config
-                use_standard_alpha_for_unshared_in_scheme_b=USE_STANDARD_ALPHA_FOR_UNSHARED_IN_SCHEME_B # Pass new config
-            )
-            
-            # # To generate Scheme A as well, uncomment and modify this block:
-            # scheme_to_use_A = 'A'
-            # file_name_shared_A = f"plot_shared_{b1.lower()}_{b2.lower()}_scheme{scheme_to_use_A}.png"
-            # output_path_shared_A = os.path.join(OUTPUT_DIR, file_name_shared_A)
-            # plot_title_shared_A = f"Key Neurons: {b1} & {b2} (Only Shared - Scheme {scheme_to_use_A})"
-            # plot_shared_neurons_map(
-            #     behavior1_name=b1, behavior2_name=b2,
-            #     behavior1_all_key_neurons_df=df_b1_all_key_neurons, # Not strictly needed for scheme A but passed for consistency
-            #     behavior2_all_key_neurons_df=df_b2_all_key_neurons, # Not strictly needed for scheme A
-            #     shared_key_neurons_df=df_shared_key_neurons,
-            #     color1=BEHAVIOR_COLORS[b1], # Not used in scheme A plot itself
-            #     color2=BEHAVIOR_COLORS[b2], # Not used in scheme A plot itself
-            #     mixed_color=mixed_color,
-            #     title=plot_title_shared_A,
-            #     output_path=output_path_shared_A,
-            #     scheme=scheme_to_use_A
-            # )
-
-        # --- Identify Unique Neurons & Generate Plots 7, 8, 9 ---
-        print("\nIdentifying unique key neurons for each behavior...")
-        unique_neurons_by_behavior = {}
-        all_behavior_sets = {name: set(ids) for name, ids in key_neurons_by_behavior.items()}
-        behavior_names = list(key_neurons_by_behavior.keys()) # Ensure behavior_names is defined here if not earlier
-
-        for b_name in behavior_names:
-            other_behaviors_neurons = set()
-            for other_b_name in behavior_names:
-                if b_name == other_b_name:
-                    continue
-                other_behaviors_neurons.update(all_behavior_sets[other_b_name])
-            unique_ids = list(all_behavior_sets[b_name] - other_behaviors_neurons)
-            unique_neurons_by_behavior[b_name] = sorted(unique_ids)
-            print(f"Unique neurons for '{b_name}': {len(unique_neurons_by_behavior[b_name])} {unique_neurons_by_behavior[b_name]}")
-
-        print("\nGenerating plots for unique key neurons (Plots 7, 8, 9)...")
-        for behavior_name, unique_ids_list in unique_neurons_by_behavior.items():
-            df_unique_key_neurons = pd.DataFrame(columns=['NeuronID', 'x', 'y']) # Default to empty
-            if not unique_ids_list:
-                print(f"No unique neurons for '{behavior_name}'. Plotting empty placeholder.")
-            else:
-                df_unique_key_neurons = df_neuron_positions[df_neuron_positions['NeuronID'].isin(unique_ids_list)]
-            
-            if df_unique_key_neurons.empty and unique_ids_list: # Check if still empty even if IDs existed (positions missing)
-                print(f"Warning: Unique Neuron IDs {unique_ids_list} found for '{behavior_name}', but no positions found. Plotting empty.")
-
-            file_name_unique = f"plot_unique_{behavior_name.lower()}_neurons.png"
-            output_path_unique = os.path.join(OUTPUT_DIR, file_name_unique)
-            plot_title_unique = f"Unique Key Neurons for '{behavior_name}' Behavior (Effect Size >= {EFFECT_SIZE_THRESHOLD})"
-
-            plot_unique_neurons_map(
-                unique_neurons_df=df_unique_key_neurons,
-                behavior_name=behavior_name,
-                behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'grey'), # Default to grey if color not in config
-                title=plot_title_unique,
-                output_path=output_path_unique,
-                all_neuron_positions_df=df_neuron_positions,
-                show_background_neurons=SHOW_BACKGROUND_NEURONS,
-                background_neuron_color=BACKGROUND_NEURON_COLOR,
-                background_neuron_size=BACKGROUND_NEURON_SIZE,
-                background_neuron_alpha=BACKGROUND_NEURON_ALPHA
-            )
+            params_shared = {
+                **shared_plot_params,
+                'behavior1_name': b1,
+                'behavior2_name': b2,
+                'behavior1_all_key_neurons_df': df_b1_all_key,
+                'behavior2_all_key_neurons_df': df_b2_all_key,
+                'shared_key_neurons_df': df_shared_key,
+                'color1': BEHAVIOR_COLORS.get(b1, 'pink'),
+                'color2': BEHAVIOR_COLORS.get(b2, 'lightblue'),
+                'mixed_color': MIXED_BEHAVIOR_COLORS.get(mixed_color_key, 'purple'),
+                'title': f'{b1}-{b2} Shared',
+                'scheme': 'B' # Assuming Scheme B is standard for these subplots
+            }
+            plot_configurations_for_3x3.append({'plot_type': 'shared', 'params': params_shared})
         
+        # Fill remaining shared plots if less than 3 behaviors (won't happen with 3 behaviors)
+        while len(plot_configurations_for_3x3) < 6 and len(ordered_behavior_names) <2: # Max 3 single + 3 shared
+             # Add placeholder for shared if not enough behaviors to make 3 pairs
+            plot_configurations_for_3x3.append({
+                'plot_type': 'placeholder', # Need to handle this in plot_combined_9_grid or ensure 9 configs
+                'params': {'title': 'N/A'}
+            })
+
+        # Row 3: Unique neuron plots
+        all_behavior_sets_for_unique = {name: set(key_neurons_by_behavior.get(name,[])) for name in ordered_behavior_names}
+        for b_name in ordered_behavior_names:
+            other_behaviors_neurons = set()
+            for other_b_name in ordered_behavior_names:
+                if b_name == other_b_name: continue
+                other_behaviors_neurons.update(all_behavior_sets_for_unique.get(other_b_name, set()))
+            
+            unique_ids = list(all_behavior_sets_for_unique.get(b_name, set()) - other_behaviors_neurons)
+            df_unique_key = df_neuron_positions[df_neuron_positions['NeuronID'].isin(unique_ids)] if unique_ids else pd.DataFrame(columns=['NeuronID', 'x', 'y'])
+
+            params_unique = {
+                **single_unique_plot_params,
+                'unique_neurons_df': df_unique_key,
+                'behavior_name': b_name,
+                'behavior_color': BEHAVIOR_COLORS.get(b_name, 'gray'),
+                'title': f'{b_name} Unique'
+            }
+            plot_configurations_for_3x3.append({'plot_type': 'unique', 'params': params_unique})
+
+        # Ensure we have exactly 9 configurations for the 3x3 grid
+        # If there were fewer than 3 behaviors, some slots might be empty or need placeholders.
+        # The logic above tries to fill based on ordered_behavior_names. If still not 9, add placeholders.
+        # This placeholder handling should ideally be more robust or data generation should guarantee data for 9 plots.
+        while len(plot_configurations_for_3x3) < 9:
+            print(f"Warning: Not enough plot configurations for 3x3 grid (currently {len(plot_configurations_for_3x3)}). Adding placeholder(s).")
+            plot_configurations_for_3x3.append({
+                'plot_type': 'placeholder', 
+                'params': {'title': 'Empty Slot'} # Placeholder title
+            })
+        
+        if len(plot_configurations_for_3x3) > 9:
+             print("Warning: More than 9 plot configurations generated. Truncating to 9 for 3x3 grid.")
+             plot_configurations_for_3x3 = plot_configurations_for_3x3[:9]
+
+        # --- Generate 3x3 Combined Plot ---
+        if len(plot_configurations_for_3x3) == 9:
+            print("\nGenerating 3x3 combined plot...")
+            combined_plot_filename = "plot_all_behaviors_3x3_grid.png"
+            combined_output_path = os.path.join(OUTPUT_DIR, combined_plot_filename)
+            
+            plot_combined_9_grid(
+                plot_configurations=plot_configurations_for_3x3,
+                output_path=combined_output_path,
+                main_title_text=f"Comprehensive View: Neuron Activity Patterns (Effect Size >= {EFFECT_SIZE_THRESHOLD})"
+            )
+        else:
+            print("Error: Could not prepare exactly 9 plot configurations for the 3x3 grid. Skipping combined plot.")
+
         print("\nAll plots generated.")
 
     else:
@@ -353,4 +344,5 @@ if __name__ == "__main__":
             print("Could not load neuron positions. Please check 'data_loader.py' and the CSV data.")
         # print("Error: Could not load data.") # Covered by more specific messages above
 
+    # ... (suggest_threshold_for_neuron_count function definition if kept for reference) ... 
     # ... (suggest_threshold_for_neuron_count function definition if kept for reference) ... 

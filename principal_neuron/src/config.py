@@ -20,7 +20,7 @@ MIXED_BEHAVIOR_COLORS = {
 
 # 目标神经元数量 (供参考，在阈值建议功能中使用过)
 TARGET_MIN_NEURONS = 5
-TARGET_MAX_NEURONS = 10
+TARGET_MAX_NEURONS = 10 
 
 # --- Key Neuron Plotting Options ---
 STANDARD_KEY_NEURON_ALPHA = 0.7 # Standard alpha for key neurons when not specifically faded
