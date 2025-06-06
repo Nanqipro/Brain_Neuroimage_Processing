@@ -13,30 +13,17 @@ amplitude_scale = 5  # 增大波动幅度的缩放系数，可以调整此值来
 
 # 定义数据文件列表和对应的标题
 data_files = [
-    'processed_NORhabititutetrace.xlsx',
-    'processed_NORtesttrace.xlsx',
-    'processed_tangsuitiewangtrace.xlsx',
-    'processed_xuanweitrace.xlsx',
-    'processed_socialtrace01.xlsx',
-    'processed_socialtrace02.xlsx',
-    'processed_ymazetrace.xlsx',
-    'processed_tstrace.xlsx',
-    'processed_homecagetrace.xlsx',
-    'processed_homecagefamilarmicetrace.xlsx'
+    'processed_Day3.xlsx',
+    'processed_Day6.xlsx',
+    'processed_Day9.xlsx',
 ]
 
 # 定义图表标题（和文件名对应）
 titles = [
-    'NOR Habituation',
-    'NOR Test',
-    'Tang Suitiewang',
-    'Xuanwei',
-    'Social 01',
-    'Social 02',
-    'Y-Maze',
-    'TS',
-    'Homecage',
-    'Homecage Familiar Mice'
+    'Day3_with_behavior_labels_filled',
+    'Day6_with_behavior_labels_filled',
+    'Day9_with_behavior_labels_filled',
+    
 ]
 
 # 加载神经元对应表
@@ -49,22 +36,15 @@ file_to_column_mapping = {
     # 这表示该文件在对应表2979中的哪一列
     
     # 请填入实际的宝工关系
-    'processed_NORhabititutetrace.xlsx': 'NORhabititutetrace',  
-    'processed_NORtesttrace.xlsx': 'NORtesttrace',
-    'processed_tangsuitiewangtrace.xlsx': 'tangsuitiewangtrace',
-    'processed_xuanweitrace.xlsx': 'xuanweitrace',
-    'processed_socialtrace01.xlsx': 'socialtrace01',
-    'processed_socialtrace02.xlsx': 'socialtrace02',
-    'processed_ymazetrace.xlsx': 'ymazetrace',
-    'processed_tstrace.xlsx': 'tstrace',
-    'processed_homecagetrace.xlsx': 'homecagetrace',
-    'processed_homecagefamilarmicetrace.xlsx': 'homecagefamilarmicetrace'
+    'processed_Day3.xlsx': 'Day3_with_behavior_labels_filled',  
+    'processed_Day6.xlsx': 'Day6_with_behavior_labels_filled',
+    'processed_Day9.xlsx': 'Day9_with_behavior_labels_filled',
 }
 
 # 加载参考排序表（基准神经元排序）
 try:
     # 尝试载入基准文件
-    reference_file = '../../datasets/2979数据/processed_NORhabititutetrace.xlsx'
+    reference_file = '../../datasets/processed_Day3.xlsx'
     reference_data = pd.read_excel(reference_file)
     print(f'成功加载基准排序文件: {reference_file}')
 except Exception as e:
@@ -83,7 +63,7 @@ time_stamps_dict = {}
 # 尝试加载所有数据文件
 for file_name in data_files:
     try:
-        file_path = f'../../datasets/2979数据/{file_name}'
+        file_path = f'../../datasets/{file_name}'
         data = pd.read_excel(file_path)
         print(f'成功加载数据文件: {file_path}')
         

@@ -6,13 +6,11 @@ import numpy as np
 import argparse
 from scipy.signal import find_peaks
 from scipy import stats
-import matplotlib.cm as cm
-from matplotlib.colors import ListedColormap
 
 # 添加命令行参数解析
-parser = argparse.ArgumentParser(description='神经元Trace图生成工具，支持不同排序方式')
-parser.add_argument('--sort-method', type=str, choices=['none', 'peak', 'calcium_wave'], default='none',
-                    help='排序方式：none（无排序）、peak（按峰值时间排序）或calcium_wave（按第一次真实钙波时间排序）')
+parser = argparse.ArgumentParser(description='神经元trace图生成工具，支持不同排序方式')
+parser.add_argument('--sort-method', type=str, choices=['peak', 'calcium_wave'], default='peak',
+                    help='排序方式：peak（按峰值时间排序）或calcium_wave（按第一次真实钙波时间排序）')
 parser.add_argument('--ca-threshold', type=float, default=1.5, help='钙波检测阈值（标准差的倍数）')
 parser.add_argument('--min-prominence', type=float, default=1.0, help='最小峰值突出度')
 parser.add_argument('--min-rise-rate', type=float, default=0.1, help='最小上升速率')
@@ -26,117 +24,24 @@ MIN_PROMINENCE = args.min_prominence
 MIN_RISE_RATE = args.min_rise_rate
 MAX_FALL_RATE = args.max_fall_rate
 
-# Trace图绘制参数配置
-class TraceConfig:
-    """
-    Trace图绘制参数配置类
-    """
-    TRACE_OFFSET = 60  # 不同神经元trace之间的垂直偏移量
-    SCALING_FACTOR = 80  # 信号振幅缩放因子
-    TRACE_ALPHA = 0.8   # trace线的透明度
-    LINE_WIDTH = 2.0    # trace线的宽度 (增加线宽以匹配 show_trace.py)
-    SAMPLING_RATE = 4.8  # 采样频率，用于将时间戳转换为秒
-
-def generate_distinct_colors(n_colors):
-    """
-    生成n个尽可能不同的颜色
-    
-    Parameters
-    ----------
-    n_colors : int
-        需要生成的颜色数量
-        
-    Returns
-    -------
-    list
-        包含颜色的列表
-    """
-    if n_colors <= 20:
-        # 使用预定义的20种明显不同的颜色
-        colors = [
-            '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF',
-            '#00FFFF', '#800000', '#008000', '#000080', '#808000',
-            '#800080', '#008080', '#FFA500', '#A52A2A', '#DDA0DD',
-            '#90EE90', '#FFB6C1', '#87CEEB', '#F0E68C', '#D2691E'
-        ]
-        return colors[:n_colors]
-    else:
-        # 对于更多颜色，使用colormap生成
-        try:
-            colormap = plt.cm.get_cmap('tab20')
-        except:
-            colormap = cm.get_cmap('tab20')
-        base_colors = [colormap(i) for i in range(20)]
-        
-        # 如果需要更多颜色，使用其他colormap补充
-        if n_colors > 20:
-            try:
-                colormap2 = plt.cm.get_cmap('Set3')
-            except:
-                colormap2 = cm.get_cmap('Set3')
-            additional_colors = [colormap2(i % 12) for i in range(n_colors - 20)]
-            return base_colors + additional_colors
-        
-        return base_colors
-
-def assign_neuron_colors(neuron_list, correspondence_table):
-    """
-    为神经元分配颜色，确保同一组神经元颜色相同，相邻神经元颜色不同
-    
-    Parameters
-    ----------
-    neuron_list : list
-        神经元ID列表
-    correspondence_table : pd.DataFrame
-        神经元对应表
-        
-    Returns
-    -------
-    dict
-        神经元ID到颜色的映射字典
-    """
-    # 创建神经元组的映射（每一行是一组对应的神经元）
-    neuron_groups = {}
-    group_colors = {}
-    
-    # 生成足够的颜色
-    n_groups = len(correspondence_table)
-    colors = generate_distinct_colors(n_groups)
-    
-    # 为每个组分配颜色
-    for group_idx, (_, row) in enumerate(correspondence_table.iterrows()):
-        group_color = colors[group_idx % len(colors)]
-        
-        # 将这一组的所有神经元都映射到相同颜色
-        for col in correspondence_table.columns:
-            neuron_id = row[col]
-            if pd.notna(neuron_id):
-                neuron_groups[neuron_id] = group_idx
-                group_colors[neuron_id] = group_color
-    
-    # 为神经元列表中的每个神经元分配颜色
-    neuron_color_map = {}
-    default_color = '#000000'  # 默认黑色
-    
-    for neuron in neuron_list:
-        neuron_color_map[neuron] = group_colors.get(neuron, default_color)
-    
-    return neuron_color_map
+# Trace图参数配置（严格按照show_trace.py的设置）
+TRACE_OFFSET = 70       # 不同神经元trace之间的垂直偏移量（增加间隔以改善可读性）
+SCALING_FACTOR = 40     # 信号振幅缩放因子（增加振幅以提高信号可见性）
+MAX_NEURONS = 60        # 最大显示神经元数量（避免图表过于拥挤）
+TRACE_ALPHA = 0.8       # trace线的透明度
+LINE_WIDTH = 2.0        # trace线的宽度
+SAMPLING_RATE = 4.8     # 采样频率，用于将时间戳转换为秒
 
 # 函数：检测神经元第一次真实钙波发生的时间点
 def detect_first_calcium_wave(neuron_data):
     """
     检测神经元第一次真实钙波发生的时间点
     
-    Parameters
-    ----------
-    neuron_data : pd.Series
-        包含神经元活动的时间序列数据（标准化后）
+    参数:
+    neuron_data -- 包含神经元活动的时间序列数据（标准化后）
     
-    Returns
-    -------
-    int
-        第一次真实钙波发生的时间点，如果没有检测到则返回数据最后一个时间点
+    返回:
+    first_wave_time -- 第一次真实钙波发生的时间点，如果没有检测到则返回数据最后一个时间点
     """
     # 计算阈值（基于数据的标准差）
     threshold = CALCIUM_WAVE_THRESHOLD
@@ -176,170 +81,233 @@ def detect_first_calcium_wave(neuron_data):
     # 如果没有满足条件的钙波，返回时间序列的最后一个点
     return neuron_data.index[-1]
 
-def plot_trace_subplot(ax, data_df, neuron_color_map, title, sort_method_str, max_neurons=60):
-    """
-    绘制单个trace子图
-    
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        绘图轴对象
-    data_df : pd.DataFrame
-        标准化后的数据
-    neuron_color_map : dict
-        神经元到颜色的映射
-    title : str
-        子图标题
-    sort_method_str : str
-        排序方法描述
-    max_neurons : int
-        最大显示神经元数量
-    """
-    # 绘制每个神经元的trace
-    for i, column in enumerate(data_df.columns):
-        if i >= max_neurons:
-            break
-        
-        # 获取神经元颜色
-        neuron_color = neuron_color_map.get(column, '#000000')
-        
-        # 计算当前神经元trace的垂直偏移量
-        ax.plot(
-            data_df.index / TraceConfig.SAMPLING_RATE,  # x轴是时间(秒)
-            data_df[column] * TraceConfig.SCALING_FACTOR + (i+1) * TraceConfig.TRACE_OFFSET,
-            linewidth=TraceConfig.LINE_WIDTH,
-            alpha=TraceConfig.TRACE_ALPHA,
-            color=neuron_color,
-            label=column
-        )
-    
-    # 设置Y轴标签
-    yticks = np.arange(TraceConfig.TRACE_OFFSET, 
-                      (min(max_neurons, len(data_df.columns))+1) * TraceConfig.TRACE_OFFSET, 
-                      TraceConfig.TRACE_OFFSET)
-    ytick_labels = [str(column) for column in data_df.columns[:max_neurons]]
-    ax.set_yticks(yticks[:len(ytick_labels)])
-    ax.set_yticklabels(ytick_labels, fontsize=12)  # 增大Y轴标签字体
-    
-    # 设置轴标签和标题 (增大字体以匹配 show_trace.py 风格)
-    ax.set_xlabel('Time (seconds)', fontsize=25)
-    ax.set_ylabel('Neuron ID', fontsize=25)
-    ax.set_title(f'{title} ({sort_method_str})', fontsize=20)  # 稍微调整标题字体大小
-    
-    # 设置刻度标签字体大小 (增大以匹配 show_trace.py)
-    ax.tick_params(axis='both', labelsize=15)
-    
-    # 取消网格线以匹配 show_trace.py 风格
-    ax.grid(False)
-
 # 加载数据
 day3_data = pd.read_excel('../../datasets/Day3_with_behavior_labels_filled.xlsx')
 day6_data = pd.read_excel('../../datasets/Day6_with_behavior_labels_filled.xlsx')
 day9_data = pd.read_excel('../../datasets/Day9_with_behavior_labels_filled.xlsx')
 correspondence_table = pd.read_excel('../../datasets/神经元对应表2979.xlsx')
 
-# 根据对应表准备数据
+# 按照show_trace.py的方法进行数据处理和排序
+# 将'stamp'列设置为索引
+day3_trace_data = day3_data.set_index('stamp')
+
+# 检查是否存在'behavior'列并分离
+if 'behavior' in day3_trace_data.columns:
+    day3_trace_data = day3_trace_data.drop(columns=['behavior'])
+
+print(f"Day3数据处理完成，神经元数量: {len(day3_trace_data.columns)}")
+
+# 按照show_trace.py的方法：对整个数据框进行标准化，用于钙事件检测
+day3_trace_data_standardized = (day3_trace_data - day3_trace_data.mean()) / day3_trace_data.std()
+
+# 确定排序方式（严格按照show_trace.py的方法）
+sort_method_str = ""
+if SORT_METHOD == 'peak':
+    # 使用与show_trace.py完全相同的排序方法
+    # 对于每个神经元，找到其信号达到全局最大值的时间戳
+    peak_times = day3_trace_data_standardized.idxmax()
+    
+    # 将神经元按照峰值时间从早到晚排序
+    sorted_neurons_by_first_peak = peak_times.sort_values().index
+    
+    print(f"按峰值时间排序完成，早期峰值神经元: {list(sorted_neurons_by_first_peak[:5])}")
+    
+    # 创建字典存储峰值时间
+    day3_peak_times = peak_times.to_dict()
+    sort_method_str = "Sorted by peak time"
+else:  # calcium_wave
+    # 计算每个神经元在Day3中的第一次钙波时间
+    first_wave_times = {}
+    
+    # 对每个神经元进行钙波检测
+    for neuron in day3_trace_data_standardized.columns:
+        neuron_data = day3_trace_data_standardized[neuron]
+        first_wave_times[neuron] = detect_first_calcium_wave(neuron_data)
+    
+    # 转换为Series以便排序
+    first_wave_times_series = pd.Series(first_wave_times)
+    
+    # 按第一次钙波时间排序
+    sorted_neurons_by_first_peak = first_wave_times_series.sort_values().index
+    
+    print(f"按钙波时间排序完成，早期钙波神经元: {list(sorted_neurons_by_first_peak[:5])}")
+    
+    # 创建字典存储钙波时间
+    day3_peak_times = first_wave_times
+    sort_method_str = "Sorted by first calcium wave time"
+
+# 根据对应表和排序结果准备数据
 aligned_day3, aligned_day6, aligned_day9 = [], [], []
 neuron_labels_day3, neuron_labels_day6, neuron_labels_day9 = [], [], []
 
-# 筛选三天都有数据的神经元
-for _, row in correspondence_table.iterrows():
-    day3_neuron, day6_neuron, day9_neuron = row['Day3_with_behavior_labels_filled'], row['Day6_with_behavior_labels_filled'], row['Day9_with_behavior_labels_filled']
+# 基于已经排序的神经元顺序，按对应表提取三天的数据
+for day3_neuron in sorted_neurons_by_first_peak:
+    # 在对应表中查找这个Day3神经元对应的Day6和Day9神经元
+    matching_row = correspondence_table[correspondence_table['Day3_with_behavior_labels_filled'] == day3_neuron]
     
-    # 检查三天是否都有数据 (都不为null且对应列存在于数据中)
-    if (pd.notna(day3_neuron) and day3_neuron in day3_data.columns and
-        pd.notna(day6_neuron) and day6_neuron in day6_data.columns and
-        pd.notna(day9_neuron) and day9_neuron in day9_data.columns):
+    if not matching_row.empty:
+        row = matching_row.iloc[0]
+        day6_neuron = row['Day6_with_behavior_labels_filled']
+        day9_neuron = row['Day9_with_behavior_labels_filled']
         
-        # 三天都有数据，添加到相应列表
-        aligned_day3.append(day3_data[day3_neuron])
-        neuron_labels_day3.append(day3_neuron)
-        
-        aligned_day6.append(day6_data[day6_neuron])
-        neuron_labels_day6.append(day6_neuron)
-        
-        aligned_day9.append(day9_data[day9_neuron])
-        neuron_labels_day9.append(day9_neuron)
-
-# 将列表转换为 DataFrame，并设置索引为时间戳 (stamp)，再转置以交换横纵坐标
-aligned_day3_df = pd.DataFrame(aligned_day3, index=neuron_labels_day3).T
-aligned_day6_df = pd.DataFrame(aligned_day6, index=neuron_labels_day6).T
-aligned_day9_df = pd.DataFrame(aligned_day9, index=neuron_labels_day9).T
+        # 检查三天是否都有数据
+        if (pd.notna(day6_neuron) and day6_neuron in day6_data.columns and
+            pd.notna(day9_neuron) and day9_neuron in day9_data.columns):
+            
+            # 三天都有数据，添加到相应列表（保持排序顺序）
+            aligned_day3.append(day3_data[day3_neuron])
+            neuron_labels_day3.append(day3_neuron)
+            
+            aligned_day6.append(day6_data[day6_neuron])
+            neuron_labels_day6.append(day6_neuron)
+            
+            aligned_day9.append(day9_data[day9_neuron])
+            neuron_labels_day9.append(day9_neuron)
 
 # 打印保留的神经元数量
 print(f"保留的神经元数量: {len(neuron_labels_day3)}")
+print(f"排序方式: {sort_method_str}")
 
-# 标准化数据
-aligned_day3_df_std = (aligned_day3_df - aligned_day3_df.mean()) / aligned_day3_df.std()
-aligned_day6_df_std = (aligned_day6_df - aligned_day6_df.mean()) / aligned_day6_df.std()
-aligned_day9_df_std = (aligned_day9_df - aligned_day9_df.mean()) / aligned_day9_df.std()
+# 验证排序是否正确 - 打印最终列表中前5个神经元的排序时间
+if len(neuron_labels_day3) >= 5:
+    print("最终保留的前5个神经元及其排序时间:")
+    for i in range(5):
+        neuron = neuron_labels_day3[i]
+        sort_time = day3_peak_times.get(neuron, 'N/A')
+        print(f"  {i+1}. {neuron}: {sort_time}")
 
-# 生成颜色映射
-neuron_color_map_day3 = assign_neuron_colors(neuron_labels_day3, correspondence_table)
-neuron_color_map_day6 = assign_neuron_colors(neuron_labels_day6, correspondence_table)
-neuron_color_map_day9 = assign_neuron_colors(neuron_labels_day9, correspondence_table)
+# 检查数据集中是否包含行为列
+has_behavior_day3 = 'behavior' in day3_data.columns
+has_behavior_day6 = 'behavior' in day6_data.columns
+has_behavior_day9 = 'behavior' in day9_data.columns
 
-# 对神经元进行排序（如果需要）
-sort_method_str = "No sorting"
-if SORT_METHOD != 'none':
-    # 获取排序索引
-    if SORT_METHOD == 'peak':
-        # 按峰值时间排序
-        peak_times = aligned_day3_df_std.idxmax(axis=0)  # 找到每列的最大值所在的索引
-        sorting_indices = peak_times.sort_values().index
-        sort_method_str = "Sorted by peak time"
-    else:  # calcium_wave
-        # 按第一次钙波时间排序
-        first_wave_times = {}
-        for neuron in aligned_day3_df_std.columns:
-            neuron_data = aligned_day3_df_std[neuron]
-            first_wave_times[neuron] = detect_first_calcium_wave(neuron_data)
+# 找出CD1行为的时间点
+cd1_indices_day3 = []
+cd1_indices_day6 = []
+cd1_indices_day9 = []
+
+if has_behavior_day3:
+    cd1_indices_day3 = day3_data[day3_data['behavior'] == 'CD1'].index.tolist()
+if has_behavior_day6:
+    cd1_indices_day6 = day6_data[day6_data['behavior'] == 'CD1'].index.tolist()
+if has_behavior_day9:
+    cd1_indices_day9 = day9_data[day9_data['behavior'] == 'CD1'].index.tolist()
+
+# 绘制trace图（调整尺寸以适应三个子图的布局）
+plt.figure(figsize=(60, 25))
+
+# 函数：绘制单个trace图（严格按照show_trace.py的方法，三个子图Y轴对齐）
+def plot_trace_subplot(ax, aligned_data, neuron_labels, day_data, cd1_indices, title, ylabel_visible=True, total_neurons=None):
+    """
+    绘制单个trace图子图，严格按照show_trace.py的方法，确保三个子图Y轴位置对齐
+    
+    Parameters
+    ----------
+    ax : matplotlib轴对象
+        绘图轴
+    aligned_data : list
+        对齐的神经元数据列表
+    neuron_labels : list
+        神经元标签列表
+    day_data : DataFrame
+        原始数据（用于获取时间戳）
+    cd1_indices : list
+        CD1行为的时间点索引
+    title : str
+        子图标题
+    ylabel_visible : bool
+        是否显示Y轴标签
+    total_neurons : int
+        所有子图的统一神经元总数，用于对齐Y轴
+    """
+    
+    # 使用统一的神经元总数来确保三个子图Y轴对齐
+    if total_neurons is None:
+        total_neurons = len(aligned_data)
+    
+    # 绘制每个神经元的trace（严格按照show_trace.py的方法）
+    for i, (neuron_data, neuron_label) in enumerate(zip(aligned_data, neuron_labels)):
+        if i >= MAX_NEURONS:  # 限制显示的神经元数量，避免图表过于拥挤
+            break
         
-        first_wave_times_series = pd.Series(first_wave_times)
-        sorting_indices = first_wave_times_series.sort_values().index
-        sort_method_str = "Sorted by first calcium wave time"
+        # 使用统一的基准计算位置，确保三个子图对齐
+        position = min(total_neurons, MAX_NEURONS) - i
+        
+        # 按照show_trace.py的方法：使用原始数据而不是标准化数据，直接缩放并偏移
+        ax.plot(
+            day_data['stamp'] / SAMPLING_RATE,  # x轴是时间(秒) = 时间戳 / 采样率
+            neuron_data * SCALING_FACTOR + position * TRACE_OFFSET,  # 应用缩放并偏移
+            linewidth=LINE_WIDTH,
+            alpha=TRACE_ALPHA,
+            label=neuron_label
+        )
     
-    # 根据排序索引重新排列数据
-    aligned_day3_df_std = aligned_day3_df_std[sorting_indices]
-    aligned_day6_df_std = aligned_day6_df_std[sorting_indices]
-    aligned_day9_df_std = aligned_day9_df_std[sorting_indices]
+    # 设置Y轴标签（使用统一的基准，确保三个子图对齐）
+    if len(aligned_data) > 0:
+        yticks = []
+        ytick_labels = []
+        
+        # 为每个神经元计算正确的Y轴位置和标签，使用统一基准
+        for i, neuron_label in enumerate(neuron_labels[:MAX_NEURONS]):
+            position = min(total_neurons, MAX_NEURONS) - i
+            yticks.append(position * TRACE_OFFSET)
+            ytick_labels.append(str(neuron_label))
+        
+        ax.set_yticks(yticks)
+        if ylabel_visible:
+            ax.set_yticklabels(ytick_labels, fontsize=20)
+        else:
+            ax.set_yticklabels([])
+        
+        # 设置统一的Y轴范围，确保三个子图对齐，并为最上面的trace留出振幅空间
+        y_max = min(total_neurons, MAX_NEURONS) * TRACE_OFFSET + TRACE_OFFSET
+        # 为最上面的trace信号振幅预留额外空间（大约是缩放因子的一半）
+        y_max += SCALING_FACTOR * 0.6  
+        ax.set_ylim(0, y_max)
     
-    # 重新生成排序后的颜色映射
-    neuron_color_map_day3 = assign_neuron_colors(list(sorting_indices), correspondence_table)
-    neuron_color_map_day6 = assign_neuron_colors(list(sorting_indices), correspondence_table)
-    neuron_color_map_day9 = assign_neuron_colors(list(sorting_indices), correspondence_table)
+    # 标记CD1行为
+    if len(cd1_indices) > 0:
+        for cd1_time in cd1_indices:
+            cd1_time_seconds = cd1_time / SAMPLING_RATE
+            ax.axvline(x=cd1_time_seconds, color='red', linestyle='--', linewidth=2, alpha=0.8)
+            ax.text(cd1_time_seconds, ax.get_ylim()[1] * 0.95, 'CD1', 
+                   color='red', rotation=90, verticalalignment='top', fontsize=12, fontweight='bold')
+    
+    # 设置标题和标签（放大字体以提高可读性）
+    ax.set_title(title, fontsize=30, pad=20)
+    ax.set_xlabel('Time (seconds)', fontsize=35)
+    if ylabel_visible:
+        ax.set_ylabel('Neuron ID', fontsize=35)
+    
+    # 设置刻度标签字体大小（放大以提高可读性）
+    ax.tick_params(axis='both', labelsize=35)
+    
+    # 添加网格
+    ax.grid(False)
 
-# 绘制Trace图
-plt.figure(figsize=(60, 20))
+# 计算统一的神经元总数，用于确保三个子图Y轴对齐
+total_neurons_count = len(neuron_labels_day3)  # 使用Day3的神经元数量作为基准
 
-# Day3 Trace图
+# Day3 trace图
 plt.subplot(1, 3, 1)
 ax1 = plt.gca()
-plot_trace_subplot(ax1, aligned_day3_df_std, neuron_color_map_day3, 'Day3', sort_method_str)
+plot_trace_subplot(ax1, aligned_day3, neuron_labels_day3, day3_data, cd1_indices_day3, 
+                  f'Day3 ({sort_method_str})', ylabel_visible=True, total_neurons=total_neurons_count)
 
-# Day6 Trace图
+# Day6 trace图
 plt.subplot(1, 3, 2)
 ax2 = plt.gca()
-plot_trace_subplot(ax2, aligned_day6_df_std, neuron_color_map_day6, 'Day6', sort_method_str)
+plot_trace_subplot(ax2, aligned_day6, neuron_labels_day6, day6_data, cd1_indices_day6, 
+                  f'Day6 (Using Day3 {sort_method_str})', ylabel_visible=True, total_neurons=total_neurons_count)
 
-# Day9 Trace图
+# Day9 trace图
 plt.subplot(1, 3, 3)
 ax3 = plt.gca()
-plot_trace_subplot(ax3, aligned_day9_df_std, neuron_color_map_day9, 'Day9', sort_method_str)
+plot_trace_subplot(ax3, aligned_day9, neuron_labels_day9, day9_data, cd1_indices_day9, 
+                  f'Day9 (Using Day3 {sort_method_str})', ylabel_visible=True, total_neurons=total_neurons_count)
 
-# 添加总标题
-plt.suptitle(f'Combined Neural Traces Across Three Days ({sort_method_str})', fontsize=25, y=0.98)
-
-# 调整布局 (使用 subplots_adjust 代替 tight_layout 以匹配 show_trace.py 风格)
-plt.subplots_adjust(top=0.90, bottom=0.1, left=0.1, right=0.95, wspace=0.3)
-
-# 保存图像
-import os
-output_dir = '../../graph/'
-os.makedirs(output_dir, exist_ok=True)
-output_filename = f'{output_dir}traces_combined_complete_neurons_{SORT_METHOD}.png'
-plt.savefig(output_filename, dpi=300, bbox_inches='tight')
-print(f"Trace图已保存到: {output_filename}")
-
+plt.tight_layout()
+plt.savefig(f'../../graph/traces_combined_sorted_complete_neurons_{SORT_METHOD}.png', dpi=300)
 plt.close()
-print("程序执行完成")
+
+print(f"Trace图已保存到: ../../graph/traces_combined_sorted_complete_neurons_{SORT_METHOD}.png")
