@@ -11,7 +11,7 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description='绘制神经元分组的钙离子浓度轨迹图')
     parser.add_argument('--input', type=str, 
-                        default='../datasets/No.297920240925homecagefamilarmice.xlsx',
+                        default='../datasets/processed_297920240925homecagefamilarmice.xlsx',
                         help='输入数据文件路径')
     parser.add_argument('--output-dir', type=str, 
                         default='../results/CD1_traces_homecage/',

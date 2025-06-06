@@ -10,9 +10,9 @@ import os
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/CSDS3-6-8_CD1后的高架/Day8EMtrace.xlsx'
+    INPUT_FILE = '../../datasets/2980tangsuicelltrace.xlsx'
     # 输出目录
-    OUTPUT_DIR = '../../graph/CSDS3-6-8_CD1后的高架/'
+    OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
@@ -112,14 +112,14 @@ sorted_trace_data = trace_data[sorted_neurons_by_first_peak]
 print("开始绘制原始顺序的Trace图...")
 if has_behavior and behavior_data.dropna().unique().size > 0:
     # 如果有行为数据，使用两行一列的布局
-    fig = plt.figure(figsize=(40, 25))
+    fig = plt.figure(figsize=(60, 15))
     # 使用GridSpec，并增加间距，解决tight_layout警告
     grid = GridSpec(2, 1, height_ratios=[1, 5], hspace=0.05, figure=fig)
     ax_behavior = fig.add_subplot(grid[0])
     ax_trace = fig.add_subplot(grid[1])
 else:
     # 没有行为数据，只创建一个图表
-    fig = plt.figure(figsize=(40, 25))
+    fig = plt.figure(figsize=(60, 15))
     ax_trace = fig.add_subplot(111)
 
 # 预定义颜色映射，与热图保持一致
@@ -338,13 +338,13 @@ plt.close()  # 关闭前一个图形
 
 if has_behavior and behavior_data.dropna().unique().size > 0:
     # 如果有行为数据，使用两行一列的布局
-    fig_sorted = plt.figure(figsize=(40, 25))
+    fig_sorted = plt.figure(figsize=(60, 15))
     grid_sorted = GridSpec(2, 1, height_ratios=[1, 5], hspace=0.05, figure=fig_sorted)
     ax_behavior_sorted = fig_sorted.add_subplot(grid_sorted[0])
     ax_trace_sorted = fig_sorted.add_subplot(grid_sorted[1])
 else:
     # 没有行为数据，只创建一个图表
-    fig_sorted = plt.figure(figsize=(40, 25))
+    fig_sorted = plt.figure(figsize=(60, 15))
     ax_trace_sorted = fig_sorted.add_subplot(111)
 
 # 绘制按钙爆发排序的Trace图
