@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import os
 import argparse
 from matplotlib.patches import Patch
+from scipy.signal import savgol_filter
+from scipy.interpolate import interp1d
 
 def parse_args():
     """
@@ -11,7 +13,7 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description='绘制神经元分组的钙离子浓度轨迹图')
     parser.add_argument('--input', type=str, 
-                        default='../datasets/processed_297920240925homecagefamilarmice.xlsx',
+                        default='../datasets/No.297920240925homecagefamilarmice.xlsx',
                         help='输入数据文件路径')
     parser.add_argument('--output-dir', type=str, 
                         default='../results/CD1_traces_homecage/',
@@ -26,6 +28,14 @@ def parse_args():
     # 阴影区域参数已被移除
     parser.add_argument('--sampling-rate', type=float, default=4.8,
                         help='采样频率(Hz)，默认为4.8Hz')
+    parser.add_argument('--smooth', action='store_true', default=True,
+                        help='是否对曲线进行平滑处理')
+    parser.add_argument('--no-smooth', action='store_false', dest='smooth',
+                        help='禁用曲线平滑处理')
+    parser.add_argument('--smooth-window', type=int, default=11,
+                        help='平滑窗口大小（奇数），默认为11')
+    parser.add_argument('--smooth-poly', type=int, default=3,
+                        help='平滑多项式阶数，默认为3')
     return parser.parse_args()
 
 def ensure_dir(directory):
@@ -217,17 +227,93 @@ GROUP_COLORS = {
     'group3': '#808080'   # 灰色
 }
 
-def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4.8):
+def smooth_data(data, window_length=11, polyorder=3):
+    """
+    使用Savitzky-Golay滤波器平滑数据
+    
+    Parameters
+    ----------
+    data : array-like
+        需要平滑的数据
+    window_length : int
+        滤波器窗口长度（必须为奇数）
+    polyorder : int
+        多项式拟合阶数
+        
+    Returns
+    -------
+    smoothed_data : array-like
+        平滑后的数据
+    """
+    if len(data) < window_length:
+        # 如果数据长度小于窗口长度，则调整窗口大小
+        window_length = len(data) if len(data) % 2 == 1 else len(data) - 1
+        if window_length < 3:
+            return data  # 数据太短，无法平滑
+    
+    try:
+        smoothed = savgol_filter(data, window_length=window_length, polyorder=polyorder)
+        return smoothed
+    except Exception as e:
+        print(f"平滑处理出错: {e}，返回原始数据")
+        return data
+
+def interpolate_data(x_data, y_data, factor=3):
+    """
+    使用插值方法增加数据点数量，使曲线更平滑
+    
+    Parameters
+    ----------
+    x_data : array-like
+        X轴数据
+    y_data : array-like
+        Y轴数据
+    factor : int
+        插值倍数，默认为3倍
+        
+    Returns
+    -------
+    x_interp : array-like
+        插值后的X轴数据
+    y_interp : array-like
+        插值后的Y轴数据
+    """
+    try:
+        # 创建插值函数
+        f_interp = interp1d(x_data, y_data, kind='cubic', bounds_error=False, fill_value='extrapolate')
+        
+        # 生成更密集的X轴点
+        x_interp = np.linspace(x_data.min(), x_data.max(), len(x_data) * factor)
+        y_interp = f_interp(x_interp)
+        
+        return x_interp, y_interp
+    except Exception as e:
+        print(f"插值处理出错: {e}，返回原始数据")
+        return x_data, y_data
+
+def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4.8, 
+                          enable_smooth=True, smooth_window=11, smooth_poly=3):
     """
     绘制CD1标签前n_stamps个时间戳的神经元组平均钙离子浓度轨迹图
     
-    参数:
-        data: 包含平均值和标准差的DataFrame
-        cd1_index: CD1标签首次出现的索引
-        n_stamps: 要绘制的时间戳数量
-        output_path: 输出图像路径
-        show_shadow: 是否显示标准差阴影区域
-        sampling_rate: 采样频率(Hz)
+    Parameters
+    ----------
+    data : DataFrame
+        包含平均值和标准差的DataFrame
+    cd1_index : int
+        CD1标签首次出现的索引
+    n_stamps : int
+        要绘制的时间戳数量
+    output_path : str
+        输出图像路径
+    sampling_rate : float
+        采样频率(Hz)
+    enable_smooth : bool
+        是否启用曲线平滑
+    smooth_window : int
+        平滑窗口大小
+    smooth_poly : int
+        平滑多项式阶数
     """
     if cd1_index is None or cd1_index < n_stamps:
         print(f"警告: CD1标签前的数据不足{n_stamps}个时间戳，将使用所有可用数据")
@@ -246,23 +332,41 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
     # 创建相对时间轴（以秒为单位，使用实际采样频率）
     plot_data['relative_time'] = [(i * sampling_period) for i in range(len(plot_data))]
     
+    # 准备绘图数据
+    time_data = plot_data['relative_time'].values
+    group1_data = plot_data['group1_avg'].values
+    group2_data = plot_data['group2_avg'].values
+    group3_data = plot_data['group3_avg'].values
+    
+    # 应用平滑处理
+    if enable_smooth:
+        print(f"正在应用平滑处理（窗口大小: {smooth_window}, 多项式阶数: {smooth_poly}）...")
+        group1_data = smooth_data(group1_data, window_length=smooth_window, polyorder=smooth_poly)
+        group2_data = smooth_data(group2_data, window_length=smooth_window, polyorder=smooth_poly)
+        group3_data = smooth_data(group3_data, window_length=smooth_window, polyorder=smooth_poly)
+        
+        # 可选：应用插值增加数据点密度
+        time_data, group1_data = interpolate_data(time_data, group1_data, factor=2)
+        _, group2_data = interpolate_data(plot_data['relative_time'].values, group2_data, factor=2)
+        _, group3_data = interpolate_data(plot_data['relative_time'].values, group3_data, factor=2)
+    
     # 创建图像
     plt.figure(figsize=(12, 8))
     
     # 使用统一的颜色方案绘制三条曲线及其阴影区域
     # Group 1 - 绿色
-    plt.plot(plot_data['relative_time'], plot_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], label='Group 1', linewidth=4)
+    plt.plot(time_data, group1_data, 
+             color=GROUP_COLORS['group1'], label='Group 1', linewidth=3)
     # 阴影区域显示已移除
     
     # Group 2 - 黄色
-    plt.plot(plot_data['relative_time'], plot_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], label='Group 2', linewidth=4)
+    plt.plot(time_data, group2_data, 
+             color=GROUP_COLORS['group2'], label='Group 2', linewidth=3)
     # 阴影区域显示已移除
     
     # Group 3 - 灰色虚线
-    plt.plot(plot_data['relative_time'], plot_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], label='Group 3', linewidth=4, linestyle='--')
+    plt.plot(time_data, group3_data, 
+             color=GROUP_COLORS['group3'], label='Group 3', linewidth=3, linestyle='--')
     # 阴影区域显示已移除
     
     # 添加图例和标签
@@ -288,17 +392,29 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
     
     print(f"CD1前轨迹图已保存至: {output_path}")
 
-def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4.8):
+def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4.8,
+                         enable_smooth=True, smooth_window=11, smooth_poly=3):
     """
     绘制CD1标签后n_stamps个时间戳的神经元组平均钙离子浓度轨迹图
     
-    参数:
-        data: 包含平均值和标准差的DataFrame
-        cd1_index: CD1标签首次出现的索引
-        n_stamps: 要绘制的时间戳数量
-        output_path: 输出图像路径
-        show_shadow: 是否显示标准差阴影区域
-        sampling_rate: 采样频率(Hz)
+    Parameters
+    ----------
+    data : DataFrame
+        包含平均值和标准差的DataFrame
+    cd1_index : int
+        CD1标签首次出现的索引
+    n_stamps : int
+        要绘制的时间戳数量
+    output_path : str
+        输出图像路径
+    sampling_rate : float
+        采样频率(Hz)
+    enable_smooth : bool
+        是否启用曲线平滑
+    smooth_window : int
+        平滑窗口大小
+    smooth_poly : int
+        平滑多项式阶数
     """
     if cd1_index is None:
         print("警告: 未找到CD1标签，无法绘制CD1后的图表")
@@ -319,23 +435,41 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
     # 创建相对时间轴（以秒为单位，使用实际采样频率）
     plot_data['relative_time'] = [(i * sampling_period) for i in range(len(plot_data))]
     
+    # 准备绘图数据
+    time_data = plot_data['relative_time'].values
+    group1_data = plot_data['group1_avg'].values
+    group2_data = plot_data['group2_avg'].values
+    group3_data = plot_data['group3_avg'].values
+    
+    # 应用平滑处理
+    if enable_smooth:
+        print(f"正在应用平滑处理（窗口大小: {smooth_window}, 多项式阶数: {smooth_poly}）...")
+        group1_data = smooth_data(group1_data, window_length=smooth_window, polyorder=smooth_poly)
+        group2_data = smooth_data(group2_data, window_length=smooth_window, polyorder=smooth_poly)
+        group3_data = smooth_data(group3_data, window_length=smooth_window, polyorder=smooth_poly)
+        
+        # 可选：应用插值增加数据点密度
+        time_data, group1_data = interpolate_data(time_data, group1_data, factor=2)
+        _, group2_data = interpolate_data(plot_data['relative_time'].values, group2_data, factor=2)
+        _, group3_data = interpolate_data(plot_data['relative_time'].values, group3_data, factor=2)
+    
     # 创建图像
     plt.figure(figsize=(12, 8))
     
     # 使用统一的颜色方案绘制三条曲线及其阴影区域
     # Group 1 - 绿色
-    plt.plot(plot_data['relative_time'], plot_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], label='Group 1', linewidth=4)
+    plt.plot(time_data, group1_data, 
+             color=GROUP_COLORS['group1'], label='Group 1', linewidth=3)
     # 阴影区域显示已移除
     
     # Group 2 - 黄色
-    plt.plot(plot_data['relative_time'], plot_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], label='Group 2', linewidth=4)
+    plt.plot(time_data, group2_data, 
+             color=GROUP_COLORS['group2'], label='Group 2', linewidth=3)
     # 阴影区域显示已移除
     
     # Group 3 - 灰色虚线
-    plt.plot(plot_data['relative_time'], plot_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], label='Group 3', linewidth=4, linestyle='--')
+    plt.plot(time_data, group3_data, 
+             color=GROUP_COLORS['group3'], label='Group 3', linewidth=3, linestyle='--')
     # 阴影区域显示已移除
     
     # 添加图例和标签
@@ -361,18 +495,31 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
     
     print(f"CD1后轨迹图已保存至: {output_path}")
 
-def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output_path, sampling_rate=4.8):
+def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output_path, sampling_rate=4.8,
+                           enable_smooth=True, smooth_window=11, smooth_poly=3):
     """
     在同一个图中绘制CD1标签前后的神经元组平均钙离子浓度轨迹图
     
-    参数:
-        data: 包含平均值和标准差的DataFrame
-        cd1_index: CD1标签首次出现的索引
-        before_stamps: CD1标签前的时间戳数量
-        after_stamps: CD1标签后的时间戳数量
-        output_path: 输出图像路径
-        show_shadow: 是否显示标准差阴影区域
-        sampling_rate: 采样频率(Hz)
+    Parameters
+    ----------
+    data : DataFrame
+        包含平均值和标准差的DataFrame
+    cd1_index : int
+        CD1标签首次出现的索引
+    before_stamps : int
+        CD1标签前的时间戳数量
+    after_stamps : int
+        CD1标签后的时间戳数量
+    output_path : str
+        输出图像路径
+    sampling_rate : float
+        采样频率(Hz)
+    enable_smooth : bool
+        是否启用曲线平滑
+    smooth_window : int
+        平滑窗口大小
+    smooth_poly : int
+        平滑多项式阶数
     """
     if cd1_index is None:
         print("警告: 未找到CD1标签，无法绘制组合图表")
@@ -406,39 +553,72 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     before_data['relative_time'] = [((i - len(before_data)) * sampling_period) for i in range(len(before_data))]
     after_data['relative_time'] = [(i * sampling_period) for i in range(len(after_data))]
     
+    # 准备绘图数据
+    before_time = before_data['relative_time'].values
+    before_group1 = before_data['group1_avg'].values
+    before_group2 = before_data['group2_avg'].values
+    before_group3 = before_data['group3_avg'].values
+    
+    after_time = after_data['relative_time'].values
+    after_group1 = after_data['group1_avg'].values
+    after_group2 = after_data['group2_avg'].values
+    after_group3 = after_data['group3_avg'].values
+    
+    # 应用平滑处理
+    if enable_smooth:
+        print(f"正在应用平滑处理（窗口大小: {smooth_window}, 多项式阶数: {smooth_poly}）...")
+        # 平滑CD1前的数据
+        before_group1 = smooth_data(before_group1, window_length=smooth_window, polyorder=smooth_poly)
+        before_group2 = smooth_data(before_group2, window_length=smooth_window, polyorder=smooth_poly)
+        before_group3 = smooth_data(before_group3, window_length=smooth_window, polyorder=smooth_poly)
+        
+        # 平滑CD1后的数据
+        after_group1 = smooth_data(after_group1, window_length=smooth_window, polyorder=smooth_poly)
+        after_group2 = smooth_data(after_group2, window_length=smooth_window, polyorder=smooth_poly)
+        after_group3 = smooth_data(after_group3, window_length=smooth_window, polyorder=smooth_poly)
+        
+        # 可选：应用插值增加数据点密度
+        before_time, before_group1 = interpolate_data(before_time, before_group1, factor=2)
+        _, before_group2 = interpolate_data(before_data['relative_time'].values, before_group2, factor=2)
+        _, before_group3 = interpolate_data(before_data['relative_time'].values, before_group3, factor=2)
+        
+        after_time, after_group1 = interpolate_data(after_time, after_group1, factor=2)
+        _, after_group2 = interpolate_data(after_data['relative_time'].values, after_group2, factor=2)
+        _, after_group3 = interpolate_data(after_data['relative_time'].values, after_group3, factor=2)
+    
     # 创建图像，增加图表大小以解决布局问题
     plt.figure(figsize=(15, 10))
     
     # 绘制CD1前的轨迹
     # Group 1 - 绿色
-    plt.plot(before_data['relative_time'], before_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], label='Group 1', linewidth=4)
+    plt.plot(before_time, before_group1, 
+             color=GROUP_COLORS['group1'], label='Group 1', linewidth=3)
     # 阴影区域显示已移除
     
     # Group 2 - 黄色
-    plt.plot(before_data['relative_time'], before_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], label='Group 2', linewidth=4)
+    plt.plot(before_time, before_group2, 
+             color=GROUP_COLORS['group2'], label='Group 2', linewidth=3)
     # 阴影区域显示已移除
     
     # Group 3 - 灰色虚线
-    plt.plot(before_data['relative_time'], before_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], label='Group 3', linewidth=4, linestyle='--')
+    plt.plot(before_time, before_group3, 
+             color=GROUP_COLORS['group3'], label='Group 3', linewidth=3, linestyle='--')
     # 阴影区域显示已移除
     
     # 绘制CD1后的轨迹
     # Group 1 - 绿色
-    plt.plot(after_data['relative_time'], after_data['group1_avg'], 
-             color=GROUP_COLORS['group1'], linewidth=4)
+    plt.plot(after_time, after_group1, 
+             color=GROUP_COLORS['group1'], linewidth=3)
     # 阴影区域显示已移除
     
     # Group 2 - 黄色
-    plt.plot(after_data['relative_time'], after_data['group2_avg'], 
-             color=GROUP_COLORS['group2'], linewidth=4)
+    plt.plot(after_time, after_group2, 
+             color=GROUP_COLORS['group2'], linewidth=3)
     # 阴影区域显示已移除
     
     # Group 3 - 灰色虚线
-    plt.plot(after_data['relative_time'], after_data['group3_avg'], 
-             color=GROUP_COLORS['group3'], linewidth=4, linestyle='--')
+    plt.plot(after_time, after_group3, 
+             color=GROUP_COLORS['group3'], linewidth=3, linestyle='--')
     # 阴影区域显示已移除
     
     # 添加图例和标签
@@ -604,15 +784,18 @@ def main():
     
     # 绘制CD1标签前的轨迹图
     plot_trace_before_cd1(data_with_avgs, cd1_index, args.before_stamps, output_before_cd1, 
-                         sampling_rate=args.sampling_rate)
+                         sampling_rate=args.sampling_rate, enable_smooth=args.smooth,
+                         smooth_window=args.smooth_window, smooth_poly=args.smooth_poly)
     
     # 绘制CD1标签后的轨迹图
     plot_trace_after_cd1(data_with_avgs, cd1_index, args.after_stamps, output_after_cd1, 
-                        sampling_rate=args.sampling_rate)
+                        sampling_rate=args.sampling_rate, enable_smooth=args.smooth,
+                        smooth_window=args.smooth_window, smooth_poly=args.smooth_poly)
     
     # 绘制CD1标签前后组合的轨迹图
     plot_combined_cd1_trace(data_with_avgs, cd1_index, args.before_stamps, args.after_stamps, output_combined_cd1, 
-                           sampling_rate=args.sampling_rate)
+                           sampling_rate=args.sampling_rate, enable_smooth=args.smooth,
+                           smooth_window=args.smooth_window, smooth_poly=args.smooth_poly)
     
     # 加载神经元位置数据并绘制拓扑图
     position_data = load_neuron_positions(args.position_file)
