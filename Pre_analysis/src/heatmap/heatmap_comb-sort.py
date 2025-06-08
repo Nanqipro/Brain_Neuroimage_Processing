@@ -109,20 +109,19 @@ else:  # calcium_wave
     sort_method_str = "Sorted by first calcium wave time"
 
 # 根据对应表准备数据
-aligned_day3, aligned_day6, aligned_day9 = [], [], []
-neuron_labels_day3, neuron_labels_day6, neuron_labels_day9 = [], [], []
+aligned_day0, aligned_day3, aligned_day6, aligned_day9 = [], [], [], []
+neuron_labels_day0, neuron_labels_day3, neuron_labels_day6, neuron_labels_day9 = [], [], [], []
 peak_times_order = []  # 用于记录对应表中每行神经元的峰值时间或钙波时间
 
-# 筛选Day3、Day6、Day9都有数据的神经元
+# 筛选四天都有数据的神经元
 valid_indices = []
-day3_to_day0_mapping = {}  # 记录Day3到Day0的神经元映射
-
 for idx, row in correspondence_table.iterrows():
     day0_neuron = row.get('0925homecagefamilarmice', None)  # 使用get方法避免KeyError
     day3_neuron, day6_neuron, day9_neuron = row['Day3_with_behavior_labels_filled'], row['Day6_with_behavior_labels_filled'], row['Day9_with_behavior_labels_filled']
     
-    # 检查Day3、Day6、Day9是否都有数据 (都不为null且对应列存在于数据中)
-    if (pd.notna(day3_neuron) and day3_neuron in day3_data.columns and
+    # 检查四天是否都有数据 (都不为null且对应列存在于数据中)
+    if (pd.notna(day0_neuron) and day0_neuron in day0_data.columns and
+        pd.notna(day3_neuron) and day3_neuron in day3_data.columns and
         pd.notna(day6_neuron) and day6_neuron in day6_data.columns and
         pd.notna(day9_neuron) and day9_neuron in day9_data.columns):
         
@@ -133,11 +132,10 @@ for idx, row in correspondence_table.iterrows():
         peak_times_order.append((sort_time, len(valid_indices)))  # 保存排序时间和新的索引
         valid_indices.append(idx)
         
-        # 记录Day3到Day0的映射关系
-        if pd.notna(day0_neuron) and day0_neuron in day0_data.columns:
-            day3_to_day0_mapping[day3_neuron] = day0_neuron
+        # 四天都有数据，添加到相应列表
+        aligned_day0.append(day0_data[day0_neuron])
+        neuron_labels_day0.append(day0_neuron)
         
-        # Day3、Day6、Day9都有数据，添加到相应列表
         aligned_day3.append(day3_data[day3_neuron])
         neuron_labels_day3.append(day3_neuron)
         
@@ -148,9 +146,7 @@ for idx, row in correspondence_table.iterrows():
         neuron_labels_day9.append(day9_neuron)
 
 # 打印保留的神经元数量
-print(f"Day3、Day6、Day9都有数据的神经元数量: {len(neuron_labels_day3)}")
-print(f"Day3到Day0有映射关系的神经元数量: {len(day3_to_day0_mapping)}")
-print(f"Day0中未映射的神经元数量: {len([col for col in day0_data.columns if col not in ['stamp', 'behavior'] and col not in day3_to_day0_mapping.values()])}")
+print(f"保留的神经元数量: {len(neuron_labels_day3)}")
 
 # 按照Day3的峰值或钙波时间排序（先去除None值的行再排序）
 valid_peak_times = [(t, i) for t, i in peak_times_order if t is not None]
@@ -160,55 +156,14 @@ none_indices = [i for t, i in peak_times_order if t is None]
 sorted_indices.extend(none_indices)
 
 # 根据排序后的索引重新排列数据
+aligned_day0 = [aligned_day0[i] for i in sorted_indices]
 aligned_day3 = [aligned_day3[i] for i in sorted_indices]
 aligned_day6 = [aligned_day6[i] for i in sorted_indices]
 aligned_day9 = [aligned_day9[i] for i in sorted_indices]
+neuron_labels_day0 = [neuron_labels_day0[i] for i in sorted_indices]
 neuron_labels_day3 = [neuron_labels_day3[i] for i in sorted_indices]
 neuron_labels_day6 = [neuron_labels_day6[i] for i in sorted_indices]
 neuron_labels_day9 = [neuron_labels_day9[i] for i in sorted_indices]
-
-# 处理Day0数据：按照Day3的排列，没有对应关系的放在最底部
-aligned_day0 = []
-neuron_labels_day0 = []
-
-# 首先按照Day3的顺序添加有对应关系的Day0神经元
-for day3_neuron in neuron_labels_day3:
-    if day3_neuron in day3_to_day0_mapping:
-        day0_neuron = day3_to_day0_mapping[day3_neuron]
-        aligned_day0.append(day0_data[day0_neuron])
-        neuron_labels_day0.append(day0_neuron)
-    else:
-        # 如果没有对应的Day0神经元，添加空数据（全为NaN）
-        aligned_day0.append(pd.Series([np.nan] * len(day0_data), index=day0_data.index))
-        neuron_labels_day0.append(f'N/A_{day3_neuron}')
-
-# 找出Day0中没有被使用的神经元（没有对应关系的）
-used_day0_neurons = set(day3_to_day0_mapping.values())
-unused_day0_neurons = []
-for col in day0_data.columns:
-    if col not in ['stamp', 'behavior'] and col not in used_day0_neurons:
-        try:
-            # 尝试提取神经元ID进行排序
-            neuron_id = int(col.replace('C', ''))
-            unused_day0_neurons.append((neuron_id, col))
-        except:
-            # 如果无法提取ID，使用字符串排序
-            unused_day0_neurons.append((float('inf'), col))
-
-# 按照神经元ID排序
-unused_day0_neurons.sort(key=lambda x: x[0])
-
-# 将未使用的Day0神经元添加到最底部
-for _, day0_neuron in unused_day0_neurons:
-    aligned_day0.append(day0_data[day0_neuron])
-    neuron_labels_day0.append(day0_neuron)
-    # 为Day3、Day6、Day9添加对应的空数据
-    aligned_day3.append(pd.Series([np.nan] * len(day3_data), index=day3_data.index))
-    neuron_labels_day3.append(f'N/A_{day0_neuron}')
-    aligned_day6.append(pd.Series([np.nan] * len(day6_data), index=day6_data.index))
-    neuron_labels_day6.append(f'N/A_{day0_neuron}')
-    aligned_day9.append(pd.Series([np.nan] * len(day9_data), index=day9_data.index))
-    neuron_labels_day9.append(f'N/A_{day0_neuron}')
 
 # 将列表转换为 DataFrame，并设置索引为时间戳 (stamp)，再转置以交换横纵坐标
 aligned_day0_df = pd.DataFrame(aligned_day0, index=neuron_labels_day0).T
@@ -216,18 +171,11 @@ aligned_day3_df = pd.DataFrame(aligned_day3, index=neuron_labels_day3).T
 aligned_day6_df = pd.DataFrame(aligned_day6, index=neuron_labels_day6).T
 aligned_day9_df = pd.DataFrame(aligned_day9, index=neuron_labels_day9).T
 
-# 标准化数据（忽略NaN值）
-aligned_day0_df = (aligned_day0_df - aligned_day0_df.mean(skipna=True)) / aligned_day0_df.std(skipna=True)
-aligned_day3_df = (aligned_day3_df - aligned_day3_df.mean(skipna=True)) / aligned_day3_df.std(skipna=True)
-aligned_day6_df = (aligned_day6_df - aligned_day6_df.mean(skipna=True)) / aligned_day6_df.std(skipna=True)
-aligned_day9_df = (aligned_day9_df - aligned_day9_df.mean(skipna=True)) / aligned_day9_df.std(skipna=True)
-
-# 打印最终统计信息
-print(f"最终热图包含的神经元总数: {len(neuron_labels_day0)}")
-mapped_count = len([label for label in neuron_labels_day0 if not label.startswith('N/A_')])
-unmapped_count = len(neuron_labels_day0) - mapped_count
-print(f"其中有映射关系的神经元: {mapped_count}个")
-print(f"其中无映射关系的Day0神经元: {unmapped_count}个")
+# 标准化数据
+aligned_day0_df = (aligned_day0_df - aligned_day0_df.mean()) / aligned_day0_df.std()
+aligned_day3_df = (aligned_day3_df - aligned_day3_df.mean()) / aligned_day3_df.std()
+aligned_day6_df = (aligned_day6_df - aligned_day6_df.mean()) / aligned_day6_df.std()
+aligned_day9_df = (aligned_day9_df - aligned_day9_df.mean()) / aligned_day9_df.std()
 
 # 设置绘图颜色范围
 vmin, vmax = -2, 2  # 控制颜色对比度
@@ -263,13 +211,6 @@ plt.title(f'Day0 (Using Day3 {sort_method_str})', fontsize=25)
 plt.xlabel('Stamp', fontsize=25)
 plt.ylabel('Neuron', fontsize=25)
 
-# 添加分隔线区分有映射关系和无映射关系的神经元
-mapped_neurons_count = len([label for label in neuron_labels_day0 if not label.startswith('N/A_')])
-if mapped_neurons_count < len(neuron_labels_day0):
-    ax0.axhline(y=mapped_neurons_count, color='red', linestyle='-', linewidth=3)
-    plt.text(-20, mapped_neurons_count + 0.5, 'Unmapped Day0 neurons', 
-             color='red', rotation=0, verticalalignment='bottom', fontsize=15, fontweight='bold')
-
 # 标记Day0的CD1行为
 if has_behavior_day0 and len(cd1_indices_day0) > 0:
     for cd1_time in cd1_indices_day0:
@@ -285,13 +226,6 @@ ax1 = sns.heatmap(aligned_day3_df.T, cmap='viridis', cbar=True, vmin=vmin, vmax=
 plt.title(f'Day3 ({sort_method_str})', fontsize=25)
 plt.xlabel('Stamp', fontsize=25)
 plt.ylabel('')
-
-# 添加分隔线区分有映射关系和无映射关系的神经元
-mapped_neurons_count_day3 = len([label for label in neuron_labels_day3 if not label.startswith('N/A_')])
-if mapped_neurons_count_day3 < len(neuron_labels_day3):
-    ax1.axhline(y=mapped_neurons_count_day3, color='red', linestyle='-', linewidth=3)
-    plt.text(-20, mapped_neurons_count_day3 + 0.5, 'Unmapped Day0 neurons', 
-             color='red', rotation=0, verticalalignment='bottom', fontsize=15, fontweight='bold')
 
 # 标记Day3的CD1行为
 if has_behavior_day3 and len(cd1_indices_day3) > 0:
@@ -309,13 +243,6 @@ plt.title(f'Day6 (Using Day3 {sort_method_str})', fontsize=25)
 plt.xlabel('Stamp', fontsize=25)
 plt.ylabel('')
 
-# 添加分隔线区分有映射关系和无映射关系的神经元
-mapped_neurons_count_day6 = len([label for label in neuron_labels_day6 if not label.startswith('N/A_')])
-if mapped_neurons_count_day6 < len(neuron_labels_day6):
-    ax2.axhline(y=mapped_neurons_count_day6, color='red', linestyle='-', linewidth=3)
-    plt.text(-20, mapped_neurons_count_day6 + 0.5, 'Unmapped Day0 neurons', 
-             color='red', rotation=0, verticalalignment='bottom', fontsize=15, fontweight='bold')
-
 # 标记Day6的CD1行为
 if has_behavior_day6 and len(cd1_indices_day6) > 0:
     for cd1_time in cd1_indices_day6:
@@ -331,13 +258,6 @@ ax3 = sns.heatmap(aligned_day9_df.T, cmap='viridis', cbar=True, vmin=vmin, vmax=
 plt.title(f'Day9 (Using Day3 {sort_method_str})', fontsize=25)
 plt.xlabel('Stamp', fontsize=25)
 plt.ylabel('')
-
-# 添加分隔线区分有映射关系和无映射关系的神经元
-mapped_neurons_count_day9 = len([label for label in neuron_labels_day9 if not label.startswith('N/A_')])
-if mapped_neurons_count_day9 < len(neuron_labels_day9):
-    ax3.axhline(y=mapped_neurons_count_day9, color='red', linestyle='-', linewidth=3)
-    plt.text(-20, mapped_neurons_count_day9 + 0.5, 'Unmapped Day0 neurons', 
-             color='red', rotation=0, verticalalignment='bottom', fontsize=15, fontweight='bold')
 
 # 标记Day9的CD1行为
 if has_behavior_day9 and len(cd1_indices_day9) > 0:
