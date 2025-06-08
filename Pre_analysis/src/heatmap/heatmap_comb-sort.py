@@ -182,11 +182,15 @@ for idx in valid_indices_369:
         day3_to_correspondence[day3_neuron] = day0_neuron
 
 # 按照Day3的顺序排列Day0神经元
+corresponding_count = 0
 for day3_neuron in neuron_labels_day3:
     if day3_neuron in day3_to_correspondence:
         day0_neuron = day3_to_correspondence[day3_neuron]
         aligned_day0.append(day0_data[day0_neuron])
         neuron_labels_day0.append(day0_neuron)
+        corresponding_count += 1
+
+print(f"对应Day3的神经元数量: {corresponding_count}")
 
 # 找出Day0中剩余的神经元（Day3对应不上的）
 remaining_day0_neurons = []
@@ -202,12 +206,19 @@ for col in day0_data.columns:
 # 按神经元ID大小排序剩余的神经元
 remaining_day0_neurons.sort(key=lambda x: float(x))
 
+print(f"剩余神经元数量: {len(remaining_day0_neurons)}")
+print(f"前10个剩余神经元ID: {remaining_day0_neurons[:10]}")
+
+# 记录分割位置（对应神经元和剩余神经元的分界线）
+separation_line = len(neuron_labels_day0)
+
 # 将剩余的神经元添加到最底部
 for neuron in remaining_day0_neurons:
     aligned_day0.append(day0_data[neuron])
     neuron_labels_day0.append(neuron)
 
-print(f"Day0神经元总数: {len(neuron_labels_day0)}, 其中对应Day3的: {len([n for n in neuron_labels_day0 if n in day3_to_correspondence.values()])}")
+print(f"Day0神经元总数: {len(neuron_labels_day0)}, 其中对应Day3的: {corresponding_count}, 剩余的: {len(remaining_day0_neurons)}")
+print(f"分割线位置（纵坐标）: {separation_line}")
 
 # 将Day0列表转换为 DataFrame
 aligned_day0_df = pd.DataFrame(aligned_day0, index=neuron_labels_day0).T
@@ -300,6 +311,16 @@ ax0 = sns.heatmap(aligned_day0_df.T, cmap='viridis', cbar=True, vmin=vmin, vmax=
 plt.title(f'Day0 (Ordered by Day3 {sort_method_str} + Remaining by Neuron ID)', fontsize=25)
 plt.xlabel('Stamp', fontsize=25)
 plt.ylabel('Neuron', fontsize=25)
+
+# 添加分割线来区分对应神经元和剩余神经元
+if corresponding_count > 0 and len(remaining_day0_neurons) > 0:
+    # 在对应神经元和剩余神经元之间画一条红色分割线
+    ax0.axhline(y=separation_line, color='red', linestyle='-', linewidth=3)
+    # 添加文本标注
+    plt.text(-10, separation_line/2, f'Day3对应神经元\n({corresponding_count}个)', 
+             color='red', fontsize=15, fontweight='bold', verticalalignment='center', rotation=90)
+    plt.text(-10, separation_line + len(remaining_day0_neurons)/2, f'剩余神经元\n({len(remaining_day0_neurons)}个)', 
+             color='red', fontsize=15, fontweight='bold', verticalalignment='center', rotation=90)
 
 # 标记Day0的CD1行为
 if has_behavior_day0 and len(cd1_indices_day0) > 0:
