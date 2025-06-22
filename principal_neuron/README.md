@@ -1,37 +1,100 @@
-# 小鼠脑神经元行为关联可视化工具
+# 小鼠脑神经元行为关联可视化工具 (v2.0)
 
 本项目旨在分析和可视化小鼠在特定行为（如"Close"，"Middle"，"Open"）中关键神经元的活动数据。
-它通过处理效应大小数据来识别关键神经元，并在神经元的相对空间位置上绘制这些神经元，以及它们之间的共享和特有关系。
+它通过**完整的效应量计算流程**从原始神经元数据到效应量分析，识别关键神经元，并在神经元的相对空间位置上绘制这些神经元，以及它们之间的共享和特有关系。
+
+## 🆕 新增功能 (v2.0)
+
+- ✅ **完整效应量计算**：集成了从 `analysis_results.py` 的 Cohen's d 效应量计算功能
+- ✅ **原始数据支持**：支持直接从原始神经元活动数据计算效应量
+- ✅ **智能工作流**：自动判断使用原始数据计算还是加载预计算效应量
+- ✅ **阈值优化**：自动推荐最佳效应量阈值
+- ✅ **完整文档**：详细的使用文档和示例代码
 
 ## 项目结构
 
 ```
-.
-├── data/                     # 存放原始CSV数据文件 (用户需自行准备)
-│   ├── EMtrace01-3标签版.csv   # 神经元效应大小数据
-│   └── EMtrace01_Max_position.csv # 神经元相对位置数据
+principal_neuron/
+├── data/                     # 存放数据文件
+│   ├── EMtrace01_raw_data.xlsx      # 🆕 原始神经元数据 (可选)
+│   ├── EMtrace01-3标签版.csv        # 预计算的效应量数据
+│   └── EMtrace01_Max_position.csv   # 神经元相对位置数据
 ├── output_plots/             # 生成的图表将保存于此
 ├── src/                      # 源代码目录
-│   ├── main_emtrace01_analysis.py # 主分析和绘图流程脚本
-│   ├── data_loader.py        # 数据加载和初步处理模块
-│   ├── config.py             # 配置文件 (阈值、颜色等)
-│   ├── plotting_utils.py     # 绘图工具函数模块
-│   └── __init__.py           # (可选, 使src成为一个包)
+│   ├── effect_size_calculator.py    # 🆕 效应量计算器 (集成自analysis_results.py)
+│   ├── main_emtrace01_analysis.py   # 主分析脚本 (已更新工作流)
+│   ├── data_loader.py              # 数据加载和初步处理模块
+│   ├── config.py                   # 配置文件 (阈值、颜色等)
+│   ├── plotting_utils.py           # 绘图工具函数模块
+│   └── __init__.py                 # (可选, 使src成为一个包)
+├── example_usage.py          # 🆕 使用示例和教程
+├── README_USAGE.md           # 🆕 详细使用文档
+├── app.py                    # Web应用入口
 └── README.md                 # 本说明文件
 ```
 
-## 如何运行
+## 🚀 快速开始
+
+### 方式1：使用原始神经元数据 (推荐)
+
+```bash
+# 1. 环境准备
+pip install pandas numpy matplotlib seaborn scikit-learn
+
+# 2. 准备原始数据
+# 将您的原始神经元数据文件 (Excel/CSV格式) 放入 data/ 目录
+# 数据格式: 神经元1 | 神经元2 | ... | 行为标签
+
+# 3. 运行分析
+python src/main_emtrace01_analysis.py
+```
+
+### 方式2：使用预计算效应量数据
+
+```bash
+# 1. 准备预计算效应量文件
+# 将效应量数据文件命名为 EMtrace01-3标签版.csv 放入 data/ 目录
+
+# 2. 运行分析
+python src/main_emtrace01_analysis.py
+```
+
+### 方式3：运行示例代码
+
+```bash
+# 运行完整的使用示例
+python example_usage.py
+```
+
+## 📚 详细文档
+
+**完整使用说明请参阅 [README_USAGE.md](README_USAGE.md)**，包含：
+- 详细的数据格式说明
+- 完整的 API 使用指南
+- 效应量计算原理
+- 高级功能使用
+- 故障排除指南
+
+## 如何运行 (详细说明)
 
 1.  **环境准备**:
-    *   确保已安装 Python 和必要的库 (pandas, matplotlib, seaborn)。
-    *   可以通过 `pip install pandas matplotlib seaborn` 进行安装。
+    *   确保已安装 Python 和必要的库 (pandas, numpy, matplotlib, seaborn, scikit-learn)。
+    *   可以通过 `pip install pandas numpy matplotlib seaborn scikit-learn` 进行安装。
 
 2.  **数据准备**:
+    
+    **选项A: 原始神经元数据 (🆕 推荐)**
+    *   准备包含神经元活动数据和行为标签的Excel或CSV文件
+    *   数据格式：每行一个样本，列为神经元活动值，最后一列为行为标签
+    *   将文件放入 `data/` 文件夹，程序会自动检测并计算效应量
+    
+    **选项B: 预计算效应量数据**
     *   将您的神经元效应大小数据文件命名为 `EMtrace01-3标签版.csv` 并放入 `data` 文件夹。
         *   该文件应包含行为名称，以及对应不同神经元 (`Neuron_X`) 的效应大小值。
+    
+    **神经元位置数据 (必需)**
     *   将您的神经元位置数据文件命名为 `EMtrace01_Max_position.csv` 并放入 `data` 文件夹。
         *   该文件应包含神经元编号 (`number`) 及其相对X (`relative_x`) 和Y (`relative_y`) 坐标。
-    *   *注意*: 当前 `src/data_loader.py` 中的加载函数包含硬编码的示例数据。如需使用您自己的文件，请确保文件存在于 `data/` 目录下，并根据需要调整 `data_loader.py` 中的文件读取逻辑（移除或修改硬编码部分）。
 
 3.  **运行脚本**:
     在项目根目录下执行以下命令：

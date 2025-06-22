@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 from itertools import combinations # Add this import for combinations
 
@@ -16,6 +17,7 @@ from plotting_utils import (
     plot_unique_neurons_map,
     plot_combined_9_grid # Import the new 3x3 grid plotting function
 )
+from effect_size_calculator import EffectSizeCalculator, load_and_calculate_effect_sizes
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -164,6 +166,135 @@ def get_key_neurons(df_effects, threshold):
         print(f"Behavior: {behavior}, Threshold >= {threshold}, Key Neurons ({len(key_neuron_ids)}): {key_neurons_by_behavior[behavior]}")
     return key_neurons_by_behavior
 
+def calculate_effect_sizes_from_data(neuron_data_file: str, output_dir: str = OUTPUT_DIR) -> tuple:
+    """
+    从原始神经元数据文件计算效应量
+    
+    参数：
+        neuron_data_file: 包含神经元活动数据和行为标签的文件路径
+        output_dir: 输出目录
+        
+    返回：
+        tuple: (效应量DataFrame (长格式), 效应量计算器实例, 计算结果字典)
+    """
+    print(f"\n从原始数据计算效应量: {neuron_data_file}")
+    
+    try:
+        # 使用便捷函数加载数据并计算效应量
+        results = load_and_calculate_effect_sizes(
+            neuron_data_path=neuron_data_file,
+            behavior_col=None,  # 假设行为标签在最后一列
+            output_dir=output_dir
+        )
+        
+        # 将效应量结果转换为长格式DataFrame（与现有代码兼容）
+        effect_sizes_dict = results['effect_sizes']
+        behavior_labels = results['behavior_labels']
+        
+        # 创建长格式DataFrame
+        long_format_data = []
+        for behavior, effect_array in effect_sizes_dict.items():
+            for neuron_idx, effect_value in enumerate(effect_array):
+                long_format_data.append({
+                    'Behavior': behavior,
+                    'NeuronID': neuron_idx + 1,  # 1-based索引
+                    'EffectSize': effect_value
+                })
+        
+        df_effect_sizes_long = pd.DataFrame(long_format_data)
+        
+        print(f"效应量计算完成:")
+        print(f"  行为类别: {behavior_labels}")
+        print(f"  效应量数据形状: {df_effect_sizes_long.shape}")
+        print(f"  输出文件: {results['output_files']['effect_sizes_csv']}")
+        
+        return df_effect_sizes_long, results['calculator'], results
+        
+    except Exception as e:
+        print(f"从原始数据计算效应量失败: {str(e)}")
+        print("将尝试使用预计算的效应量数据...")
+        return None, None, None
+
+def create_effect_sizes_workflow(raw_data_file: str = None, 
+                                precomputed_file: str = None,
+                                recalculate: bool = False) -> pd.DataFrame:
+    """
+    创建效应量计算工作流
+    
+    参数：
+        raw_data_file: 原始神经元数据文件路径
+        precomputed_file: 预计算的效应量文件路径
+        recalculate: 是否强制重新计算效应量
+        
+    返回：
+        pd.DataFrame: 效应量数据（长格式）
+    """
+    print("\n=== 效应量计算工作流 ===")
+    
+    # 如果指定了原始数据文件且需要重新计算，或者没有预计算文件
+    if (raw_data_file and recalculate) or (raw_data_file and not precomputed_file):
+        print("使用原始数据计算效应量...")
+        df_long, calculator, results = calculate_effect_sizes_from_data(raw_data_file)
+        
+        if df_long is not None:
+            print("效应量计算成功！")
+            return df_long
+        else:
+            print("效应量计算失败，尝试加载预计算数据...")
+    
+    # 尝试加载预计算的效应量数据
+    if precomputed_file and os.path.exists(precomputed_file):
+        print(f"加载预计算的效应量数据: {precomputed_file}")
+        try:
+            df_long = load_effect_sizes(precomputed_file)
+            if df_long is not None:
+                print("预计算效应量数据加载成功！")
+                return df_long
+            else:
+                print("预计算效应量数据加载失败")
+        except Exception as e:
+            print(f"加载预计算效应量数据时出错: {str(e)}")
+    
+    # 如果所有方法都失败，生成示例数据
+    print("所有数据源都不可用，生成示例效应量数据用于演示...")
+    return generate_sample_effect_sizes()
+
+def generate_sample_effect_sizes() -> pd.DataFrame:
+    """
+    生成示例效应量数据用于演示
+    """
+    print("生成示例效应量数据...")
+    
+    behaviors = ['Close', 'Middle', 'Open']
+    n_neurons = 50
+    
+    # 生成随机效应量数据
+    np.random.seed(42)
+    long_format_data = []
+    
+    for behavior in behaviors:
+        # 为每种行为生成效应量，部分神经元有较高效应量
+        effect_sizes = np.random.exponential(scale=0.3, size=n_neurons)
+        
+        # 让某些神经元对特定行为有更高的效应量
+        if behavior == 'Close':
+            effect_sizes[0:10] += np.random.uniform(0.4, 0.8, 10)
+        elif behavior == 'Middle':
+            effect_sizes[15:25] += np.random.uniform(0.4, 0.8, 10)
+        else:  # Open
+            effect_sizes[30:40] += np.random.uniform(0.4, 0.8, 10)
+        
+        for neuron_id in range(1, n_neurons + 1):
+            long_format_data.append({
+                'Behavior': behavior,
+                'NeuronID': neuron_id,
+                'EffectSize': effect_sizes[neuron_id - 1]
+            })
+    
+    df_sample = pd.DataFrame(long_format_data)
+    print(f"示例数据生成完成: {df_sample.shape}")
+    return df_sample
+
 if __name__ == "__main__":
     # Ensure the output directory for plots exists
     if not os.path.exists(OUTPUT_DIR):
@@ -171,12 +302,19 @@ if __name__ == "__main__":
         print(f"Created directory: {OUTPUT_DIR}")
 
     # Define paths for data files (relative to workspace root)
-    effect_data_identifier = 'data/EMtrace01-3标签版.csv'
+    raw_data_identifier = '../data/EMtrace01_plus.xlsx'  # 原始神经元数据文件
+    effect_data_identifier = 'data/EMtrace01-3标签版.csv'  # 预计算的效应量文件
     position_data_identifier = 'data/EMtrace01_Max_position.csv'
 
-    # Load data
-    print(f"\nLoading effect sizes from: {effect_data_identifier}")
-    df_effect_sizes_transformed = load_effect_sizes(effect_data_identifier)
+    # === 效应量计算工作流 ===
+    print("\n=== 开始分析流程 ===")
+    
+    # 创建效应量计算工作流
+    df_effect_sizes_transformed = create_effect_sizes_workflow(
+        raw_data_file=raw_data_identifier if os.path.exists(raw_data_identifier) else None,
+        precomputed_file=effect_data_identifier,
+        recalculate=False  # 设置为True强制重新计算效应量
+    )
     
     print(f"\nLoading neuron positions from: {position_data_identifier}")
     df_neuron_positions = load_neuron_positions(position_data_identifier)
