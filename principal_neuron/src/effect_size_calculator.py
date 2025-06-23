@@ -5,6 +5,107 @@ from typing import Tuple, List, Dict, Any
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 
+class PathConfig:
+    """
+    路径配置类：集中管理所有输入输出路径配置
+    
+    在这里统一修改所有文件路径，便于管理和维护
+    
+    使用方法：
+    --------
+    1. 修改 default_data_file 来改变默认数据文件
+    2. 修改 output_dir 路径来改变输出目录
+    3. 在 alternative_data_files 中添加或修改其他数据文件
+    4. 修改 default_behavior_column 来指定行为标签列名
+    """
+    
+    def __init__(self):
+        # 获取当前文件所在目录和项目根目录
+        self.current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.principal_neuron_dir = os.path.dirname(self.current_dir)
+        
+        # === 输入数据路径配置 ===
+        self.data_dir = os.path.join(self.principal_neuron_dir, "data")
+        self.default_data_file = "EMtrace01_plus.xlsx"  # 默认数据文件名
+        self.default_data_path = os.path.join(self.data_dir, self.default_data_file)
+        
+        # === 输出路径配置 ===
+        self.output_dir = os.path.join(self.principal_neuron_dir, "effect_size_output")
+        self.effect_sizes_filename = "effect_sizes.csv"  # 效应量结果文件名
+        self.effect_sizes_path = os.path.join(self.output_dir, self.effect_sizes_filename)
+        
+        # === 其他可选数据文件路径 ===
+        self.alternative_data_files = {
+            "emtrace01": os.path.join(self.data_dir, "2980240924EMtrace.xlsx"),
+            "emtrace02": os.path.join(self.data_dir, "62501monthgood0419fixedmerge.xlsx"),
+            "emtrace03": os.path.join(self.data_dir, "bla6250EM0626goodtrace.xlsx")
+        }
+        
+        # === 行为标签配置 ===
+        self.default_behavior_column = None  # None表示使用最后一列
+        
+    def get_data_path(self, data_key: str = "default") -> str:
+        """
+        获取数据文件路径
+        
+        参数
+        ----------
+        data_key : str
+            数据文件键名，可选值：
+            - "default": 使用默认数据文件
+            - "emtrace01", "emtrace02", "emtrace03": 使用替代数据文件
+            - 或直接传入完整文件路径
+        
+        返回
+        ----------
+        str
+            数据文件的完整路径
+        """
+        if data_key == "default":
+            return self.default_data_path
+        elif data_key in self.alternative_data_files:
+            return self.alternative_data_files[data_key]
+        elif os.path.exists(data_key):  # 如果是完整路径且文件存在
+            return data_key
+        else:
+            raise ValueError(f"无效的数据文件键名或路径: {data_key}")
+    
+    def ensure_output_dir(self) -> str:
+        """
+        确保输出目录存在，如果不存在则创建
+        
+        返回
+        ----------
+        str
+            输出目录路径
+        """
+        os.makedirs(self.output_dir, exist_ok=True)
+        return self.output_dir
+    
+    def get_output_path(self, filename: str = None) -> str:
+        """
+        获取输出文件的完整路径
+        
+        参数
+        ----------
+        filename : str, 可选
+            输出文件名，如果未提供则使用默认的效应量文件名
+        
+        返回
+        ----------
+        str
+            输出文件的完整路径
+        """
+        self.ensure_output_dir()
+        if filename is None:
+            filename = self.effect_sizes_filename
+        return os.path.join(self.output_dir, filename)
+
+
+# 创建全局路径配置实例
+PATH_CONFIG = PathConfig()
+
+
 class EffectSizeCalculator:
     """
     效应量计算器类：用于计算神经元活动与行为之间的Cohen's d效应量
@@ -313,7 +414,7 @@ class EffectSizeCalculator:
         return effect_sizes, X_scaled, y_encoded
 
 
-def load_and_calculate_effect_sizes(neuron_data_path: str, behavior_col: str = None, 
+def load_and_calculate_effect_sizes(neuron_data_path: str = None, behavior_col: str = None, 
                                   output_dir: str = None) -> Dict[str, Any]:
     """
     从文件加载数据并计算效应量的便捷函数
@@ -323,30 +424,30 @@ def load_and_calculate_effect_sizes(neuron_data_path: str, behavior_col: str = N
     
     参数
     ----------
-    neuron_data_path : str
+    neuron_data_path : str, 可选
         包含神经元数据的文件路径（Excel或CSV格式）
+        如果未指定，将使用PATH_CONFIG中的默认数据路径
     behavior_col : str, 可选
         行为标签列名，如果未指定则使用最后一列
     output_dir : str, 可选
-        输出目录路径，如果未指定则使用相对于principal_neuron的output目录
+        输出目录路径，如果未指定则使用PATH_CONFIG中的默认输出目录
         
     返回
     ----------
     results : Dict[str, Any]
         包含效应量计算结果的字典
     """
+    # 使用路径配置获取数据文件路径
+    if neuron_data_path is None:
+        neuron_data_path = PATH_CONFIG.get_data_path("default")
+    
     print(f"从文件加载数据: {neuron_data_path}")
     
-    # 如果未指定输出目录，使用默认目录（相对于principal_neuron根目录）
+    # 使用路径配置获取输出目录
     if output_dir is None:
-        # 获取当前文件所在目录
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # 获取principal_neuron根目录
-        principal_neuron_dir = os.path.dirname(current_dir)
-        output_dir = os.path.join(principal_neuron_dir, "effect_size_output")
-    
-    # 创建输出目录
-    os.makedirs(output_dir, exist_ok=True)
+        output_dir = PATH_CONFIG.ensure_output_dir()
+    else:
+        os.makedirs(output_dir, exist_ok=True)
     
     # 加载数据
     if neuron_data_path.endswith('.xlsx'):
@@ -380,7 +481,7 @@ def load_and_calculate_effect_sizes(neuron_data_path: str, behavior_col: str = N
     )
     
     # 导出效应量数据
-    csv_path = os.path.join(output_dir, "effect_sizes.csv")
+    csv_path = PATH_CONFIG.get_output_path("effect_sizes.csv")
     calculator.export_effect_sizes_to_csv(effect_sizes, csv_path)
     
     # 获取top神经元
@@ -412,15 +513,9 @@ if __name__ == "__main__":
     """
     print("效应量计算器 - 真实数据分析...")
     
-    # 设置真实数据路径和输出目录
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    principal_neuron_dir = os.path.dirname(current_dir)
-    
-    # 真实数据文件路径
-    real_data_path = os.path.join(principal_neuron_dir, "data", "EMtrace01_plus.xlsx")
-    
-    # 输出目录
-    output_dir = os.path.join(principal_neuron_dir, "effect_size_output")
+    # 使用路径配置获取数据路径和输出目录
+    real_data_path = PATH_CONFIG.get_data_path("default")
+    output_dir = PATH_CONFIG.ensure_output_dir()
     
     print(f"数据文件路径: {real_data_path}")
     print(f"输出目录: {output_dir}")
@@ -428,14 +523,15 @@ if __name__ == "__main__":
     # 检查数据文件是否存在
     if not os.path.exists(real_data_path):
         print(f"错误: 数据文件不存在 - {real_data_path}")
-        print("请确保 EMtrace01_plus.xlsx 文件位于 principal_neuron/data/ 目录下")
+        print(f"请确保 {PATH_CONFIG.default_data_file} 文件位于 {PATH_CONFIG.data_dir} 目录下")
+        print("或者修改 PATH_CONFIG 中的路径配置")
         exit(1)
     
     try:
         # 使用便捷函数加载和计算效应量
         results = load_and_calculate_effect_sizes(
             neuron_data_path=real_data_path,
-            behavior_col=None,  # 使用最后一列作为行为标签
+            behavior_col=PATH_CONFIG.default_behavior_column,  # 使用配置的行为标签列
             output_dir=output_dir
         )
         
