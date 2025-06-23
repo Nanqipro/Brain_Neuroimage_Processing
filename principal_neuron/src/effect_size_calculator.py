@@ -26,20 +26,20 @@ class PathConfig:
         
         # === 输入数据路径配置 ===
         self.data_dir = os.path.join(self.principal_neuron_dir, "data")
-        self.default_data_file = "bla6250EM0626goodtrace.xlsx"  # 默认数据文件名
+        self.default_data_file = "2980240924EMtrace.xlsx"  # 默认数据文件名
         self.default_data_path = os.path.join(self.data_dir, self.default_data_file)
         
         # === 输出路径配置 ===
         self.output_dir = os.path.join(self.principal_neuron_dir, "effect_size_output")
-        self.effect_sizes_filename = "effect_sizes_bla6250EM0626goodtrace.csv"  # 效应量结果文件名
+        self.effect_sizes_filename = "effect_sizes_2980240924EMtrace.csv"  # 效应量结果文件名
         self.effect_sizes_path = os.path.join(self.output_dir, self.effect_sizes_filename)
         
-        # === 其他可选数据文件路径 ===
-        self.alternative_data_files = {
-            "emtrace01": os.path.join(self.data_dir, "2980240924EMtrace.xlsx"),
-            "emtrace02": os.path.join(self.data_dir, "62501monthgood0419fixedmerge.xlsx"),
-            "emtrace03": os.path.join(self.data_dir, "bla6250EM0626goodtrace.xlsx")
-        }
+        # # === 其他可选数据文件路径 ===
+        # self.alternative_data_files = {
+        #     "emtrace01": os.path.join(self.data_dir, "2980240924EMtrace.xlsx"),
+        #     "emtrace02": os.path.join(self.data_dir, "62501monthgood0419fixedmerge.xlsx"),
+        #     "emtrace03": os.path.join(self.data_dir, "bla6250EM0626goodtrace.xlsx")
+        # }
         
         # === 行为标签配置 ===
         self.default_behavior_column = "behavior"  # None表示使用最后一列

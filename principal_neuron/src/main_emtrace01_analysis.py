@@ -1,7 +1,135 @@
+"""
+神经元主要分析器 - EMtrace01 数据分析脚本
+
+该脚本用于分析神经元活动数据，包括效应量计算、关键神经元识别和可视化。
+所有的路径配置都统一管理在文件开头的PathConfig类中，方便修改和维护。
+
+使用方法：
+1. 修改PathConfig类中的路径变量来指定输入输出文件
+2. 在main函数中修改dataset_key来切换不同的数据集
+3. 运行脚本即可生成分析结果和可视化图表
+
+作者: Assistant
+日期: 2025年
+"""
+
 import pandas as pd
 import numpy as np
 import os
 from itertools import combinations # Add this import for combinations
+
+# ===============================================================================
+# 路径配置部分 - 所有输入输出路径的统一管理
+# ===============================================================================
+
+class PathConfig:
+    """
+    路径配置类：集中管理所有输入输出路径配置
+    
+    在这里统一修改所有文件路径，便于管理和维护
+    
+    使用方法：
+    --------
+    1. 修改以下路径变量来改变输入输出目录
+    2. 确保数据文件存在于指定路径
+    3. 程序将自动创建输出目录
+    """
+    
+    def __init__(self):
+        # === 输出目录配置 ===
+        self.OUTPUT_DIR = "output_plots"  # 主要的图表输出目录
+        
+        # === 输入数据路径配置 ===
+        # 原始神经元数据文件（用于计算效应量）
+        self.RAW_DATA_FILE = '../data/2980240924EMtrace.xlsx'
+        
+        # 预计算的效应量数据文件（CSV格式）
+        self.EFFECT_DATA_FILE = '../effect_size_output/effect_sizes_2980240924EMtrace.csv'
+        
+        # 神经元位置数据文件（可设置为空字符串或None来使用随机位置）
+        self.POSITION_DATA_FILE = '../data/EMtrace01_Max_position.csv'
+        
+        # === 可选的替代数据文件路径 ===
+        # 在这里添加新的数据集配置，格式如下：
+        # 'dataset_name': {
+        #     'raw': '原始数据文件路径',
+        #     'effect': '效应量数据文件路径', 
+        #     'position': '位置数据文件路径'（可设置为 '' 或 None 来使用随机位置）
+        # }
+        self.ALTERNATIVE_DATA_FILES = {
+            'emtrace02': {
+                'raw': '../data/EMtrace02_plus.xlsx',
+                'effect': 'data/EMtrace02-3标签版.csv',
+                'position': 'data/EMtrace02_Max_position.csv'
+            },
+            'bla6250': {
+                'raw': '../data/bla6250EM0626goodtrace.xlsx',
+                'effect': 'data/bla6250-3标签版.csv',
+                'position': 'data/bla6250_Max_position.csv'
+            },
+            'random_positions_demo': {
+                'raw': '../data/2980240924EMtrace.xlsx',
+                'effect': '../effect_size_output/effect_sizes_2980240924EMtrace.csv',
+                'position': ''  # 空字符串表示使用随机位置
+            }
+            # 可以在这里添加更多数据集配置...
+        }
+        
+        # === 效应量计算输出路径配置 ===
+        self.EFFECT_SIZE_OUTPUT_DIR = "effect_size_output"  # 效应量计算结果输出目录
+        
+        # === 创建必要的目录 ===
+        self._ensure_directories()
+    
+    def _ensure_directories(self):
+        """确保必要的输出目录存在"""
+        directories = [self.OUTPUT_DIR, self.EFFECT_SIZE_OUTPUT_DIR]
+        for directory in directories:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+                print(f"创建输出目录: {directory}")
+    
+    def get_data_paths(self, dataset_key='default'):
+        """
+        获取指定数据集的所有路径
+        
+        参数:
+            dataset_key: 数据集键名 ('default', 'emtrace02', 'bla6250' 等)
+        
+        返回:
+            dict: 包含raw, effect, position三个路径的字典
+        """
+        if dataset_key == 'default':
+            return {
+                'raw': self.RAW_DATA_FILE,
+                'effect': self.EFFECT_DATA_FILE,
+                'position': self.POSITION_DATA_FILE
+            }
+        elif dataset_key in self.ALTERNATIVE_DATA_FILES:
+            return self.ALTERNATIVE_DATA_FILES[dataset_key]
+        else:
+            raise ValueError(f"未知的数据集键名: {dataset_key}")
+    
+    def list_available_datasets(self):
+        """列出所有可用的数据集"""
+        datasets = ['default'] + list(self.ALTERNATIVE_DATA_FILES.keys())
+        print("可用的数据集:")
+        for dataset in datasets:
+            paths = self.get_data_paths(dataset)
+            print(f"  {dataset}:")
+            print(f"    原始数据: {paths['raw']}")
+            print(f"    效应量数据: {paths['effect']}")
+            print(f"    位置数据: {paths['position']}")
+
+# 创建全局路径配置实例
+PATH_CONFIG = PathConfig()
+
+# 为了向后兼容，保留原始的OUTPUT_DIR变量
+OUTPUT_DIR = PATH_CONFIG.OUTPUT_DIR
+
+# ===============================================================================
+# 导入其他模块
+# ===============================================================================
 
 # Assuming data_loader, config, and plotting_utils are in the same directory (src)
 from data_loader import load_effect_sizes, load_neuron_positions
@@ -21,8 +149,6 @@ from effect_size_calculator import EffectSizeCalculator, load_and_calculate_effe
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-OUTPUT_DIR = "output_plots"
 
 def analyze_effect_sizes(df_effect_sizes_long):
     """
@@ -166,7 +292,7 @@ def get_key_neurons(df_effects, threshold):
         print(f"Behavior: {behavior}, Threshold >= {threshold}, Key Neurons ({len(key_neuron_ids)}): {key_neurons_by_behavior[behavior]}")
     return key_neurons_by_behavior
 
-def calculate_effect_sizes_from_data(neuron_data_file: str, output_dir: str = OUTPUT_DIR) -> tuple:
+def calculate_effect_sizes_from_data(neuron_data_file: str, output_dir: str = None) -> tuple:
     """
     从原始神经元数据文件计算效应量
     
@@ -178,6 +304,10 @@ def calculate_effect_sizes_from_data(neuron_data_file: str, output_dir: str = OU
         tuple: (效应量DataFrame (长格式), 效应量计算器实例, 计算结果字典)
     """
     print(f"\n从原始数据计算效应量: {neuron_data_file}")
+    
+    # 如果未指定输出目录，使用路径配置的默认目录
+    if output_dir is None:
+        output_dir = PATH_CONFIG.EFFECT_SIZE_OUTPUT_DIR
     
     try:
         # 使用便捷函数加载数据并计算效应量
@@ -296,15 +426,46 @@ def generate_sample_effect_sizes() -> pd.DataFrame:
     return df_sample
 
 if __name__ == "__main__":
-    # Ensure the output directory for plots exists
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-        print(f"Created directory: {OUTPUT_DIR}")
-
-    # Define paths for data files (relative to workspace root)
-    raw_data_identifier = '../data/EMtrace01_plus.xlsx'  # 原始神经元数据文件
-    effect_data_identifier = 'data/EMtrace01-3标签版.csv'  # 预计算的效应量文件
-    position_data_identifier = 'data/EMtrace01_Max_position.csv'
+    # ===============================================================================
+    # 主程序入口 - 使用路径配置
+    # ===============================================================================
+    
+    print("=" * 80)
+    print("神经元主要分析器 - EMtrace01 数据分析")
+    print("=" * 80)
+    print(f"输出目录: {PATH_CONFIG.OUTPUT_DIR}")
+    print(f"效应量输出目录: {PATH_CONFIG.EFFECT_SIZE_OUTPUT_DIR}")
+    
+    # 可以通过修改下面的dataset_key来切换不同的数据集
+    # 可选值: 'default', 'emtrace02', 'bla6250'
+    dataset_key = 'default'  # 默认使用EMtrace01数据集
+    
+    # 如果需要切换到其他数据集，取消注释下面的行
+    # dataset_key = 'emtrace02'  # 使用EMtrace02数据集
+    # dataset_key = 'bla6250'   # 使用bla6250数据集
+    
+    # 如果想查看所有可用的数据集，取消注释下面的行
+    # PATH_CONFIG.list_available_datasets()
+    
+    # 获取当前数据集的路径配置
+    try:
+        data_paths = PATH_CONFIG.get_data_paths(dataset_key)
+        raw_data_identifier = data_paths['raw']
+        effect_data_identifier = data_paths['effect']
+        position_data_identifier = data_paths['position']
+        
+        print(f"\n使用数据集: {dataset_key}")
+        print(f"原始数据文件: {raw_data_identifier}")
+        print(f"效应量数据文件: {effect_data_identifier}")
+        print(f"位置数据文件: {position_data_identifier}")
+        
+    except ValueError as e:
+        print(f"错误: {e}")
+        print("使用默认路径配置...")
+        # 备用路径（如果配置出错时使用）
+        raw_data_identifier = '../data/EMtrace01_plus.xlsx'
+        effect_data_identifier = 'data/EMtrace01-3标签版.csv'
+        position_data_identifier = 'data/EMtrace01_Max_position.csv'
 
     # === 效应量计算工作流 ===
     print("\n=== 开始分析流程 ===")
@@ -316,8 +477,21 @@ if __name__ == "__main__":
         recalculate=False  # 设置为True强制重新计算效应量
     )
     
-    print(f"\nLoading neuron positions from: {position_data_identifier}")
-    df_neuron_positions = load_neuron_positions(position_data_identifier)
+    # 加载神经元位置数据（支持空位置文件，会自动生成随机位置）
+    print(f"\n加载神经元位置数据: {position_data_identifier if position_data_identifier else '(使用随机位置)'}")
+    
+    # 如果效应量数据可用，根据其确定神经元数量
+    num_neurons_for_random = None
+    if df_effect_sizes_transformed is not None:
+        num_neurons_for_random = df_effect_sizes_transformed['NeuronID'].nunique()
+        print(f"根据效应量数据确定神经元数量: {num_neurons_for_random}")
+    
+    # 加载位置数据（如果位置文件为空，会自动生成随机位置）
+    df_neuron_positions = load_neuron_positions(
+        position_data_identifier, 
+        num_neurons=num_neurons_for_random,
+        random_seed=42
+    )
 
     if df_effect_sizes_transformed is not None and df_neuron_positions is not None:
         print(f"\nUsing effect size threshold: {EFFECT_SIZE_THRESHOLD} (from config.py)")
