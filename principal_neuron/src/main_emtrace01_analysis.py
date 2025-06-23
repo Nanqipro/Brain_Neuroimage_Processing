@@ -81,12 +81,26 @@ class PathConfig:
                 'position': '../data/2980_Max_position.csv',
                 'description': '2980神经元活动数据'
             },
+            '2980_plus': {
+                'name': '2980 datasets',
+                'raw': '../data/2980240924EMtrace_plus.xlsx',
+                'effect': '../effect_size_output/effect_sizes_2980240924EMtrace_plus.csv',
+                'position': '../data/2980_Max_position.csv',
+                'description': '2980增强版神经元活动数据'
+            },
             'bla6250': {
                 'name': 'BLA6250 datasets',
                 'raw': '../data/bla6250EM0626goodtrace.xlsx',
                 'effect': '../effect_size_output/effect_sizes_bla6250EM0626goodtrace.csv',
                 'position': '../data/6250_Max_position.csv',
                 'description': 'BLA6250神经元活动数据'
+            },
+            'bla6250_plus': {
+                'name': 'BLA6250 datasets',
+                'raw': '../data/bla6250EM0626goodtrace_plus.xlsx',
+                'effect': '../effect_size_output/effect_sizes_bla6250EM0626goodtrace_plus.csv',
+                'position': '../data/6250_Max_position.csv',
+                'description': 'BLA6250增强版神经元活动数据'
             },
             
             # Day系列数据集
@@ -646,7 +660,9 @@ if __name__ == "__main__":
     # dataset_key = 'emtrace01'    # 使用EMtrace01数据集
     # dataset_key = 'emtrace02'    # 使用EMtrace02数据集  
     # dataset_key = '2980'         # 使用2980数据集
-    dataset_key = 'bla6250'      # 使用BLA6250数据集
+    # dataset_key = '2980_plus'      # 使用2980增强版数据集
+    # dataset_key = 'bla6250'      # 使用BLA6250数据集
+    dataset_key = 'bla6250_plus' # 使用BLA6250增强版数据集
     # dataset_key = 'day3'         # 使用Day3数据集
     
     # ===============================================================================

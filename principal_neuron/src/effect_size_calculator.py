@@ -26,12 +26,12 @@ class PathConfig:
         
         # === 输入数据路径配置 ===
         self.data_dir = os.path.join(self.principal_neuron_dir, "data")
-        self.default_data_file = "2980240924EMtrace.xlsx"  # 默认数据文件名
+        self.default_data_file = "bla6250EM0626goodtrace_plus.xlsx"  # 默认数据文件名
         self.default_data_path = os.path.join(self.data_dir, self.default_data_file)
         
         # === 输出路径配置 ===
         self.output_dir = os.path.join(self.principal_neuron_dir, "effect_size_output")
-        self.effect_sizes_filename = "effect_sizes_2980240924EMtrace.csv"  # 效应量结果文件名
+        self.effect_sizes_filename = "effect_sizes_bla6250EM0626goodtrace_plus.csv"  # 效应量结果文件名
         self.effect_sizes_path = os.path.join(self.output_dir, self.effect_sizes_filename)
         
         # # === 其他可选数据文件路径 ===
@@ -111,7 +111,7 @@ class EffectSizeCalculator:
     效应量计算器类：用于计算神经元活动与行为之间的Cohen's d效应量
     
     该类实现了从原始神经元活动数据计算效应量的完整流程，
-    包括数据预处理、标准化、以及Cohen's d效应量计算
+    包括数据预处理、标准化、以及Cohen's d效应量计算，自动删除包含NaN值的行
     
     参数
     ----------
@@ -131,12 +131,101 @@ class EffectSizeCalculator:
         self.behavior_labels = behavior_labels
         self.label_encoder = LabelEncoder()
         self.scaler = StandardScaler()
+        self.nan_info = {}  # 存储NaN值处理信息
         
+    def remove_nan_rows(self, neuron_data: np.ndarray, behavior_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        检测并删除包含NaN值的行
+        
+        参数
+        ----------
+        neuron_data : np.ndarray
+            神经元活动数据
+        behavior_data : np.ndarray
+            行为标签数据
+            
+        返回
+        ----------
+        cleaned_neuron_data : np.ndarray
+            删除NaN行后的神经元数据
+        cleaned_behavior_data : np.ndarray
+            删除NaN行后的行为数据
+        """
+        print("\n检测并删除包含NaN值的行...")
+        
+        # 检测神经元数据中的NaN值
+        try:
+            neuron_nan_mask = np.isnan(neuron_data).any(axis=1)
+        except TypeError:
+            # 如果神经元数据包含非数值类型，转换为浮点数
+            print("警告: 神经元数据包含非数值类型，尝试转换为数值类型...")
+            try:
+                neuron_data = pd.DataFrame(neuron_data).apply(pd.to_numeric, errors='coerce').values
+                neuron_nan_mask = np.isnan(neuron_data).any(axis=1)
+            except Exception as e:
+                print(f"神经元数据转换失败: {e}")
+                neuron_nan_mask = np.zeros(neuron_data.shape[0], dtype=bool)
+        
+        # 检测行为数据中的NaN值
+        try:
+            if isinstance(behavior_data, pd.Series):
+                behavior_nan_mask = pd.isna(behavior_data)
+            else:
+                # 对于numpy数组，需要区分数值类型和字符串类型
+                if behavior_data.dtype.kind in ['U', 'S', 'O']:  # 字符串或对象类型
+                    behavior_nan_mask = pd.isna(pd.Series(behavior_data))
+                else:
+                    # 数值类型
+                    behavior_nan_mask = np.isnan(behavior_data)
+        except Exception as e:
+            print(f"检测行为数据NaN值时出错: {e}")
+            # 创建一个通用的检测方法
+            behavior_nan_list = []
+            for item in behavior_data:
+                if item is None or item is np.nan:
+                    behavior_nan_list.append(True)
+                elif isinstance(item, str) and (item.lower() in ['nan', 'none', ''] or item.strip() == ''):
+                    behavior_nan_list.append(True)
+                else:
+                    behavior_nan_list.append(False)
+            behavior_nan_mask = np.array(behavior_nan_list)
+        
+        # 统计NaN值信息
+        self.nan_info['original_shape'] = neuron_data.shape
+        self.nan_info['neuron_nan_rows'] = np.sum(neuron_nan_mask)
+        self.nan_info['behavior_nan_rows'] = np.sum(behavior_nan_mask)
+        self.nan_info['total_nan_rows'] = np.sum(neuron_nan_mask | behavior_nan_mask)
+        
+        print(f"原始数据形状: {neuron_data.shape}")
+        print(f"神经元数据中包含NaN的行数: {self.nan_info['neuron_nan_rows']}")
+        print(f"行为数据中包含NaN的行数: {self.nan_info['behavior_nan_rows']}")
+        print(f"总共包含NaN的行数: {self.nan_info['total_nan_rows']}")
+        
+        if self.nan_info['total_nan_rows'] == 0:
+            print("数据中没有发现NaN值")
+            return neuron_data, behavior_data
+        
+        # 直接删除包含NaN的行
+        print("删除包含NaN值的行...")
+        valid_mask = ~(neuron_nan_mask | behavior_nan_mask)
+        cleaned_neuron_data = neuron_data[valid_mask]
+        cleaned_behavior_data = behavior_data[valid_mask]
+        
+        # 更新处理后的信息
+        self.nan_info['cleaned_shape'] = cleaned_neuron_data.shape
+        self.nan_info['removed_rows'] = self.nan_info['original_shape'][0] - cleaned_neuron_data.shape[0]
+        
+        print(f"处理后数据形状: {cleaned_neuron_data.shape}")
+        print(f"删除的行数: {self.nan_info['removed_rows']}")
+        print("NaN值处理完成，数据已清理")
+            
+        return cleaned_neuron_data, cleaned_behavior_data
+
     def preprocess_data(self, neuron_data: np.ndarray, behavior_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        预处理神经元活动数据和行为标签
+        预处理神经元活动数据和行为标签（自动删除NaN值）
         
-        对输入的神经元活动数据进行标准化处理，对行为标签进行编码，
+        对输入的神经元活动数据进行NaN值删除和标准化处理，对行为标签进行编码，
         确保数据格式符合后续分析要求
         
         参数
@@ -155,12 +244,26 @@ class EffectSizeCalculator:
         """
         print("\n预处理神经元活动数据和行为标签...")
         
+        # 删除包含NaN值的行
+        cleaned_neuron_data, cleaned_behavior_data = self.remove_nan_rows(neuron_data, behavior_data)
+        
+        # 检查数据是否为空
+        if cleaned_neuron_data.shape[0] == 0:
+            raise ValueError("删除NaN值后没有剩余数据，请检查数据质量")
+        
         # 标准化神经元活动数据
-        X_scaled = self.scaler.fit_transform(neuron_data)
+        X_scaled = self.scaler.fit_transform(cleaned_neuron_data)
         print(f"神经元数据标准化完成: {X_scaled.shape}")
         
+        # 检查标准化后是否产生新的NaN值
+        if np.isnan(X_scaled).any():
+            print("警告: 标准化过程中产生了NaN值，可能是由于某些特征的标准差为0")
+            # 用0替换标准化后的NaN值
+            X_scaled = np.where(np.isnan(X_scaled), 0, X_scaled)
+            print("已将标准化后的NaN值替换为0")
+        
         # 编码行为标签
-        y_encoded = self.label_encoder.fit_transform(behavior_data)
+        y_encoded = self.label_encoder.fit_transform(cleaned_behavior_data)
         
         # 保存行为标签
         if self.behavior_labels is None:
@@ -175,10 +278,10 @@ class EffectSizeCalculator:
     
     def calculate_effect_sizes(self, X_scaled: np.ndarray, y: np.ndarray) -> Dict[str, np.ndarray]:
         """
-        计算每个神经元对每种行为的Cohen's d效应量
+        计算每个神经元对每种行为的Cohen's d效应量（增强NaN值处理）
         
         对于每种行为，计算该行为下神经元活动与其他行为下神经元活动的差异，
-        使用Cohen's d公式量化这种差异的大小
+        使用Cohen's d公式量化这种差异的大小，并处理计算过程中可能出现的NaN值
         
         参数
         ----------
@@ -214,20 +317,41 @@ class EffectSizeCalculator:
                 effect_sizes[behavior] = np.zeros(X_scaled.shape[1])
                 continue
             
-            # 计算均值和标准差
-            behavior_mean = np.mean(behavior_data, axis=0)
-            other_mean = np.mean(other_data, axis=0)
-            behavior_std = np.std(behavior_data, axis=0)
-            other_std = np.std(other_data, axis=0)
+            # 计算均值和标准差，使用nanmean和nanstd以防万一
+            behavior_mean = np.nanmean(behavior_data, axis=0)
+            other_mean = np.nanmean(other_data, axis=0)
+            behavior_std = np.nanstd(behavior_data, axis=0, ddof=1)
+            other_std = np.nanstd(other_data, axis=0, ddof=1)
+            
+            # 检查是否有NaN值
+            if np.isnan(behavior_mean).any() or np.isnan(other_mean).any():
+                print(f"警告: 行为 '{behavior}' 的均值计算中包含NaN值")
+                
+            if np.isnan(behavior_std).any() or np.isnan(other_std).any():
+                print(f"警告: 行为 '{behavior}' 的标准差计算中包含NaN值")
             
             # 计算合并标准差 (Pooled Standard Deviation)
             pooled_std = np.sqrt((behavior_std**2 + other_std**2) / 2)
             
-            # 避免除零错误
-            pooled_std = np.where(pooled_std == 0, 1e-10, pooled_std)
+            # 处理NaN和零值情况
+            # 如果pooled_std为NaN，用较大的标准差替代
+            nan_mask = np.isnan(pooled_std)
+            if nan_mask.any():
+                print(f"警告: 行为 '{behavior}' 的合并标准差中有 {np.sum(nan_mask)} 个NaN值")
+                pooled_std_fixed = np.where(nan_mask, np.nanmax([behavior_std, other_std], axis=0), pooled_std)
+                pooled_std = pooled_std_fixed
+            
+            # 避免除零错误，同时处理NaN
+            pooled_std = np.where((pooled_std == 0) | np.isnan(pooled_std), 1e-10, pooled_std)
             
             # 计算Cohen's d效应量
             effect_size = np.abs(behavior_mean - other_mean) / pooled_std
+            
+            # 处理效应量中的NaN值
+            nan_effect_mask = np.isnan(effect_size)
+            if nan_effect_mask.any():
+                print(f"警告: 行为 '{behavior}' 的效应量中有 {np.sum(nan_effect_mask)} 个NaN值，将其设为0")
+                effect_size = np.where(nan_effect_mask, 0, effect_size)
             
             effect_sizes[behavior] = effect_size
             
@@ -417,10 +541,10 @@ class EffectSizeCalculator:
 def load_and_calculate_effect_sizes(neuron_data_path: str = None, behavior_col: str = None, 
                                   output_dir: str = None) -> Dict[str, Any]:
     """
-    从文件加载数据并计算效应量的便捷函数
+    从文件加载数据并计算效应量的便捷函数（自动删除NaN值）
     
     这是一个高级接口函数，直接从Excel或CSV文件加载数据，
-    自动执行完整的效应量计算流程
+    自动执行完整的效应量计算流程，自动删除包含NaN值的行
     
     参数
     ----------
@@ -442,6 +566,7 @@ def load_and_calculate_effect_sizes(neuron_data_path: str = None, behavior_col: 
         neuron_data_path = PATH_CONFIG.get_data_path("default")
     
     print(f"从文件加载数据: {neuron_data_path}")
+    print("NaN值处理策略: 自动删除包含NaN值的行")
     
     # 使用路径配置获取输出目录
     if output_dir is None:
@@ -458,6 +583,15 @@ def load_and_calculate_effect_sizes(neuron_data_path: str = None, behavior_col: 
         raise ValueError("不支持的文件格式，请使用Excel (.xlsx)或CSV (.csv)文件")
     
     print(f"数据加载完成: {data.shape}")
+    
+    # 检查加载的数据中是否有NaN值
+    total_nan = data.isnull().sum().sum()
+    if total_nan > 0:
+        print(f"数据中发现 {total_nan} 个NaN值")
+        nan_cols = data.columns[data.isnull().any()].tolist()
+        print(f"包含NaN值的列: {nan_cols}")
+    else:
+        print("数据中没有发现NaN值")
     
     # 分离神经元数据和行为标签
     if behavior_col is None:
@@ -492,6 +626,7 @@ def load_and_calculate_effect_sizes(neuron_data_path: str = None, behavior_col: 
         'effect_sizes': effect_sizes,
         'behavior_labels': calculator.behavior_labels.tolist(),
         'top_neurons': top_neurons,
+        'nan_info': calculator.nan_info,  # 添加NaN处理信息
         'processed_data': {
             'X_scaled': X_scaled,
             'y_encoded': y_encoded
@@ -504,14 +639,23 @@ def load_and_calculate_effect_sizes(neuron_data_path: str = None, behavior_col: 
     
     print(f"\n效应量计算完成！结果已保存到 {output_dir}")
     
+    # 输出NaN处理摘要
+    if calculator.nan_info and calculator.nan_info.get('total_nan_rows', 0) > 0:
+        print(f"\n=== NaN值处理摘要 ===")
+        print(f"原始数据行数: {calculator.nan_info['original_shape'][0]}")
+        print(f"包含NaN的行数: {calculator.nan_info['total_nan_rows']}")
+        print(f"处理后数据行数: {calculator.nan_info['cleaned_shape'][0]}")
+        print(f"删除的行数: {calculator.nan_info['removed_rows']}")
+        print(f"数据保留率: {calculator.nan_info['cleaned_shape'][0]/calculator.nan_info['original_shape'][0]*100:.2f}%")
+    
     return results
 
 
 if __name__ == "__main__":
     """
-    使用真实数据计算效应量的示例
+    使用真实数据计算效应量的示例（自动删除NaN值）
     """
-    print("效应量计算器 - 真实数据分析...")
+    print("效应量计算器 - 真实数据分析（自动删除NaN值）...")
     
     # 使用路径配置获取数据路径和输出目录
     real_data_path = PATH_CONFIG.get_data_path("default")
