@@ -37,90 +37,274 @@ class PathConfig:
     
     def __init__(self):
         # === 输出目录配置 ===
-        self.OUTPUT_DIR = "output_plots"  # 主要的图表输出目录
+        self.BASE_OUTPUT_DIR = "../output_plots"  # 基础输出目录（与src同级）
+        self.BASE_EFFECT_SIZE_OUTPUT_DIR = "../effect_size_output"  # 基础效应量输出目录（与src同级）
         
-        # === 输入数据路径配置 ===
-        # 原始神经元数据文件（用于计算效应量）
-        self.RAW_DATA_FILE = '../data/2980240924EMtrace.xlsx'
-        
-        # 预计算的效应量数据文件（CSV格式）
-        self.EFFECT_DATA_FILE = '../effect_size_output/effect_sizes_2980240924EMtrace.csv'
-        
-        # 神经元位置数据文件
-        self.POSITION_DATA_FILE = '../data/EMtrace01_Max_position.csv'
-        
-        # === 可选的替代数据文件路径 ===
-        # 在这里添加新的数据集配置，格式如下：
-        # 'dataset_name': {
-        #     'raw': '原始数据文件路径',
-        #     'effect': '效应量数据文件路径', 
-        #     'position': '位置数据文件路径'
-        # }
-        self.ALTERNATIVE_DATA_FILES = {
+        # === 数据集配置：完整的数据集清单 ===
+        # 每个数据集包含三个文件：原始数据、效应量数据、位置数据
+        self.DATASETS = {
+            # EMtrace系列数据集
+            'emtrace01': {
+                'name': 'EMtrace01数据集',
+                'raw': '../data/EMtrace01.xlsx',
+                'effect': '../data/EMtrace01-3标签版.csv',
+                'position': '../data/EMtrace01_Max_position.csv',
+                'description': 'EMtrace01神经元活动数据（3标签版）'
+            },
+            'emtrace01_plus': {
+                'name': 'EMtrace01增强数据集',
+                'raw': '../data/EMtrace01_plus.xlsx',
+                'effect': '../data/EMtrace01-3标签版.csv',  # 复用同一个效应量文件
+                'position': '../data/EMtrace01_Max_position.csv',
+                'description': 'EMtrace01增强版神经元活动数据'
+            },
             'emtrace02': {
+                'name': 'EMtrace02数据集',
+                'raw': '../data/EMtrace02.xlsx',
+                'effect': '../data/EMtrace02-3标签版.csv',
+                'position': '../data/EMtrace02_Max_position.csv',
+                'description': 'EMtrace02神经元活动数据（3标签版）'
+            },
+            'emtrace02_plus': {
+                'name': 'EMtrace02增强数据集',
                 'raw': '../data/EMtrace02_plus.xlsx',
-                'effect': 'data/EMtrace02-3标签版.csv',
-                'position': 'data/EMtrace02_Max_position.csv'
+                'effect': '../data/EMtrace02-3标签版.csv',
+                'position': '../data/EMtrace02_Max_position.csv',
+                'description': 'EMtrace02增强版神经元活动数据'
+            },
+            
+            # 其他数据集
+            '2980': {
+                'name': '2980 datasets',
+                'raw': '../data/2980240924EMtrace.xlsx',
+                'effect': '../effect_size_output/effect_sizes_2980240924EMtrace.csv',
+                'position': '../data/2980_Max_position.csv',
+                'description': '2980神经元活动数据'
             },
             'bla6250': {
+                'name': 'BLA6250 datasets',
                 'raw': '../data/bla6250EM0626goodtrace.xlsx',
-                'effect': 'data/bla6250-3标签版.csv',
-                'position': 'data/bla6250_Max_position.csv'
+                'effect': '../effect_size_output/effect_sizes_bla6250EM0626goodtrace.csv',
+                'position': '../data/6250_Max_position.csv',
+                'description': 'BLA6250神经元活动数据'
+            },
+            
+            # Day系列数据集
+            'day3': {
+                'name': 'Day3数据集',
+                'raw': None,  # 只有效应量数据
+                'effect': '../data/day3.csv',
+                'position': '../data/Day3_Max_position.csv',
+                'description': 'Day3神经元活动数据'
+            },
+            'day6': {
+                'name': 'Day6数据集',
+                'raw': None,
+                'effect': '../data/day6.csv',
+                'position': '../data/Day6_Max_position.csv',
+                'description': 'Day6神经元活动数据'
+            },
+            'day9': {
+                'name': 'Day9数据集',
+                'raw': None,
+                'effect': '../data/day9.csv',
+                'position': '../data/Day9_Max_position.csv',
+                'description': 'Day9神经元活动数据'
             }
-            # 可以在这里添加更多数据集配置...
         }
         
-        # === 效应量计算输出路径配置 ===
-        self.EFFECT_SIZE_OUTPUT_DIR = "effect_size_output"  # 效应量计算结果输出目录
+        # === 默认数据集设置 ===
+        self.DEFAULT_DATASET = 'emtrace01'  # 默认使用EMtrace01数据集
         
         # === 创建必要的目录 ===
-        self._ensure_directories()
+        self._ensure_base_directories()
     
-    def _ensure_directories(self):
-        """确保必要的输出目录存在"""
-        directories = [self.OUTPUT_DIR, self.EFFECT_SIZE_OUTPUT_DIR]
-        for directory in directories:
+    def _ensure_base_directories(self):
+        """确保基础输出目录存在"""
+        base_directories = [self.BASE_OUTPUT_DIR, self.BASE_EFFECT_SIZE_OUTPUT_DIR]
+        for directory in base_directories:
             if not os.path.exists(directory):
                 os.makedirs(directory)
-                print(f"创建输出目录: {directory}")
+                print(f"创建基础输出目录: {directory}")
     
-    def get_data_paths(self, dataset_key='default'):
+    def get_dataset_output_dir(self, dataset_key):
+        """
+        获取指定数据集的专用输出目录
+        
+        参数:
+            dataset_key: 数据集键名
+            
+        返回:
+            str: 数据集专用输出目录路径
+        """
+        if dataset_key not in self.DATASETS:
+            raise ValueError(f"未知的数据集键名: {dataset_key}")
+        
+        dataset_output_dir = os.path.join(self.BASE_OUTPUT_DIR, dataset_key)
+        
+        # 确保目录存在
+        if not os.path.exists(dataset_output_dir):
+            os.makedirs(dataset_output_dir)
+            print(f"创建数据集专用输出目录: {dataset_output_dir}")
+            
+        return dataset_output_dir
+    
+    def get_dataset_effect_size_output_dir(self, dataset_key):
+        """
+        获取指定数据集的专用效应量输出目录
+        
+        参数:
+            dataset_key: 数据集键名
+            
+        返回:
+            str: 数据集专用效应量输出目录路径
+        """
+        if dataset_key not in self.DATASETS:
+            raise ValueError(f"未知的数据集键名: {dataset_key}")
+        
+        effect_size_output_dir = os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, dataset_key)
+        
+        # 确保目录存在
+        if not os.path.exists(effect_size_output_dir):
+            os.makedirs(effect_size_output_dir)
+            print(f"创建数据集专用效应量输出目录: {effect_size_output_dir}")
+            
+        return effect_size_output_dir
+    
+    def get_data_paths(self, dataset_key=None):
         """
         获取指定数据集的所有路径
         
         参数:
-            dataset_key: 数据集键名 ('default', 'emtrace02', 'bla6250' 等)
+            dataset_key: 数据集键名，如果为None则使用默认数据集
         
         返回:
             dict: 包含raw, effect, position三个路径的字典
         """
-        if dataset_key == 'default':
-            return {
-                'raw': self.RAW_DATA_FILE,
-                'effect': self.EFFECT_DATA_FILE,
-                'position': self.POSITION_DATA_FILE
-            }
-        elif dataset_key in self.ALTERNATIVE_DATA_FILES:
-            return self.ALTERNATIVE_DATA_FILES[dataset_key]
-        else:
-            raise ValueError(f"未知的数据集键名: {dataset_key}")
+        if dataset_key is None:
+            dataset_key = self.DEFAULT_DATASET
+            
+        if dataset_key not in self.DATASETS:
+            raise ValueError(f"未知的数据集键名: {dataset_key}。可用数据集: {list(self.DATASETS.keys())}")
+        
+        dataset_info = self.DATASETS[dataset_key]
+        return {
+            'raw': dataset_info['raw'],
+            'effect': dataset_info['effect'],
+            'position': dataset_info['position'],
+            'name': dataset_info['name'],
+            'description': dataset_info['description'],
+            'output_dir': self.get_dataset_output_dir(dataset_key),  # 添加专用输出目录
+            'effect_size_output_dir': self.get_dataset_effect_size_output_dir(dataset_key)  # 添加专用效应量输出目录
+        }
     
     def list_available_datasets(self):
         """列出所有可用的数据集"""
-        datasets = ['default'] + list(self.ALTERNATIVE_DATA_FILES.keys())
+        print("=" * 60)
         print("可用的数据集:")
-        for dataset in datasets:
-            paths = self.get_data_paths(dataset)
-            print(f"  {dataset}:")
-            print(f"    原始数据: {paths['raw']}")
-            print(f"    效应量数据: {paths['effect']}")
-            print(f"    位置数据: {paths['position']}")
+        print("=" * 60)
+        for key, dataset in self.DATASETS.items():
+            print(f"\n📁 数据集键名: '{key}'")
+            print(f"   名称: {dataset['name']}")
+            print(f"   描述: {dataset['description']}")
+            print(f"   原始数据: {dataset['raw'] or '无'}")
+            print(f"   效应量数据: {dataset['effect'] or '需要计算'}")
+            print(f"   位置数据: {dataset['position'] or '无'}")
+            print(f"   输出目录: {self.BASE_OUTPUT_DIR}/{key}/")
+        print("=" * 60)
+    
+    def check_dataset_availability(self, dataset_key=None):
+        """
+        检查指定数据集的文件是否存在
+        
+        参数:
+            dataset_key: 数据集键名
+            
+        返回:
+            dict: 包含各文件存在状态的字典
+        """
+        if dataset_key is None:
+            dataset_key = self.DEFAULT_DATASET
+            
+        paths = self.get_data_paths(dataset_key)
+        availability = {
+            'dataset_key': dataset_key,
+            'dataset_name': paths['name'],
+            'raw_exists': paths['raw'] and os.path.exists(paths['raw']),
+            'effect_exists': paths['effect'] and os.path.exists(paths['effect']),
+            'position_exists': paths['position'] and os.path.exists(paths['position']),
+            'raw_path': paths['raw'],
+            'effect_path': paths['effect'],
+            'position_path': paths['position'],
+            'output_dir': paths['output_dir'],
+            'effect_size_output_dir': paths['effect_size_output_dir']
+        }
+        
+        availability['is_usable'] = (
+            availability['position_exists'] and 
+            (availability['effect_exists'] or availability['raw_exists'])
+        )
+        
+        return availability
+    
+    def print_dataset_status(self, dataset_key=None):
+        """打印数据集的详细状态信息"""
+        status = self.check_dataset_availability(dataset_key)
+        
+        print(f"\n📊 数据集状态检查: {status['dataset_name']} ('{status['dataset_key']}')")
+        print("-" * 50)
+        
+        # 检查各文件状态
+        files_to_check = [
+            ('原始数据文件', status['raw_path'], status['raw_exists']),
+            ('效应量数据文件', status['effect_path'], status['effect_exists']),
+            ('位置数据文件', status['position_path'], status['position_exists'])
+        ]
+        
+        for file_type, file_path, exists in files_to_check:
+            if file_path:
+                status_icon = "✅" if exists else "❌"
+                print(f"{status_icon} {file_type}: {file_path}")
+            else:
+                print(f"⚪ {file_type}: 无")
+        
+        # 输出目录信息
+        print(f"\n📂 输出目录:")
+        print(f"   图表输出: {status['output_dir']}")
+        print(f"   效应量输出: {status['effect_size_output_dir']}")
+        
+        # 总体可用性
+        if status['is_usable']:
+            print(f"\n✅ 数据集可用！")
+        else:
+            print(f"\n❌ 数据集不可用 - 缺少必要文件")
+            
+        return status
+    
+    def get_recommended_dataset(self):
+        """获取推荐的可用数据集"""
+        # 按优先级检查数据集
+        priority_order = ['emtrace01', 'emtrace02', 'emtrace01_plus', 'emtrace02_plus', '2980', 'bla6250']
+        
+        for dataset_key in priority_order:
+            if dataset_key in self.DATASETS:
+                status = self.check_dataset_availability(dataset_key)
+                if status['is_usable']:
+                    return dataset_key
+        
+        # 如果优先级列表中没有可用的，检查所有数据集
+        for dataset_key in self.DATASETS.keys():
+            status = self.check_dataset_availability(dataset_key)
+            if status['is_usable']:
+                return dataset_key
+        
+        return None
 
 # 创建全局路径配置实例
 PATH_CONFIG = PathConfig()
 
 # 为了向后兼容，保留原始的OUTPUT_DIR变量
-OUTPUT_DIR = PATH_CONFIG.OUTPUT_DIR
+OUTPUT_DIR = PATH_CONFIG.BASE_OUTPUT_DIR
 
 # ===============================================================================
 # 导入其他模块
@@ -278,13 +462,31 @@ def suggest_threshold_for_neuron_count(df_effects, min_neurons=5, max_neurons=10
         return None
 
 def get_key_neurons(df_effects, threshold):
-    """Identifies key neurons for each behavior based on the effect size threshold."""
+    """
+    根据效应量阈值识别每种行为的关键神经元
+    
+    参数:
+        df_effects: 效应量数据DataFrame，包含Behavior、NeuronID、EffectSize列
+        threshold: 效应量阈值
+    
+    返回:
+        dict: 每种行为对应的关键神经元ID列表
+    """
     key_neurons_by_behavior = {}
-    for behavior in df_effects['Behavior'].unique():
+    
+    # 过滤掉无效的行为名称（如nan值）
+    valid_behaviors = df_effects['Behavior'].dropna().unique()
+    
+    for behavior in valid_behaviors:
+        # 跳过nan值或空值
+        if pd.isna(behavior) or behavior == '' or str(behavior).lower() == 'nan':
+            continue
+            
         behavior_df = df_effects[df_effects['Behavior'] == behavior]
         key_neuron_ids = behavior_df[behavior_df['EffectSize'] >= threshold]['NeuronID'].tolist()
         key_neurons_by_behavior[behavior] = sorted(list(set(key_neuron_ids)))
         print(f"Behavior: {behavior}, Threshold >= {threshold}, Key Neurons ({len(key_neuron_ids)}): {key_neurons_by_behavior[behavior]}")
+    
     return key_neurons_by_behavior
 
 def calculate_effect_sizes_from_data(neuron_data_file: str, output_dir: str = None) -> tuple:
@@ -302,7 +504,7 @@ def calculate_effect_sizes_from_data(neuron_data_file: str, output_dir: str = No
     
     # 如果未指定输出目录，使用路径配置的默认目录
     if output_dir is None:
-        output_dir = PATH_CONFIG.EFFECT_SIZE_OUTPUT_DIR
+        output_dir = PATH_CONFIG.BASE_EFFECT_SIZE_OUTPUT_DIR
     
     try:
         # 使用便捷函数加载数据并计算效应量
@@ -426,21 +628,61 @@ if __name__ == "__main__":
     # ===============================================================================
     
     print("=" * 80)
-    print("神经元主要分析器 - EMtrace01 数据分析")
+    print("神经元主要分析器 - 多数据集支持版本")
     print("=" * 80)
-    print(f"输出目录: {PATH_CONFIG.OUTPUT_DIR}")
-    print(f"效应量输出目录: {PATH_CONFIG.EFFECT_SIZE_OUTPUT_DIR}")
+    print(f"输出目录: {PATH_CONFIG.BASE_OUTPUT_DIR}")
+    print(f"效应量输出目录: {PATH_CONFIG.BASE_EFFECT_SIZE_OUTPUT_DIR}")
     
-    # 可以通过修改下面的dataset_key来切换不同的数据集
-    # 可选值: 'default', 'emtrace02', 'bla6250'
-    dataset_key = 'default'  # 默认使用EMtrace01数据集
+    # ===============================================================================
+    # 数据集选择配置
+    # ===============================================================================
     
-    # 如果需要切换到其他数据集，取消注释下面的行
-    # dataset_key = 'emtrace02'  # 使用EMtrace02数据集
-    # dataset_key = 'bla6250'   # 使用bla6250数据集
+    # 🔧 在这里修改 dataset_key 来切换不同的数据集
+    # 可选值: 'emtrace01', 'emtrace02', 'emtrace01_plus', 'emtrace02_plus', 
+    #         '2980', 'bla6250', 'day3', 'day6', 'day9'
+    # 设置为 None 会自动选择可用的数据集
     
-    # 如果想查看所有可用的数据集，取消注释下面的行
-    # PATH_CONFIG.list_available_datasets()
+    # dataset_key = None # 🔧 修改这里来指定数据集，None表示自动选择
+    # dataset_key = 'emtrace01'    # 使用EMtrace01数据集
+    # dataset_key = 'emtrace02'    # 使用EMtrace02数据集  
+    dataset_key = '2980'         # 使用2980数据集
+    # dataset_key = 'bla6250'      # 使用BLA6250数据集
+    # dataset_key = 'day3'         # 使用Day3数据集
+    
+    # ===============================================================================
+    # 智能数据集选择和验证
+    # ===============================================================================
+    
+    # 显示所有可用数据集
+    print("\n" + "=" * 60)
+    print("🔍 检查可用数据集...")
+    PATH_CONFIG.list_available_datasets()
+    
+    # 如果没有指定数据集，自动选择可用的数据集
+    if dataset_key is None:
+        print("\n🤖 未指定数据集，正在自动选择最佳可用数据集...")
+        dataset_key = PATH_CONFIG.get_recommended_dataset()
+        if dataset_key is None:
+            print("❌ 错误：没有找到任何可用的数据集！")
+            print("请检查data目录中的文件是否存在。")
+            exit(1)
+        else:
+            print(f"✅ 自动选择数据集: {dataset_key}")
+    
+    # 验证选择的数据集
+    print(f"\n🔍 验证数据集: {dataset_key}")
+    status = PATH_CONFIG.print_dataset_status(dataset_key)
+    
+    if not status['is_usable']:
+        print(f"\n❌ 错误：数据集 '{dataset_key}' 不可用！")
+        print("请选择其他数据集或检查文件路径。")
+        
+        # 尝试推荐替代数据集
+        alternative = PATH_CONFIG.get_recommended_dataset()
+        if alternative and alternative != dataset_key:
+            print(f"\n💡 建议使用数据集: {alternative}")
+            PATH_CONFIG.print_dataset_status(alternative)
+        exit(1)
     
     # 获取当前数据集的路径配置
     try:
@@ -449,40 +691,39 @@ if __name__ == "__main__":
         effect_data_identifier = data_paths['effect']
         position_data_identifier = data_paths['position']
         
-        print(f"\n使用数据集: {dataset_key}")
-        print(f"原始数据文件: {raw_data_identifier}")
-        print(f"效应量数据文件: {effect_data_identifier}")
-        print(f"位置数据文件: {position_data_identifier}")
+        print(f"\n✅ 使用数据集: {data_paths['name']} ('{dataset_key}')")
+        print(f"📄 描述: {data_paths['description']}")
+        print(f"📁 原始数据文件: {raw_data_identifier or '无'}")
+        print(f"📁 效应量数据文件: {effect_data_identifier or '需要计算'}")
+        print(f"📁 位置数据文件: {position_data_identifier}")
         
     except ValueError as e:
-        print(f"错误: {e}")
-        print("使用默认路径配置...")
-        # 备用路径（如果配置出错时使用）
-        raw_data_identifier = '../data/EMtrace01_plus.xlsx'
-        effect_data_identifier = 'data/EMtrace01-3标签版.csv'
-        position_data_identifier = 'data/EMtrace01_Max_position.csv'
+        print(f"❌ 错误: {e}")
+        exit(1)
 
     # === 效应量计算工作流 ===
-    print("\n=== 开始分析流程 ===")
+    print("\n" + "=" * 60)
+    print("🚀 开始分析流程")
+    print("=" * 60)
     
     # 创建效应量计算工作流
     df_effect_sizes_transformed = create_effect_sizes_workflow(
-        raw_data_file=raw_data_identifier if os.path.exists(raw_data_identifier) else None,
-        precomputed_file=effect_data_identifier,
+        raw_data_file=raw_data_identifier if raw_data_identifier and os.path.exists(raw_data_identifier) else None,
+        precomputed_file=effect_data_identifier if effect_data_identifier and os.path.exists(effect_data_identifier) else None,
         recalculate=False  # 设置为True强制重新计算效应量
     )
     
-    print(f"\nLoading neuron positions from: {position_data_identifier}")
+    print(f"\n📍 Loading neuron positions from: {position_data_identifier}")
     df_neuron_positions = load_neuron_positions(position_data_identifier)
 
     if df_effect_sizes_transformed is not None and df_neuron_positions is not None:
-        print(f"\nUsing effect size threshold: {EFFECT_SIZE_THRESHOLD} (from config.py)")
+        print(f"\n🎯 Using effect size threshold: {EFFECT_SIZE_THRESHOLD} (from config.py)")
         
         # Get key neurons based on the threshold
         key_neurons_by_behavior = get_key_neurons(df_effect_sizes_transformed, EFFECT_SIZE_THRESHOLD)
         
         # --- Prepare data for 3x3 Combined Plot ---
-        print("\nPreparing data for 3x3 combined plot...")
+        print("\n🎨 Preparing data for 3x3 combined plot...")
         plot_configurations_for_3x3 = []
 
         # Common parameters for many plots
@@ -617,26 +858,27 @@ if __name__ == "__main__":
 
         # --- Generate 3x3 Combined Plot ---
         if len(plot_configurations_for_3x3) == 9:
-            print("\nGenerating 3x3 combined plot...")
-            combined_plot_filename = "plot_all_behaviors_3x3_grid.png"
-            combined_output_path = os.path.join(OUTPUT_DIR, combined_plot_filename)
+            print("\n🎨 Generating 3x3 combined plot...")
+            combined_plot_filename = f"plot_{dataset_key}_3x3_grid.png"
+            combined_output_path = os.path.join(data_paths['output_dir'], combined_plot_filename)
             
             plot_combined_9_grid(
                 plot_configurations=plot_configurations_for_3x3,
                 output_path=combined_output_path,
-                main_title_text=f"Comprehensive View: Neuron Activity Patterns (Effect Size >= {EFFECT_SIZE_THRESHOLD})"
+                main_title_text=f"{data_paths['name']}: Neuron Activity Patterns (Effect Size >= {EFFECT_SIZE_THRESHOLD})"
             )
         else:
             print("Error: Could not prepare exactly 9 plot configurations for the 3x3 grid. Skipping combined plot.")
 
-        print("\nAll plots generated.")
+        print("\n✅ All plots generated successfully!")
+        print(f"📁 Output directory: {data_paths['output_dir']}")
 
     else:
         if df_effect_sizes_transformed is None:
-            print("Could not load effect sizes. Please check 'data_loader.py' and the CSV data.")
+            print("❌ Could not load effect sizes. Please check the effect size data file.")
         if df_neuron_positions is None:
-            print("Could not load neuron positions. Please check 'data_loader.py' and the CSV data.")
-        # print("Error: Could not load data.") # Covered by more specific messages above
+            print("❌ Could not load neuron positions. Please check the position data file.")
 
-    # ... (suggest_threshold_for_neuron_count function definition if kept for reference) ... 
-    # ... (suggest_threshold_for_neuron_count function definition if kept for reference) ... 
+    print("\n" + "=" * 80)
+    print("🎉 Analysis completed!")
+    print("=" * 80)

@@ -350,9 +350,9 @@ def main():
     """
     主函数，运行点标记工具
     """
-    image_path = '../datasets/0925homecagefamilarmice.png'
-    output_file = '../datasets/homecage_Max_position.csv'
-    start_number = 2  # 从编号2开始
+    image_path = '../datasets/6250位置.png'
+    output_file = '../datasets/6250_Max_position.csv'
+    start_number = 1  # 从编号1开始
     
     print(f"开始标记工具，起始编号: {start_number}")
     marker = PointMarker(image_path, start_number=start_number)
