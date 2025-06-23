@@ -1,7 +1,7 @@
 # EMtrace01 分析的配置文件
 
 # 基于效应大小识别关键神经元的阈值
-EFFECT_SIZE_THRESHOLD = 0.4407
+EFFECT_SIZE_THRESHOLD = 0.5
 
 # 不同行为的颜色配置
 BEHAVIOR_COLORS = {
