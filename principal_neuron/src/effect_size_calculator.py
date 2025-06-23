@@ -26,12 +26,12 @@ class PathConfig:
         
         # === 输入数据路径配置 ===
         self.data_dir = os.path.join(self.principal_neuron_dir, "data")
-        self.default_data_file = "EMtrace01_plus.xlsx"  # 默认数据文件名
+        self.default_data_file = "bla6250EM0626goodtrace.xlsx"  # 默认数据文件名
         self.default_data_path = os.path.join(self.data_dir, self.default_data_file)
         
         # === 输出路径配置 ===
         self.output_dir = os.path.join(self.principal_neuron_dir, "effect_size_output")
-        self.effect_sizes_filename = "effect_sizes.csv"  # 效应量结果文件名
+        self.effect_sizes_filename = "effect_sizes_bla6250EM0626goodtrace.csv"  # 效应量结果文件名
         self.effect_sizes_path = os.path.join(self.output_dir, self.effect_sizes_filename)
         
         # === 其他可选数据文件路径 ===
@@ -42,7 +42,7 @@ class PathConfig:
         }
         
         # === 行为标签配置 ===
-        self.default_behavior_column = None  # None表示使用最后一列
+        self.default_behavior_column = "behavior"  # None表示使用最后一列
         
     def get_data_path(self, data_key: str = "default") -> str:
         """
@@ -481,7 +481,7 @@ def load_and_calculate_effect_sizes(neuron_data_path: str = None, behavior_col: 
     )
     
     # 导出效应量数据
-    csv_path = PATH_CONFIG.get_output_path("effect_sizes.csv")
+    csv_path = PATH_CONFIG.get_output_path(PATH_CONFIG.effect_sizes_filename)
     calculator.export_effect_sizes_to_csv(effect_sizes, csv_path)
     
     # 获取top神经元
