@@ -46,7 +46,7 @@ class PathConfig:
         # 预计算的效应量数据文件（CSV格式）
         self.EFFECT_DATA_FILE = '../effect_size_output/effect_sizes_2980240924EMtrace.csv'
         
-        # 神经元位置数据文件（可设置为空字符串或None来使用随机位置）
+        # 神经元位置数据文件
         self.POSITION_DATA_FILE = '../data/EMtrace01_Max_position.csv'
         
         # === 可选的替代数据文件路径 ===
@@ -54,7 +54,7 @@ class PathConfig:
         # 'dataset_name': {
         #     'raw': '原始数据文件路径',
         #     'effect': '效应量数据文件路径', 
-        #     'position': '位置数据文件路径'（可设置为 '' 或 None 来使用随机位置）
+        #     'position': '位置数据文件路径'
         # }
         self.ALTERNATIVE_DATA_FILES = {
             'emtrace02': {
@@ -66,11 +66,6 @@ class PathConfig:
                 'raw': '../data/bla6250EM0626goodtrace.xlsx',
                 'effect': 'data/bla6250-3标签版.csv',
                 'position': 'data/bla6250_Max_position.csv'
-            },
-            'random_positions_demo': {
-                'raw': '../data/2980240924EMtrace.xlsx',
-                'effect': '../effect_size_output/effect_sizes_2980240924EMtrace.csv',
-                'position': ''  # 空字符串表示使用随机位置
             }
             # 可以在这里添加更多数据集配置...
         }
@@ -477,21 +472,8 @@ if __name__ == "__main__":
         recalculate=False  # 设置为True强制重新计算效应量
     )
     
-    # 加载神经元位置数据（支持空位置文件，会自动生成随机位置）
-    print(f"\n加载神经元位置数据: {position_data_identifier if position_data_identifier else '(使用随机位置)'}")
-    
-    # 如果效应量数据可用，根据其确定神经元数量
-    num_neurons_for_random = None
-    if df_effect_sizes_transformed is not None:
-        num_neurons_for_random = df_effect_sizes_transformed['NeuronID'].nunique()
-        print(f"根据效应量数据确定神经元数量: {num_neurons_for_random}")
-    
-    # 加载位置数据（如果位置文件为空，会自动生成随机位置）
-    df_neuron_positions = load_neuron_positions(
-        position_data_identifier, 
-        num_neurons=num_neurons_for_random,
-        random_seed=42
-    )
+    print(f"\nLoading neuron positions from: {position_data_identifier}")
+    df_neuron_positions = load_neuron_positions(position_data_identifier)
 
     if df_effect_sizes_transformed is not None and df_neuron_positions is not None:
         print(f"\nUsing effect size threshold: {EFFECT_SIZE_THRESHOLD} (from config.py)")
