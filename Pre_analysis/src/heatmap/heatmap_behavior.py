@@ -56,8 +56,8 @@ class BehaviorHeatmapConfig:
         # 最小行为持续时间（秒），用于过滤短暂的误标记
         self.MIN_BEHAVIOR_DURATION = 1.0
         # 热力图颜色范围
-        self.VMIN = -3.0
-        self.VMAX = 3.0
+        self.VMIN = -2
+        self.VMAX = 2
         # 配置优先级控制：True表示__init__中的设定优先级最高，False表示命令行参数优先
         self.INIT_CONFIG_PRIORITY = True
 
@@ -468,7 +468,7 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
     # 绘制热力图
     sns.heatmap(
         data.T,  # 转置：行为神经元，列为时间
-        cmap='RdYlBu_r',
+        cmap='viridis',
         center=0,
         vmin=config.VMIN,
         vmax=config.VMAX,
@@ -600,7 +600,7 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
     # 绘制热力图
     sns.heatmap(
         average_df_sorted.T,
-        cmap='RdYlBu_r',
+        cmap='viridis',
         center=0,
         vmin=config.VMIN,
         vmax=config.VMAX,
