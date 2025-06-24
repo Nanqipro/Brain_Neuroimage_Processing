@@ -58,6 +58,8 @@ class BehaviorHeatmapConfig:
         # 热力图颜色范围
         self.VMIN = -2
         self.VMAX = 2
+        # 神经元排序方式：True表示使用全局排序，False表示每个热图单独排序
+        self.USE_GLOBAL_SORTING = True
         # 配置优先级控制：True表示__init__中的设定优先级最高，False表示命令行参数优先
         self.INIT_CONFIG_PRIORITY = True
 
@@ -119,6 +121,18 @@ def parse_arguments() -> argparse.Namespace:
         type=float, 
         default=4.8,
         help='数据采样率，Hz（默认：4.8）'
+    )
+    
+    parser.add_argument(
+        '--use-global-sorting', 
+        action='store_true',
+        help='使用全局神经元排序（默认：False，每个热图单独排序）'
+    )
+    
+    parser.add_argument(
+        '--use-local-sorting', 
+        action='store_true',
+        help='使用局部神经元排序（每个热图单独排序）'
     )
     
     return parser.parse_args()
@@ -286,7 +300,9 @@ def find_behavior_pairs(data: pd.DataFrame,
                        min_duration: float,
                        sampling_rate: float) -> List[Tuple[float, float, float, float]]:
     """
-    找到起始行为和结束行为的配对
+    找到起始行为和结束行为的连续配对
+    
+    只有当起始行为和结束行为连续出现（或为同一行为）时才返回配对。
     
     Parameters
     ----------
@@ -304,38 +320,131 @@ def find_behavior_pairs(data: pd.DataFrame,
     Returns
     -------
     List[Tuple[float, float, float, float]]
-        行为配对列表，每个元素为(起始行为开始时间, 起始行为结束时间, 结束行为开始时间, 结束行为结束时间)
+        连续行为配对列表，每个元素为(起始行为开始时间, 起始行为结束时间, 结束行为开始时间, 结束行为结束时间)
     """
     # 检测起始行为事件
     start_events = detect_behavior_events(data, start_behavior, min_duration, sampling_rate)
     
-    # 检测结束行为事件
-    end_events = detect_behavior_events(data, end_behavior, min_duration, sampling_rate)
-    
     if not start_events:
         print(f"未找到 {start_behavior} 行为事件")
-        return []
-    
-    if not end_events:
-        print(f"未找到 {end_behavior} 行为事件")
         return []
     
     behavior_pairs = []
     
     # 如果是同一行为，直接使用每个事件的开始和结束时间
     if start_behavior == end_behavior:
+        print(f"分析同一行为: {start_behavior}")
         for start_time, end_time in start_events:
             behavior_pairs.append((start_time, start_time, end_time, end_time))
     else:
-        # 如果是不同行为，找到时间上匹配的配对
+        # 如果是不同行为，需要检查行为的连续性
+        print(f"分析连续行为: {start_behavior} → {end_behavior}")
+        
+        # 检测结束行为事件
+        end_events = detect_behavior_events(data, end_behavior, min_duration, sampling_rate)
+        
+        if not end_events:
+            print(f"未找到 {end_behavior} 行为事件")
+            return []
+        
+        # 获取完整的行为序列，用于检查连续性
+        behavior_column = data['behavior']
+        
         for start_begin, start_end in start_events:
-            # 找到在起始行为之后开始的第一个结束行为
-            for end_begin, end_end in end_events:
-                if end_begin >= start_begin:  # 结束行为必须在起始行为开始之后
-                    behavior_pairs.append((start_begin, start_end, end_begin, end_end))
-                    break  # 找到第一个匹配的就停止
+            # 检查起始行为结束后紧接着的下一个行为是否为结束行为
+            continuous_pair = check_behavior_continuity(
+                behavior_column, 
+                start_begin, 
+                start_end, 
+                end_behavior, 
+                min_duration
+            )
+            
+            if continuous_pair:
+                end_begin, end_end = continuous_pair
+                behavior_pairs.append((start_begin, start_end, end_begin, end_end))
+                print(f"找到连续行为配对: {start_behavior}({start_begin:.1f}s-{start_end:.1f}s) → {end_behavior}({end_begin:.1f}s-{end_end:.1f}s)")
+            else:
+                print(f"跳过非连续行为: {start_behavior}({start_begin:.1f}s-{start_end:.1f}s) 后没有紧接着 {end_behavior}")
     
     return behavior_pairs
+
+def check_behavior_continuity(behavior_column: pd.Series,
+                            start_begin: float,
+                            start_end: float,
+                            target_end_behavior: str,
+                            min_duration: float) -> Optional[Tuple[float, float]]:
+    """
+    检查起始行为结束后是否紧接着目标结束行为
+    
+    Parameters
+    ----------
+    behavior_column : pd.Series
+        行为标签时间序列
+    start_begin : float
+        起始行为开始时间
+    start_end : float
+        起始行为结束时间
+    target_end_behavior : str
+        目标结束行为类型
+    min_duration : float
+        最小行为持续时间（秒）
+        
+    Returns
+    -------
+    Optional[Tuple[float, float]]
+        如果连续，返回(结束行为开始时间, 结束行为结束时间)；否则返回None
+    """
+    # 从起始行为结束时间开始查找下一个行为
+    after_start_data = behavior_column[behavior_column.index > start_end]
+    
+    if after_start_data.empty:
+        return None
+    
+    # 找到起始行为结束后的第一个非空行为标签
+    next_behavior = None
+    next_behavior_start = None
+    
+    for timestamp, behavior in after_start_data.items():
+        if pd.notna(behavior):  # 跳过空值
+            next_behavior = behavior
+            next_behavior_start = timestamp
+            break
+    
+    # 检查下一个行为是否是目标结束行为
+    if next_behavior != target_end_behavior:
+        return None
+    
+    # 找到这个结束行为的结束时间
+    end_behavior_data = after_start_data[after_start_data == target_end_behavior]
+    if end_behavior_data.empty:
+        return None
+    
+    # 找到连续的结束行为区间
+    behavior_start = next_behavior_start
+    behavior_end = None
+    
+    # 从结束行为开始位置向后查找，直到行为改变
+    current_time = behavior_start
+    for timestamp, behavior in after_start_data[after_start_data.index >= behavior_start].items():
+        if pd.notna(behavior) and behavior == target_end_behavior:
+            current_time = timestamp
+        elif pd.notna(behavior) and behavior != target_end_behavior:
+            # 行为改变了，结束时间是上一个时间点
+            behavior_end = current_time
+            break
+        # 如果是空值，继续当前行为
+    
+    # 如果没有找到行为改变点，说明数据在这个行为中结束
+    if behavior_end is None:
+        behavior_end = after_start_data.index[-1]
+    
+    # 检查持续时间是否满足最小要求
+    duration = behavior_end - behavior_start
+    if duration < min_duration:
+        return None
+    
+    return (behavior_start, behavior_end)
 
 def extract_behavior_sequence_data(data: pd.DataFrame,
                                  start_time: float,
@@ -405,9 +514,60 @@ def standardize_neural_data(data: pd.DataFrame) -> pd.DataFrame:
     
     return standardized_data
 
-def sort_neurons_by_peak_time(data: pd.DataFrame) -> pd.DataFrame:
+def get_global_neuron_order(data: pd.DataFrame) -> pd.Index:
     """
-    按神经元峰值时间排序
+    根据整体数据计算全局神经元排序顺序（按峰值时间排序）
+    
+    Parameters
+    ----------
+    data : pd.DataFrame
+        完整的标准化神经元数据
+        
+    Returns
+    -------
+    pd.Index
+        按峰值时间排序的神经元顺序
+    """
+    # 移除行为列（如果存在）
+    neural_data = data.copy()
+    if 'behavior' in neural_data.columns:
+        neural_data = neural_data.drop(columns=['behavior'])
+    
+    # 对整体数据进行标准化
+    neural_data_standardized = standardize_neural_data(neural_data)
+    
+    # 计算每个神经元的峰值时间
+    peak_times = neural_data_standardized.idxmax()
+    
+    # 按峰值时间排序，返回神经元顺序
+    sorted_neurons = peak_times.sort_values().index
+    
+    return sorted_neurons
+
+def apply_global_neuron_order(data: pd.DataFrame, global_order: pd.Index) -> pd.DataFrame:
+    """
+    按照全局神经元顺序重新排列数据
+    
+    Parameters
+    ----------
+    data : pd.DataFrame
+        神经元数据
+    global_order : pd.Index
+        全局神经元排序顺序
+        
+    Returns
+    -------
+    pd.DataFrame
+        按全局顺序排列的数据
+    """
+    # 只保留在全局顺序中的神经元列
+    available_neurons = [neuron for neuron in global_order if neuron in data.columns]
+    
+    return data[available_neurons]
+
+def sort_neurons_by_local_peak_time(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    按当前数据窗口内的神经元峰值时间排序（局部排序）
     
     Parameters
     ----------
@@ -419,7 +579,7 @@ def sort_neurons_by_peak_time(data: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         按峰值时间排序的数据
     """
-    # 计算每个神经元的峰值时间
+    # 计算每个神经元在当前时间窗口内的峰值时间
     peak_times = data.idxmax()
     
     # 按峰值时间排序
@@ -434,7 +594,8 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
                                    end_behavior: str,
                                    pre_behavior_time: float,
                                    config: BehaviorHeatmapConfig,
-                                   pair_index: int) -> plt.Figure:
+                                   pair_index: int,
+                                   global_neuron_order: Optional[pd.Index] = None) -> plt.Figure:
     """
     创建行为序列的热力图
     
@@ -456,23 +617,35 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
         配置对象
     pair_index : int
         配对索引
+    global_neuron_order : Optional[pd.Index]
+        全局神经元排序顺序（仅在使用全局排序时需要）
         
     Returns
     -------
     plt.Figure
         生成的图形对象
     """
+    # 根据配置选择排序方式
+    if config.USE_GLOBAL_SORTING and global_neuron_order is not None:
+        # 使用全局排序
+        data_ordered = apply_global_neuron_order(data, global_neuron_order)
+        sorting_method = "global"
+    else:
+        # 使用局部排序
+        data_ordered = sort_neurons_by_local_peak_time(data)
+        sorting_method = "local"
+    
     # 创建图形
-    fig, ax = plt.subplots(figsize=(18, 10))
+    fig, ax = plt.subplots(figsize=(18, 40))
     
     # 绘制热力图
     sns.heatmap(
-        data.T,  # 转置：行为神经元，列为时间
+        data_ordered.T,  # 转置：行为神经元，列为时间
         cmap='viridis',
         center=0,
         vmin=config.VMIN,
         vmax=config.VMAX,
-        cbar_kws={'label': 'Standardized Calcium Signal'},
+        cbar=False,  # 去掉颜色图例
         ax=ax
     )
     
@@ -481,9 +654,9 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
     total_duration = end_behavior_time - sequence_start_time
     
     # 起始行为开始位置
-    start_position = len(data.index) * pre_behavior_time / total_duration
+    start_position = len(data_ordered.index) * pre_behavior_time / total_duration
     # 结束行为结束位置（序列结束）
-    end_position = len(data.index) - 1
+    end_position = len(data_ordered.index) - 1
     
     # 在关键时间点画垂直线
     ax.axvline(x=start_position, color='white', linestyle='--', linewidth=3, alpha=0.8)
@@ -499,26 +672,31 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
     
     # 设置标题和标签
+    sorting_description = "global peak time" if sorting_method == "global" else "local peak time"
+    
     if start_behavior == end_behavior:
         title = f'{start_behavior} Behavior Sequence #{pair_index + 1}\n'
-        title += f'Neural Activity: -{pre_behavior_time}s to End'
+        # title += f'Neural Activity: -{pre_behavior_time}s to End (Neurons sorted by {sorting_description})'
     else:
         title = f'{start_behavior} → {end_behavior} Behavior Sequence #{pair_index + 1}\n'
-        title += f'Neural Activity: {start_behavior} -{pre_behavior_time}s to {end_behavior} End'
+        # title += f'Neural Activity: {start_behavior} -{pre_behavior_time}s to {end_behavior} End (Neurons sorted by {sorting_description})'
     
-    ax.set_title(title, fontsize=16, fontweight='bold')
-    ax.set_xlabel('Time (seconds)', fontsize=14)
-    ax.set_ylabel('Neurons', fontsize=14)
+    ax.set_title(title, fontsize=25, fontweight='bold')
+    ax.set_xlabel('Time (seconds)', fontsize=30, fontweight='bold')
+    ax.set_ylabel(f'Neurons (sorted by {sorting_description})', fontsize=30, fontweight='bold')
     
     # 设置X轴刻度标签（显示相对于起始行为开始的时间）
-    time_points = data.index - start_behavior_time
-    tick_positions = np.linspace(0, len(data.index)-1, 8)
+    time_points = data_ordered.index - start_behavior_time
+    tick_positions = np.linspace(0, len(data_ordered.index)-1, 8)
     tick_labels = [f'{time_points[int(pos)]:.1f}' for pos in tick_positions]
     ax.set_xticks(tick_positions)
-    ax.set_xticklabels(tick_labels)
+    ax.set_xticklabels(tick_labels, fontsize=30, fontweight='bold')
     
-    # 调整Y轴标签
-    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=8)
+    # 设置Y轴显示所有神经元编号
+    neuron_positions = np.arange(len(data_ordered.columns))
+    neuron_labels = data_ordered.columns.tolist()
+    ax.set_yticks(neuron_positions)
+    ax.set_yticklabels(neuron_labels, rotation=0, fontsize=30, fontweight='bold')
     
     plt.tight_layout()
     return fig
@@ -527,7 +705,8 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
                                   start_behavior: str,
                                   end_behavior: str,
                                   pre_behavior_time: float,
-                                  config: BehaviorHeatmapConfig) -> plt.Figure:
+                                  config: BehaviorHeatmapConfig,
+                                  global_neuron_order: Optional[pd.Index] = None) -> plt.Figure:
     """
     创建所有行为序列的平均热力图
     
@@ -543,6 +722,8 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
         行为开始前的时间
     config : BehaviorHeatmapConfig
         配置对象
+    global_neuron_order : Optional[pd.Index]
+        全局神经元排序顺序（仅在使用全局排序时需要）
         
     Returns
     -------
@@ -552,12 +733,32 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
     if not all_sequence_data:
         raise ValueError("没有有效的行为序列数据")
     
-    # 找到所有数据的公共神经元
-    common_neurons = set(all_sequence_data[0].columns)
-    for data in all_sequence_data[1:]:
-        common_neurons &= set(data.columns)
-    
-    common_neurons = sorted(list(common_neurons))
+    # 根据配置选择排序方式获取公共神经元
+    if config.USE_GLOBAL_SORTING and global_neuron_order is not None:
+        # 使用全局排序：找到所有数据的公共神经元，并按照全局顺序排列
+        all_available_neurons = set()
+        for data in all_sequence_data:
+            all_available_neurons.update(data.columns)
+        
+        # 按照全局顺序筛选出可用的神经元
+        common_neurons = [neuron for neuron in global_neuron_order if neuron in all_available_neurons]
+        
+        # 确保每个序列数据都包含这些神经元
+        for data in all_sequence_data:
+            missing_neurons = set(common_neurons) - set(data.columns)
+            if missing_neurons:
+                common_neurons = [neuron for neuron in common_neurons if neuron in data.columns]
+        
+        sorting_method = "global"
+    else:
+        # 使用局部排序：基于平均数据计算排序
+        # 先找到所有数据的公共神经元
+        common_neurons = set(all_sequence_data[0].columns)
+        for data in all_sequence_data[1:]:
+            common_neurons &= set(data.columns)
+        
+        common_neurons = sorted(list(common_neurons))
+        sorting_method = "local"
     
     # 确定目标长度（使用最短序列的长度以确保所有数据都有效）
     min_length = min(len(data) for data in all_sequence_data)
@@ -591,11 +792,16 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
                              index=time_relative, 
                              columns=common_neurons)
     
-    # 按峰值时间排序
-    average_df_sorted = sort_neurons_by_peak_time(average_df)
+    # 根据排序方式处理数据
+    if sorting_method == "global":
+        # 全局排序：数据已经按照全局顺序排列，无需再次排序
+        average_df_sorted = average_df
+    else:
+        # 局部排序：基于平均数据重新排序
+        average_df_sorted = sort_neurons_by_local_peak_time(average_df)
     
     # 创建图形
-    fig, ax = plt.subplots(figsize=(18, 10))
+    fig, ax = plt.subplots(figsize=(18, 40))
     
     # 绘制热力图
     sns.heatmap(
@@ -604,7 +810,7 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
         center=0,
         vmin=config.VMIN,
         vmax=config.VMAX,
-        cbar_kws={'label': 'Average Standardized Calcium Signal'},
+        cbar=False,  # 去掉颜色图例
         ax=ax
     )
     
@@ -618,25 +824,30 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
     
     # 设置标题和标签
+    sorting_description = "global peak time" if sorting_method == "global" else "local peak time"
+    
     if start_behavior == end_behavior:
         title = f'Average {start_behavior} Behavior Sequence\n'
-        title += f'Neural Activity: -{pre_behavior_time}s to End (n={len(all_sequence_data)} sequences)'
+        # title += f'Neural Activity: -{pre_behavior_time}s to End (n={len(all_sequence_data)} sequences, Neurons sorted by {sorting_description})'
     else:
         title = f'Average {start_behavior} → {end_behavior} Behavior Sequence\n'
-        title += f'Neural Activity: {start_behavior} -{pre_behavior_time}s to {end_behavior} End (n={len(all_sequence_data)} sequences)'
+        # title += f'Neural Activity: {start_behavior} -{pre_behavior_time}s to {end_behavior} End (n={len(all_sequence_data)} sequences, Neurons sorted by {sorting_description})'
     
-    ax.set_title(title, fontsize=16, fontweight='bold')
-    ax.set_xlabel('Time (seconds)', fontsize=14)
-    ax.set_ylabel('Neurons (sorted by peak time)', fontsize=14)
+    ax.set_title(title, fontsize=15, fontweight='bold')
+    ax.set_xlabel('Time (seconds)', fontsize=25, fontweight='bold')
+    ax.set_ylabel(f'Neurons (sorted by {sorting_description})', fontsize=25, fontweight='bold')
     
     # 设置X轴刻度标签
     tick_positions = np.linspace(0, len(average_df_sorted)-1, 8)
     tick_labels = [f'{time_relative[int(pos)]:.1f}' for pos in tick_positions]
     ax.set_xticks(tick_positions)
-    ax.set_xticklabels(tick_labels)
+    ax.set_xticklabels(tick_labels, fontsize=25, fontweight='bold')
     
-    # 调整Y轴标签
-    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=8)
+    # 设置Y轴显示所有神经元编号
+    neuron_positions = np.arange(len(average_df_sorted.columns))
+    neuron_labels = average_df_sorted.columns.tolist()
+    ax.set_yticks(neuron_positions)
+    ax.set_yticklabels(neuron_labels, rotation=0, fontsize=25, fontweight='bold')
     
     plt.tight_layout()
     return fig
@@ -668,6 +879,12 @@ def main():
     if args.sampling_rate:
         config.SAMPLING_RATE = args.sampling_rate
     
+    # 处理排序方式参数
+    if args.use_global_sorting:
+        config.USE_GLOBAL_SORTING = True
+    elif args.use_local_sorting:
+        config.USE_GLOBAL_SORTING = False
+    
     # 行为设定优先级控制
     if init_priority:
         # __init__中的设定具有最高优先级
@@ -695,8 +912,22 @@ def main():
         data = convert_timestamps_to_seconds(data, config.SAMPLING_RATE)
         print(f"数据加载成功，包含 {len(data)} 个时间点，时间范围: {data.index.min():.2f}s - {data.index.max():.2f}s")
         
-        # 查找行为配对
-        print(f"正在查找 {config.START_BEHAVIOR} → {config.END_BEHAVIOR} 行为配对...")
+        # 根据配置决定是否计算全局神经元排序顺序
+        global_neuron_order = None
+        if config.USE_GLOBAL_SORTING:
+            print("正在计算全局神经元排序顺序...")
+            global_neuron_order = get_global_neuron_order(data)
+            print(f"全局排序完成，共 {len(global_neuron_order)} 个神经元按峰值时间排序")
+        else:
+            print("使用局部排序模式，每个热图将根据当前时间窗口内的峰值时间独立排序")
+        
+        # 查找连续行为配对
+        if config.START_BEHAVIOR == config.END_BEHAVIOR:
+            print(f"正在查找 {config.START_BEHAVIOR} 行为事件...")
+        else:
+            print(f"正在查找连续行为配对: {config.START_BEHAVIOR} → {config.END_BEHAVIOR}")
+            print("注意：只有连续出现的行为配对才会被处理")
+        
         behavior_pairs = find_behavior_pairs(
             data,
             config.START_BEHAVIOR,
@@ -706,10 +937,18 @@ def main():
         )
         
         if not behavior_pairs:
-            print(f"未找到符合条件的行为配对")
+            if config.START_BEHAVIOR == config.END_BEHAVIOR:
+                print(f"未找到符合条件的 {config.START_BEHAVIOR} 行为事件")
+            else:
+                print(f"未找到符合条件的连续行为配对: {config.START_BEHAVIOR} → {config.END_BEHAVIOR}")
+                print("提示：请检查这两个行为是否在数据中连续出现")
             return
         
-        print(f"找到 {len(behavior_pairs)} 个行为配对")
+        if config.START_BEHAVIOR == config.END_BEHAVIOR:
+            print(f"找到 {len(behavior_pairs)} 个 {config.START_BEHAVIOR} 行为事件")
+        else:
+            print(f"找到 {len(behavior_pairs)} 个连续行为配对")
+            print("所有配对都满足连续性要求")
         
         # 分析每个行为配对
         all_sequence_data = []
@@ -739,8 +978,13 @@ def main():
             # 标准化数据
             standardized_data = standardize_neural_data(sequence_data)
             
-            # 按峰值时间排序
-            sorted_data = sort_neurons_by_peak_time(standardized_data)
+            # 根据配置选择排序方式
+            if config.USE_GLOBAL_SORTING and global_neuron_order is not None:
+                # 使用全局排序
+                sorted_data = apply_global_neuron_order(standardized_data, global_neuron_order)
+            else:
+                # 使用局部排序（在创建热力图时才排序，这里保持原始数据）
+                sorted_data = standardized_data
             
             # 保存用于平均计算
             all_sequence_data.append(sorted_data)
@@ -754,7 +998,8 @@ def main():
                 config.END_BEHAVIOR,
                 config.PRE_BEHAVIOR_TIME,
                 config,
-                i
+                i,
+                global_neuron_order
             )
             
             # 保存图形
@@ -781,7 +1026,8 @@ def main():
                 config.START_BEHAVIOR,
                 config.END_BEHAVIOR,
                 config.PRE_BEHAVIOR_TIME,
-                config
+                config,
+                global_neuron_order
             )
             
             # 保存平均热力图
@@ -834,21 +1080,40 @@ if __name__ == "__main__":
 
 3. 命令行使用示例：
    ```bash
-   # 分析同一行为
-   python heatmap_behavior.py --start-behavior "Crack-seeds-shells" --end-behavior "Crack-seeds-shells" --pre-behavior-time 10
+   # 分析同一行为（使用全局排序）
+   python heatmap_behavior.py --start-behavior "Crack-seeds-shells" --end-behavior "Crack-seeds-shells" --pre-behavior-time 10 --use-global-sorting
 
-   # 分析不同行为序列  
-   python heatmap_behavior.py --start-behavior "Find-seeds" --end-behavior "Eat-seed-kernels" --pre-behavior-time 15
+   # 分析不同行为序列（使用局部排序）
+   python heatmap_behavior.py --start-behavior "Find-seeds" --end-behavior "Eat-seed-kernels" --pre-behavior-time 15 --use-local-sorting
+   
+   # 使用默认排序方式（根据配置类中的USE_GLOBAL_SORTING设定）
+   python heatmap_behavior.py --start-behavior "Groom" --end-behavior "Water"
    ```
 
-4. 功能特点：
+4. 神经元排序方式控制：
+   ```python
+   # 使用全局排序（所有热图使用相同的神经元顺序，便于比较）
+   self.USE_GLOBAL_SORTING = True
+   
+   # 使用局部排序（每个热图根据当前时间窗口独立排序，突出局部模式）
+   self.USE_GLOBAL_SORTING = False
+   ```
+
+5. 功能特点：
    - 支持同一行为的完整序列分析（开始前N秒到行为结束）
    - 支持不同行为的连续序列分析（行为A开始前N秒到行为B结束）
-   - 自动匹配时间上相关的行为配对
+   - 严格的连续性检查：只有当起始行为结束后紧接着出现结束行为时才绘制热力图
+   - 自动跳过非连续的行为配对，确保分析的生物学意义
+   - 灵活的神经元排序：支持全局排序（一致性）或局部排序（突出局部特征）
    - 生成个体序列和平均序列的热力图
    - 在热力图上标注关键时间点（行为开始和结束）
 
 5. 可用的行为类型：
+6. 排序方式对比：
+   - **全局排序**：所有热图使用相同的神经元顺序，便于跨行为序列比较，神经元位置固定
+   - **局部排序**：每个热图根据当前时间窗口内的峰值时间独立排序，突出各自的时序模式
+
+7. 可用的行为类型：
    - 'Crack-seeds-shells', 'Eat-feed', 'Eat-seed-kernels', 'Explore'
    - 'Explore-search-seeds', 'Find-seeds', 'Get-feed', 'Get-seeds'
    - 'Grab-seeds', 'Groom', 'Smell-feed', 'Smell-Get-seeds'
