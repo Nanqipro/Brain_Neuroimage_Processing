@@ -40,11 +40,11 @@ class BehaviorHeatmapConfig:
     
     def __init__(self):
         # 输入文件路径
-        self.INPUT_FILE = '../../datasets/Day3_with_behavior_labels_filled.xlsx'
+        self.INPUT_FILE = '../../datasets/29790930糖水铁网糖水trace2.xlsx'
         # 输出目录
         self.OUTPUT_DIR = '../../graph/behavior_heatmaps'
         # 目标行为类型
-        self.TARGET_BEHAVIOR = 'CD1'
+        self.TARGET_BEHAVIOR = 'Eat-seed-kernels'
         # 时间窗口（秒）
         self.TIME_WINDOW = 10.0
         # 采样率（钙离子数据采样频率：4.8Hz）
@@ -54,6 +54,8 @@ class BehaviorHeatmapConfig:
         # 热力图颜色范围
         self.VMIN = -3.0
         self.VMAX = 3.0
+        # 配置优先级控制：True表示__init__中的设定优先级最高，False表示命令行参数优先
+        self.INIT_CONFIG_PRIORITY = True
 
 def parse_arguments() -> argparse.Namespace:
     """
@@ -83,8 +85,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         '--behavior', 
         type=str, 
-        default='CD1',
-        help='目标行为类型（默认：CD1）'
+        default='Eat-seed-kernels',
+        help='目标行为类型（默认：Eat-seed-kernels）'
     )
     
     parser.add_argument(
@@ -518,19 +520,34 @@ def main():
     # 创建配置对象
     config = BehaviorHeatmapConfig()
     
-    # 更新配置
+    # 保存__init__中的TARGET_BEHAVIOR设定
+    init_target_behavior = config.TARGET_BEHAVIOR
+    init_priority = config.INIT_CONFIG_PRIORITY
+    
+    # 更新其他配置项
     if args.input:
         config.INPUT_FILE = args.input
     if args.output_dir:
         config.OUTPUT_DIR = args.output_dir
-    if args.behavior:
-        config.TARGET_BEHAVIOR = args.behavior
     if args.time_window:
         config.TIME_WINDOW = args.time_window
     if args.min_duration:
         config.MIN_BEHAVIOR_DURATION = args.min_duration
     if args.sampling_rate:
         config.SAMPLING_RATE = args.sampling_rate
+    
+    # TARGET_BEHAVIOR优先级控制
+    if init_priority:
+        # __init__中的设定具有最高优先级
+        config.TARGET_BEHAVIOR = init_target_behavior
+        print(f"使用目标行为: {config.TARGET_BEHAVIOR} (来源: __init__配置，优先级最高)")
+    else:
+        # 命令行参数优先
+        if args.behavior:
+            config.TARGET_BEHAVIOR = args.behavior
+            print(f"使用目标行为: {config.TARGET_BEHAVIOR} (来源: 命令行参数)")
+        else:
+            print(f"使用目标行为: {config.TARGET_BEHAVIOR} (来源: __init__配置，默认值)")
     
     # 创建输出目录
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
@@ -632,3 +649,47 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+使用示例和配置说明：
+
+1. 让__init__中的TARGET_BEHAVIOR设定具有最高优先级（推荐）：
+   ```python
+   class BehaviorHeatmapConfig:
+       def __init__(self):
+           self.TARGET_BEHAVIOR = 'Groom'  # 分析梳理行为
+           self.INIT_CONFIG_PRIORITY = True  # 启用__init__优先级
+   ```
+   这样无论命令行传入什么--behavior参数，都会使用'Groom'
+
+2. 让命令行参数具有最高优先级：
+   ```python
+   class BehaviorHeatmapConfig:
+       def __init__(self):
+           self.TARGET_BEHAVIOR = 'Eat-seed-kernels'  # 默认值
+           self.INIT_CONFIG_PRIORITY = False  # 禁用__init__优先级
+   ```
+   这样可以通过命令行灵活切换：
+   python heatmap_behavior.py --behavior "Water"
+
+3. 可用的行为类型：
+   - 'Crack-seeds-shells'      # 敲碎种子外壳
+   - 'Eat-feed'               # 吃饲料
+   - 'Eat-seed-kernels'       # 吃种子仁
+   - 'Explore'                # 探索
+   - 'Explore-search-seeds'   # 探索寻找种子
+   - 'Find-seeds'             # 发现种子
+   - 'Get-feed'               # 获取饲料
+   - 'Get-seeds'              # 获取种子
+   - 'Grab-seeds'             # 抓取种子
+   - 'Groom'                  # 梳理毛发
+   - 'Smell-feed'             # 嗅闻饲料
+   - 'Smell-Get-seeds'        # 嗅闻获取种子
+   - 'Store-seeds'            # 储存种子
+   - 'Water'                  # 饮水
+
+4. 优先级控制的优势：
+   - 当INIT_CONFIG_PRIORITY=True时，确保代码中的设定不会被意外覆盖
+   - 当INIT_CONFIG_PRIORITY=False时，保持命令行的灵活性
+   - 可以根据需要随时在配置类中切换优先级模式
+"""
