@@ -128,8 +128,17 @@ def convert_timestamps_to_seconds(data: pd.DataFrame, sampling_rate: float) -> p
     pd.DataFrame
         转换后的数据，索引为秒
     """
+    # 调试信息：查看数据索引的具体情况
+    print(f"调试信息：数据索引类型: {type(data.index[0])}")
+    print(f"调试信息：前5个索引值: {data.index[:5].tolist()}")
+    print(f"调试信息：索引范围: {data.index.min()} - {data.index.max()}")
+    
     # 检查时间戳是否为连续的数值序列
-    if isinstance(data.index[0], (int, float)):
+    import numbers
+    is_numeric = isinstance(data.index[0], (int, float, numbers.Integral, numbers.Real)) or np.issubdtype(data.index.dtype, np.number)
+    print(f"调试信息：isinstance检查结果: {is_numeric}")
+    
+    if is_numeric:
         # 计算时间间隔来判断是否需要转换
         time_intervals = np.diff(data.index[:10])  # 检查前10个时间间隔
         avg_interval = np.mean(time_intervals)
@@ -137,20 +146,29 @@ def convert_timestamps_to_seconds(data: pd.DataFrame, sampling_rate: float) -> p
         # 如果平均时间间隔接近1/采样率，说明时间戳已经是秒
         expected_interval = 1.0 / sampling_rate
         
+        print(f"调试信息：平均时间间隔: {avg_interval:.3f}, 期望秒间隔: {expected_interval:.3f}")
+        print(f"调试信息：差值: {abs(avg_interval - expected_interval):.3f}, 阈值: {expected_interval * 0.1:.3f}")
+        
         if abs(avg_interval - expected_interval) < expected_interval * 0.1:
             # 时间戳已经是秒，直接返回
             print(f"检测到时间戳已为秒格式（平均间隔: {avg_interval:.3f}s）")
             return data
         else:
-            # 时间戳可能是数据点索引，需要转换为秒
-            print(f"检测到时间戳为数据点格式（平均间隔: {avg_interval:.1f}），转换为秒")
-            time_seconds = data.index / sampling_rate
+            # 时间戳是数据点索引，需要转换为秒
+            print(f"检测到时间戳为采样点索引（间隔: {avg_interval:.1f}点），转换为秒")
+            
+            # 正确的转换：将采样点索引转换为时间（秒）
+            # 假设第一个采样点（索引1）对应时间0秒
+            time_seconds = (data.index - data.index.min()) / sampling_rate
+            
             data_converted = data.copy()
             data_converted.index = time_seconds
+            
+            print(f"时间转换完成: {data.index.min()}-{data.index.max()}(采样点) → {time_seconds.min():.2f}-{time_seconds.max():.2f}(秒)")
             return data_converted
     else:
         # 如果时间戳已经是时间格式，直接返回
-        print("检测到时间戳为时间格式")
+        print(f"检测到时间戳为非数值格式，类型: {type(data.index[0])}")
         return data
 
 def load_and_validate_data(file_path: str) -> pd.DataFrame:
@@ -398,7 +416,7 @@ def create_behavior_heatmap(data: pd.DataFrame,
     # 设置X轴刻度标签（显示相对时间，以秒为单位）
     time_points = data.index - behavior_start_time
     tick_positions = np.linspace(0, len(data.index)-1, 5)
-    tick_labels = [f'{time_points.iloc[int(pos)]:.1f}' for pos in tick_positions]
+    tick_labels = [f'{time_points[int(pos)]:.1f}' for pos in tick_positions]
     ax.set_xticks(tick_positions)
     ax.set_xticklabels(tick_labels)
     
