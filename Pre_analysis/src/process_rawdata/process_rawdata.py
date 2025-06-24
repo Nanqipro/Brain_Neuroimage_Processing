@@ -83,8 +83,8 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
 
 if __name__ == "__main__":
     # 定义输入和输出文件路径
-    input_path = '../../raw_data/bla6250EM0626goodtrace.xlsx'
-    output_path = '../../processed_data/bla6250EM0626goodtrace_processed.xlsx'
+    input_path = '../../raw_data/BLA62500627homecagecelltrace.xlsx'
+    output_path = '../../processed_data/BLA62500627homecagecelltrace_processed.xlsx'
     
     try:
         # 处理数据

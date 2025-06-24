@@ -55,7 +55,7 @@ class BehaviorHeatmapConfig:
         self.SAMPLING_RATE = 4.8
         # 最小行为持续时间（秒），用于过滤短暂的误标记
         self.MIN_BEHAVIOR_DURATION = 1.0
-        # 热力图颜色范围
+        # 热力图颜色范围（与heatmap_sort-EM.py保持一致）
         self.VMIN = -2
         self.VMAX = 2
         # 神经元排序方式：
@@ -447,27 +447,32 @@ def check_behavior_continuity(behavior_column: pd.Series,
 def extract_behavior_sequence_data(data: pd.DataFrame,
                                  start_time: float,
                                  end_time: float,
-                                 pre_behavior_time: float) -> Optional[pd.DataFrame]:
+                                 pre_behavior_time: float,
+                                 sampling_rate: float = 4.8) -> Optional[pd.DataFrame]:
     """
     提取从行为开始前到行为结束的数据序列
     
     Parameters
     ----------
     data : pd.DataFrame
-        完整的神经元数据
+        完整的神经元数据（时间戳为索引）
     start_time : float
-        起始行为开始时间
+        起始行为开始时间戳
     end_time : float
-        结束行为结束时间
+        结束行为结束时间戳
     pre_behavior_time : float
         行为开始前的时间（秒）
+    sampling_rate : float
+        采样率（Hz），用于计算时间戳偏移量
         
     Returns
     -------
     Optional[pd.DataFrame]
         提取的数据序列，如果时间范围超出数据范围则返回None
     """
-    sequence_start = start_time - pre_behavior_time
+    # 将行为开始前的时间（秒）转换为时间戳偏移量
+    pre_behavior_timestamps = pre_behavior_time * sampling_rate
+    sequence_start = start_time - pre_behavior_timestamps
     sequence_end = end_time
     
     # 检查时间范围是否在数据范围内
@@ -649,16 +654,15 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
         current_order = data_ordered.columns
     
     # 创建图形
-    fig, ax = plt.subplots(figsize=(18, 40))
+    fig, ax = plt.subplots(figsize=(16, 60))
     
     # 绘制热力图
     sns.heatmap(
         data_ordered.T,  # 转置：行为神经元，列为时间
         cmap='viridis',
-        center=0,
+        cbar=False,  # 显示颜色图例
         vmin=config.VMIN,
         vmax=config.VMAX,
-        cbar=False,  # 去掉颜色图例
         ax=ax
     )
     
@@ -703,10 +707,12 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
     ax.set_xlabel('Time (seconds)', fontsize=30, fontweight='bold')
     ax.set_ylabel(f'Neurons (sorted by {sorting_description})', fontsize=30, fontweight='bold')
     
-    # 设置X轴刻度标签（显示相对于起始行为开始的时间）
-    time_points = data_ordered.index - start_behavior_time
-    tick_positions = np.linspace(0, len(data_ordered.index)-1, 8)
-    tick_labels = [f'{time_points[int(pos)]:.1f}' for pos in tick_positions]
+    # 设置X轴刻度标签（显示相对于起始行为开始的时间，以秒为单位，5秒为一个刻度）
+    tick_positions, tick_labels = calculate_5second_ticks(
+        data_ordered.index, 
+        start_behavior_time, 
+        config.SAMPLING_RATE
+    )
     ax.set_xticks(tick_positions)
     ax.set_xticklabels(tick_labels, fontsize=30, fontweight='bold')
     
@@ -824,9 +830,10 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
     average_data = np.mean(aligned_data, axis=0)
     
     # 创建平均数据的DataFrame
-    time_relative = np.linspace(-pre_behavior_time, 0, min_length)  # 相对于起始行为开始的时间
+    # 使用相对于起始行为开始的时间戳形式，但在显示时会转换为秒
+    time_relative_timestamps = np.linspace(-pre_behavior_time * config.SAMPLING_RATE, 0, min_length)  # 相对于起始行为开始的时间戳
     average_df = pd.DataFrame(average_data, 
-                             index=time_relative, 
+                             index=time_relative_timestamps, 
                              columns=common_neurons)
     
     # 根据排序方式处理数据
@@ -841,16 +848,15 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
         average_df_sorted = sort_neurons_by_local_peak_time(average_df)
     
     # 创建图形
-    fig, ax = plt.subplots(figsize=(18, 40))
+    fig, ax = plt.subplots(figsize=(4, 15))
     
     # 绘制热力图
     sns.heatmap(
         average_df_sorted.T,
         cmap='viridis',
-        center=0,
+        cbar=False,  # 显示颜色图例
         vmin=config.VMIN,
         vmax=config.VMAX,
-        cbar=False,  # 去掉颜色图例
         ax=ax
     )
     
@@ -882,9 +888,13 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
     ax.set_xlabel('Time (seconds)', fontsize=25, fontweight='bold')
     ax.set_ylabel(f'Neurons (sorted by {sorting_description})', fontsize=25, fontweight='bold')
     
-    # 设置X轴刻度标签
-    tick_positions = np.linspace(0, len(average_df_sorted)-1, 8)
-    tick_labels = [f'{time_relative[int(pos)]:.1f}' for pos in tick_positions]
+    # 设置X轴刻度标签（以秒为单位，5秒为一个刻度）
+    # 为平均热力图设置参考时间为0（起始行为开始时间）
+    tick_positions, tick_labels = calculate_5second_ticks(
+        average_df_sorted.index, 
+        0,  # 参考时间为0，因为time_relative_timestamps已经是相对时间
+        config.SAMPLING_RATE
+    )
     ax.set_xticks(tick_positions)
     ax.set_xticklabels(tick_labels, fontsize=25, fontweight='bold')
     
@@ -896,6 +906,54 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
     
     plt.tight_layout()
     return fig
+
+def calculate_5second_ticks(data_index: pd.Index, 
+                           reference_time: float, 
+                           sampling_rate: float) -> Tuple[List[float], List[str]]:
+    """
+    计算基于5秒间隔的X轴刻度位置和标签
+    
+    Parameters
+    ----------
+    data_index : pd.Index
+        数据的时间戳索引
+    reference_time : float
+        参考时间戳（如行为开始时间）
+    sampling_rate : float
+        采样率（Hz）
+        
+    Returns
+    -------
+    Tuple[List[float], List[str]]
+        刻度位置和对应的标签
+    """
+    # 将时间戳转换为相对于参考时间的秒数
+    time_points_seconds = (data_index - reference_time) / sampling_rate
+    
+    # 确定5秒刻度的范围
+    min_time = time_points_seconds.min()
+    max_time = time_points_seconds.max()
+    
+    # 生成5秒间隔的刻度点
+    tick_times_seconds = np.arange(
+        np.floor(min_time / 5) * 5,  # 起始点向下取整到5的倍数
+        np.ceil(max_time / 5) * 5 + 5,  # 结束点向上取整到5的倍数
+        5  # 5秒间隔
+    )
+    
+    # 将秒数转换为热力图中的像素位置
+    tick_positions = []
+    tick_labels = []
+    
+    for tick_time in tick_times_seconds:
+        if min_time <= tick_time <= max_time:
+            # 计算该时间点在热力图中的位置
+            relative_position = (tick_time - min_time) / (max_time - min_time)
+            pixel_position = relative_position * (len(data_index) - 1)
+            tick_positions.append(pixel_position)
+            tick_labels.append(f'{tick_time:.0f}')
+    
+    return tick_positions, tick_labels
 
 def main():
     """
@@ -950,10 +1008,9 @@ def main():
         print(f"正在加载数据: {config.INPUT_FILE}")
         data = load_and_validate_data(config.INPUT_FILE)
         
-        # 转换时间戳为秒
-        print(f"转换时间戳为秒（采样率: {config.SAMPLING_RATE}Hz）")
-        data = convert_timestamps_to_seconds(data, config.SAMPLING_RATE)
-        print(f"数据加载成功，包含 {len(data)} 个时间点，时间范围: {data.index.min():.2f}s - {data.index.max():.2f}s")
+        # 保持原始时间戳格式，不进行转换
+        print(f"保持原始时间戳格式（采样率: {config.SAMPLING_RATE}Hz）")
+        print(f"数据加载成功，包含 {len(data)} 个时间点，时间戳范围: {data.index.min():.0f} - {data.index.max():.0f}")
         
         # 根据配置决定是否计算全局神经元排序顺序
         global_neuron_order = None
@@ -1002,11 +1059,11 @@ def main():
         
         for i, (start_begin, start_end, end_begin, end_end) in enumerate(behavior_pairs):
             if config.START_BEHAVIOR == config.END_BEHAVIOR:
-                print(f"正在分析序列 {i+1}: {config.START_BEHAVIOR} ({start_begin:.1f}s - {end_end:.1f}s)")
+                print(f"正在分析序列 {i+1}: {config.START_BEHAVIOR} (时间戳 {start_begin:.0f} - {end_end:.0f})")
                 sequence_start_time = start_begin
                 sequence_end_time = end_end
             else:
-                print(f"正在分析序列 {i+1}: {config.START_BEHAVIOR} ({start_begin:.1f}s - {start_end:.1f}s) → {config.END_BEHAVIOR} ({end_begin:.1f}s - {end_end:.1f}s)")
+                print(f"正在分析序列 {i+1}: {config.START_BEHAVIOR} (时间戳 {start_begin:.0f} - {start_end:.0f}) → {config.END_BEHAVIOR} (时间戳 {end_begin:.0f} - {end_end:.0f})")
                 sequence_start_time = start_begin
                 sequence_end_time = end_end
             
@@ -1015,7 +1072,8 @@ def main():
                 data,
                 sequence_start_time,
                 sequence_end_time,
-                config.PRE_BEHAVIOR_TIME
+                config.PRE_BEHAVIOR_TIME,
+                config.SAMPLING_RATE
             )
             
             if sequence_data is None:
@@ -1062,7 +1120,7 @@ def main():
                     f'{config.START_BEHAVIOR}_to_{config.END_BEHAVIOR}_sequence_{i+1}_heatmap.png'
                 )
             
-            fig.savefig(output_path, dpi=300, bbox_inches='tight')
+            fig.savefig(output_path, bbox_inches='tight', pad_inches=0.1, dpi=100)
             plt.close(fig)
             print(f"已保存: {output_path}")
         
@@ -1091,7 +1149,7 @@ def main():
                     f'{config.START_BEHAVIOR}_to_{config.END_BEHAVIOR}_average_sequence_heatmap.png'
                 )
             
-            avg_fig.savefig(avg_output_path, dpi=300, bbox_inches='tight')
+            avg_fig.savefig(avg_output_path, bbox_inches='tight', pad_inches=0.1, dpi=100)
             plt.close(avg_fig)
             print(f"已保存平均热力图: {avg_output_path}")
         
@@ -1114,6 +1172,7 @@ if __name__ == "__main__":
            self.START_BEHAVIOR = 'Eat-seed-kernels'  # 起始行为
            self.END_BEHAVIOR = 'Eat-seed-kernels'    # 结束行为（同一行为）
            self.PRE_BEHAVIOR_TIME = 10.0             # 行为开始前10秒
+           self.SAMPLING_RATE = 4.8                  # 采样率（Hz）
            self.INIT_CONFIG_PRIORITY = True
    ```
 
@@ -1124,6 +1183,7 @@ if __name__ == "__main__":
            self.START_BEHAVIOR = 'Groom'           # 从梳理行为开始前10秒
            self.END_BEHAVIOR = 'Water'             # 到饮水行为结束
            self.PRE_BEHAVIOR_TIME = 10.0           # 行为开始前10秒
+           self.SAMPLING_RATE = 4.8                # 采样率（Hz）
            self.INIT_CONFIG_PRIORITY = True
    ```
 
@@ -1162,6 +1222,7 @@ if __name__ == "__main__":
    - 灵活的神经元排序：支持全局排序（一致性）或局部排序（突出局部特征）
    - 生成个体序列和平均序列的热力图
    - 在热力图上标注关键时间点（行为开始和结束）
+   - 热力图粒度保持原始时间戳，横坐标显示为秒（5秒一刻度）
 
 5. 可用的行为类型：
 6. 排序方式对比：
