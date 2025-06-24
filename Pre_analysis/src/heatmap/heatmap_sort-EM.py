@@ -13,14 +13,16 @@ from scipy import stats
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/2980tangsuicelltrace.xlsx'
+    INPUT_FILE = '../../datasets/29790930糖水铁网糖水trace2.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort-'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
-    # 排序方式：'peak'（默认，按峰值时间排序）或'calcium_wave'（按第一次真实钙波发生时间排序）
-    SORT_METHOD = 'peak'
+    # 排序方式：'peak'（默认，按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
+    SORT_METHOD = 'custom'
+    # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
+    CUSTOM_NEURON_ORDER = ['n53', 'n40', 'n29', 'n34', 'n4', 'n32', 'n25', 'n27', 'n22', 'n55', 'n21', 'n5', 'n19']
     # 钙波检测参数
     CALCIUM_WAVE_THRESHOLD = 1.5  # 钙波阈值（标准差的倍数）
     MIN_PROMINENCE = 1.0  # 最小峰值突出度
@@ -34,8 +36,8 @@ def parse_args():
     parser.add_argument('--output-prefix', type=str, help='输出文件名前缀')
     parser.add_argument('--stamp-min', type=float, help='最小时间戳值')
     parser.add_argument('--stamp-max', type=float, help='最大时间戳值')
-    parser.add_argument('--sort-method', type=str, choices=['peak', 'calcium_wave'], 
-                        help='排序方式：peak（按峰值时间排序）或calcium_wave（按第一次真实钙波时间排序）')
+    parser.add_argument('--sort-method', type=str, choices=['peak', 'calcium_wave', 'custom'], 
+                        help='排序方式：peak（按峰值时间排序）、calcium_wave（按第一次真实钙波时间排序）或custom（按自定义顺序排序）')
     parser.add_argument('--ca-threshold', type=float, help='钙波检测阈值（标准差的倍数）')
     parser.add_argument('--min-prominence', type=float, help='最小峰值突出度')
     return parser.parse_args()
@@ -82,6 +84,36 @@ if has_behavior:
 
 # 数据标准化（Z-score 标准化）
 day6_data_standardized = (day6_data - day6_data.mean()) / day6_data.std()
+
+# 函数：按自定义神经元顺序排序
+def sort_neurons_by_custom_order(data_columns, custom_order):
+    """
+    按自定义神经元顺序排序
+    
+    指定神经元按给定顺序排在前面，剩余神经元按字符串排序排在后面
+    
+    参数:
+    data_columns -- 数据中的神经元列名
+    custom_order -- 自定义的神经元顺序列表
+    
+    返回:
+    sorted_neurons -- 按自定义顺序排列的神经元列表
+    """
+    available_neurons = set(data_columns)
+    
+    # 首先按照自定义顺序排列存在的神经元
+    ordered_neurons = []
+    for neuron in custom_order:
+        if neuron in available_neurons:
+            ordered_neurons.append(neuron)
+    
+    # 找出剩余的神经元，按字符串大小顺序排列
+    remaining_neurons = sorted(list(available_neurons - set(ordered_neurons)))
+    
+    # 合并两部分：自定义顺序 + 剩余神经元（按大小排序）
+    final_order = ordered_neurons + remaining_neurons
+    
+    return final_order
 
 # 函数：检测神经元第一次真实钙波发生的时间点
 def detect_first_calcium_wave(neuron_data):
@@ -142,6 +174,14 @@ if Config.SORT_METHOD == 'peak':
     sorted_neurons = peak_times.sort_values().index
     
     sort_method_str = "Sorted by peak time"
+elif Config.SORT_METHOD == 'custom':
+    # 自定义方法：按指定的神经元顺序排序
+    sorted_neurons = sort_neurons_by_custom_order(day6_data_standardized.columns, Config.CUSTOM_NEURON_ORDER)
+    
+    sort_method_str = "Sorted by custom order"
+    print(f"使用自定义神经元排序")
+    print(f"指定顺序: {Config.CUSTOM_NEURON_ORDER}")
+    print("剩余神经元将按字符串大小顺序排列在指定神经元下方")
 else:  # 'calcium_wave'
     # 新方法：按第一次真实钙波发生时间排序
     first_wave_times = {}
@@ -357,7 +397,7 @@ if len(sorted_day6_data.index) > 426:
     ax_heatmap.axvline(x=426 - 0.5, color='white', linestyle='--', linewidth=4)
 
 # 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = f'2980tangsuicelltrace-heatmap ({sort_method_str})'
+title_text = f'29790930tangsuitiewangtrace2-heatmap ({sort_method_str})'
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
@@ -388,7 +428,7 @@ ax_heatmap.set_xticklabels(xtick_labels, fontsize=14, fontweight='bold', rotatio
 # 而是使用之前设置的subplots_adjust()已经足够调整布局
 
 # 构建输出文件名，包含排序方式和时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}2980tangsuicelltrace_{Config.SORT_METHOD}"
+output_filename = f"{Config.OUTPUT_PREFIX}29790930tangsuitiewangtrace2_{Config.SORT_METHOD}"
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()

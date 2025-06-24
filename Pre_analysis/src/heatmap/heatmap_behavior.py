@@ -62,7 +62,11 @@ class BehaviorHeatmapConfig:
         # 'global' - 使用全局排序（基于整个数据集）
         # 'local' - 每个热图单独排序
         # 'first' - 以第一个热图的排序为基准，后续热图使用相同顺序
-        self.SORTING_METHOD = 'global'
+        # 'custom' - 使用自定义神经元顺序
+        self.SORTING_METHOD = 'first'
+        
+        # 自定义神经元排序顺序（仅在SORTING_METHOD='custom'时使用）
+        self.CUSTOM_NEURON_ORDER = ['n53', 'n40', 'n29', 'n34', 'n4', 'n32', 'n25', 'n27', 'n22', 'n55', 'n21', 'n5', 'n19']
         # 配置优先级控制：True表示__init__中的设定优先级最高，False表示命令行参数优先
         self.INIT_CONFIG_PRIORITY = True
 
@@ -129,8 +133,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         '--sorting-method',
         type=str,
-        choices=['global', 'local', 'first'],
-        help='神经元排序方式：global（全局排序），local（局部排序），first（首图排序）'
+        choices=['global', 'local', 'first', 'custom'],
+        help='神经元排序方式：global（全局排序），local（局部排序），first（首图排序），custom（自定义顺序）'
     )
     
     return parser.parse_args()
@@ -590,6 +594,40 @@ def sort_neurons_by_local_peak_time(data: pd.DataFrame) -> pd.DataFrame:
     
     return data[sorted_neurons]
 
+def sort_neurons_by_custom_order(data: pd.DataFrame, custom_order: List[str]) -> pd.DataFrame:
+    """
+    按自定义神经元顺序排序
+    
+    指定神经元按给定顺序排在前面，剩余神经元按字符串排序排在后面
+    
+    Parameters
+    ----------
+    data : pd.DataFrame
+        神经元数据
+    custom_order : List[str]
+        自定义的神经元顺序列表
+        
+    Returns
+    -------
+    pd.DataFrame
+        按自定义顺序排列的数据
+    """
+    available_neurons = set(data.columns)
+    
+    # 首先按照自定义顺序排列存在的神经元
+    ordered_neurons = []
+    for neuron in custom_order:
+        if neuron in available_neurons:
+            ordered_neurons.append(neuron)
+    
+    # 找出剩余的神经元，按字符串大小顺序排列
+    remaining_neurons = sorted(list(available_neurons - set(ordered_neurons)))
+    
+    # 合并两部分：自定义顺序 + 剩余神经元（按大小排序）
+    final_order = ordered_neurons + remaining_neurons
+    
+    return data[final_order]
+
 def create_behavior_sequence_heatmap(data: pd.DataFrame,
                                    start_behavior_time: float,
                                    end_behavior_time: float,
@@ -637,6 +675,11 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
         data_ordered = apply_global_neuron_order(data, global_neuron_order)
         sorting_method = "global"
         current_order = global_neuron_order
+    elif config.SORTING_METHOD == 'custom':
+        # 使用自定义排序
+        data_ordered = sort_neurons_by_custom_order(data, config.CUSTOM_NEURON_ORDER)
+        sorting_method = "custom"
+        current_order = data_ordered.columns
     elif config.SORTING_METHOD == 'first' and first_heatmap_order is not None:
         # 使用首图排序
         data_ordered = apply_global_neuron_order(data, first_heatmap_order)
@@ -693,6 +736,8 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
         sorting_description = "global peak time"
     elif sorting_method == "first heatmap":
         sorting_description = "first heatmap order"
+    elif sorting_method == "custom":
+        sorting_description = "custom order"
     else:
         sorting_description = "local peak time"
     
@@ -777,6 +822,29 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
                 common_neurons = [neuron for neuron in common_neurons if neuron in data.columns]
         
         sorting_method = "global"
+    elif config.SORTING_METHOD == 'custom':
+        # 使用自定义排序：基于自定义神经元顺序
+        all_available_neurons = set()
+        for data in all_sequence_data:
+            all_available_neurons.update(data.columns)
+        
+        # 按照自定义顺序排列神经元：优先顺序 + 剩余按字符串排序
+        ordered_neurons = []
+        for neuron in config.CUSTOM_NEURON_ORDER:
+            if neuron in all_available_neurons:
+                ordered_neurons.append(neuron)
+        
+        # 添加剩余神经元（按字符串排序）
+        remaining_neurons = sorted(list(all_available_neurons - set(ordered_neurons)))
+        common_neurons = ordered_neurons + remaining_neurons
+        
+        # 确保每个序列数据都包含这些神经元
+        for data in all_sequence_data:
+            missing_neurons = set(common_neurons) - set(data.columns)
+            if missing_neurons:
+                common_neurons = [neuron for neuron in common_neurons if neuron in data.columns]
+        
+        sorting_method = "custom"
     elif config.SORTING_METHOD == 'first' and first_heatmap_order is not None:
         # 使用首图排序：基于第一个热图的排序顺序
         all_available_neurons = set()
@@ -843,12 +911,15 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
     elif sorting_method == "first heatmap":
         # 首图排序：数据已经按照首图顺序排列，无需再次排序
         average_df_sorted = average_df
+    elif sorting_method == "custom":
+        # 自定义排序：数据已经按照自定义顺序排列，无需再次排序
+        average_df_sorted = average_df
     else:
         # 局部排序：基于平均数据重新排序
         average_df_sorted = sort_neurons_by_local_peak_time(average_df)
     
     # 创建图形
-    fig, ax = plt.subplots(figsize=(4, 15))
+    fig, ax = plt.subplots(figsize=(16, 60))
     
     # 绘制热力图
     sns.heatmap(
@@ -874,6 +945,8 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
         sorting_description = "global peak time"
     elif sorting_method == "first heatmap":
         sorting_description = "first heatmap order"
+    elif sorting_method == "custom":
+        sorting_description = "custom order"
     else:
         sorting_description = "local peak time"
     
@@ -1020,6 +1093,10 @@ def main():
             print("正在计算全局神经元排序顺序...")
             global_neuron_order = get_global_neuron_order(data)
             print(f"全局排序完成，共 {len(global_neuron_order)} 个神经元按峰值时间排序")
+        elif config.SORTING_METHOD == 'custom':
+            print(f"使用自定义神经元排序模式")
+            print(f"指定顺序: {config.CUSTOM_NEURON_ORDER}")
+            print("剩余神经元将按字符串大小顺序排列在指定神经元下方")
         elif config.SORTING_METHOD == 'first':
             print("使用首图排序模式，将以第一个热图的排序为基准，后续热图使用相同神经元顺序")
         else:
@@ -1198,6 +1275,9 @@ if __name__ == "__main__":
    # 分析行为序列（使用首图排序）
    python heatmap_behavior.py --start-behavior "Groom" --end-behavior "Water" --sorting-method first
    
+   # 分析行为序列（使用自定义排序）
+   python heatmap_behavior.py --start-behavior "Crack-seeds-shells" --end-behavior "Eat-seed-kernels" --sorting-method custom
+   
    # 使用默认排序方式（根据配置类中的SORTING_METHOD设定）
    python heatmap_behavior.py --start-behavior "Groom" --end-behavior "Water"
    ```
@@ -1212,6 +1292,10 @@ if __name__ == "__main__":
    
    # 使用首图排序（以第一个热图的排序为基准，后续热图使用相同顺序）
    self.SORTING_METHOD = 'first'
+   
+   # 使用自定义排序（按指定的神经元顺序排列，剩余神经元按字符串大小排序）
+   self.SORTING_METHOD = 'custom'
+   self.CUSTOM_NEURON_ORDER = ['n53', 'n40', 'n29', 'n34', 'n4', 'n32', 'n25', 'n27', 'n22', 'n55', 'n21', 'n5', 'n19']
    ```
 
 5. 功能特点：
@@ -1228,12 +1312,14 @@ if __name__ == "__main__":
 6. 排序方式对比：
    - **全局排序 (global)**：基于整个数据集计算排序，所有热图使用相同的神经元顺序，便于跨行为序列比较，神经元位置固定
    - **局部排序 (local)**：每个热图根据当前时间窗口内的峰值时间独立排序，突出各自的时序模式
-   - **首图排序 (first)**：以第一个热图的排序为基准，后续所有热图使用相同的神经元顺序，既保留第一个序列的局部特征，又保持一致性便于比较。这种方式特别适合当第一个行为序列具有代表性，希望以此为参照来观察其他序列的神经元活动模式时使用。
+   - **首图排序 (first)**：以第一个热图的排序为基准，后续所有热图使用相同的神经元顺序，既保留第一个序列的局部特征，又保持一致性便于比较。这种方式特别适合当第一个行为序列具有代表性，希望以此为参照来观察其他序列的神经元活动模式时使用
+   - **自定义排序 (custom)**：按用户指定的神经元顺序排列（n53, n40, n29等），剩余神经元按字符串大小顺序排在指定神经元下方，适用于特定的科研需求或重点关注特定神经元的情况
 
 7. 排序方式选择建议：
    - 需要严格比较不同序列时 → 使用全局排序
    - 关注每个序列自身的时序特征时 → 使用局部排序  
    - 以某个特定序列为参照进行比较时 → 使用首图排序
+   - 需要重点关注特定神经元或遵循特定顺序时 → 使用自定义排序
 
 8. 可用的行为类型：
    - 'Crack-seeds-shells', 'Eat-feed', 'Eat-seed-kernels', 'Explore'
