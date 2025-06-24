@@ -58,8 +58,11 @@ class BehaviorHeatmapConfig:
         # 热力图颜色范围
         self.VMIN = -2
         self.VMAX = 2
-        # 神经元排序方式：True表示使用全局排序，False表示每个热图单独排序
-        self.USE_GLOBAL_SORTING = True
+        # 神经元排序方式：
+        # 'global' - 使用全局排序（基于整个数据集）
+        # 'local' - 每个热图单独排序
+        # 'first' - 以第一个热图的排序为基准，后续热图使用相同顺序
+        self.SORTING_METHOD = 'global'
         # 配置优先级控制：True表示__init__中的设定优先级最高，False表示命令行参数优先
         self.INIT_CONFIG_PRIORITY = True
 
@@ -124,15 +127,10 @@ def parse_arguments() -> argparse.Namespace:
     )
     
     parser.add_argument(
-        '--use-global-sorting', 
-        action='store_true',
-        help='使用全局神经元排序（默认：False，每个热图单独排序）'
-    )
-    
-    parser.add_argument(
-        '--use-local-sorting', 
-        action='store_true',
-        help='使用局部神经元排序（每个热图单独排序）'
+        '--sorting-method',
+        type=str,
+        choices=['global', 'local', 'first'],
+        help='神经元排序方式：global（全局排序），local（局部排序），first（首图排序）'
     )
     
     return parser.parse_args()
@@ -595,7 +593,8 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
                                    pre_behavior_time: float,
                                    config: BehaviorHeatmapConfig,
                                    pair_index: int,
-                                   global_neuron_order: Optional[pd.Index] = None) -> plt.Figure:
+                                   global_neuron_order: Optional[pd.Index] = None,
+                                   first_heatmap_order: Optional[pd.Index] = None) -> Tuple[plt.Figure, Optional[pd.Index]]:
     """
     创建行为序列的热力图
     
@@ -619,21 +618,35 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
         配对索引
     global_neuron_order : Optional[pd.Index]
         全局神经元排序顺序（仅在使用全局排序时需要）
+    first_heatmap_order : Optional[pd.Index]
+        第一个热图的排序顺序（仅在使用首图排序时需要）
         
     Returns
     -------
-    plt.Figure
-        生成的图形对象
+    Tuple[plt.Figure, Optional[pd.Index]]
+        生成的图形对象和当前热图的神经元排序顺序
     """
     # 根据配置选择排序方式
-    if config.USE_GLOBAL_SORTING and global_neuron_order is not None:
+    if config.SORTING_METHOD == 'global' and global_neuron_order is not None:
         # 使用全局排序
         data_ordered = apply_global_neuron_order(data, global_neuron_order)
         sorting_method = "global"
+        current_order = global_neuron_order
+    elif config.SORTING_METHOD == 'first' and first_heatmap_order is not None:
+        # 使用首图排序
+        data_ordered = apply_global_neuron_order(data, first_heatmap_order)
+        sorting_method = "first heatmap"
+        current_order = first_heatmap_order
+    elif config.SORTING_METHOD == 'first' and pair_index == 0:
+        # 第一个热图，创建首图排序
+        data_ordered = sort_neurons_by_local_peak_time(data)
+        sorting_method = "first heatmap"
+        current_order = data_ordered.columns
     else:
         # 使用局部排序
         data_ordered = sort_neurons_by_local_peak_time(data)
         sorting_method = "local"
+        current_order = data_ordered.columns
     
     # 创建图形
     fig, ax = plt.subplots(figsize=(18, 40))
@@ -659,8 +672,8 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
     end_position = len(data_ordered.index) - 1
     
     # 在关键时间点画垂直线
-    ax.axvline(x=start_position, color='white', linestyle='--', linewidth=3, alpha=0.8)
-    ax.axvline(x=end_position, color='white', linestyle='-', linewidth=3, alpha=0.8)
+    ax.axvline(x=start_position, color='black', linestyle='--', linewidth=5, alpha=0.9)
+    ax.axvline(x=end_position, color='black', linestyle='-', linewidth=5, alpha=0.9)
     
     # 添加文本标注
     ax.text(start_position + 1, -3, f'{start_behavior} Start', 
@@ -672,7 +685,12 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
     
     # 设置标题和标签
-    sorting_description = "global peak time" if sorting_method == "global" else "local peak time"
+    if sorting_method == "global":
+        sorting_description = "global peak time"
+    elif sorting_method == "first heatmap":
+        sorting_description = "first heatmap order"
+    else:
+        sorting_description = "local peak time"
     
     if start_behavior == end_behavior:
         title = f'{start_behavior} Behavior Sequence #{pair_index + 1}\n'
@@ -699,14 +717,15 @@ def create_behavior_sequence_heatmap(data: pd.DataFrame,
     ax.set_yticklabels(neuron_labels, rotation=0, fontsize=30, fontweight='bold')
     
     plt.tight_layout()
-    return fig
+    return fig, current_order
 
 def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
                                   start_behavior: str,
                                   end_behavior: str,
                                   pre_behavior_time: float,
                                   config: BehaviorHeatmapConfig,
-                                  global_neuron_order: Optional[pd.Index] = None) -> plt.Figure:
+                                  global_neuron_order: Optional[pd.Index] = None,
+                                  first_heatmap_order: Optional[pd.Index] = None) -> plt.Figure:
     """
     创建所有行为序列的平均热力图
     
@@ -724,6 +743,8 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
         配置对象
     global_neuron_order : Optional[pd.Index]
         全局神经元排序顺序（仅在使用全局排序时需要）
+    first_heatmap_order : Optional[pd.Index]
+        第一个热图的排序顺序（仅在使用首图排序时需要）
         
     Returns
     -------
@@ -734,7 +755,7 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
         raise ValueError("没有有效的行为序列数据")
     
     # 根据配置选择排序方式获取公共神经元
-    if config.USE_GLOBAL_SORTING and global_neuron_order is not None:
+    if config.SORTING_METHOD == 'global' and global_neuron_order is not None:
         # 使用全局排序：找到所有数据的公共神经元，并按照全局顺序排列
         all_available_neurons = set()
         for data in all_sequence_data:
@@ -750,6 +771,22 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
                 common_neurons = [neuron for neuron in common_neurons if neuron in data.columns]
         
         sorting_method = "global"
+    elif config.SORTING_METHOD == 'first' and first_heatmap_order is not None:
+        # 使用首图排序：基于第一个热图的排序顺序
+        all_available_neurons = set()
+        for data in all_sequence_data:
+            all_available_neurons.update(data.columns)
+        
+        # 按照首图顺序筛选出可用的神经元
+        common_neurons = [neuron for neuron in first_heatmap_order if neuron in all_available_neurons]
+        
+        # 确保每个序列数据都包含这些神经元
+        for data in all_sequence_data:
+            missing_neurons = set(common_neurons) - set(data.columns)
+            if missing_neurons:
+                common_neurons = [neuron for neuron in common_neurons if neuron in data.columns]
+        
+        sorting_method = "first heatmap"
     else:
         # 使用局部排序：基于平均数据计算排序
         # 先找到所有数据的公共神经元
@@ -796,6 +833,9 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
     if sorting_method == "global":
         # 全局排序：数据已经按照全局顺序排列，无需再次排序
         average_df_sorted = average_df
+    elif sorting_method == "first heatmap":
+        # 首图排序：数据已经按照首图顺序排列，无需再次排序
+        average_df_sorted = average_df
     else:
         # 局部排序：基于平均数据重新排序
         average_df_sorted = sort_neurons_by_local_peak_time(average_df)
@@ -816,7 +856,7 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
     
     # 在起始行为开始时间点画垂直线
     start_position = len(average_df_sorted) * pre_behavior_time / (pre_behavior_time + 0)  # 在序列中的相对位置
-    ax.axvline(x=start_position, color='white', linestyle='--', linewidth=3)
+    ax.axvline(x=start_position, color='black', linestyle='--', linewidth=5, alpha=0.9)
     
     # 添加文本标注
     ax.text(start_position + 1, -3, f'{start_behavior} Start', 
@@ -824,7 +864,12 @@ def create_average_sequence_heatmap(all_sequence_data: List[pd.DataFrame],
            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
     
     # 设置标题和标签
-    sorting_description = "global peak time" if sorting_method == "global" else "local peak time"
+    if sorting_method == "global":
+        sorting_description = "global peak time"
+    elif sorting_method == "first heatmap":
+        sorting_description = "first heatmap order"
+    else:
+        sorting_description = "local peak time"
     
     if start_behavior == end_behavior:
         title = f'Average {start_behavior} Behavior Sequence\n'
@@ -880,10 +925,8 @@ def main():
         config.SAMPLING_RATE = args.sampling_rate
     
     # 处理排序方式参数
-    if args.use_global_sorting:
-        config.USE_GLOBAL_SORTING = True
-    elif args.use_local_sorting:
-        config.USE_GLOBAL_SORTING = False
+    if args.sorting_method:
+        config.SORTING_METHOD = args.sorting_method
     
     # 行为设定优先级控制
     if init_priority:
@@ -914,10 +957,14 @@ def main():
         
         # 根据配置决定是否计算全局神经元排序顺序
         global_neuron_order = None
-        if config.USE_GLOBAL_SORTING:
+        first_heatmap_order = None
+        
+        if config.SORTING_METHOD == 'global':
             print("正在计算全局神经元排序顺序...")
             global_neuron_order = get_global_neuron_order(data)
             print(f"全局排序完成，共 {len(global_neuron_order)} 个神经元按峰值时间排序")
+        elif config.SORTING_METHOD == 'first':
+            print("使用首图排序模式，将以第一个热图的排序为基准，后续热图使用相同神经元顺序")
         else:
             print("使用局部排序模式，每个热图将根据当前时间窗口内的峰值时间独立排序")
         
@@ -978,19 +1025,14 @@ def main():
             # 标准化数据
             standardized_data = standardize_neural_data(sequence_data)
             
-            # 根据配置选择排序方式
-            if config.USE_GLOBAL_SORTING and global_neuron_order is not None:
-                # 使用全局排序
-                sorted_data = apply_global_neuron_order(standardized_data, global_neuron_order)
-            else:
-                # 使用局部排序（在创建热力图时才排序，这里保持原始数据）
-                sorted_data = standardized_data
+            # 根据配置选择排序方式（在创建热力图时才排序，这里保持原始数据）
+            sorted_data = standardized_data
             
             # 保存用于平均计算
             all_sequence_data.append(sorted_data)
             
             # 创建单个序列的热力图
-            fig = create_behavior_sequence_heatmap(
+            fig, current_order = create_behavior_sequence_heatmap(
                 sorted_data,
                 sequence_start_time,
                 sequence_end_time,
@@ -999,8 +1041,14 @@ def main():
                 config.PRE_BEHAVIOR_TIME,
                 config,
                 i,
-                global_neuron_order
+                global_neuron_order,
+                first_heatmap_order
             )
+            
+            # 如果是首图排序且这是第一个热图，保存排序顺序
+            if config.SORTING_METHOD == 'first' and i == 0:
+                first_heatmap_order = current_order
+                print(f"第一个热图排序顺序已确定，共 {len(current_order)} 个神经元")
             
             # 保存图形
             if config.START_BEHAVIOR == config.END_BEHAVIOR:
@@ -1027,7 +1075,8 @@ def main():
                 config.END_BEHAVIOR,
                 config.PRE_BEHAVIOR_TIME,
                 config,
-                global_neuron_order
+                global_neuron_order,
+                first_heatmap_order
             )
             
             # 保存平均热力图
@@ -1081,22 +1130,28 @@ if __name__ == "__main__":
 3. 命令行使用示例：
    ```bash
    # 分析同一行为（使用全局排序）
-   python heatmap_behavior.py --start-behavior "Crack-seeds-shells" --end-behavior "Crack-seeds-shells" --pre-behavior-time 10 --use-global-sorting
+   python heatmap_behavior.py --start-behavior "Crack-seeds-shells" --end-behavior "Crack-seeds-shells" --pre-behavior-time 10 --sorting-method global
 
    # 分析不同行为序列（使用局部排序）
-   python heatmap_behavior.py --start-behavior "Find-seeds" --end-behavior "Eat-seed-kernels" --pre-behavior-time 15 --use-local-sorting
+   python heatmap_behavior.py --start-behavior "Find-seeds" --end-behavior "Eat-seed-kernels" --pre-behavior-time 15 --sorting-method local
    
-   # 使用默认排序方式（根据配置类中的USE_GLOBAL_SORTING设定）
+   # 分析行为序列（使用首图排序）
+   python heatmap_behavior.py --start-behavior "Groom" --end-behavior "Water" --sorting-method first
+   
+   # 使用默认排序方式（根据配置类中的SORTING_METHOD设定）
    python heatmap_behavior.py --start-behavior "Groom" --end-behavior "Water"
    ```
 
 4. 神经元排序方式控制：
    ```python
-   # 使用全局排序（所有热图使用相同的神经元顺序，便于比较）
-   self.USE_GLOBAL_SORTING = True
+   # 使用全局排序（基于整个数据集，所有热图使用相同的神经元顺序，便于比较）
+   self.SORTING_METHOD = 'global'
    
    # 使用局部排序（每个热图根据当前时间窗口独立排序，突出局部模式）
-   self.USE_GLOBAL_SORTING = False
+   self.SORTING_METHOD = 'local'
+   
+   # 使用首图排序（以第一个热图的排序为基准，后续热图使用相同顺序）
+   self.SORTING_METHOD = 'first'
    ```
 
 5. 功能特点：
@@ -1110,10 +1165,16 @@ if __name__ == "__main__":
 
 5. 可用的行为类型：
 6. 排序方式对比：
-   - **全局排序**：所有热图使用相同的神经元顺序，便于跨行为序列比较，神经元位置固定
-   - **局部排序**：每个热图根据当前时间窗口内的峰值时间独立排序，突出各自的时序模式
+   - **全局排序 (global)**：基于整个数据集计算排序，所有热图使用相同的神经元顺序，便于跨行为序列比较，神经元位置固定
+   - **局部排序 (local)**：每个热图根据当前时间窗口内的峰值时间独立排序，突出各自的时序模式
+   - **首图排序 (first)**：以第一个热图的排序为基准，后续所有热图使用相同的神经元顺序，既保留第一个序列的局部特征，又保持一致性便于比较。这种方式特别适合当第一个行为序列具有代表性，希望以此为参照来观察其他序列的神经元活动模式时使用。
 
-7. 可用的行为类型：
+7. 排序方式选择建议：
+   - 需要严格比较不同序列时 → 使用全局排序
+   - 关注每个序列自身的时序特征时 → 使用局部排序  
+   - 以某个特定序列为参照进行比较时 → 使用首图排序
+
+8. 可用的行为类型：
    - 'Crack-seeds-shells', 'Eat-feed', 'Eat-seed-kernels', 'Explore'
    - 'Explore-search-seeds', 'Find-seeds', 'Get-feed', 'Get-seeds'
    - 'Grab-seeds', 'Groom', 'Smell-feed', 'Smell-Get-seeds'
