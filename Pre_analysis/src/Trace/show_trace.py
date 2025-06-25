@@ -275,15 +275,15 @@ fixed_color_map = {
         # === 新增配色选项 ===
         'Rest': '#8B4513',                  # 深褐色
         'Sleep': '#2F4F4F',                 # 深灰绿色
-        'Social': '#FF1493',                # 深粉色
-        'Climbing': '#32CD32',              # 酸橙绿
-        'Digging': '#8B008B',               # 深洋红色
-        'Running': '#FF4500',               # 橙红色
-        'Swimming': '#1E90FF',              # 道奇蓝
-        'Freezing': '#708090',              # 石板灰
-        'Hiding': '#556B2F',                # 暗橄榄绿
-        'Aggressive': '#DC143C',            # 深红色
-        'Defensive': '#9932CC',             # 深兰花紫
+        'Drink-sweet': '#FF1493',                # 深粉色
+        'Drink-water': '#32CD32',              # 酸橙绿
+        'Eat-seeds': '#8B008B',               # 深洋红色
+        'Expore': '#FF4500',               # 橙红色
+        'Find-seeds': '#1E90FF',              # 道奇蓝
+        'Grooming-Cleaning': '#708090',              # 石板灰
+        'Move-with-seeds': '#556B2F',                # 暗橄榄绿
+        'Stand': '#DC143C',            # 深红色
+        'stop-Drink-water': '#9932CC',             # 深兰花紫
         'Play': '#FFD700',                  # 金色
         'Sniffing': '#20B2AA',              # 浅海绿色
         'Licking': '#FF69B4',               # 热粉色
