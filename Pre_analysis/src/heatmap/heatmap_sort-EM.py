@@ -13,16 +13,18 @@ from scipy import stats
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/29790930糖水铁网糖水trace2.xlsx'
+    INPUT_FILE = '../../datasets/BLA62500627homecagecelltrace.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort-'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = None  # 最小时间戳
-    STAMP_MAX = None  # 最大时间戳
+    STAMP_MIN = 3001  # 最小时间戳
+    STAMP_MAX = 6000  # 最大时间戳
     # 排序方式：'peak'（默认，按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
     CUSTOM_NEURON_ORDER = ['n53', 'n40', 'n29', 'n34', 'n4', 'n32', 'n25', 'n27', 'n22', 'n55', 'n21', 'n5', 'n19']
+    # 采样率 (Hz)
+    SAMPLING_RATE = 4.8  # 采样频率，用于将时间戳转换为秒
     # 钙波检测参数
     CALCIUM_WAVE_THRESHOLD = 1.5  # 钙波阈值（标准差的倍数）
     MIN_PROMINENCE = 1.0  # 最小峰值突出度
@@ -60,30 +62,28 @@ if args.min_prominence is not None:
     Config.MIN_PROMINENCE = args.min_prominence
 
 # 加载数据
-day6_data = pd.read_excel(Config.INPUT_FILE)
+print(f"正在从 {Config.INPUT_FILE} 加载数据...")
+day6_data_full = pd.read_excel(Config.INPUT_FILE)
 
 # 将 'stamp' 列设置为索引
-day6_data = day6_data.set_index('stamp')
-
-# 根据配置的时间戳区间筛选数据
-if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
-    # 确定实际的最小值和最大值
-    min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
-    max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
-    
-    # 筛选数据，保留指定区间内的数据
-    day6_data = day6_data.loc[min_stamp:max_stamp]
+stamp_column = day6_data_full['stamp'].copy()  # 保存原始时间戳
+# 创建秒为单位的时间索引
+seconds_index = stamp_column / Config.SAMPLING_RATE
+day6_data_full = day6_data_full.set_index('stamp')
 
 # 检查是否存在 'behavior' 列
-has_behavior = 'behavior' in day6_data.columns
+has_behavior = 'behavior' in day6_data_full.columns
 
 # 分离 'behavior' 列（如果存在）
 if has_behavior:
-    frame_lost = day6_data['behavior']
-    day6_data = day6_data.drop(columns=['behavior'])
+    behavior_data_full = day6_data_full['behavior']
+    neural_data_full = day6_data_full.drop(columns=['behavior'])
+else:
+    neural_data_full = day6_data_full.copy()
 
-# 数据标准化（Z-score 标准化）
-day6_data_standardized = (day6_data - day6_data.mean()) / day6_data.std()
+# 基于全局数据进行神经元排序（重要：确保不同时间区间的神经元排序一致）
+print("正在基于全局数据计算神经元排序...")
+neural_data_full_standardized = (neural_data_full - neural_data_full.mean()) / neural_data_full.std()
 
 # 函数：按自定义神经元顺序排序
 def sort_neurons_by_custom_order(data_columns, custom_order):
@@ -164,31 +164,31 @@ def detect_first_calcium_wave(neuron_data):
     # 如果没有满足条件的钙波，返回时间序列的最后一个点
     return neuron_data.index[-1]
 
-# 根据排序方式选择相应的排序算法
+# 根据排序方式选择相应的排序算法（基于全局数据）
 if Config.SORT_METHOD == 'peak':
     # 原始方法：按峰值时间排序
-    # 对于每个神经元，找到其信号达到最大值的时间戳
-    peak_times = day6_data_standardized.idxmax()
+    # 对于每个神经元，找到其信号达到最大值的时间戳（基于全局数据）
+    peak_times = neural_data_full_standardized.idxmax()
     
     # 将神经元按照峰值时间从早到晚排序
     sorted_neurons = peak_times.sort_values().index
     
-    sort_method_str = "Sorted by peak time"
+    sort_method_str = "Sorted by peak time (global)"
 elif Config.SORT_METHOD == 'custom':
     # 自定义方法：按指定的神经元顺序排序
-    sorted_neurons = sort_neurons_by_custom_order(day6_data_standardized.columns, Config.CUSTOM_NEURON_ORDER)
+    sorted_neurons = sort_neurons_by_custom_order(neural_data_full_standardized.columns, Config.CUSTOM_NEURON_ORDER)
     
     sort_method_str = "Sorted by custom order"
     print(f"使用自定义神经元排序")
     print(f"指定顺序: {Config.CUSTOM_NEURON_ORDER}")
     print("剩余神经元将按字符串大小顺序排列在指定神经元下方")
 else:  # 'calcium_wave'
-    # 新方法：按第一次真实钙波发生时间排序
+    # 新方法：按第一次真实钙波发生时间排序（基于全局数据）
     first_wave_times = {}
     
     # 对每个神经元进行钙波检测
-    for neuron in day6_data_standardized.columns:
-        neuron_data = day6_data_standardized[neuron]
+    for neuron in neural_data_full_standardized.columns:
+        neuron_data = neural_data_full_standardized[neuron]
         first_wave_times[neuron] = detect_first_calcium_wave(neuron_data)
     
     # 转换为Series以便排序
@@ -197,23 +197,60 @@ else:  # 'calcium_wave'
     # 按第一次钙波时间排序
     sorted_neurons = first_wave_times_series.sort_values().index
     
-    sort_method_str = "Sorted by first calcium wave time"
+    sort_method_str = "Sorted by first calcium wave time (global)"
 
-# 根据排序后的神经元顺序重新排列 DataFrame 的列
-sorted_day6_data = day6_data_standardized[sorted_neurons]
+print(f"神经元排序方式: {sort_method_str}")
+print(f"神经元排序基于全局数据，确保不同时间区间的热图具有一致的纵坐标排序")
+
+# 现在根据配置的时间戳区间筛选数据
+if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
+    # 确定实际的最小值和最大值
+    min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else neural_data_full.index.min()
+    max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else neural_data_full.index.max()
+    
+    # 筛选神经元数据，保留指定区间内的数据
+    neural_data_interval = neural_data_full.loc[min_stamp:max_stamp]
+    
+    # 如果有行为数据，也进行筛选
+    if has_behavior:
+        behavior_data_interval = behavior_data_full.loc[min_stamp:max_stamp]
+        frame_lost = behavior_data_interval
+    
+    print(f"已筛选时间戳区间: {min_stamp} 到 {max_stamp}")
+    # 对应的秒数区间
+    min_seconds = min_stamp / Config.SAMPLING_RATE
+    max_seconds = max_stamp / Config.SAMPLING_RATE
+    print(f"对应的时间区间: {min_seconds:.2f}s 到 {max_seconds:.2f}s")
+else:
+    # 如果没有指定时间区间，使用全部数据
+    neural_data_interval = neural_data_full
+    if has_behavior:
+        frame_lost = behavior_data_full
+
+# 对筛选后的区间数据进行标准化
+neural_data_interval_standardized = (neural_data_interval - neural_data_interval.mean()) / neural_data_interval.std()
+
+# 根据全局排序后的神经元顺序重新排列筛选后数据的列
+sorted_day6_data = neural_data_interval_standardized[sorted_neurons]
 
 # **步骤4：找到所有行为标签的区间**
 
 # 初始化行为区间变量
 behavior_intervals = {}
 unique_behaviors = []
+global_unique_behaviors = []  # 全局行为类型
 
 # 只有当behavior列存在时才处理行为标签
 if has_behavior:
-    # 获取所有不同的行为标签
-    unique_behaviors = frame_lost.dropna().unique()
+    # 获取全局数据中所有不同的行为标签（用于创建一致的图例）
+    global_unique_behaviors = behavior_data_full.dropna().unique()
+    print(f"全局行为类型: {list(global_unique_behaviors)}")
     
-    # 初始化所有行为的区间字典
+    # 获取当前时间区间内的行为标签
+    unique_behaviors = frame_lost.dropna().unique()
+    print(f"当前时间区间内的行为类型: {list(unique_behaviors)}")
+    
+    # 初始化当前时间区间内行为的区间字典
     for behavior in unique_behaviors:
         behavior_intervals[behavior] = []
     
@@ -288,7 +325,7 @@ ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
 ax_legend = fig.add_subplot(grid[1, 1])
 
 # 只有当behavior列存在时才添加行为标记
-if has_behavior and len(unique_behaviors) > 0:
+if has_behavior and len(global_unique_behaviors) > 0:
     # 创建固定的行为颜色映射，确保相同行为始终使用相同颜色
     # 预定义所有可能的行为及其固定颜色，使用更加鲜明和对比度更高的颜色
     fixed_color_map = {
@@ -302,65 +339,64 @@ if has_behavior and len(unique_behaviors) > 0:
         'Get-feed': '#FF00CC',              # 亮粉色
         'Get-seeds': '#000000',             # 黑色
         'Grab-seeds': '#AACC00',            # 亮黄绿色
-        'Groom': '#00CCFF',                 # 亮蓝绿色
+        'Groom': '#00CCFF',                 # 亮蓝绿色 - 原有的整理行为
         'Smell-feed': '#66B3FF',            # 亮蓝色
         'Smell-Get-seeds': '#33FF33',       # 鲜绿色
         'Store-seeds': '#FF6666',           # 亮红色
         'Water': '#CC99FF',                 # 亮紫色
         
-        # === 新增配色选项 ===
-        'Rest': '#8B4513',                  # 深褐色
-        'Sleep': '#2F4F4F',                 # 深灰绿色
-        'Social': '#FF1493',                # 深粉色
-        'Climbing': '#32CD32',              # 酸橙绿
-        'Digging': '#8B008B',               # 深洋红色
-        'Running': '#FF4500',               # 橙红色
-        'Swimming': '#1E90FF',              # 道奇蓝
-        'Freezing': '#708090',              # 石板灰
-        'Hiding': '#556B2F',                # 暗橄榄绿
-        'Aggressive': '#DC143C',            # 深红色
-        'Defensive': '#9932CC',             # 深兰花紫
-        'Play': '#FFD700',                  # 金色
-        'Sniffing': '#20B2AA',              # 浅海绿色
-        'Licking': '#FF69B4',               # 热粉色
-        'Scratching': '#CD853F',            # 秘鲁色
-        'Stretching': '#4169E1',            # 皇家蓝
-        'Turning': '#DA70D6',               # 兰花紫
-        'Jumping': '#FF6347',               # 番茄色
-        'Rearing': '#40E0D0',               # 青绿色
-        'Grooming-self': '#9370DB',         # 中紫色
-        'Grooming-other': '#3CB371',        # 中海绿色
-        'Feeding-young': '#F0E68C',         # 卡其色
-        'Nesting': '#DDA0DD',               # 李子色
-        'Mating': '#FA8072',                # 鲑鱼色
-        'Territory-marking': '#87CEEB',     # 天蓝色
-        'Escape': '#B22222',                # 火砖色
-        'Approach': '#228B22',              # 森林绿
-        'Avoid': '#4B0082',                 # 靛蓝色
-        'Investigate': '#FF8C00',           # 深橙色
-        'Vocalization': '#6A5ACD'           # 石蓝色
+        
+        # === 高架十字迷宫行为标签 ===
+        'Close-arm': '#8B0000',             # 深红色 - 封闭臂
+        'Close-armed-Exp': '#CD5C5C',       # 印度红 - 封闭臂探索
+        'Closed-arm-freezing': '#2F2F2F',  # 深灰色 - 封闭臂僵直
+        'Middle-zone': '#FFD700',           # 金色 - 中央区域
+        'Middle-zone-freezing': '#B8860B',  # 深金黄色 - 中央区域僵直
+        'Open-arm': '#32CD32',              # 酸橙绿 - 开放臂
+        'Open-arm-exp': '#00FF7F',          # 春绿色 - 开放臂探索
+        'open-arm-freezing': '#006400',     # 深绿色 - 开放臂僵直
+        'Open-arm-head dipping': '#7CFC00', # 草绿色 - 开放臂头部探测
+        
+        # === 新增家庭笼行为标签 ===
+        'Active': '#FF4500',                # 橙红色 - 活跃状态
+        'Drink': '#1E90FF',                 # 道奇蓝 - 饮水
+        'Move': '#32CD32',                  # 酸橙绿 - 移动
+        'Scratch': '#CD853F',               # 秘鲁色 - 抓挠
+        'Scratch + Groom': '#DDA0DD',       # 李子色 - 抓挠+整理组合行为
+        'Sleep': '#2F4F4F',                 # 深灰绿色 - 睡眠
+        'Wake': '#FFD700',                  # 金色 - 清醒
+        'zone-out': '#708090'               # 石板灰 - 发呆状态
     }
     
-    # 为当前数据集中的行为创建颜色映射
-    color_map = {}
-    for i, behavior in enumerate(unique_behaviors):
+    # 为全局行为类型创建颜色映射（确保图例一致性）
+    global_color_map = {}
+    for i, behavior in enumerate(global_unique_behaviors):
         if behavior in fixed_color_map:
             # 使用预定义的颜色
-            color_map[behavior] = fixed_color_map[behavior]
+            global_color_map[behavior] = fixed_color_map[behavior]
         else:
             # 对于未预定义的行为，使用更鲜明的调色板
             # 从tab10调色板获取颜色，它提供更高的对比度
-            colors = plt.cm.tab10(np.linspace(0, 1, len(unique_behaviors)))
-            color_map[behavior] = colors[i % 10]
+            colors = plt.cm.tab10(np.linspace(0, 1, len(global_unique_behaviors)))
+            global_color_map[behavior] = colors[i % 10]
     
-    # 创建图例补丁列表
+    # 为当前时间区间内的行为创建颜色映射（用于绘制）
+    color_map = {}
+    for behavior in unique_behaviors:
+        if behavior in global_color_map:
+            color_map[behavior] = global_color_map[behavior]
+    
+    # 创建全局图例补丁列表（基于全局行为类型，确保图例一致性）
     legend_patches = []
+    for behavior in sorted(global_unique_behaviors):  # 按字母顺序排序确保一致性
+        behavior_color = global_color_map[behavior]
+        legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
     
-    # 将所有行为绘制在同一条水平线上
+    # 将所有行为绘制在同一条水平线上（只绘制当前时间区间内存在的行为）
     y_position = 0.5  # 固定的Y轴位置，居中
     line_height = 0.8  # 线条的高度
     
-    # 为每种行为绘制区间，都在同一水平线上
+    # 为当前时间区间内每种行为绘制区间，都在同一水平线上
     for behavior, intervals in behavior_intervals.items():
         behavior_color = color_map[behavior]
         
@@ -389,9 +425,6 @@ if has_behavior and len(unique_behaviors) > 0:
                     # 使用与热图网格线一致的位置，确保对齐
                     ax_heatmap.axvline(x=start_pos - 0.5, color='white', linestyle='--', linewidth=2, alpha=0.5)
                     ax_heatmap.axvline(x=end_pos - 0.5, color='white', linestyle='--', linewidth=2, alpha=0.5)
-        
-        # 添加到图例，同样提高alpha值
-        legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
     
     # 再次确认两个坐标轴的对齐情况
     # 唯一正确的做法是设置完全相同的范围
@@ -464,22 +497,58 @@ ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontsize=23, fontweight
 # 修改X轴标签（时间戳）的字体大小和粗细
 ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=30, fontweight='bold')
 
-# 设置X轴刻度，以10秒为间隔
-# 采样频率为4.8Hz，每个时间戳间隔 = 1/4.8 ≈ 0.208秒
-sampling_rate = 4.8  # Hz
-time_per_frame = 1.0 / sampling_rate  # 每帧的时间间隔（秒）
+# 设置X轴刻度，以10秒为间隔，仿照show_trace.py的方法
+# 使用配置中的采样率
+time_per_frame = 1.0 / Config.SAMPLING_RATE  # 每帧的时间间隔（秒）
 
-numpoints = sorted_day6_data.shape[0]  # 获取数据点的总数
-max_time_seconds = numpoints * time_per_frame  # 总时间长度（秒）
+# 获取当前筛选后数据的时间范围
+if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
+    # 如果指定了时间区间，使用筛选后的范围
+    min_stamp = sorted_day6_data.index.min()
+    max_stamp = sorted_day6_data.index.max()
+    min_seconds = min_stamp / Config.SAMPLING_RATE
+    max_seconds = max_stamp / Config.SAMPLING_RATE
+    # 确保起始时间不小于0
+    min_seconds = max(0, min_seconds)
+else:
+    # 如果没有指定时间范围，从0开始显示
+    min_stamp = sorted_day6_data.index.min()
+    max_stamp = sorted_day6_data.index.max()
+    min_seconds = max(0, min_stamp / Config.SAMPLING_RATE)
+    max_seconds = max_stamp / Config.SAMPLING_RATE
 
 # 生成以10秒为间隔的时间刻度（秒）
-time_ticks_seconds = np.arange(0, max_time_seconds + 10, 10)  # 从0开始，每10秒一个刻度
-# 将秒转换为对应的数据点位置
-xtick_positions = time_ticks_seconds / time_per_frame  # 转换为帧位置
-# 确保刻度位置不超过数据范围
-xtick_positions = xtick_positions[xtick_positions < numpoints]
-# 时间标签直接使用秒数
-xtick_labels = [f'{int(t)}' for t in time_ticks_seconds[:len(xtick_positions)]]
+import matplotlib.ticker as ticker
+# 计算合适的刻度起始点（向下取整到最近的10秒）
+start_tick = int(min_seconds // 10) * 10
+time_ticks_seconds = np.arange(start_tick, max_seconds + 10, 10)
+
+# 将秒转换为对应的数据点位置（相对于筛选后的数据）
+xtick_positions = []
+xtick_labels = []
+
+for t in time_ticks_seconds:
+    # 将秒转换为时间戳
+    timestamp = t * Config.SAMPLING_RATE
+    # 检查这个时间戳是否在筛选后的数据范围内
+    if min_stamp <= timestamp <= max_stamp and timestamp in sorted_day6_data.index:
+        # 获取在筛选后数据中的索引位置
+        pos = sorted_day6_data.index.get_loc(timestamp)
+        xtick_positions.append(pos)
+        xtick_labels.append(f'{int(t)}')
+
+# 如果没有找到合适的刻度位置，使用默认方法
+if len(xtick_positions) == 0:
+    numpoints = sorted_day6_data.shape[0]
+    # 生成均匀分布的刻度
+    num_ticks = min(10, numpoints // 10 + 1)  # 最多10个刻度
+    xtick_positions = np.linspace(0, numpoints - 1, num_ticks, dtype=int)
+    # 计算对应的时间标签
+    xtick_labels = []
+    for pos in xtick_positions:
+        timestamp = sorted_day6_data.index[pos]
+        seconds = timestamp / Config.SAMPLING_RATE
+        xtick_labels.append(f'{int(seconds)}')
 
 # 设置X轴刻度位置和标签
 ax_heatmap.set_xticks(xtick_positions)
@@ -489,13 +558,21 @@ ax_heatmap.set_xticklabels(xtick_labels, fontsize=30, fontweight='bold', rotatio
 # 不使用tight_layout()，因为它与GridSpec布局不兼容
 # 而是使用之前设置的subplots_adjust()已经足够调整布局
 
-# 构建输出文件名，包含排序方式和时间区间信息（如果有）
-output_filename = f"{Config.OUTPUT_PREFIX}29790930tangsuitiewangtrace2_{Config.SORT_METHOD}"
+# 从输入文件路径中提取文件名（不包括路径和扩展名），仿照show_trace.py的方法
+import os
+input_filename = os.path.basename(Config.INPUT_FILE)
+input_filename = os.path.splitext(input_filename)[0]  # 去除扩展名
+
+# 构建输出文件名：目录 + 前缀 + 排序方式 + 输入文件名 + 时间戳信息
+stamp_info = ''
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
-    min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
-    max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
-    output_filename += f"_time_{min_stamp:.2f}_to_{max_stamp:.2f}"
-output_filename += ".png"
+    min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else sorted_day6_data.index.min()
+    max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else sorted_day6_data.index.max()
+    min_seconds = min_stamp / Config.SAMPLING_RATE
+    max_seconds = max_stamp / Config.SAMPLING_RATE
+    stamp_info = f'_{min_seconds:.2f}s_{max_seconds:.2f}s'
+
+output_filename = f"{Config.OUTPUT_PREFIX}{input_filename}_{Config.SORT_METHOD}{stamp_info}.png"
 
 # 在保存前使用多重方法确保对齐
 
@@ -521,8 +598,10 @@ new_behavior_pos = Bbox([[heatmap_bbox.x0, behavior_bbox.y0],
 ax_behavior.set_position(new_behavior_pos)
 
 # 4. 保存图像
+print(f"正在保存图像到 {output_filename}")
 fig.savefig(output_filename, bbox_inches='tight', pad_inches=0.1, dpi=100)
 plt.close()
 
 # 输出保存信息
 print(f"热图已保存至: {output_filename}")
+print("程序执行完成")

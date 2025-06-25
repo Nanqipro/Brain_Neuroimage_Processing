@@ -13,7 +13,7 @@ plt.rcParams['lines.linewidth'] = 2.0  # 设置默认线宽
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/2980tangsuicelltrace.xlsx'
+    INPUT_FILE = '../../datasets/EMtrace01.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
@@ -275,15 +275,15 @@ fixed_color_map = {
         # === 新增配色选项 ===
         'Rest': '#8B4513',                  # 深褐色
         'Sleep': '#2F4F4F',                 # 深灰绿色
-        'Drink-sweet': '#FF1493',                # 深粉色
-        'Drink-water': '#32CD32',              # 酸橙绿
-        'Eat-seeds': '#8B008B',               # 深洋红色
-        'Expore': '#FF4500',               # 橙红色
-        'Find-seeds': '#1E90FF',              # 道奇蓝
-        'Grooming-Cleaning': '#708090',              # 石板灰
-        'Move-with-seeds': '#556B2F',                # 暗橄榄绿
-        'Stand': '#DC143C',            # 深红色
-        'stop-Drink-water': '#9932CC',             # 深兰花紫
+        'Social': '#FF1493',                # 深粉色
+        'Climbing': '#32CD32',              # 酸橙绿
+        'Digging': '#8B008B',               # 深洋红色
+        'Running': '#FF4500',               # 橙红色
+        'Swimming': '#1E90FF',              # 道奇蓝
+        'Freezing': '#708090',              # 石板灰
+        'Hiding': '#556B2F',                # 暗橄榄绿
+        'Aggressive': '#DC143C',            # 深红色
+        'Defensive': '#9932CC',             # 深兰花紫
         'Play': '#FFD700',                  # 金色
         'Sniffing': '#20B2AA',              # 浅海绿色
         'Licking': '#FF69B4',               # 热粉色
@@ -302,8 +302,19 @@ fixed_color_map = {
         'Approach': '#228B22',              # 森林绿
         'Avoid': '#4B0082',                 # 靛蓝色
         'Investigate': '#FF8C00',           # 深橙色
-        'Vocalization': '#6A5ACD'           # 石蓝色
-}
+        'Vocalization': '#6A5ACD',          # 石蓝色
+        
+        # === 高架十字迷宫行为标签 ===
+        'Close-arm': '#8B0000',             # 深红色 - 封闭臂
+        'Close-armed-Exp': '#CD5C5C',       # 印度红 - 封闭臂探索
+        'Closed-arm-freezing': '#2F2F2F',  # 深灰色 - 封闭臂僵直
+        'Middle-zone': '#FFD700',           # 金色 - 中央区域
+        'Middle-zone-freezing': '#B8860B',  # 深金黄色 - 中央区域僵直
+        'Open-arm': '#32CD32',              # 酸橙绿 - 开放臂
+        'Open-arm-exp': '#00FF7F',          # 春绿色 - 开放臂探索
+        'open-arm-freezing': '#006400',     # 深绿色 - 开放臂僵直
+        'Open-arm-head dipping': '#7CFC00'  # 草绿色 - 开放臂头部探测
+    }
 
 # 绘制Trace图
 for i, column in enumerate(sorted_neurons):
