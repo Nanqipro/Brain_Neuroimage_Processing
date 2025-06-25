@@ -20,7 +20,7 @@ class Config:
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
     # 排序方式：'peak'（默认，按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
-    SORT_METHOD = 'custom'
+    SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
     CUSTOM_NEURON_ORDER = ['n53', 'n40', 'n29', 'n34', 'n4', 'n32', 'n25', 'n27', 'n22', 'n55', 'n21', 'n5', 'n19']
     # 钙波检测参数
@@ -257,38 +257,42 @@ if has_behavior:
 vmin, vmax = -2, 2  # 控制颜色对比度
 
 # 创建图形和轴，使用更高的高度比例和精确调整来确保对齐
-fig = plt.figure(figsize=(60, 15))
+fig = plt.figure(figsize=(60, 25))
 
 # 使用更精确的GridSpec布局系统
-# 通过更大的底部空间留出足够的标签空间
+# 修改为2行2列布局：左侧为行为线条和热图，右侧为图例
 from matplotlib.gridspec import GridSpec
-grid = GridSpec(2, 1, height_ratios=[1, 5], hspace=0.0, figure=fig)
+grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
 
-# 先创建热图子图
-ax_heatmap = fig.add_subplot(grid[1])
+# 先创建热图子图（左下角）
+ax_heatmap = fig.add_subplot(grid[1, 0])
 
 # 为了确保对齐，我们首先定义X轴范围
 # 创建一个X轴数据点数组，这个数组将用于两个图表
 data_x_points = np.arange(len(sorted_day6_data.index))
 
 # 绘制热图
-heatmap = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=True, vmin=vmin, vmax=vmax, ax=ax_heatmap)
+heatmap = sns.heatmap(sorted_day6_data.T, cmap='viridis', cbar=False, vmin=vmin, vmax=vmax, ax=ax_heatmap)
 
 # 置空刻度位置，稍后设置
 # 设置热图的x轴范围为精确数据点范围
 ax_heatmap.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
 
-# 创建行为标记子图作为单独的子图
-ax_behavior = fig.add_subplot(grid[0])
+# 创建行为标记子图（左上角）
+ax_behavior = fig.add_subplot(grid[0, 0])
 
 # 手动设置行为子图的X轴范围与热图完全相匹配
 ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
+
+# 创建图例子图（右下角，与热图对齐）
+ax_legend = fig.add_subplot(grid[1, 1])
 
 # 只有当behavior列存在时才添加行为标记
 if has_behavior and len(unique_behaviors) > 0:
     # 创建固定的行为颜色映射，确保相同行为始终使用相同颜色
     # 预定义所有可能的行为及其固定颜色，使用更加鲜明和对比度更高的颜色
     fixed_color_map = {
+        # === 原有配色（保持不变）===
         'Crack-seeds-shells': '#FF9500',    # 明亮橙色
         'Eat-feed': '#0066CC',              # 深蓝色
         'Eat-seed-kernels': '#00CC00',      # 亮绿色
@@ -302,7 +306,39 @@ if has_behavior and len(unique_behaviors) > 0:
         'Smell-feed': '#66B3FF',            # 亮蓝色
         'Smell-Get-seeds': '#33FF33',       # 鲜绿色
         'Store-seeds': '#FF6666',           # 亮红色
-        'Water': '#CC99FF'                  # 亮紫色
+        'Water': '#CC99FF',                 # 亮紫色
+        
+        # === 新增配色选项 ===
+        'Rest': '#8B4513',                  # 深褐色
+        'Sleep': '#2F4F4F',                 # 深灰绿色
+        'Social': '#FF1493',                # 深粉色
+        'Climbing': '#32CD32',              # 酸橙绿
+        'Digging': '#8B008B',               # 深洋红色
+        'Running': '#FF4500',               # 橙红色
+        'Swimming': '#1E90FF',              # 道奇蓝
+        'Freezing': '#708090',              # 石板灰
+        'Hiding': '#556B2F',                # 暗橄榄绿
+        'Aggressive': '#DC143C',            # 深红色
+        'Defensive': '#9932CC',             # 深兰花紫
+        'Play': '#FFD700',                  # 金色
+        'Sniffing': '#20B2AA',              # 浅海绿色
+        'Licking': '#FF69B4',               # 热粉色
+        'Scratching': '#CD853F',            # 秘鲁色
+        'Stretching': '#4169E1',            # 皇家蓝
+        'Turning': '#DA70D6',               # 兰花紫
+        'Jumping': '#FF6347',               # 番茄色
+        'Rearing': '#40E0D0',               # 青绿色
+        'Grooming-self': '#9370DB',         # 中紫色
+        'Grooming-other': '#3CB371',        # 中海绿色
+        'Feeding-young': '#F0E68C',         # 卡其色
+        'Nesting': '#DDA0DD',               # 李子色
+        'Mating': '#FA8072',                # 鲑鱼色
+        'Territory-marking': '#87CEEB',     # 天蓝色
+        'Escape': '#B22222',                # 火砖色
+        'Approach': '#228B22',              # 森林绿
+        'Avoid': '#4B0082',                 # 靛蓝色
+        'Investigate': '#FF8C00',           # 深橙色
+        'Vocalization': '#6A5ACD'           # 石蓝色
     }
     
     # 为当前数据集中的行为创建颜色映射
@@ -320,14 +356,11 @@ if has_behavior and len(unique_behaviors) > 0:
     # 创建图例补丁列表
     legend_patches = []
     
-    # 为每种行为绘制区间
-    y_positions = {}
-    max_position = len(unique_behaviors)
-    # 为每种行为分配Y轴位置
-    for i, behavior in enumerate(unique_behaviors):
-        y_positions[behavior] = max_position - i
+    # 将所有行为绘制在同一条水平线上
+    y_position = 0.5  # 固定的Y轴位置，居中
+    line_height = 0.8  # 线条的高度
     
-    # 为每种行为绘制区间
+    # 为每种行为绘制区间，都在同一水平线上
     for behavior, intervals in behavior_intervals.items():
         behavior_color = color_map[behavior]
         
@@ -346,17 +379,17 @@ if has_behavior and len(unique_behaviors) > 0:
                 if end_pos - start_pos > 0:  
                     # 在行为标记子图中绘制区间，使用精确的数据点对齐方式
                     # 提高alpha值从0.7到0.9，使颜色更加明显
-                    rect = plt.Rectangle((start_pos - 0.5, y_positions[behavior] - 0.4), 
-                                        end_pos - start_pos, 0.8, 
+                    rect = plt.Rectangle((start_pos - 0.5, y_position - line_height/2), 
+                                        end_pos - start_pos, line_height, 
                                         color=behavior_color, alpha=0.9, 
-                                        ec='black')  # 添加黑色边框以增强可见度
+                                        ec='black', linewidth=0.5)  # 添加黑色边框以增强可见度
                     ax_behavior.add_patch(rect)
                     
                     # 在热图中添加区间边界垂直线
                     # 使用与热图网格线一致的位置，确保对齐
                     ax_heatmap.axvline(x=start_pos - 0.5, color='white', linestyle='--', linewidth=2, alpha=0.5)
                     ax_heatmap.axvline(x=end_pos - 0.5, color='white', linestyle='--', linewidth=2, alpha=0.5)
-            
+        
         # 添加到图例，同样提高alpha值
         legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
     
@@ -365,15 +398,16 @@ if has_behavior and len(unique_behaviors) > 0:
     ax_heatmap.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
     ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
     
-    # 设置Y轴范围和刻度位置
-    ax_behavior.set_ylim(0, max_position + 1)
-    # 先设置刻度位置，再设置刻度标签，避免警告
-    ax_behavior.set_yticks([y_positions[b] for b in unique_behaviors])
-    ax_behavior.set_yticklabels(unique_behaviors, fontsize=12, fontweight='bold')
+    # 设置行为子图的Y轴范围，只显示一条线
+    ax_behavior.set_ylim(0, 1)
+    
+    # 移除Y轴刻度和标签
+    ax_behavior.set_yticks([])
+    ax_behavior.set_yticklabels([])
     
     # 特别重要：移除X轴刻度，让它只在热图上显示
     ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-    ax_behavior.set_title('Behavior Intervals', fontsize=16, pad=10)
+    ax_behavior.set_title('Behavior Timeline', fontsize=40, pad=10)
     ax_behavior.set_xlabel('')  # Remove x-axis label, shared with the heatmap below
 
     # 更强制地隐藏X轴刻度和标签
@@ -386,9 +420,33 @@ if has_behavior and len(unique_behaviors) > 0:
     ax_behavior.spines['bottom'].set_visible(False)
     ax_behavior.spines['left'].set_visible(False)
     
-    # 添加图例
-    legend = ax_behavior.legend(handles=legend_patches, loc='upper right', fontsize=12, 
-                           title='Behavior Types', title_fontsize=14, bbox_to_anchor=(1.0, 1.3))
+    # 在单独的图例子图中添加图例（右侧）
+    ax_legend.axis('off')  # 隐藏图例子图的坐标轴
+    
+    # 计算图例的行数，垂直排列所有行为类型
+    num_behaviors = len(legend_patches)
+    
+    # 计算合适的字体大小，使图例高度与热图一致
+    # 根据行为数量动态调整字体大小
+    # if num_behaviors <= 5:
+    #     legend_fontsize = 20
+    #     title_fontsize = 22
+    # elif num_behaviors <= 8:
+    #     legend_fontsize = 16
+    #     title_fontsize = 18
+    # elif num_behaviors <= 12:
+    #     legend_fontsize = 14
+    #     title_fontsize = 16
+    # else:
+    #     legend_fontsize = 12
+    #     title_fontsize = 14
+
+    legend_fontsize = 40  # 设置您想要的字体大小
+    title_fontsize = 40   # 设置标题字体大小
+    
+    legend = ax_legend.legend(handles=legend_patches, loc='center left', fontsize=legend_fontsize, 
+                           title='Behavior Types', title_fontsize=title_fontsize, ncol=1,
+                           frameon=True, fancybox=True, shadow=True, bbox_to_anchor=(0, 0.5))
 
 # 在第426帧处添加白色虚线
 # 检查数据中是否有足够的时间戳
@@ -396,32 +454,36 @@ if len(sorted_day6_data.index) > 426:
     # 绘制垂直线，白色虚线
     ax_heatmap.axvline(x=426 - 0.5, color='white', linestyle='--', linewidth=4)
 
-# 生成标题，如果设置了时间区间，则在标题中显示区间信息
-title_text = f'29790930tangsuitiewangtrace2-heatmap ({sort_method_str})'
-if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
-    min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else day6_data.index.min()
-    max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else day6_data.index.max()
-    title_text += f' (Time: {min_stamp:.2f} to {max_stamp:.2f})'
-
-# 为热图添加标题和标签
-ax_heatmap.set_title(title_text, fontsize=25)
-ax_heatmap.set_xlabel('stamp', fontsize=25)
-ax_heatmap.set_ylabel('neuron', fontsize=25)
+# 移除热图标题，直接设置轴标签
+ax_heatmap.set_xlabel('Time (s)', fontsize=40)      # 增大X轴标签字体
+ax_heatmap.set_ylabel('neuron', fontsize=40)        # 增大Y轴标签字体
 
 # 修改Y轴标签（神经元标签）的字体大小和粗细，设置为水平方向
-ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontsize=14, fontweight='bold', rotation=0)
+ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), fontsize=23, fontweight='bold', rotation=0)
 
 # 修改X轴标签（时间戳）的字体大小和粗细
-ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=14, fontweight='bold')
+ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), fontsize=30, fontweight='bold')
 
-# 设置X轴刻度，从0开始，以100为间隔（参考heatmap_sort.py的横坐标处理方法）
+# 设置X轴刻度，以10秒为间隔
+# 采样频率为4.8Hz，每个时间戳间隔 = 1/4.8 ≈ 0.208秒
+sampling_rate = 4.8  # Hz
+time_per_frame = 1.0 / sampling_rate  # 每帧的时间间隔（秒）
+
 numpoints = sorted_day6_data.shape[0]  # 获取数据点的总数
-xtick_positions = np.arange(0, numpoints, 100)  # 生成从0开始，间隔为100的刻度位置
-xtick_labels = xtick_positions  # 刻度标签就是位置值
+max_time_seconds = numpoints * time_per_frame  # 总时间长度（秒）
+
+# 生成以10秒为间隔的时间刻度（秒）
+time_ticks_seconds = np.arange(0, max_time_seconds + 10, 10)  # 从0开始，每10秒一个刻度
+# 将秒转换为对应的数据点位置
+xtick_positions = time_ticks_seconds / time_per_frame  # 转换为帧位置
+# 确保刻度位置不超过数据范围
+xtick_positions = xtick_positions[xtick_positions < numpoints]
+# 时间标签直接使用秒数
+xtick_labels = [f'{int(t)}' for t in time_ticks_seconds[:len(xtick_positions)]]
 
 # 设置X轴刻度位置和标签
 ax_heatmap.set_xticks(xtick_positions)
-ax_heatmap.set_xticklabels(xtick_labels, fontsize=14, fontweight='bold', rotation=45)
+ax_heatmap.set_xticklabels(xtick_labels, fontsize=30, fontweight='bold', rotation=45)
 
 # 应用紧凑布局
 # 不使用tight_layout()，因为它与GridSpec布局不兼容
