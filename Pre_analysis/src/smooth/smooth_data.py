@@ -248,9 +248,9 @@ def visualize_traces(
 def main():
     """主函数入口"""
     # 配置参数No.29790930NORhabitituteCellVedio22024-12-04202145trace
-    input_file = '../../datasets/No.297920240925homecagefamilarmice.xlsx'
-    output_file = '../../datasets/processed_297920240925homecagefamilarmice.xlsx'
-    output_graph = '../../graph/smooth_traces_amplitude_297920240925homecagefamilarmice.png'
+    input_file = '../../datasets/EMtrace01.xlsx'
+    output_file = '../../datasets/processed_EMtrace01.xlsx'
+    output_graph = '../../graph/smooth_traces_amplitude_EMtrace01.png'
     
     params = {
         'moving_avg_window': 3,
