@@ -1218,6 +1218,157 @@ def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='be
     
     return freq_df
 
+def analyze_behavior_total_calcium_frequency(data_df, neuron_columns, behavior_col='behavior', fs=1.0, 
+                                           save_path=None, filter_strength=1.0, adaptive_params=True):
+    """
+    按行为标签统计所有神经元的钙波总次数，忽略神经元个体差异
+    
+    参数
+    ----------
+    data_df : pandas.DataFrame
+        包含神经元数据和行为标签的DataFrame
+    neuron_columns : list of str
+        要处理的神经元列名列表
+    behavior_col : str, 可选
+        行为标签列名，默认为'behavior'
+    fs : float, 可选
+        采样频率，默认为1.0Hz
+    save_path : str, 可选
+        CSV文件保存路径，默认为None（不保存）
+    filter_strength : float, 可选
+        过滤强度系数(0.5-2.0)，控制检测灵敏度
+    adaptive_params : bool, 可选
+        是否为每个神经元使用自适应参数，默认为True
+        
+    返回
+    -------
+    behavior_freq_df : pandas.DataFrame
+        包含每种行为下钙波总次数和频率的DataFrame
+    """
+    # 确保数据中包含行为标签列
+    if behavior_col not in data_df.columns:
+        print(f"错误: 数据中不包含行为标签列 '{behavior_col}'")
+        return pd.DataFrame()
+    
+    # 获取所有行为类型
+    behaviors = data_df[behavior_col].unique()
+    print(f"数据中包含 {len(behaviors)} 种行为标签: {behaviors}")
+    
+    # 准备结果容器
+    behavior_frequency_data = []
+    
+    # 计算总体频次（所有神经元，整个时间序列）
+    print("计算总体钙波频次...")
+    total_calcium_events = 0
+    total_time = len(data_df) / fs  # 总时间（秒）
+    
+    for neuron in neuron_columns:
+        neuron_data = data_df[neuron].values
+        
+        # 如果启用自适应参数，为每个神经元生成自定义参数
+        custom_params = None
+        if adaptive_params:
+            custom_params = estimate_neuron_params(neuron_data, filter_strength)
+        
+        # 检测该神经元的钙爆发
+        neuron_transients, _ = detect_calcium_transients(neuron_data, fs=fs, 
+                                                       params=custom_params, 
+                                                       filter_strength=filter_strength)
+        total_calcium_events += len(neuron_transients)
+    
+    total_freq = total_calcium_events / total_time if total_time > 0 else 0
+    
+    # 记录总体频次
+    total_result = {
+        'behavior': 'ALL',
+        'total_calcium_events': total_calcium_events,
+        'duration_seconds': total_time,
+        'frequency_hz': total_freq,
+        'neuron_count': len(neuron_columns),
+        'avg_frequency_per_neuron': total_freq / len(neuron_columns) if len(neuron_columns) > 0 else 0
+    }
+    behavior_frequency_data.append(total_result)
+    
+    print(f"总体统计: {total_calcium_events} 个钙波事件，频率 {total_freq:.4f} Hz")
+    
+    # 遍历每种行为标签
+    for behavior in behaviors:
+        print(f"处理行为 '{behavior}' 的钙波频次...")
+        
+        # 获取该行为标签的索引
+        behavior_indices = data_df[data_df[behavior_col] == behavior].index
+        
+        if len(behavior_indices) == 0:
+            print(f"  警告: 行为 '{behavior}' 没有对应的数据点")
+            continue
+            
+        behavior_time = len(behavior_indices) / fs  # 行为持续时间（秒）
+        behavior_calcium_events = 0
+        
+        # 检查行为数据长度是否足够进行分析
+        if len(behavior_indices) < 10:  # 至少需要10个点才能进行有效分析
+            print(f"  警告: 行为 '{behavior}' 的数据点({len(behavior_indices)})太少，无法进行有效分析")
+            # 记录没有检测到钙波的结果
+            behavior_result = {
+                'behavior': behavior,
+                'total_calcium_events': 0,
+                'duration_seconds': behavior_time,
+                'frequency_hz': 0,
+                'neuron_count': len(neuron_columns),
+                'avg_frequency_per_neuron': 0
+            }
+            behavior_frequency_data.append(behavior_result)
+            continue
+        
+        # 统计该行为下所有神经元的钙波事件
+        for neuron in neuron_columns:
+            # 提取该行为下神经元数据
+            behavior_data = data_df.loc[behavior_indices, neuron].values
+            
+            # 如果启用自适应参数，为每个神经元生成自定义参数
+            custom_params = None
+            if adaptive_params:
+                custom_params = estimate_neuron_params(behavior_data, filter_strength)
+            
+            # 检测该行为下的钙爆发
+            try:
+                behavior_transients, _ = detect_calcium_transients(behavior_data, fs=fs, 
+                                                                 params=custom_params,
+                                                                 filter_strength=filter_strength)
+                behavior_calcium_events += len(behavior_transients)
+            except Exception as e:
+                print(f"  错误: 无法分析神经元 {neuron} 在行为 '{behavior}' 下的钙波: {str(e)}")
+                continue
+        
+        # 计算该行为的频率
+        behavior_freq = behavior_calcium_events / behavior_time if behavior_time > 0 else 0
+        avg_freq_per_neuron = behavior_freq / len(neuron_columns) if len(neuron_columns) > 0 else 0
+        
+        # 记录该行为下的频次
+        behavior_result = {
+            'behavior': behavior,
+            'total_calcium_events': behavior_calcium_events,
+            'duration_seconds': behavior_time,
+            'frequency_hz': behavior_freq,
+            'neuron_count': len(neuron_columns),
+            'avg_frequency_per_neuron': avg_freq_per_neuron
+        }
+        behavior_frequency_data.append(behavior_result)
+        
+        print(f"  行为 '{behavior}': {behavior_calcium_events} 个钙波事件，频率 {behavior_freq:.4f} Hz，平均每神经元 {avg_freq_per_neuron:.4f} Hz")
+    
+    # 创建DataFrame
+    behavior_freq_df = pd.DataFrame(behavior_frequency_data)
+    
+    # 如果指定了保存路径，则保存到CSV
+    if save_path:
+        # 确保保存目录存在
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        behavior_freq_df.to_csv(save_path, index=False)
+        print(f"成功将行为钙波频次数据保存到: {save_path}")
+    
+    return behavior_freq_df
+
 if __name__ == "__main__":
     """
     从Excel文件加载神经元数据并进行特征提取的示例
@@ -1225,7 +1376,7 @@ if __name__ == "__main__":
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
-    parser.add_argument('--data', type=str, default='../datasets/processed_Day6EMtrace.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/processed_EMtrace01.xlsx',
                         help='数据文件路径，支持.xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
@@ -1289,12 +1440,22 @@ if __name__ == "__main__":
             # 如果指定了行为标签列，则进行行为相关分析
             if args.behavior_col and args.behavior_col in df.columns:
                 print(f"\n执行行为相关分析，使用行为标签列: {args.behavior_col}")
+                
+                # 1. 原始的按神经元分别计算的频率分析
                 behavior_freq_path = f"{output_dir}/behavior_calcium_frequency.csv"
                 freq_df = analyze_behavior_calcium_frequency(
                     df, neuron_columns, behavior_col=args.behavior_col, fs=1.0,
                     save_path=behavior_freq_path, filter_strength=args.filter_strength
                 )
-                print(f"成功生成行为钙波频次分析结果")
+                print(f"成功生成按神经元的行为钙波频次分析结果")
+                
+                # 2. 新的按行为统计总钙波次数的分析
+                behavior_total_freq_path = f"{output_dir}/behavior_total_calcium_frequency.csv"
+                total_freq_df = analyze_behavior_total_calcium_frequency(
+                    df, neuron_columns, behavior_col=args.behavior_col, fs=1.0,
+                    save_path=behavior_total_freq_path, filter_strength=args.filter_strength
+                )
+                print(f"成功生成按行为统计的总钙波频次分析结果")
             else:
                 if args.behavior_col:
                     print(f"\n警告: 指定的行为标签列 '{args.behavior_col}' 不存在于数据中，跳过行为相关分析")
