@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy import signal
-from scipy.signal import find_peaks, peak_widths, savgol_filter
+from scipy.signal import find_peaks, peak_widths, savgol_filter, butter, filtfilt
 from numpy import trapezoid
 import matplotlib.pyplot as plt
 import os
@@ -10,6 +10,8 @@ import glob
 import logging
 import datetime
 import sys
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+from typing import Union, Literal
 
 # 初始化日志记录器
 def setup_logger(output_dir=None, prefix="element_extraction-integrate", capture_all_output=True):
@@ -87,22 +89,206 @@ def setup_logger(output_dir=None, prefix="element_extraction-integrate", capture
     logger.info(f"日志文件创建于: {log_file}")
     return logger
 
-def detect_calcium_transients(data, fs=0.7, min_snr=3.5, min_duration=12, smooth_window=31, 
+def moving_average_smooth(data: Union[pd.Series, np.ndarray], window_size: int = 3) -> np.ndarray:
+    """
+    应用移动平均滤波平滑数据（与smooth_data.py保持一致）
+    
+    参数
+    ------
+    data : array-like
+        输入的时间序列数据
+    window_size : int, 可选
+        滑动窗口大小，必须为奇数，默认为3
+        
+    返回
+    ------
+    np.ndarray
+        平滑后的数据
+    """
+    if window_size % 2 == 0:
+        logging.warning("窗口大小应为奇数，已自动加1")
+        window_size += 1
+    # 使用与 smooth_data.py 相同的实现，但返回 numpy 数组
+    smoothed_series = pd.Series(data).rolling(window=window_size, center=True).mean().bfill().ffill()
+    return smoothed_series.values
+
+def butterworth_filter(
+    data: np.ndarray,
+    cutoff_freq: float = 20,
+    fs: float = 4.8,
+    order: int = 2,
+    strength: float = 0.05
+) -> np.ndarray:
+    """
+    应用Butterworth低通滤波器去除高频噪声（与smooth_data.py保持一致）
+    
+    参数
+    ------
+    data : np.ndarray
+        输入信号数据
+    cutoff_freq : float, 可选
+        截止频率，值越小滤波效果越强，默认为20
+    fs : float, 可选
+        采样频率，默认为4.8Hz（钙离子浓度数据的实际采样频率）
+    order : int, 可选
+        滤波器阶数，阶数越高滤波效果越陡峭，默认为2
+    strength : float, 可选
+        滤波强度系数，范围0-1，值越大滤波效果越强，默认为0.05
+        
+    返回
+    ------
+    np.ndarray
+        滤波后的数据
+    """
+    nyquist = fs * 0.5
+    normal_cutoff = (cutoff_freq * strength) / nyquist
+    if normal_cutoff >= 1.0:
+        normal_cutoff = 0.99  # 防止截止频率超过奈奎斯特频率
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return filtfilt(b, a, data)
+
+def normalize_neural_data(
+    data: np.ndarray,
+    method: Literal['standard', 'minmax', 'robust', 'log_standard', 'log_minmax'] = 'standard',
+    feature_range: tuple = (0, 1)
+) -> np.ndarray:
+    """
+    对神经元数据进行归一化处理
+    
+    参数
+    ------
+    data : np.ndarray
+        输入的神经元数据
+    method : str, 可选
+        归一化方法，可选：
+        'standard' - 标准化(Z-score)
+        'minmax' - 最小最大值归一化
+        'robust' - 稳健归一化（基于分位数）
+        'log_standard' - 对数变换后的标准化
+        'log_minmax' - 对数变换后的最小最大值归一化
+        默认为'standard'
+    feature_range : tuple, 可选
+        用于minmax归一化的目标范围，默认为(0, 1)
+        
+    返回
+    ------
+    np.ndarray
+        归一化后的数据
+    """
+    data_2d = data.reshape(-1, 1)  # 转换为2D数组以适配scikit-learn
+    
+    # 对数变换预处理
+    if method.startswith('log_'):
+        # 将数据平移到正数区间
+        min_val = data_2d.min()
+        shift = abs(min_val) + 1 if min_val <= 0 else 0
+        data_2d = data_2d + shift
+        # 应用对数变换
+        data_2d = np.log1p(data_2d)
+    
+    # 选择归一化方法
+    if method in ['standard', 'log_standard']:
+        scaler = StandardScaler()
+    elif method in ['minmax', 'log_minmax']:
+        scaler = MinMaxScaler(feature_range=feature_range)
+    elif method == 'robust':
+        scaler = RobustScaler(quantile_range=(25, 75))
+    else:
+        raise ValueError(f"未知的归一化方法: {method}")
+    
+    # 应用归一化
+    normalized_data = scaler.fit_transform(data_2d)
+    return normalized_data.flatten()
+
+def preprocess_neural_signal(
+    data: np.ndarray,
+    apply_moving_average: bool = True,
+    moving_avg_window: int = 3,
+    apply_butterworth: bool = True,
+    butterworth_cutoff: float = 20,
+    butterworth_strength: float = 0.05,
+    apply_normalization: bool = False,
+    normalization_method: str = 'standard',
+    fs: float = 4.8
+) -> np.ndarray:
+    """
+    对神经元信号进行预处理，包括平滑化和归一化（与smooth_data.py保持一致的参数）
+    
+    参数
+    ------
+    data : np.ndarray
+        输入的神经元信号数据
+    apply_moving_average : bool, 可选
+        是否应用移动平均滤波，默认为True
+    moving_avg_window : int, 可选
+        移动平均窗口大小，默认为3
+    apply_butterworth : bool, 可选
+        是否应用Butterworth滤波，默认为True
+    butterworth_cutoff : float, 可选
+        Butterworth滤波器截止频率，默认为20
+    butterworth_strength : float, 可选
+        Butterworth滤波强度，默认为0.05
+    apply_normalization : bool, 可选
+        是否应用归一化，默认为False
+    normalization_method : str, 可选
+        归一化方法，默认为'standard'
+    fs : float, 可选
+        采样频率，默认为4.8Hz（钙离子浓度数据的实际采样频率）
+        
+    返回
+    ------
+    np.ndarray
+        预处理后的数据
+    """
+    processed_data = data.copy()
+    
+    # 步骤1：移动平均滤波
+    if apply_moving_average:
+        processed_data = moving_average_smooth(processed_data, window_size=moving_avg_window)
+    
+    # 步骤2：Butterworth滤波
+    if apply_butterworth:
+        processed_data = butterworth_filter(
+            processed_data, 
+            cutoff_freq=butterworth_cutoff,
+            fs=fs,
+            strength=butterworth_strength
+        )
+    
+    # 步骤3：数据归一化
+    if apply_normalization:
+        processed_data = normalize_neural_data(
+            processed_data, 
+            method=normalization_method
+        )
+    
+    return processed_data
+
+def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smooth_window=31, 
                              peak_distance=5, baseline_percentile=8, max_duration=800,
                              detect_subpeaks=False, subpeak_prominence=0.15, 
                              subpeak_width=5, subpeak_distance=8, params=None, 
                              min_morphology_score=0.20, min_exp_decay_score=0.12,
-                             filter_strength=1.0):
+                             filter_strength=1.0,
+                             # 新增的预处理参数（与smooth_data.py保持一致）
+                             apply_preprocessing=True,
+                             apply_moving_average=True,
+                             moving_avg_window=3,
+                             apply_butterworth=True,
+                             butterworth_cutoff=20,
+                             butterworth_strength=0.05,
+                             apply_normalization=False,
+                             normalization_method='standard'):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
     
     参数:
         data: 神经元荧光数据
-        fs: 采样频率，默认为0.7Hz
+        fs: 采样频率，默认为4.8Hz（钙离子浓度数据的实际采样频率）
         min_snr: 最小信噪比阈值，默认为3.5
         min_duration: 最小持续时间(采样点数)，默认为12
-        smooth_window: 平滑窗口大小，默认为31
+        smooth_window: Savitzky-Golay平滑窗口大小，默认为31
         peak_distance: 峰值之间的最小距离，默认为5（已降低以更好地检测相邻钙波）
         baseline_percentile: 用于估计基线的百分位数，默认为8
         max_duration: 最大持续时间(采样点数)，默认为800
@@ -116,9 +302,18 @@ def detect_calcium_transients(data, fs=0.7, min_snr=3.5, min_duration=12, smooth
         filter_strength: 过滤强度系数(0.5-2.0)，控制所有阈值的整体强度，1.0为默认强度
                          <1.0: 降低所有阈值，检测更多潜在信号
                          >1.0: 提高所有阈值，更严格地过滤噪声
+        apply_preprocessing: 是否应用预处理，默认为True
+        apply_moving_average: 是否应用移动平均滤波，默认为True
+        moving_avg_window: 移动平均窗口大小，默认为3
+        apply_butterworth: 是否应用Butterworth滤波，默认为True
+        butterworth_cutoff: Butterworth滤波器截止频率，默认为20（与smooth_data.py保持一致）
+        butterworth_strength: Butterworth滤波强度，默认为0.05（与smooth_data.py保持一致）
+        apply_normalization: 是否应用归一化，默认为False
+        normalization_method: 归一化方法，默认为'standard'
                          
     返回:
         transients: 检测到的钙爆发列表，每个元素包含开始、峰值、结束时间以及其他特征
+        preprocessed_data: 预处理后的数据
     """
     
     # 根据filter_strength调整所有阈值参数
@@ -175,14 +370,46 @@ def detect_calcium_transients(data, fs=0.7, min_snr=3.5, min_duration=12, smooth
     min_morphology_score = params['min_morphology_score']
     min_exp_decay_score = params['min_exp_decay_score']
     
-    # 1. 应用平滑滤波器
+    # 步骤0：数据预处理（新增）
+    if apply_preprocessing:
+        preprocessed_data = preprocess_neural_signal(
+            data=data,
+            apply_moving_average=apply_moving_average,
+            moving_avg_window=moving_avg_window,
+            apply_butterworth=apply_butterworth,
+            butterworth_cutoff=butterworth_cutoff,
+            butterworth_strength=butterworth_strength,
+            apply_normalization=apply_normalization,
+            normalization_method=normalization_method,
+            fs=fs
+        )
+        print(f"  预处理完成: 移动平均({apply_moving_average}), Butterworth({apply_butterworth}), 归一化({apply_normalization})")
+    else:
+        preprocessed_data = data.copy()
+    
+    # 1. 应用Savitzky-Golay平滑滤波器（在预处理之后）
     if smooth_window > 1:
         # 确保smooth_window是奇数
         if smooth_window % 2 == 0:
             smooth_window += 1
-        smoothed_data = signal.savgol_filter(data, smooth_window, 3)
+        
+        # 确保smooth_window不超过数据长度
+        if smooth_window >= len(preprocessed_data):
+            # 如果数据长度太短，调整smooth_window为数据长度的一半（确保为奇数）
+            if len(preprocessed_data) <= 3:
+                # 数据点太少，无法进行有效分析
+                return [], preprocessed_data.copy()
+            else:
+                smooth_window = min(len(preprocessed_data) - 1, 
+                                  max(3, int(len(preprocessed_data) // 2)))
+                # 确保为奇数
+                if smooth_window % 2 == 0:
+                    smooth_window -= 1
+                print(f"  警告: 预处理后数据长度({len(preprocessed_data)})小于平滑窗口({smooth_window}原始值)，已调整为{smooth_window}")
+        
+        smoothed_data = signal.savgol_filter(preprocessed_data, smooth_window, 3)
     else:
-        smoothed_data = data.copy()
+        smoothed_data = preprocessed_data.copy()
     
     # 2. 估计基线和噪声水平
     baseline = np.percentile(smoothed_data, baseline_percentile)
@@ -585,7 +812,16 @@ def detect_calcium_transients(data, fs=0.7, min_snr=3.5, min_duration=12, smooth
     
     return transients, smoothed_data
 
-def extract_calcium_features(neuron_data, fs=0.7, visualize=False, detect_subpeaks=False, params=None, filter_strength=1.0):
+def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpeaks=False, params=None, filter_strength=1.0,
+                           # 新增的预处理参数（与smooth_data.py保持一致）
+                           apply_preprocessing=True,
+                           apply_moving_average=True,
+                           moving_avg_window=3,
+                           apply_butterworth=True,
+                           butterworth_cutoff=20,
+                           butterworth_strength=0.05,
+                           apply_normalization=False,
+                           normalization_method='standard'):
     """
     从钙离子浓度数据中提取关键特征
     
@@ -594,7 +830,7 @@ def extract_calcium_features(neuron_data, fs=0.7, visualize=False, detect_subpea
     neuron_data : numpy.ndarray 或 pandas.Series
         神经元钙离子浓度时间序列数据
     fs : float, 可选
-        采样频率，默认为0.7Hz
+        采样频率，默认为4.8Hz（钙离子浓度数据的实际采样频率）
     visualize : bool, 可选
         是否可视化结果，默认为False
     detect_subpeaks : bool, 可选
@@ -603,6 +839,22 @@ def extract_calcium_features(neuron_data, fs=0.7, visualize=False, detect_subpea
         自定义参数字典
     filter_strength : float, 可选
         过滤强度系数(0.5-2.0)，控制所有阈值的整体强度，1.0为默认强度
+    apply_preprocessing : bool, 可选
+        是否应用预处理，默认为True
+    apply_moving_average : bool, 可选
+        是否应用移动平均滤波，默认为True
+    moving_avg_window : int, 可选
+        移动平均窗口大小，默认为3
+    apply_butterworth : bool, 可选
+        是否应用Butterworth滤波，默认为True
+    butterworth_cutoff : float, 可选
+        Butterworth滤波器截止频率，默认为20（与smooth_data.py保持一致）
+    butterworth_strength : float, 可选
+        Butterworth滤波强度，默认为0.05（与smooth_data.py保持一致）
+    apply_normalization : bool, 可选
+        是否应用归一化，默认为False
+    normalization_method : str, 可选
+        归一化方法，默认为'standard'
         
     返回
     -------
@@ -616,8 +868,18 @@ def extract_calcium_features(neuron_data, fs=0.7, visualize=False, detect_subpea
     else:
         data = neuron_data
     
-    # 检测钙爆发
-    transients, smoothed_data = detect_calcium_transients(data, fs=fs, detect_subpeaks=detect_subpeaks, params=params, filter_strength=filter_strength)
+    # 检测钙爆发（传递预处理参数）
+    transients, smoothed_data = detect_calcium_transients(
+        data, fs=fs, detect_subpeaks=detect_subpeaks, params=params, filter_strength=filter_strength,
+        apply_preprocessing=apply_preprocessing,
+        apply_moving_average=apply_moving_average,
+        moving_avg_window=moving_avg_window,
+        apply_butterworth=apply_butterworth,
+        butterworth_cutoff=butterworth_cutoff,
+        butterworth_strength=butterworth_strength,
+        apply_normalization=apply_normalization,
+        normalization_method=normalization_method
+    )
     
     # 如果没有检测到钙爆发，返回空特征
     if len(transients) == 0:
@@ -670,7 +932,7 @@ def extract_calcium_features(neuron_data, fs=0.7, visualize=False, detect_subpea
     
     return features, transients
 
-def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0, max_duration=350):
+def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=4.8, max_duration=350):
     """
     可视化钙离子浓度数据和检测到的钙爆发，包括形态评分信息
     
@@ -683,7 +945,7 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0, ma
     transients : list of dict
         检测到的钙爆发特征列表
     fs : float, 可选
-        采样频率，默认为1.0Hz
+        采样频率，默认为4.8Hz（钙离子浓度数据的实际采样频率）
     max_duration : int, 可选
         钙爆发最大持续时间（采样点数），默认为350
     """
@@ -904,7 +1166,7 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=1.0, ma
     plt.tight_layout()
     plt.show()
 
-def process_multiple_neurons(data_df, neuron_columns, fs=1.0):
+def process_multiple_neurons(data_df, neuron_columns, fs=4.8):
     """
     处理多个神经元的钙离子数据并提取特征
     
@@ -915,7 +1177,7 @@ def process_multiple_neurons(data_df, neuron_columns, fs=1.0):
     neuron_columns : list of str
         要处理的神经元列名列表
     fs : float, 可选
-        采样频率，默认为1.0Hz
+        采样频率，默认为4.8Hz（钙离子浓度数据的实际采样频率）
         
     返回
     -------
@@ -932,7 +1194,7 @@ def process_multiple_neurons(data_df, neuron_columns, fs=1.0):
     
     return pd.DataFrame(results)
 
-def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='behavior', fs=1.0):
+def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='behavior', fs=4.8):
     """
     分析不同行为条件下的钙离子特征
     
@@ -945,7 +1207,7 @@ def analyze_behavior_specific_features(data_df, neuron_columns, behavior_col='be
     behavior_col : str, 可选
         行为标签列名，默认为'behavior'
     fs : float, 可选
-        采样频率，默认为1.0Hz
+        采样频率，默认为4.8Hz（钙离子浓度数据的实际采样频率）
         
     返回
     -------
@@ -1035,7 +1297,7 @@ def estimate_neuron_params(neuron_data, filter_strength=1.0):
     
     return params
 
-def analyze_all_neurons_transients(data_df, neuron_columns, fs=0.7, save_path=None, adaptive_params=True, start_id=1, 
+def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=None, adaptive_params=True, start_id=1, 
                             file_info=None, filter_strength=1.0):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
@@ -1047,7 +1309,7 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=0.7, save_path=No
     neuron_columns : list of str
         要处理的神经元列名列表
     fs : float, 可选
-        采样频率，默认为0.7Hz
+        采样频率，默认为4.8Hz（钙离子浓度数据的实际采样频率）
     save_path : str, 可选
         Excel文件保存路径，默认为None（不保存）
     adaptive_params : bool, 可选

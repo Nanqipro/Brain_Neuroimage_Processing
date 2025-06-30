@@ -43,7 +43,7 @@ def moving_average(data: Union[pd.Series, np.ndarray], window_size: int = 3) -> 
 def butterworth_filter(
     data: np.ndarray,
     cutoff_freq: float = 20,
-    fs: float = 10.0,
+    fs: float = 4.8,
     order: int = 2,
     strength: float = 0.05
 ) -> np.ndarray:
@@ -53,7 +53,7 @@ def butterworth_filter(
     参数:
         data: 输入信号数据
         cutoff_freq: 截止频率，值越小滤波效果越强（默认0.1）
-        fs: 采样频率（默认10.0）
+        fs: 采样频率（默认4.8）
         order: 滤波器阶数，阶数越高滤波效果越陡峭（默认4）
         strength: 滤波强度系数，范围0-1，值越大滤波效果越强（默认0.5）
 
