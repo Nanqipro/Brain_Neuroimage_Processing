@@ -118,9 +118,11 @@ def plot_confusion_matrix(y_true, y_pred, class_names, result_dir='result'):
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
                xticklabels=class_names, yticklabels=class_names)
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label') 
-    plt.title('Confusion Matrix')
+    plt.xlabel('Predicted Label', fontsize=14, fontweight='bold')
+    plt.ylabel('True Label', fontsize=14, fontweight='bold') 
+    plt.title('Confusion Matrix', fontsize=16, fontweight='bold')
+    plt.xticks(fontsize=12, fontweight='bold')
+    plt.yticks(fontsize=12, fontweight='bold')
     plt.tight_layout()
     plt.savefig(f'{result_dir}/confusion_matrix.png')
     plt.close()
@@ -139,10 +141,11 @@ def plot_training_metrics(train_metrics, val_metrics, result_dir='result'):
         if metric in val_metrics:
             ax.plot(val_metrics[metric], 'r-', label=f'Validation {metric}')
             
-        ax.set_title(f'{metric.capitalize()} over epochs')
-        ax.set_xlabel('Epochs')
-        ax.set_ylabel(metric.capitalize())
-        ax.legend()
+        ax.set_title(f'{metric.capitalize()} over epochs', fontsize=16, fontweight='bold')
+        ax.set_xlabel('Epochs', fontsize=14, fontweight='bold')
+        ax.set_ylabel(metric.capitalize(), fontsize=14, fontweight='bold')
+        ax.tick_params(axis='both', which='major', labelsize=12)
+        ax.legend(fontsize=12)
         ax.grid(True)
     
     plt.tight_layout()
@@ -159,21 +162,22 @@ def plot_learning_curve(train_metrics, val_metrics, result_dir='result'):
     
     # 绘制训练损失
     ax1.plot(train_metrics['loss'], 'b-', label='Train Loss')
-    ax1.set_xlabel('Epochs')
-    ax1.set_ylabel('Loss', color='b')
-    ax1.tick_params(axis='y', labelcolor='b')
+    ax1.set_xlabel('Epochs', fontsize=14, fontweight='bold')
+    ax1.set_ylabel('Loss', color='b', fontsize=14, fontweight='bold')
+    ax1.tick_params(axis='y', labelcolor='b', labelsize=12)
+    ax1.tick_params(axis='x', labelsize=12)
     
     # 绘制验证准确率
     ax2.plot(val_metrics['accuracy'], 'r-', label='Validation Accuracy')
-    ax2.set_ylabel('Accuracy', color='r')
-    ax2.tick_params(axis='y', labelcolor='r')
+    ax2.set_ylabel('Accuracy', color='r', fontsize=14, fontweight='bold')
+    ax2.tick_params(axis='y', labelcolor='r', labelsize=12)
     
     # 添加图例
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best', fontsize=12)
     
-    plt.title('Training Loss and Validation Accuracy')
+    plt.title('Training Loss and Validation Accuracy', fontsize=16, fontweight='bold')
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(f'{result_dir}/learning_curve.png')

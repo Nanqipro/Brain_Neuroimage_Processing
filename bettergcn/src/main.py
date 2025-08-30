@@ -36,6 +36,16 @@ def setup_matplotlib_fonts():
     # 设置中文字体
     plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans', 'Arial Unicode MS', 'Arial']  # 优先使用中文黑体
     plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+    
+    # 设置坐标轴标签字体大小和粗细
+    plt.rcParams['axes.labelsize'] = 14  # 坐标轴标签字体大小
+    plt.rcParams['axes.labelweight'] = 'bold'  # 坐标轴标签字体粗细
+    plt.rcParams['xtick.labelsize'] = 12  # X轴刻度字体大小
+    plt.rcParams['ytick.labelsize'] = 12  # Y轴刻度字体大小
+    plt.rcParams['axes.titlesize'] = 16  # 图表标题字体大小
+    plt.rcParams['axes.titleweight'] = 'bold'  # 图表标题字体粗细
+    plt.rcParams['legend.fontsize'] = 12  # 图例字体大小
+    
     # 检查字体是否正确设置
     # print("可用字体:", mpl.font_manager.findSystemFonts(fontpaths=None, fontext="ttf"))
     # 测试中文显示
@@ -50,8 +60,8 @@ def main():
     setup_matplotlib_fonts()
     
     # 定义数据文件路径和最小样本数
-    data_file = '../datasets/EMtrace01.xlsx'
-    position_file = '../datasets/EMtrace01_Max_position.csv'
+    data_file = '../datasets/EMtrace01_plus.xlsx'
+    position_file = '../datasets/EMtrace01_plus_Max_position.csv'
     min_samples = 50
     
     # 使用数据文件名和最小样本数来设置结果目录
@@ -135,7 +145,11 @@ def main():
     # 可视化相关性矩阵
     plt.figure(figsize=(10, 8))
     sns.heatmap(correlation_matrix, cmap='coolwarm', center=0)
-    plt.title("Neuron Correlation Matrix")
+    plt.title("Neuron Correlation Matrix", fontsize=16, fontweight='bold')
+    plt.xlabel("Neuron Index", fontsize=14, fontweight='bold')
+    plt.ylabel("Neuron Index", fontsize=14, fontweight='bold')
+    plt.xticks(fontsize=12, fontweight='bold')
+    plt.yticks(fontsize=12, fontweight='bold')
     plt.savefig(f'{result_dir}/correlation_matrix.png')
     plt.close()
     

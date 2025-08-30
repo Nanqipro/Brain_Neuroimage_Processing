@@ -1099,25 +1099,26 @@ def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", resul
     # 绘制节点标签
     nx.draw_networkx_labels(
         G, pos,
-        font_size=9,
+        font_size=10,
         font_family='sans-serif',
         font_weight='bold'
     )
     
     # 添加颜色条
     cbar = plt.colorbar(nodes, label='Calcium Concentration', shrink=0.8)
-    cbar.ax.tick_params(labelsize=9)
+    cbar.set_label('Calcium Concentration', fontsize=14, fontweight='bold')
+    cbar.ax.tick_params(labelsize=12)
     
     # 添加标题和信息
     behavior_label = graph_data.y.item()
-    plt.title(f"{title}\nSample Label: {behavior_label}", fontsize=14, fontweight='bold')
+    plt.title(f"{title}\nSample Label: {behavior_label}", fontsize=16, fontweight='bold')
     plt.text(0.02, 0.02, f"Number of Nodes: {G.number_of_nodes()}, Number of Edges: {G.number_of_edges()}",
-             transform=plt.gca().transAxes, fontsize=10)
+             transform=plt.gca().transAxes, fontsize=12, fontweight='bold')
     
     # 添加坐标位置信息
     position_source = "Real Space Position" if position_file and os.path.exists(position_file) else "Layout Algorithm Generated"
     plt.text(0.02, 0.06, f"Position Source: {position_source}",
-             transform=plt.gca().transAxes, fontsize=10)
+             transform=plt.gca().transAxes, fontsize=12, fontweight='bold')
     plt.axis('off')
     plt.tight_layout()
     plt.savefig(f'{result_dir}/graph_visualization.png', dpi=300, bbox_inches='tight')
