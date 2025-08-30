@@ -37,14 +37,19 @@ def setup_matplotlib_fonts():
     plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans', 'Arial Unicode MS', 'Arial']  # 优先使用中文黑体
     plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
     
-    # 设置坐标轴标签字体大小和粗细
-    plt.rcParams['axes.labelsize'] = 14  # 坐标轴标签字体大小
+    # 设置坐标轴标签字体大小和粗细 - 进一步增大字体
+    plt.rcParams['axes.labelsize'] = 24  # 坐标轴标签字体大小
     plt.rcParams['axes.labelweight'] = 'bold'  # 坐标轴标签字体粗细
-    plt.rcParams['xtick.labelsize'] = 12  # X轴刻度字体大小
-    plt.rcParams['ytick.labelsize'] = 12  # Y轴刻度字体大小
-    plt.rcParams['axes.titlesize'] = 16  # 图表标题字体大小
+    plt.rcParams['xtick.labelsize'] = 20  # X轴刻度字体大小
+    plt.rcParams['ytick.labelsize'] = 20  # Y轴刻度字体大小
+    plt.rcParams['axes.titlesize'] = 28  # 图表标题字体大小
     plt.rcParams['axes.titleweight'] = 'bold'  # 图表标题字体粗细
-    plt.rcParams['legend.fontsize'] = 12  # 图例字体大小
+    plt.rcParams['legend.fontsize'] = 20  # 图例字体大小
+    
+    # 设置线条样式
+    plt.rcParams['lines.linewidth'] = 3  # 默认线条粗细
+    plt.rcParams['axes.linewidth'] = 2  # 坐标轴边框粗细
+    plt.rcParams['grid.linewidth'] = 1  # 网格线粗细
     
     # 检查字体是否正确设置
     # print("可用字体:", mpl.font_manager.findSystemFonts(fontpaths=None, fontext="ttf"))
@@ -60,7 +65,7 @@ def main():
     setup_matplotlib_fonts()
     
     # 定义数据文件路径和最小样本数
-    data_file = '../datasets/EMtrace01_plus.xlsx'
+    data_file = '../datasets/processed_EMtrace01_plus.xlsx'
     position_file = '../datasets/EMtrace01_plus_Max_position.csv'
     min_samples = 50
     
@@ -145,11 +150,11 @@ def main():
     # 可视化相关性矩阵
     plt.figure(figsize=(10, 8))
     sns.heatmap(correlation_matrix, cmap='coolwarm', center=0)
-    plt.title("Neuron Correlation Matrix", fontsize=16, fontweight='bold')
-    plt.xlabel("Neuron Index", fontsize=14, fontweight='bold')
-    plt.ylabel("Neuron Index", fontsize=14, fontweight='bold')
-    plt.xticks(fontsize=12, fontweight='bold')
-    plt.yticks(fontsize=12, fontweight='bold')
+    plt.title("Neuron Correlation Matrix", fontsize=28, fontweight='bold')
+    plt.xlabel("Neuron Index", fontsize=24, fontweight='bold')
+    plt.ylabel("Neuron Index", fontsize=24, fontweight='bold')
+    plt.xticks(fontsize=20, fontweight='bold')
+    plt.yticks(fontsize=20, fontweight='bold')
     plt.savefig(f'{result_dir}/correlation_matrix.png')
     plt.close()
     
@@ -197,9 +202,9 @@ def main():
     # 训练模型
     best_val_f1 = 0
     best_epoch = 0
-    patience = 20  # early stopping patience
-    epochs_no_improve = 0
-    max_epochs = 250
+    # patience = 20  # early stopping patience
+    # epochs_no_improve = 0
+    max_epochs = 300
     
     history = {
         'train': {
@@ -235,21 +240,14 @@ def main():
         if val_metrics['f1'] > best_val_f1:
             best_val_f1 = val_metrics['f1']
             best_epoch = epoch
-            epochs_no_improve = 0
             torch.save(model.state_dict(), f'{result_dir}/best_model.pth')
             print(f"✓ Epoch {epoch+1}: 保存新的最佳模型，验证F1分数: {best_val_f1:.4f}")
-        else:
-            epochs_no_improve += 1
         # 打印进度
         if (epoch + 1) % 10 == 0 or epoch == 0:
             print(f'Epoch {epoch+1}/{max_epochs}:')
             print(f'  Train - Loss: {train_metrics["loss"]:.4f}, Accuracy: {train_metrics["accuracy"]:.4f}, F1: {train_metrics["f1"]:.4f}')
             print(f'  Val   - Accuracy: {val_metrics["accuracy"]:.4f}, F1: {val_metrics["f1"]:.4f}')
-        # 早停检查
-        if epochs_no_improve >= patience:
-            print(f'\n早停! {patience}个epoch没有提高。')
-            print(f'最佳F1分数: {best_val_f1:.4f} (epoch {best_epoch+1})')
-            break
+        # 继续训练直到最大epoch数
     print(f"\n训练完成! 最佳验证F1分数: {best_val_f1:.4f} (epoch {best_epoch+1})")
     # 绘制训练指标
     plot_training_metrics(history['train'], history['val'], result_dir=result_dir)

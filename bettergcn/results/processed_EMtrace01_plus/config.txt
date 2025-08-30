@@ -1,6 +1,6 @@
-数据文件: ../datasets/EMtrace01_plus.xlsx
+数据文件: ../datasets/processed_EMtrace01_plus.xlsx
 神经元位置文件: ../datasets/EMtrace01_plus_Max_position.csv
 最小样本数: 50
 设备: cuda
 随机种子: 42
-训练开始时间: 2025-08-30 15:28:12
+训练开始时间: 2025-08-30 23:44:31

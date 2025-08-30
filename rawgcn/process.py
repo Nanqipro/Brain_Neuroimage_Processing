@@ -10,7 +10,11 @@ from imblearn.over_sampling import SMOTE
 from collections import Counter
 
 def load_data(data_path):
-    data = pd.read_csv(data_path)
+    # Check file extension and use appropriate pandas function
+    if data_path.endswith('.xlsx') or data_path.endswith('.xls'):
+        data = pd.read_excel(data_path)
+    else:
+        data = pd.read_csv(data_path)
     features = data.loc[:, 'n1':'n43'].values
     labels = data['behavior'].values
 

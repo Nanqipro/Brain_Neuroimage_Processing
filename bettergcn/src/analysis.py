@@ -258,11 +258,11 @@ class GCNVisualizer:
         from scipy.cluster.hierarchy import dendrogram
         
         plt.figure(figsize=(12, 8))
-        plt.title('Neural Network Hierarchical Clustering Dendrogram', fontsize=16, fontweight='bold')
-        plt.xlabel('Neuron Index', fontsize=14, fontweight='bold')
-        plt.ylabel('Distance', fontsize=14, fontweight='bold')
-        plt.xticks(fontsize=12, fontweight='bold')
-        plt.yticks(fontsize=12, fontweight='bold')
+        plt.title('Neural Network Hierarchical Clustering Dendrogram', fontsize=28, fontweight='bold')
+        plt.xlabel('Neuron Index', fontsize=24, fontweight='bold')
+        plt.ylabel('Distance', fontsize=24, fontweight='bold')
+        plt.xticks(fontsize=20, fontweight='bold')
+        plt.yticks(fontsize=20, fontweight='bold')
         
         # 计算截断距离，如果未提供
         if max_d is None:
@@ -579,7 +579,7 @@ class GCNVisualizer:
         labels = {node: f'N{node+1}' for node in self.G.nodes()}
         nx.draw_networkx_labels(self.G, pos, labels, font_size=9, font_weight='bold')
         
-        plt.title(title, fontsize=16, fontweight='bold')
+        plt.title(title, fontsize=28, fontweight='bold')
         plt.axis('off')
         
         # 添加社区图例
@@ -588,12 +588,12 @@ class GCNVisualizer:
                                     markerfacecolor=self.community_colors[i % len(self.community_colors)],
                                     markersize=10, label=f'Community {i+1}')
                          for i in range(num_communities)]
-        plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5), fontsize=12)
+        plt.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5), fontsize=20)
         
         # 添加位置信息来源说明
         position_source = "Real Space Position" if position_file and os.path.exists(position_file) else "Layout Algorithm Generated"
-        plt.figtext(0.02, 0.02, f"Position Source: {position_source}", fontsize=12, fontweight='bold')
-        plt.figtext(0.02, 0.04, f"Nodes: {len(self.G.nodes())}, Edges: {len(self.G.edges())}, Communities: {num_communities}", fontsize=12, fontweight='bold')
+        plt.figtext(0.02, 0.02, f"Position Source: {position_source}", fontsize=14, fontweight='bold')
+        plt.figtext(0.02, 0.04, f"Nodes: {len(self.G.nodes())}, Edges: {len(self.G.edges())}, Communities: {num_communities}", fontsize=14, fontweight='bold')
         
         # 保存图像
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
@@ -749,19 +749,19 @@ class GCNVisualizer:
             plt.text(bar.get_x() + bar.get_width()/2., height + 0.05,
                     f'{community_sizes[sorted_indices[i]]} neurons',
                     ha='center', va='bottom', rotation=0,
-                    fontsize=9)
+                    fontsize=12)
         # 添加标签和标题
-        plt.xlabel('Neuron Communities', fontsize=14, fontweight='bold')
-        plt.ylabel('Behavior Association Strength (Effect Size)', fontsize=14, fontweight='bold')
-        plt.title('Neuron Community-Behavior Association Analysis', fontsize=16, fontweight='bold')
+        plt.xlabel('Neuron Communities', fontsize=24, fontweight='bold')
+        plt.ylabel('Behavior Association Strength (Effect Size)', fontsize=24, fontweight='bold')
+        plt.title('Neuron Community-Behavior Association Analysis', fontsize=28, fontweight='bold')
         # 设置x轴刻度
-        plt.xticks(bar_positions, [communities[i] for i in sorted_indices], rotation=45, fontsize=12, fontweight='bold')
-        plt.yticks(fontsize=12, fontweight='bold')
+        plt.xticks(bar_positions, [communities[i] for i in sorted_indices], rotation=45, fontsize=20, fontweight='bold')
+        plt.yticks(fontsize=20, fontweight='bold')
         
         # 添加行为图例
         legend_elements = [plt.Rectangle((0,0), 1, 1, color=behavior_color_map[b], alpha=0.8, label=b) 
                           for b in unique_behaviors]
-        plt.legend(handles=legend_elements, title='Behavior Types', loc='upper right', fontsize=12)
+        plt.legend(handles=legend_elements, title='Behavior Types', loc='upper right', fontsize=20)
         
         plt.tight_layout()
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
@@ -887,7 +887,7 @@ class GCNVisualizer:
             behavior = community_behavior_mapping[comm_id]['behavior']
             plt.text(center[0], center[1], 
                     f"{comm_id}\n({behavior})", 
-                    fontsize=12, fontweight='bold', 
+                    fontsize=14, fontweight='bold', 
                     ha='center', va='center',
                     bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
         
@@ -895,9 +895,9 @@ class GCNVisualizer:
         legend_elements = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color, 
                                     markersize=10, label=behavior) 
                           for behavior, color in behavior_color_map.items()]
-        plt.legend(handles=legend_elements, loc='upper right', title='Behavior Types', fontsize=12)
+        plt.legend(handles=legend_elements, loc='upper right', title='Behavior Types', fontsize=20)
         
-        plt.title('Neural Network Community-Behavior Association Network', fontsize=16, fontweight='bold')
+        plt.title('Neural Network Community-Behavior Association Network', fontsize=28, fontweight='bold')
         plt.axis('off')
         plt.tight_layout()
         

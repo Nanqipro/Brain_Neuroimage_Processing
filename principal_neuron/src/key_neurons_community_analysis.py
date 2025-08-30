@@ -3,6 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
+
+# 导入并应用matplotlib样式配置
+try:
+    from matplotlib_config import setup_matplotlib_style
+    setup_matplotlib_style()
+except ImportError:
+    print("警告: 无法导入matplotlib_config，使用默认字体设置")
 from scipy.stats import pearsonr, spearmanr
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 from sklearn.preprocessing import StandardScaler
@@ -396,7 +403,7 @@ class KeyNeuronCommunityAnalyzer:
                 # 绘制标签
                 nx.draw_networkx_labels(G, pos, font_size=8)
             
-            plt.title(f'{behavior} 行为的神经元网络和社区结构')
+            plt.title(f'{behavior} 行为的神经元网络和社区结构', fontsize=16, fontweight='bold')
             plt.axis('off')
             
             if save_plots:
@@ -433,9 +440,10 @@ class KeyNeuronCommunityAnalyzer:
         ax1 = axes[0, 0]
         bars1 = ax1.bar(stats_df['Behavior'], stats_df['N_Communities'], 
                        color='skyblue', alpha=0.7)
-        ax1.set_title('各行为状态的社区数量')
-        ax1.set_ylabel('社区数量')
-        ax1.tick_params(axis='x', rotation=45)
+        ax1.set_title('各行为状态的社区数量', fontsize=14, fontweight='bold')
+        ax1.set_ylabel('社区数量', fontsize=12, fontweight='bold')
+        ax1.tick_params(axis='x', rotation=45, labelsize=10, labelweight='bold')
+        ax1.tick_params(axis='y', labelsize=10, labelweight='bold')
         
         # 添加数值标签
         for bar in bars1:
@@ -447,9 +455,10 @@ class KeyNeuronCommunityAnalyzer:
         ax2 = axes[0, 1]
         bars2 = ax2.bar(stats_df['Behavior'], stats_df['Modularity'], 
                        color='lightgreen', alpha=0.7)
-        ax2.set_title('各行为状态的模块度')
-        ax2.set_ylabel('模块度')
-        ax2.tick_params(axis='x', rotation=45)
+        ax2.set_title('各行为状态的模块度', fontsize=14, fontweight='bold')
+        ax2.set_ylabel('模块度', fontsize=12, fontweight='bold')
+        ax2.tick_params(axis='x', rotation=45, labelsize=10, labelweight='bold')
+        ax2.tick_params(axis='y', labelsize=10, labelweight='bold')
         
         # 添加数值标签
         for bar in bars2:
@@ -461,9 +470,10 @@ class KeyNeuronCommunityAnalyzer:
         ax3 = axes[1, 0]
         bars3 = ax3.bar(stats_df['Behavior'], stats_df['Network_Density'], 
                        color='orange', alpha=0.7)
-        ax3.set_title('各行为状态的网络密度')
-        ax3.set_ylabel('网络密度')
-        ax3.tick_params(axis='x', rotation=45)
+        ax3.set_title('各行为状态的网络密度', fontsize=14, fontweight='bold')
+        ax3.set_ylabel('网络密度', fontsize=12, fontweight='bold')
+        ax3.tick_params(axis='x', rotation=45, labelsize=10, labelweight='bold')
+        ax3.tick_params(axis='y', labelsize=10, labelweight='bold')
         
         # 添加数值标签
         for bar in bars3:
@@ -475,9 +485,10 @@ class KeyNeuronCommunityAnalyzer:
         ax4 = axes[1, 1]
         scatter = ax4.scatter(stats_df['Network_Density'], stats_df['Modularity'], 
                             c=stats_df['N_Communities'], cmap='viridis', s=100, alpha=0.7)
-        ax4.set_xlabel('网络密度')
-        ax4.set_ylabel('模块度')
-        ax4.set_title('网络密度 vs 模块度')
+        ax4.set_xlabel('网络密度', fontsize=12, fontweight='bold')
+        ax4.set_ylabel('模块度', fontsize=12, fontweight='bold')
+        ax4.set_title('网络密度 vs 模块度', fontsize=14, fontweight='bold')
+        ax4.tick_params(axis='both', labelsize=10, labelweight='bold')
         
         # 添加颜色条
         cbar = plt.colorbar(scatter, ax=ax4)
@@ -606,4 +617,4 @@ def main():
     }
 
 if __name__ == "__main__":
-    results = main() 
+    results = main()

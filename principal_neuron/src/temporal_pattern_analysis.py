@@ -2,6 +2,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+# 导入并应用matplotlib样式配置
+try:
+    from matplotlib_config import setup_matplotlib_style
+    setup_matplotlib_style()
+except ImportError:
+    print("警告: 无法导入matplotlib_config，使用默认字体设置")
 from scipy import stats
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 from sklearn.decomposition import PCA
@@ -414,9 +421,11 @@ class TemporalPatternAnalyzer:
         plt.figure(figsize=(15, 8))
         activity_data = self.df[self.neurons].T
         sns.heatmap(activity_data, cmap='viridis', cbar=True)
-        plt.title('神经元活动热图 (神经元 x 时间点)')
-        plt.xlabel('时间点 (行为序列)')
-        plt.ylabel('神经元')
+        plt.title('神经元活动热图 (神经元 x 时间点)', fontsize=16, fontweight='bold')
+        plt.xlabel('时间点 (行为序列)', fontsize=14, fontweight='bold')
+        plt.ylabel('神经元', fontsize=14, fontweight='bold')
+        plt.xticks(fontsize=12, fontweight='bold')
+        plt.yticks(fontsize=12, fontweight='bold')
         if save_plots:
             plt.savefig(f"{plot_dir}/neuron_activity_heatmap.png", dpi=300, bbox_inches='tight')
         plt.show()
@@ -425,9 +434,10 @@ class TemporalPatternAnalyzer:
         behaviors_numeric = pd.Categorical(self.behaviors).codes
         plt.figure(figsize=(12, 4))
         plt.plot(behaviors_numeric, marker='o', linewidth=2, markersize=6)
-        plt.title('行为序列时间线')
-        plt.xlabel('时间点')
-        plt.ylabel('行为类型 (编码)')
+        plt.title('行为序列时间线', fontsize=16, fontweight='bold')
+        plt.xlabel('时间点', fontsize=14, fontweight='bold')
+        plt.ylabel('行为类型 (编码)', fontsize=14, fontweight='bold')
+        plt.tick_params(axis='both', labelsize=12, labelweight='bold')
         unique_behaviors = list(set(self.behaviors))
         plt.yticks(range(len(unique_behaviors)), unique_behaviors)
         plt.grid(True, alpha=0.3)
@@ -441,9 +451,10 @@ class TemporalPatternAnalyzer:
             dendrogram(clustering_result['linkage_matrix'], 
                       labels=self.neurons, 
                       leaf_rotation=90)
-            plt.title('神经元层次聚类树状图')
-            plt.xlabel('神经元')
-            plt.ylabel('距离')
+            plt.title('神经元层次聚类树状图', fontsize=16, fontweight='bold')
+            plt.xlabel('神经元', fontsize=14, fontweight='bold')
+            plt.ylabel('距离', fontsize=14, fontweight='bold')
+            plt.tick_params(axis='both', labelsize=12, labelweight='bold')
             if save_plots:
                 plt.savefig(f"{plot_dir}/neuron_clustering_dendrogram.png", dpi=300, bbox_inches='tight')
             plt.show()
@@ -491,4 +502,4 @@ def main():
     }
 
 if __name__ == "__main__":
-    results = main() 
+    results = main()

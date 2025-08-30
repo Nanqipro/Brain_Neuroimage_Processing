@@ -2,6 +2,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+# 导入并应用matplotlib样式配置
+try:
+    from matplotlib_config import setup_matplotlib_style
+    setup_matplotlib_style()
+except ImportError:
+    print("警告: 无法导入matplotlib_config，使用默认字体设置")
 from collections import Counter
 import warnings
 warnings.filterwarnings('ignore')
@@ -305,15 +312,16 @@ class LabelComparisonAnalyzer:
         # 设置图表样式
         plt.style.use('default')
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle('标签分布比较分析', fontsize=16, fontweight='bold')
+        fig.suptitle('标签分布比较分析', fontsize=18, fontweight='bold')
         
         # 1. 多标签版本分布
         ax1 = axes[0, 0]
         bars1 = ax1.bar(range(len(multi_label_counts)), multi_label_counts.values, 
                        color='skyblue', alpha=0.7)
-        ax1.set_title('多标签版本分布')
-        ax1.set_xlabel('标签')
-        ax1.set_ylabel('样本数量')
+        ax1.set_title('多标签版本分布', fontsize=14, fontweight='bold')
+        ax1.set_xlabel('标签', fontsize=12, fontweight='bold')
+        ax1.set_ylabel('样本数量', fontsize=12, fontweight='bold')
+        ax1.tick_params(axis='both', labelsize=10, labelweight='bold')
         ax1.set_xticks(range(len(multi_label_counts)))
         ax1.set_xticklabels(multi_label_counts.index, rotation=45, ha='right')
         
@@ -327,9 +335,10 @@ class LabelComparisonAnalyzer:
         ax2 = axes[0, 1]
         bars2 = ax2.bar(range(len(simple_label_counts)), simple_label_counts.values, 
                        color='lightgreen', alpha=0.7)
-        ax2.set_title('简化标签版本分布')
-        ax2.set_xlabel('标签')
-        ax2.set_ylabel('样本数量')
+        ax2.set_title('简化标签版本分布', fontsize=14, fontweight='bold')
+        ax2.set_xlabel('标签', fontsize=12, fontweight='bold')
+        ax2.set_ylabel('样本数量', fontsize=12, fontweight='bold')
+        ax2.tick_params(axis='both', labelsize=10, labelweight='bold')
         ax2.set_xticks(range(len(simple_label_counts)))
         ax2.set_xticklabels(simple_label_counts.index, rotation=45, ha='right')
         
@@ -344,9 +353,10 @@ class LabelComparisonAnalyzer:
             ax3 = axes[1, 0]
             bars3 = ax3.bar(range(len(mapped_counts)), mapped_counts.values, 
                            color='orange', alpha=0.7)
-            ax3.set_title('映射后标签分布')
-            ax3.set_xlabel('标签')
-            ax3.set_ylabel('样本数量')
+            ax3.set_title('映射后标签分布', fontsize=14, fontweight='bold')
+            ax3.set_xlabel('标签', fontsize=12, fontweight='bold')
+            ax3.set_ylabel('样本数量', fontsize=12, fontweight='bold')
+            ax3.tick_params(axis='both', labelsize=10, labelweight='bold')
             ax3.set_xticks(range(len(mapped_counts)))
             ax3.set_xticklabels(mapped_counts.index, rotation=45, ha='right')
             
@@ -358,7 +368,7 @@ class LabelComparisonAnalyzer:
         else:
             axes[1, 0].text(0.5, 0.5, '无映射数据', ha='center', va='center', 
                            transform=axes[1, 0].transAxes, fontsize=12)
-            axes[1, 0].set_title('映射后标签分布')
+            axes[1, 0].set_title('映射后标签分布', fontsize=14, fontweight='bold')
         
         # 4. 统计效力对比
         ax4 = axes[1, 1]
@@ -382,12 +392,13 @@ class LabelComparisonAnalyzer:
         ax4.bar(x - width/2, multi_data, width, label='多标签版', alpha=0.7, color='skyblue')
         ax4.bar(x + width/2, simple_data, width, label='简化版', alpha=0.7, color='lightgreen')
         
-        ax4.set_title('统计效力对比')
-        ax4.set_xlabel('数据量分类')
-        ax4.set_ylabel('标签数量')
+        ax4.set_title('统计效力对比', fontsize=14, fontweight='bold')
+        ax4.set_xlabel('数据量分类', fontsize=12, fontweight='bold')
+        ax4.set_ylabel('标签数量', fontsize=12, fontweight='bold')
         ax4.set_xticks(x)
         ax4.set_xticklabels(categories)
-        ax4.legend()
+        ax4.tick_params(axis='both', labelsize=10, labelweight='bold')
+        ax4.legend(fontsize=10)
         
         plt.tight_layout()
         plt.savefig('label_comparison_analysis.png', dpi=300, bbox_inches='tight')
@@ -432,4 +443,4 @@ def main():
     return recommendation
 
 if __name__ == "__main__":
-    results = main() 
+    results = main()

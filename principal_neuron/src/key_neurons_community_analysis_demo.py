@@ -3,6 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
+
+# 导入并应用matplotlib样式配置
+try:
+    from matplotlib_config import setup_matplotlib_style
+    setup_matplotlib_style()
+except ImportError:
+    print("警告: 无法导入matplotlib_config，使用默认字体设置")
 from scipy.stats import pearsonr, spearmanr
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 from sklearn.preprocessing import StandardScaler
@@ -398,8 +405,8 @@ class KeyNeuronCommunityDemo:
             # 绘制标签
             nx.draw_networkx_labels(G, pos, font_size=8, font_weight='bold')
             
-            plt.title('关键神经元网络和社区结构', fontsize=16, fontweight='bold')
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            plt.title('关键神经元网络和社区结构', fontsize=18, fontweight='bold')
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=14)
             plt.axis('off')
             
             if save_plots:
@@ -451,9 +458,11 @@ class KeyNeuronCommunityDemo:
                    cmap='viridis',
                    cbar_kws={'label': '神经元活动'})
         
-        plt.title('各社区神经元在不同行为状态下的活动', fontsize=14, fontweight='bold')
-        plt.xlabel('行为状态')
-        plt.ylabel('神经元 (按社区分组)')
+        plt.title('各社区神经元在不同行为状态下的活动', fontsize=16, fontweight='bold')
+        plt.xlabel('行为状态', fontsize=14, fontweight='bold')
+        plt.ylabel('神经元 (按社区分组)', fontsize=14, fontweight='bold')
+        plt.xticks(fontsize=12, fontweight='bold')
+        plt.yticks(fontsize=10, fontweight='bold')
         plt.tight_layout()
         
         if save_plots and plot_dir:
@@ -564,4 +573,4 @@ def main():
     }
 
 if __name__ == "__main__":
-    results = main() 
+    results = main()

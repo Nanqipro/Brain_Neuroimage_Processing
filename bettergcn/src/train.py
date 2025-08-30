@@ -118,11 +118,11 @@ def plot_confusion_matrix(y_true, y_pred, class_names, result_dir='result'):
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
                xticklabels=class_names, yticklabels=class_names)
-    plt.xlabel('Predicted Label', fontsize=14, fontweight='bold')
-    plt.ylabel('True Label', fontsize=14, fontweight='bold') 
-    plt.title('Confusion Matrix', fontsize=16, fontweight='bold')
-    plt.xticks(fontsize=12, fontweight='bold')
-    plt.yticks(fontsize=12, fontweight='bold')
+    plt.xlabel('Predicted Label', fontsize=24, fontweight='bold')
+    plt.ylabel('True Label', fontsize=24, fontweight='bold') 
+    plt.title('Confusion Matrix', fontsize=28, fontweight='bold')
+    plt.xticks(fontsize=20, fontweight='bold')
+    plt.yticks(fontsize=20, fontweight='bold')
     plt.tight_layout()
     plt.savefig(f'{result_dir}/confusion_matrix.png')
     plt.close()
@@ -130,55 +130,103 @@ def plot_confusion_matrix(y_true, y_pred, class_names, result_dir='result'):
 def plot_training_metrics(train_metrics, val_metrics, result_dir='result'):
     """绘制训练过程中的各项指标"""
     metrics = ['loss', 'accuracy', 'precision', 'recall', 'f1']
-    fig, axes = plt.subplots(len(metrics), 1, figsize=(12, 4*len(metrics)))
+    fig, axes = plt.subplots(len(metrics), 1, figsize=(14, 5*len(metrics)))
     
     for i, metric in enumerate(metrics):
         ax = axes[i]
+        epochs = range(len(train_metrics[metric]) if metric in train_metrics else len(val_metrics[metric]))
         
         if metric in train_metrics:
-            ax.plot(train_metrics[metric], 'b-', label=f'Train {metric}')
+            # 绘制粗线条
+            line1 = ax.plot(epochs, train_metrics[metric], 'b-', linewidth=3, 
+                           label=f'Train {metric}', alpha=0.8, zorder=2)
+            # 每10个epoch添加红点
+            marker_epochs = [e for e in epochs if e % 10 == 0 or e == 0]
+            marker_values = [train_metrics[metric][e] for e in marker_epochs]
+            ax.scatter(marker_epochs, marker_values, color='red', s=80, 
+                      zorder=3, edgecolors='darkred', linewidth=2)
         
         if metric in val_metrics:
-            ax.plot(val_metrics[metric], 'r-', label=f'Validation {metric}')
+            # 绘制粗线条
+            line2 = ax.plot(epochs, val_metrics[metric], 'g-', linewidth=3, 
+                           label=f'Validation {metric}', alpha=0.8, zorder=2)
+            # 每10个epoch添加红点
+            marker_epochs = [e for e in epochs if e % 10 == 0 or e == 0]
+            marker_values = [val_metrics[metric][e] for e in marker_epochs]
+            ax.scatter(marker_epochs, marker_values, color='red', s=80, 
+                      zorder=3, edgecolors='darkred', linewidth=2)
             
-        ax.set_title(f'{metric.capitalize()} over epochs', fontsize=16, fontweight='bold')
-        ax.set_xlabel('Epochs', fontsize=14, fontweight='bold')
-        ax.set_ylabel(metric.capitalize(), fontsize=14, fontweight='bold')
-        ax.tick_params(axis='both', which='major', labelsize=12)
-        ax.legend(fontsize=12)
-        ax.grid(True)
+        # 增强立体感 - 添加阴影效果
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.set_facecolor('#f8f9fa')
+        
+        # 调整字体大小
+        ax.set_title(f'{metric.capitalize()} over epochs', fontsize=26, fontweight='bold', pad=20)
+        ax.set_xlabel('Epochs', fontsize=24, fontweight='bold')
+        ax.set_ylabel(metric.capitalize(), fontsize=24, fontweight='bold')
+        ax.tick_params(axis='both', which='major', labelsize=20, width=2, length=6)
+        ax.legend(fontsize=20, frameon=True, fancybox=True, shadow=True, loc='upper right', bbox_to_anchor=(1.0, 0.95))
+        
+        # 添加边框样式
+        for spine in ax.spines.values():
+            spine.set_linewidth(2)
     
-    plt.tight_layout()
-    plt.savefig(f'{result_dir}/training_metrics.png')
+    plt.tight_layout(pad=3.0)
+    plt.savefig(f'{result_dir}/training_metrics.png', dpi=300, bbox_inches='tight')
     plt.close()
 
 def plot_learning_curve(train_metrics, val_metrics, result_dir='result'):
     """绘制学习曲线（训练损失和验证准确率）"""
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(14, 8))
     
     # 创建两个Y轴
     ax1 = plt.gca()
     ax2 = ax1.twinx()
     
-    # 绘制训练损失
-    ax1.plot(train_metrics['loss'], 'b-', label='Train Loss')
-    ax1.set_xlabel('Epochs', fontsize=14, fontweight='bold')
-    ax1.set_ylabel('Loss', color='b', fontsize=14, fontweight='bold')
-    ax1.tick_params(axis='y', labelcolor='b', labelsize=12)
-    ax1.tick_params(axis='x', labelsize=12)
+    epochs = range(len(train_metrics['loss']))
     
-    # 绘制验证准确率
-    ax2.plot(val_metrics['accuracy'], 'r-', label='Validation Accuracy')
-    ax2.set_ylabel('Accuracy', color='r', fontsize=14, fontweight='bold')
-    ax2.tick_params(axis='y', labelcolor='r', labelsize=12)
+    # 绘制训练损失 - 粗线条
+    line1 = ax1.plot(epochs, train_metrics['loss'], 'b-', linewidth=4, 
+                     label='Train Loss', alpha=0.8, zorder=2)
+    # 每10个epoch添加红点
+    marker_epochs = [e for e in epochs if e % 10 == 0 or e == 0]
+    marker_loss_values = [train_metrics['loss'][e] for e in marker_epochs]
+    ax1.scatter(marker_epochs, marker_loss_values, color='red', s=100, 
+               zorder=3, edgecolors='darkred', linewidth=2)
+    
+    ax1.set_xlabel('Epochs', fontsize=24, fontweight='bold')
+    ax1.set_ylabel('Loss', color='b', fontsize=24, fontweight='bold')
+    ax1.tick_params(axis='y', labelcolor='b', labelsize=20, width=2, length=6)
+    ax1.tick_params(axis='x', labelsize=20, width=2, length=6)
+    
+    # 绘制验证准确率 - 粗线条
+    line2 = ax2.plot(epochs, val_metrics['accuracy'], 'g-', linewidth=4, 
+                     label='Validation Accuracy', alpha=0.8, zorder=2)
+    # 每10个epoch添加红点
+    marker_acc_values = [val_metrics['accuracy'][e] for e in marker_epochs]
+    ax2.scatter(marker_epochs, marker_acc_values, color='red', s=100, 
+               zorder=3, edgecolors='darkred', linewidth=2)
+    
+    ax2.set_ylabel('Accuracy', color='g', fontsize=24, fontweight='bold')
+    ax2.tick_params(axis='y', labelcolor='g', labelsize=20, width=2, length=6)
+    
+    # 增强立体感
+    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.set_facecolor('#f8f9fa')
+    
+    # 添加边框样式
+    for spine in ax1.spines.values():
+        spine.set_linewidth(2)
+    for spine in ax2.spines.values():
+        spine.set_linewidth(2)
     
     # 添加图例
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best', fontsize=12)
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right', fontsize=20, 
+                 frameon=True, fancybox=True, shadow=True, bbox_to_anchor=(1.0, 0.95))
     
-    plt.title('Training Loss and Validation Accuracy', fontsize=16, fontweight='bold')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f'{result_dir}/learning_curve.png')
+    plt.title('Training Loss and Validation Accuracy', fontsize=28, fontweight='bold', pad=20)
+    plt.tight_layout(pad=3.0)
+    plt.savefig(f'{result_dir}/learning_curve.png', dpi=300, bbox_inches='tight')
     plt.close()
