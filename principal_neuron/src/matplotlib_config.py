@@ -32,35 +32,41 @@ def setup_matplotlib_style():
     plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans', 'Arial Unicode MS', 'Arial']
     plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
     
-    # 设置坐标轴标签字体大小和粗细
-    plt.rcParams['axes.labelsize'] = 14  # 坐标轴标签字体大小
+    # 设置坐标轴标签字体大小和粗细 - 适合论文使用的大字体
+    plt.rcParams['axes.labelsize'] = 20  # 坐标轴标签字体大小 (从14增加到20)
     plt.rcParams['axes.labelweight'] = 'bold'  # 坐标轴标签字体粗细
     
     # 设置刻度标签字体大小和粗细
-    plt.rcParams['xtick.labelsize'] = 12  # X轴刻度字体大小
-    plt.rcParams['ytick.labelsize'] = 12  # Y轴刻度字体大小
-    plt.rcParams['xtick.major.size'] = 6  # X轴主刻度长度
-    plt.rcParams['ytick.major.size'] = 6  # Y轴主刻度长度
-    plt.rcParams['xtick.minor.size'] = 4  # X轴次刻度长度
-    plt.rcParams['ytick.minor.size'] = 4  # Y轴次刻度长度
+    plt.rcParams['xtick.labelsize'] = 18  # X轴刻度字体大小 (从12增加到18)
+    plt.rcParams['ytick.labelsize'] = 18  # Y轴刻度字体大小 (从12增加到18)
+    plt.rcParams['xtick.major.size'] = 8  # X轴主刻度长度 (从6增加到8)
+    plt.rcParams['ytick.major.size'] = 8  # Y轴主刻度长度 (从6增加到8)
+    plt.rcParams['xtick.minor.size'] = 6  # X轴次刻度长度 (从4增加到6)
+    plt.rcParams['ytick.minor.size'] = 6  # Y轴次刻度长度 (从4增加到6)
     
     # 设置图表标题字体大小和粗细
-    plt.rcParams['axes.titlesize'] = 16  # 子图标题字体大小
+    plt.rcParams['axes.titlesize'] = 24  # 子图标题字体大小 (从16增加到24)
     plt.rcParams['axes.titleweight'] = 'bold'  # 子图标题字体粗细
-    plt.rcParams['figure.titlesize'] = 18  # 主图标题字体大小
+    plt.rcParams['figure.titlesize'] = 26  # 主图标题字体大小 (从18增加到26)
     plt.rcParams['figure.titleweight'] = 'bold'  # 主图标题字体粗细
     
     # 设置图例字体大小
-    plt.rcParams['legend.fontsize'] = 12  # 图例字体大小
+    plt.rcParams['legend.fontsize'] = 18  # 图例字体大小 (调整为18)
+    plt.rcParams['legend.markerscale'] = 1.5  # 图例标记大小比例
+    plt.rcParams['legend.handlelength'] = 2.0  # 图例标记长度
+    plt.rcParams['legend.handletextpad'] = 0.8  # 图例标记与文本间距
     
     # 设置图表边框和网格
     plt.rcParams['axes.linewidth'] = 1.2  # 坐标轴边框线宽
     plt.rcParams['grid.linewidth'] = 0.8  # 网格线宽
     plt.rcParams['grid.alpha'] = 0.5  # 网格透明度
     
-    # 设置图表保存参数
-    plt.rcParams['savefig.dpi'] = 300  # 保存图片的DPI
+    # 设置图表保存参数 - 适合论文发表的高质量设置
+    plt.rcParams['savefig.dpi'] = 600  # 保存图片的DPI (从300增加到600)
     plt.rcParams['savefig.bbox'] = 'tight'  # 保存时自动调整边界
+    plt.rcParams['savefig.facecolor'] = 'white'  # 保存图片的背景色
+    plt.rcParams['savefig.edgecolor'] = 'none'  # 保存图片的边框色
+    plt.rcParams['figure.figsize'] = [10, 10]  # 默认图片尺寸 (英寸) - 1:1正方形
     
     print("✅ Matplotlib样式配置已应用：字体大小和粗细已优化")
 

@@ -37,8 +37,13 @@ class PathConfig:
     
     def __init__(self):
         # === 输出目录配置 ===
-        self.BASE_OUTPUT_DIR = "../output_plots"  # 基础输出目录（与src同级）
-        self.BASE_EFFECT_SIZE_OUTPUT_DIR = "../effect_size_output"  # 基础效应量输出目录（与src同级）
+        # 获取当前脚本的目录，然后构建绝对路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_dir = os.path.dirname(current_dir)  # 上一级目录（principal_neuron）
+        
+        self.BASE_OUTPUT_DIR = os.path.join(project_dir, "output_plots")  # 基础输出目录
+        self.BASE_EFFECT_SIZE_OUTPUT_DIR = os.path.join(project_dir, "effect_size_output")  # 基础效应量输出目录
+        self.DATA_DIR = os.path.join(project_dir, "data")  # 数据目录
         
         # === 数据集配置：完整的数据集清单 ===
         # 每个数据集包含三个文件：原始数据、效应量数据、位置数据
@@ -46,60 +51,60 @@ class PathConfig:
             # EMtrace系列数据集
             'emtrace01': {
                 'name': 'EMtrace01数据集',
-                'raw': '../data/EMtrace01.xlsx',
-                'effect': '../data/EMtrace01-3标签版.csv',
-                'position': '../data/EMtrace01_Max_position.csv',
+                'raw': os.path.join(self.DATA_DIR, 'EMtrace01.xlsx'),
+                'effect': os.path.join(self.DATA_DIR, 'EMtrace01-3标签版.csv'),
+                'position': os.path.join(self.DATA_DIR, 'EMtrace01_Max_position.csv'),
                 'description': 'EMtrace01神经元活动数据（3标签版）'
             },
             'emtrace01_plus': {
                 'name': 'EMtrace01增强数据集',
-                'raw': '../data/EMtrace01_plus.xlsx',
-                'effect': '../data/EMtrace01-3标签版.csv',  # 复用同一个效应量文件
-                'position': '../data/EMtrace01_Max_position.csv',
+                'raw': os.path.join(self.DATA_DIR, 'EMtrace01_plus.xlsx'),
+                'effect': os.path.join(self.DATA_DIR, 'EMtrace01-3标签版.csv'),  # 复用同一个效应量文件
+                'position': os.path.join(self.DATA_DIR, 'EMtrace01_Max_position.csv'),
                 'description': 'EMtrace01增强版神经元活动数据'
             },
             'emtrace02': {
                 'name': 'EMtrace02数据集',
-                'raw': '../data/EMtrace02.xlsx',
-                'effect': '../data/EMtrace02-3标签版.csv',
-                'position': '../data/EMtrace02_Max_position.csv',
+                'raw': os.path.join(self.DATA_DIR, 'EMtrace02.xlsx'),
+                'effect': os.path.join(self.DATA_DIR, 'EMtrace02-3标签版.csv'),
+                'position': os.path.join(self.DATA_DIR, 'EMtrace02_Max_position.csv'),
                 'description': 'EMtrace02神经元活动数据（3标签版）'
             },
             'emtrace02_plus': {
                 'name': 'EMtrace02增强数据集',
-                'raw': '../data/EMtrace02_plus.xlsx',
-                'effect': '../data/EMtrace02-3标签版.csv',
-                'position': '../data/EMtrace02_Max_position.csv',
+                'raw': os.path.join(self.DATA_DIR, 'EMtrace02_plus.xlsx'),
+                'effect': os.path.join(self.DATA_DIR, 'EMtrace02-3标签版.csv'),
+                'position': os.path.join(self.DATA_DIR, 'EMtrace02_Max_position.csv'),
                 'description': 'EMtrace02增强版神经元活动数据'
             },
             
             # 其他数据集
             '2980': {
                 'name': '2980 datasets',
-                'raw': '../data/2980240924EMtrace.xlsx',
-                'effect': '../effect_size_output/effect_sizes_2980240924EMtrace.csv',
-                'position': '../data/2980_Max_position.csv',
+                'raw': os.path.join(self.DATA_DIR, '2980240924EMtrace.xlsx'),
+                'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_2980240924EMtrace.csv'),
+                'position': os.path.join(self.DATA_DIR, '2980_Max_position.csv'),
                 'description': '2980神经元活动数据'
             },
             '2980_plus': {
                 'name': '2980 datasets',
-                'raw': '../data/2980240924EMtrace_plus.xlsx',
-                'effect': '../effect_size_output/effect_sizes_2980240924EMtrace_plus.csv',
-                'position': '../data/2980_Max_position.csv',
+                'raw': os.path.join(self.DATA_DIR, '2980240924EMtrace_plus.xlsx'),
+                'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_2980240924EMtrace_plus.csv'),
+                'position': os.path.join(self.DATA_DIR, '2980_Max_position.csv'),
                 'description': '2980增强版神经元活动数据'
             },
             'bla6250': {
                 'name': 'BLA6250 datasets',
-                'raw': '../data/bla6250EM0626goodtrace.xlsx',
-                'effect': '../effect_size_output/effect_sizes_bla6250EM0626goodtrace.csv',
-                'position': '../data/6250_Max_position.csv',
+                'raw': os.path.join(self.DATA_DIR, 'bla6250EM0626goodtrace.xlsx'),
+                'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_bla6250EM0626goodtrace.csv'),
+                'position': os.path.join(self.DATA_DIR, '6250_Max_position.csv'),
                 'description': 'BLA6250神经元活动数据'
             },
             'bla6250_plus': {
                 'name': 'BLA6250 datasets',
-                'raw': '../data/bla6250EM0626goodtrace_plus.xlsx',
-                'effect': '../effect_size_output/effect_sizes_bla6250EM0626goodtrace_plus.csv',
-                'position': '../data/6250_Max_position.csv',
+                'raw': os.path.join(self.DATA_DIR, 'bla6250EM0626goodtrace_plus.xlsx'),
+                'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_bla6250EM0626goodtrace_plus.csv'),
+                'position': os.path.join(self.DATA_DIR, '6250_Max_position.csv'),
                 'description': 'BLA6250增强版神经元活动数据'
             },
             
@@ -107,22 +112,22 @@ class PathConfig:
             'day3': {
                 'name': 'Day3数据集',
                 'raw': None,  # 只有效应量数据
-                'effect': '../data/day3.csv',
-                'position': '../data/Day3_Max_position.csv',
+                'effect': os.path.join(self.DATA_DIR, 'day3.csv'),
+                'position': os.path.join(self.DATA_DIR, 'Day3_Max_position.csv'),
                 'description': 'Day3神经元活动数据'
             },
             'day6': {
                 'name': 'Day6数据集',
                 'raw': None,
-                'effect': '../data/day6.csv',
-                'position': '../data/Day6_Max_position.csv',
+                'effect': os.path.join(self.DATA_DIR, 'day6.csv'),
+                'position': os.path.join(self.DATA_DIR, 'Day6_Max_position.csv'),
                 'description': 'Day6神经元活动数据'
             },
             'day9': {
                 'name': 'Day9数据集',
                 'raw': None,
-                'effect': '../data/day9.csv',
-                'position': '../data/Day9_Max_position.csv',
+                'effect': os.path.join(self.DATA_DIR, 'day9.csv'),
+                'position': os.path.join(self.DATA_DIR, 'Day9_Max_position.csv'),
                 'description': 'Day9神经元活动数据'
             }
         }
@@ -780,7 +785,7 @@ if __name__ == "__main__":
                     background_neuron_color=BACKGROUND_NEURON_COLOR,
                     background_neuron_size=BACKGROUND_NEURON_SIZE,
                     background_neuron_alpha=BACKGROUND_NEURON_ALPHA,
-                    key_neuron_size=150,
+                    key_neuron_size=300,
                     key_neuron_alpha=STANDARD_KEY_NEURON_ALPHA,
                     show_title=True
                 )
@@ -895,7 +900,7 @@ if __name__ == "__main__":
                     background_neuron_color=BACKGROUND_NEURON_COLOR,
                     background_neuron_size=BACKGROUND_NEURON_SIZE,
                     background_neuron_alpha=BACKGROUND_NEURON_ALPHA,
-                    key_neuron_size=150,
+                    key_neuron_size=300,
                     key_neuron_alpha=STANDARD_KEY_NEURON_ALPHA,
                     show_title=True
                 )

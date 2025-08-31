@@ -26,7 +26,7 @@ if __name__ == '__main__':
     
     # 使用新的训练函数，获取详细指标
     train_metrics, val_metrics, final_predictions, final_labels = train_evaluate(
-        model, train_loader, test_loader, optimizer, criterion, epochs=50
+        model, train_loader, test_loader, optimizer, criterion, epochs=300
     )
 
     # 绘制各种图表

@@ -12,7 +12,7 @@ except ImportError:
 # Internal helper function to draw neurons on a given axis
 def _draw_activity_on_ax(ax, neurons_df, color, size, alpha, edgecolors, label, 
                          annotate_ids=True, neuron_id_col='NeuronID', x_col='x', y_col='y', 
-                         z_order=1, annotation_fontsize=9, annotation_offset=(0,10), annotation_weight='normal'):
+                         z_order=1, annotation_fontsize=18, annotation_offset=(0,12), annotation_weight='bold'):
     """
     Helper function to draw neuron scatter points and annotations on a given matplotlib axis.
     """
@@ -41,9 +41,9 @@ def _style_activity_plot_ax(ax):
     ax.set_xticks([]) 
     ax.set_yticks([])
     
-    # 设置坐标轴标签字体大小
-    ax.tick_params(axis='both', which='major', labelsize=14)
-    ax.tick_params(axis='both', which='minor', labelsize=12)
+    # 设置坐标轴标签字体大小 - 使用全局配置
+    ax.tick_params(axis='both', which='major', labelsize=18)
+    ax.tick_params(axis='both', which='minor', labelsize=16)
 
 def plot_single_behavior_activity_map(key_neurons_df, behavior_name, behavior_color, title, output_path=None, 
                                       all_neuron_positions_df=None, 
@@ -52,7 +52,7 @@ def plot_single_behavior_activity_map(key_neurons_df, behavior_name, behavior_co
                                       background_neuron_size=20, 
                                       background_neuron_alpha=0.5, 
                                       show_title=True,
-                                      key_neuron_size=150,
+                                      key_neuron_size=300,
                                       key_neuron_alpha=0.7,
                                       ax=None # New parameter
                                       ):
@@ -99,14 +99,14 @@ def plot_single_behavior_activity_map(key_neurons_df, behavior_name, behavior_co
                              z_order=2)
     
     if show_title: # This title becomes the subplot title in a composite
-        ax.set_title(title, fontsize=16 if fig is None else 14, fontweight='bold') # 增大标题字体并加粗
+        ax.set_title(title, fontsize=24 if fig is None else 22, fontweight='bold') # 增大标题字体并加粗
     
     _style_activity_plot_ax(ax)
 
     handles, labels = ax.get_legend_handles_labels()
     if handles: 
         by_label = OrderedDict(zip(labels, handles))
-        ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize='medium' if fig is None else 'small')
+        ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=18, markerscale=1.5)
 
     if fig is not None and output_path is not None: # Save only if it's a standalone plot
         plt.savefig(output_path, bbox_inches='tight')
@@ -194,14 +194,14 @@ def plot_shared_neurons_map(behavior1_name, behavior2_name,
         if fig is not None: raise ValueError(f"未知绘图方案: {scheme}。请选择 'A' 或 'B'。")
         else: ax.text(0.5,0.5, f"Error: Unknown scheme '{scheme}'", transform=ax.transAxes)
 
-    if show_title: ax.set_title(title, fontsize=16 if fig is None else 14, fontweight='bold')
+    if show_title: ax.set_title(title, fontsize=24 if fig is None else 22, fontweight='bold')
     
     _style_activity_plot_ax(ax)
     
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         by_label = OrderedDict(zip(labels, handles))
-        ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize='medium' if fig is None else 'small')
+        ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=18, markerscale=1.5)
 
     if fig is not None and output_path is not None:
         plt.savefig(output_path, bbox_inches='tight')
@@ -217,7 +217,7 @@ def plot_unique_neurons_map(unique_neurons_df, behavior_name, behavior_color, ti
                               background_neuron_size=20, 
                               background_neuron_alpha=0.5, 
                               show_title=True,
-                              key_neuron_size=150, # Added for consistency
+                              key_neuron_size=300, # Added for consistency
                               key_neuron_alpha=0.7,  # Added for consistency
                               ax=None # New parameter
                               ):
@@ -249,16 +249,16 @@ def plot_unique_neurons_map(unique_neurons_df, behavior_name, behavior_color, ti
         _draw_activity_on_ax(ax, unique_neurons_df, color=behavior_color, size=key_neuron_size,
                              alpha=key_neuron_alpha, edgecolors='black',
                              label=f'{behavior_name} Unique Key ({len(unique_neurons_df)})',
-                             z_order=2, annotation_fontsize=9 if fig is None else 8)
+                             z_order=2, annotation_fontsize=18 if fig is None else 16)
     
-    if show_title: ax.set_title(title, fontsize=16 if fig is None else 14, fontweight='bold')
+    if show_title: ax.set_title(title, fontsize=24 if fig is None else 22, fontweight='bold')
 
     _style_activity_plot_ax(ax)
     
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         by_label = OrderedDict(zip(labels, handles))
-        ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize='medium' if fig is None else 'small')
+        ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=18, markerscale=1.5)
     
     if fig is not None and output_path is not None:
         plt.savefig(output_path, bbox_inches='tight')
