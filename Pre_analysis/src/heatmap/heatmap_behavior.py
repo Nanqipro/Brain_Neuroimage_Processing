@@ -493,7 +493,38 @@ def extract_behavior_sequence_data(data: pd.DataFrame,
     
     return sequence_data
 
-def standardize_neural_data(data: pd.DataFrame) -> pd.DataFrame:
+def calculate_global_standardization_params(data: pd.DataFrame) -> Dict[str, Tuple[float, float]]:
+    """
+    计算整体数据的全局标准化参数（均值和标准差）
+    
+    Parameters
+    ----------
+    data : pd.DataFrame
+        完整的神经元数据
+        
+    Returns
+    -------
+    Dict[str, Tuple[float, float]]
+        每个神经元的全局标准化参数，格式为 {神经元名: (均值, 标准差)}
+    """
+    # 移除行为列（如果存在）
+    neural_data = data.copy()
+    if 'behavior' in neural_data.columns:
+        neural_data = neural_data.drop(columns=['behavior'])
+    
+    # 只处理数值列
+    numeric_columns = neural_data.select_dtypes(include=[np.number]).columns
+    
+    global_params = {}
+    for col in numeric_columns:
+        mean_val = neural_data[col].mean()
+        std_val = neural_data[col].std()
+        global_params[col] = (mean_val, std_val)
+    
+    return global_params
+
+def standardize_neural_data(data: pd.DataFrame, 
+                           global_params: Optional[Dict[str, Tuple[float, float]]] = None) -> pd.DataFrame:
     """
     对神经元数据进行Z-score标准化
     
@@ -501,6 +532,8 @@ def standardize_neural_data(data: pd.DataFrame) -> pd.DataFrame:
     ----------
     data : pd.DataFrame
         原始神经元数据
+    global_params : Optional[Dict[str, Tuple[float, float]]]
+        全局标准化参数。如果提供，使用全局参数；否则基于当前数据计算
         
     Returns
     -------
@@ -512,8 +545,14 @@ def standardize_neural_data(data: pd.DataFrame) -> pd.DataFrame:
     standardized_data = data.copy()
     
     for col in numeric_columns:
-        mean_val = data[col].mean()
-        std_val = data[col].std()
+        if global_params is not None and col in global_params:
+            # 使用全局标准化参数
+            mean_val, std_val = global_params[col]
+        else:
+            # 基于当前数据计算标准化参数（原有逻辑）
+            mean_val = data[col].mean()
+            std_val = data[col].std()
+        
         if std_val != 0:  # 避免除零错误
             standardized_data[col] = (data[col] - mean_val) / std_val
         else:
@@ -521,14 +560,17 @@ def standardize_neural_data(data: pd.DataFrame) -> pd.DataFrame:
     
     return standardized_data
 
-def get_global_neuron_order(data: pd.DataFrame) -> pd.Index:
+def get_global_neuron_order(data: pd.DataFrame, 
+                          global_standardization_params: Dict[str, Tuple[float, float]]) -> pd.Index:
     """
     根据整体数据计算全局神经元排序顺序（按峰值时间排序）
     
     Parameters
     ----------
     data : pd.DataFrame
-        完整的标准化神经元数据
+        完整的神经元数据
+    global_standardization_params : Dict[str, Tuple[float, float]]
+        全局标准化参数
         
     Returns
     -------
@@ -540,8 +582,8 @@ def get_global_neuron_order(data: pd.DataFrame) -> pd.Index:
     if 'behavior' in neural_data.columns:
         neural_data = neural_data.drop(columns=['behavior'])
     
-    # 对整体数据进行标准化
-    neural_data_standardized = standardize_neural_data(neural_data)
+    # 使用全局标准化参数对整体数据进行标准化
+    neural_data_standardized = standardize_neural_data(neural_data, global_standardization_params)
     
     # 计算每个神经元的峰值时间
     peak_times = neural_data_standardized.idxmax()
@@ -1085,13 +1127,18 @@ def main():
         print(f"保持原始时间戳格式（采样率: {config.SAMPLING_RATE}Hz）")
         print(f"数据加载成功，包含 {len(data)} 个时间点，时间戳范围: {data.index.min():.0f} - {data.index.max():.0f}")
         
+        # 计算全局标准化参数（确保所有片段使用相同的标准化参数）
+        print("正在计算全局标准化参数...")
+        global_standardization_params = calculate_global_standardization_params(data)
+        print(f"全局标准化参数计算完成，共 {len(global_standardization_params)} 个神经元")
+        
         # 根据配置决定是否计算全局神经元排序顺序
         global_neuron_order = None
         first_heatmap_order = None
         
         if config.SORTING_METHOD == 'global':
             print("正在计算全局神经元排序顺序...")
-            global_neuron_order = get_global_neuron_order(data)
+            global_neuron_order = get_global_neuron_order(data, global_standardization_params)
             print(f"全局排序完成，共 {len(global_neuron_order)} 个神经元按峰值时间排序")
         elif config.SORTING_METHOD == 'custom':
             print(f"使用自定义神经元排序模式")
@@ -1157,8 +1204,8 @@ def main():
                 print(f"序列 {i+1} 的时间范围超出数据范围，跳过")
                 continue
             
-            # 标准化数据
-            standardized_data = standardize_neural_data(sequence_data)
+            # 使用全局标准化参数进行标准化（确保与整体热图一致的对比度）
+            standardized_data = standardize_neural_data(sequence_data, global_standardization_params)
             
             # 根据配置选择排序方式（在创建热力图时才排序，这里保持原始数据）
             sorted_data = standardized_data
