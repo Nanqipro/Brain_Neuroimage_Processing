@@ -52,7 +52,7 @@ class BatchExperimentRunner:
             "--model", model_name,
             "--runs", str(runs),
             "--dataset", DATA_ROOT,
-            "--save_all", "false"  # 不保存详细结果，只保存摘要
+            "--window_size", str(window_size)
         ]
         
         # 记录开始时间
@@ -60,10 +60,9 @@ class BatchExperimentRunner:
         
         try:
             # 运行实验
+            # 直接继承父进程的stdout/stderr，实时打印子进程日志，避免看起来“卡住”
             result = subprocess.run(
-                cmd, 
-                capture_output=True, 
-                text=True, 
+                cmd,
                 cwd=Path.cwd(),
                 timeout=7200  # 2小时超时
             )

@@ -44,7 +44,7 @@ def setup_matplotlib_fonts():
     ax.set_title('测试中文显示')
     plt.close(fig)
 
-def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=64, dropout=0.3, save_all_results=False):
+def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=64, dropout=0.3, save_all_results=False, window_size: int | None = None):
     torch.manual_seed(seed)
     np.random.seed(seed)
     
@@ -95,7 +95,9 @@ def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=6
             visualize_graph(train_data_list, sample_index=0, title="训练样本神经元图", result_dir=result_dir)
     else:
         # 新的图数据处理流程
-        data_list, class_weights, class_names = load_data(data_path)
+        # 按需过滤窗口，减少一次性加载数据规模
+        window_sizes = [window_size] if window_size is not None else None
+        data_list, class_weights, class_names = load_data(data_path, window_sizes)
         
         if not data_list:
             print("No data loaded!")
@@ -258,7 +260,7 @@ def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=6
     return experiment_result
 
 def run_multiple_experiments(model_name, n_experiments=100, data_path='../../data', 
-                            hidden_dim=64, dropout=0.3, save_all=False):
+                            hidden_dim=64, dropout=0.3, save_all=False, window_size: int | None = None):
     
     setup_matplotlib_fonts()
     
@@ -283,7 +285,8 @@ def run_multiple_experiments(model_name, n_experiments=100, data_path='../../dat
             data_path=data_path,
             hidden_dim=hidden_dim,
             dropout=dropout,
-            save_all_results=save_all
+            save_all_results=save_all,
+            window_size=window_size
         )
         
         all_results.append(result)
@@ -370,6 +373,7 @@ def parse_args():
     parser.add_argument('--hidden_dim', type=int, default=64, help='隐藏层维度')
     parser.add_argument('--dropout', type=float, default=0.3, help='Dropout比例')
     parser.add_argument('--save_all', action='store_true', help='保存每次实验的详细结果')
+    parser.add_argument('--window_size', type=int, default=None, help='仅加载指定窗口大小的数据')
     return parser.parse_args()
 
 def main():
@@ -388,7 +392,8 @@ def main():
         data_path=args.dataset,
         hidden_dim=args.hidden_dim,
         dropout=args.dropout,
-        save_all=args.save_all
+        save_all=args.save_all,
+        window_size=args.window_size
     )
 
 if __name__ == "__main__":

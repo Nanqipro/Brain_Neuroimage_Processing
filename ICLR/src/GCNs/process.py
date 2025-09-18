@@ -14,7 +14,7 @@ import os
 import glob
 import re
 
-def load_data(data_path):
+def load_data(data_path, window_sizes=None):
     """
     加载数据，支持CSV文件和图文件目录两种格式
     
@@ -45,8 +45,8 @@ def load_data(data_path):
 
         return features_scaled, labels_encoded, class_weights, encoder.classes_
     else:
-        # 新的图文件加载逻辑
-        return load_graph_data_from_directory(data_path)
+        # 新的图文件加载逻辑，支持按窗口过滤
+        return load_graph_data_from_directory(data_path, window_sizes)
 
 def load_graph_data_from_directory(data_root_path, window_sizes=None):
     """
