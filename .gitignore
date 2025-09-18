@@ -86,3 +86,7 @@ tmp/
 # Project specific large directories
 Pre_analysis/datasets/
 Pre_analysis/graph/
+ 
+# Ignore symlinked data directory (works for symlink and real directory)
+ICLR/data
+ICLR/data/
