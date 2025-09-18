@@ -14,7 +14,7 @@ import os
 import glob
 import re
 
-def load_data(data_path, window_sizes=None):
+def load_data(data_path, window_sizes=None, label_mapping=None):
     """
     加载数据，支持CSV文件和图文件目录两种格式
     
@@ -46,9 +46,9 @@ def load_data(data_path, window_sizes=None):
         return features_scaled, labels_encoded, class_weights, encoder.classes_
     else:
         # 新的图文件加载逻辑，支持按窗口过滤
-        return load_graph_data_from_directory(data_path, window_sizes)
+        return load_graph_data_from_directory(data_path, window_sizes, label_mapping)
 
-def load_graph_data_from_directory(data_root_path, window_sizes=None):
+def load_graph_data_from_directory(data_root_path, window_sizes=None, label_mapping=None):
     """
     从图文件目录直接加载数据
     
@@ -89,6 +89,9 @@ def load_graph_data_from_directory(data_root_path, window_sizes=None):
             match = re.search(r'graph_\d+_\d+_(\w+)', filename)
             if match:
                 label = match.group(1)
+                # 应用标签映射（如果提供）
+                if label_mapping and label in label_mapping:
+                    label = label_mapping[label]
                 all_labels.append(label)
                 all_files.append(os.path.join(window_dir, filename))
     

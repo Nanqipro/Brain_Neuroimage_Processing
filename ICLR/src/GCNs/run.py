@@ -49,7 +49,7 @@ def setup_matplotlib_fonts():
     ax.set_title('测试中文显示')
     plt.close(fig)
 
-def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=64, dropout=0.3, save_all_results=False, window_size: int | None = None):
+def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=64, dropout=0.3, save_all_results=False, window_size: int | None = None, label_mapping=None):
     torch.manual_seed(seed)
     np.random.seed(seed)
     
@@ -102,7 +102,7 @@ def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=6
         # 新的图数据处理流程
         # 按需过滤窗口，减少一次性加载数据规模
         window_sizes = [window_size] if window_size is not None else None
-        data_list, class_weights, class_names = load_data(data_path, window_sizes)
+        data_list, class_weights, class_names = load_data(data_path, window_sizes, label_mapping)
         
         if not data_list:
             print("No data loaded!")
@@ -270,7 +270,7 @@ def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=6
     return experiment_result
 
 def run_multiple_experiments(model_name, n_experiments=100, data_path='../../data', 
-                            hidden_dim=64, dropout=0.3, save_all=False, window_size: int | None = None):
+                            hidden_dim=64, dropout=0.3, save_all=False, window_size: int | None = None, label_mapping=None):
     
     setup_matplotlib_fonts()
     
@@ -296,7 +296,8 @@ def run_multiple_experiments(model_name, n_experiments=100, data_path='../../dat
             hidden_dim=hidden_dim,
             dropout=dropout,
             save_all_results=save_all,
-            window_size=window_size
+            window_size=window_size,
+            label_mapping=label_mapping
         )
         
         all_results.append(result)
@@ -385,6 +386,7 @@ def parse_args():
     parser.add_argument('--dropout', type=float, default=0.3, help='Dropout比例')
     parser.add_argument('--save_all', action='store_true', help='保存每次实验的详细结果')
     parser.add_argument('--window_size', type=int, default=None, help='仅加载指定窗口大小的数据')
+    parser.add_argument('--binary_mode', action='store_true', help='使用二分类模式（Sleep vs Active）')
     return parser.parse_args()
 
 def main():
@@ -397,6 +399,22 @@ def main():
     print(f"Dropout比例: {args.dropout}")
     print(f"保存所有详细结果: {args.save_all}")
     
+    # 准备标签映射（如果启用二分类模式）
+    label_mapping = None
+    if args.binary_mode:
+        label_mapping = {
+            'Sleep': 'Sleep',
+            'Wake': 'Active',
+            'Move': 'Active',
+            'Drink': 'Active',
+            'zone': 'Active',
+            'Scratch': 'Active',
+            'Groom': 'Active',
+            'Active': 'Active'
+        }
+        print(f"启用二分类模式: Sleep vs Active")
+        print(f"标签映射: {label_mapping}")
+    
     run_multiple_experiments(
         model_name=args.model,
         n_experiments=args.runs,
@@ -404,7 +422,8 @@ def main():
         hidden_dim=args.hidden_dim,
         dropout=args.dropout,
         save_all=args.save_all,
-        window_size=args.window_size
+        window_size=args.window_size,
+        label_mapping=label_mapping
     )
 
 if __name__ == "__main__":
