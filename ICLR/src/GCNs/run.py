@@ -44,7 +44,7 @@ def setup_matplotlib_fonts():
     ax.set_title('测试中文显示')
     plt.close(fig)
 
-def run_single_experiment(model_name, seed, data_path='dataset/processed3.csv', hidden_dim=64, dropout=0.3, save_all_results=False):
+def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=64, dropout=0.3, save_all_results=False):
     torch.manual_seed(seed)
     np.random.seed(seed)
     
@@ -62,44 +62,81 @@ def run_single_experiment(model_name, seed, data_path='dataset/processed3.csv', 
     # 记录开始时间
     begin_time = time.time()
     
-    features, labels, class_weights, class_names = load_data(data_path)
-    features_resampled, labels_resampled = oversample_data(features, labels, ramdom_state=seed)
-    
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        features_resampled, labels_resampled, test_size=0.4, 
-        random_state=seed, stratify=labels_resampled
-    )
-    
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_temp, y_temp, test_size=0.5, 
-        random_state=seed, stratify=y_temp
-    )
-    
-    correlation_matrix = compute_correlation_matrix(X_train)
-    
-    if save_all_results:
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(correlation_matrix, cmap='coolwarm', center=0)
-        plt.title("神经元相关性矩阵")
-        plt.savefig(f'{result_dir}/correlation_matrix.png')
-        plt.close()
-    
-    train_data_list = create_pyg_dataset(X_train, y_train, correlation_matrix)
-    val_data_list = create_pyg_dataset(X_val, y_val, correlation_matrix)
-    test_data_list = create_pyg_dataset(X_test, y_test, correlation_matrix)
-    
-    if save_all_results:
-        visualize_graph(train_data_list, sample_index=0, title="训练样本神经元图", result_dir=result_dir)
+    # 检查数据路径类型并加载数据
+    if data_path.endswith('.csv'):
+        # 原有的CSV数据处理流程
+        features, labels, class_weights, class_names = load_data(data_path)
+        features_resampled, labels_resampled = oversample_data(features, labels, ramdom_state=seed)
+        
+        X_train, X_temp, y_train, y_temp = train_test_split(
+            features_resampled, labels_resampled, test_size=0.4, 
+            random_state=seed, stratify=labels_resampled
+        )
+        
+        X_val, X_test, y_val, y_test = train_test_split(
+            X_temp, y_temp, test_size=0.5, 
+            random_state=seed, stratify=y_temp
+        )
+        
+        correlation_matrix = compute_correlation_matrix(X_train)
+        
+        if save_all_results:
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(correlation_matrix, cmap='coolwarm', center=0)
+            plt.title("神经元相关性矩阵")
+            plt.savefig(f'{result_dir}/correlation_matrix.png')
+            plt.close()
+        
+        train_data_list = create_pyg_dataset(X_train, y_train, correlation_matrix)
+        val_data_list = create_pyg_dataset(X_val, y_val, correlation_matrix)
+        test_data_list = create_pyg_dataset(X_test, y_test, correlation_matrix)
+        
+        if save_all_results:
+            visualize_graph(train_data_list, sample_index=0, title="训练样本神经元图", result_dir=result_dir)
+    else:
+        # 新的图数据处理流程
+        data_list, class_weights, class_names = load_data(data_path)
+        
+        if not data_list:
+            print("No data loaded!")
+            return None
+        
+        # 将PyG数据转换为标签列表用于分割
+        labels = [data.y.item() for data in data_list]
+        
+        # 数据分割
+        train_indices, temp_indices = train_test_split(
+            range(len(data_list)), test_size=0.4, 
+            random_state=seed, stratify=labels
+        )
+        
+        temp_labels = [labels[i] for i in temp_indices]
+        val_indices, test_indices = train_test_split(
+            temp_indices, test_size=0.5, 
+            random_state=seed, stratify=temp_labels
+        )
+        
+        # 创建数据子集
+        train_data_list = [data_list[i] for i in train_indices]
+        val_data_list = [data_list[i] for i in val_indices]
+        test_data_list = [data_list[i] for i in test_indices]
+        
+        if save_all_results:
+            visualize_graph(train_data_list, sample_index=0, title="训练样本神经元图", result_dir=result_dir)
     
     train_loader = DataLoader(train_data_list, batch_size=32, shuffle=True)
     val_loader = DataLoader(val_data_list, batch_size=32)
     test_loader = DataLoader(test_data_list, batch_size=32)
     
+    # 获取特征维度
+    num_features = train_data_list[0].x.shape[1]
+    num_classes = len(class_names)
+    
     model_class = MODEL_DICT[model_name]
     model = model_class(
-        num_features=1,
+        num_features=num_features,
         hidden_dim=hidden_dim,
-        num_classes=len(np.unique(labels)),
+        num_classes=num_classes,
         dropout=dropout
     ).to(device)
     
@@ -183,9 +220,9 @@ def run_single_experiment(model_name, seed, data_path='dataset/processed3.csv', 
             "dropout": dropout,
             "total_params": total_params,
             "dataset": data_path,
-            "train_size": X_train.shape[0],
-            "val_size": X_val.shape[0],
-            "test_size": X_test.shape[0],
+            "train_size": len(train_data_list),
+            "val_size": len(val_data_list),
+            "test_size": len(test_data_list),
             "best_epoch": best_epoch + 1,
             "training_time": elapsed_time
         },
@@ -220,7 +257,7 @@ def run_single_experiment(model_name, seed, data_path='dataset/processed3.csv', 
     
     return experiment_result
 
-def run_multiple_experiments(model_name, n_experiments=100, data_path='dataset/processed3.csv', 
+def run_multiple_experiments(model_name, n_experiments=100, data_path='../../data', 
                             hidden_dim=64, dropout=0.3, save_all=False):
     
     setup_matplotlib_fonts()
@@ -329,7 +366,7 @@ def parse_args():
     parser.add_argument('--model', type=str, default='hybrid', choices=['hybrid', 'gcn', 'gat', 'sage'],
                         help='模型类型: hybrid (混合GCN+SAGE+GAT), gcn (纯GCN), gat (纯GAT), sage(纯sage)')
     parser.add_argument('--runs', type=int, default=100, help='实验运行次数')
-    parser.add_argument('--dataset', type=str, default='dataset/processed3.csv', help='数据集路径')
+    parser.add_argument('--dataset', type=str, default='../../data', help='数据集路径')
     parser.add_argument('--hidden_dim', type=int, default=64, help='隐藏层维度')
     parser.add_argument('--dropout', type=float, default=0.3, help='Dropout比例')
     parser.add_argument('--save_all', action='store_true', help='保存每次实验的详细结果')

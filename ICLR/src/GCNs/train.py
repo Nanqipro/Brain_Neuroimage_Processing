@@ -143,32 +143,32 @@ def plot_training_metrics(train_metrics, val_metrics, result_dir='result'):
     plt.savefig(f'{result_dir}/training_metrics.png')
     plt.close()
 
-# def plot_learning_curve(train_metrics, val_metrics, result_dir='result'):
-#     """绘制学习曲线（训练损失和验证准确率）"""
-#     plt.figure(figsize=(12, 6))
+def plot_learning_curve(train_metrics, val_metrics, result_dir='result'):
+    """绘制学习曲线（训练损失和验证准确率）"""
+    plt.figure(figsize=(12, 6))
     
-#     # 创建两个Y轴
-#     ax1 = plt.gca()
-#     ax2 = ax1.twinx()
+    # 创建两个Y轴
+    ax1 = plt.gca()
+    ax2 = ax1.twinx()
     
-#     # 绘制训练损失
-#     ax1.plot(train_metrics['loss'], 'b-', label='Train Loss')
-#     ax1.set_xlabel('Epochs')
-#     ax1.set_ylabel('Loss', color='b')
-#     ax1.tick_params(axis='y', labelcolor='b')
+    # 绘制训练损失
+    ax1.plot(train_metrics['loss'], 'b-', label='Train Loss')
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('Loss', color='b')
+    ax1.tick_params(axis='y', labelcolor='b')
     
-#     # 绘制验证准确率
-#     ax2.plot(val_metrics['accuracy'], 'r-', label='Validation Accuracy')
-#     ax2.set_ylabel('Accuracy', color='r')
-#     ax2.tick_params(axis='y', labelcolor='r')
+    # 绘制验证准确率
+    ax2.plot(val_metrics['accuracy'], 'r-', label='Validation Accuracy')
+    ax2.set_ylabel('Accuracy', color='r')
+    ax2.tick_params(axis='y', labelcolor='r')
     
-#     # 添加图例
-#     lines1, labels1 = ax1.get_legend_handles_labels()
-#     lines2, labels2 = ax2.get_legend_handles_labels()
-#     ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
+    # 添加图例
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
     
-#     plt.title('Training Loss and Validation Accuracy')
-#     plt.grid(True)
-#     plt.tight_layout()
-#     plt.savefig(f'{result_dir}/learning_curve.png')
-#     plt.close()
+    plt.title('Training Loss and Validation Accuracy')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f'{result_dir}/learning_curve.png')
+    plt.close()

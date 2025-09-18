@@ -12,8 +12,8 @@
 5. run.py: 运行模型的启动函数以及结果分析，仔细查看 `parse_args` 中的参数，并对超参数根据数据做出一些调整
 
 ## To-do list
-1. 对图数据做适配：txt(/app/ZJ/ICLR/data/graphs) - PyG - tensor
-2. 注意这是监督学习，每个图都有 label, /app/ZJ/ICLR/data/labels
+1. 对图数据做适配：txt(../../data/graphs) - PyG - tensor
+2. 注意这是监督学习，每个图都有 label, ../../data/labels
 3. 做多组实验（50-100组），注意数据集的划分
 4. 指标：每个模型的 accuracy, recall, f1-score, training time, predicting time, run time(纯数据就好，图我们自己另外画，数据处理无需记录时间)
 5. 找其他论文的模型（SOTA），重复以上的步骤，Paper with code / Google Scholar
