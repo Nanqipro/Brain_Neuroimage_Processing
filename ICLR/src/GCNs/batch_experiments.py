@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 # 实验配置
-MODELS = ['gcn', 'gat', 'hybrid']
+MODELS = ['gcn', 'gat', 'sage', 'hybrid', 'gin', 'transformer', 'chebnet', 'ensemble']
 WINDOW_SIZES = [20, 50, 100]
 DEFAULT_RUNS = 50  # 默认实验组数
 DATA_ROOT = "../../data"
@@ -262,8 +262,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="批量GCN实验脚本")
     parser.add_argument('--runs', type=int, default=DEFAULT_RUNS,
                         help=f'每个实验的运行次数 (默认: {DEFAULT_RUNS})')
-    parser.add_argument('--models', nargs='+', choices=MODELS, default=MODELS,
-                        help=f'要测试的模型 (默认: {MODELS})')
+    parser.add_argument('--models', nargs='+', choices=MODELS, default=['gcn', 'gat', 'sage', 'gin'],
+                        help=f'要测试的模型 (默认: gcn, gat, sage, gin)')
     parser.add_argument('--window_sizes', type=int, nargs='+', default=WINDOW_SIZES,
                         help=f'要测试的窗口大小 (默认: {WINDOW_SIZES})')
     parser.add_argument('--output_dir', type=str, default="batch_results",

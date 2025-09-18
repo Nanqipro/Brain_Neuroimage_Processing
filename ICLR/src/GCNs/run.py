@@ -14,8 +14,9 @@ import matplotlib as mpl
 from sklearn.metrics import classification_report
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
-from model import ImprovedGCN, PureGCN, PureGAT #, PureGraphSAGE
-from process import load_data, oversample_data # , compute_correlation_matrix, create_pyg_dataset, visualize_graph
+from model import ImprovedGCN, PureGCN, PureGAT, PureGraphSAGE
+from sota_models import GIN, GraphTransformer, ChebNet, EnsembleGNN
+from process import load_data, oversample_data, compute_correlation_matrix, create_pyg_dataset, visualize_graph
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics, plot_learning_curve
 
 # 模型字典，方便通过字符串参数选择模型
@@ -23,7 +24,11 @@ MODEL_DICT = {
     'hybrid': ImprovedGCN,
     'gcn': PureGCN,
     'gat': PureGAT,
-    # sage': PureGraphSAGE
+    'sage': PureGraphSAGE,
+    'gin': GIN,
+    'transformer': GraphTransformer,
+    'chebnet': ChebNet,
+    'ensemble': EnsembleGNN
 }
 
 def setup_result_directory(model_name):
@@ -205,7 +210,11 @@ def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=6
         model.load_state_dict(torch.load(f'{result_dir}/best_model.pth'))
     
     # 最终测试
+    import time as time_module
+    test_start_time = time_module.time()
     test_metrics = evaluate_model(model, test_loader, device)
+    test_end_time = time_module.time()
+    predicting_time = test_end_time - test_start_time
     
     # 计算训练时间
     end_time = time.time()
@@ -226,7 +235,8 @@ def run_single_experiment(model_name, seed, data_path='../../data', hidden_dim=6
             "val_size": len(val_data_list),
             "test_size": len(test_data_list),
             "best_epoch": best_epoch + 1,
-            "training_time": elapsed_time
+            "training_time": elapsed_time,
+            "predicting_time": predicting_time
         },
         "test_metrics": {
             "accuracy": float(test_metrics['accuracy']),
@@ -366,7 +376,8 @@ def run_multiple_experiments(model_name, n_experiments=100, data_path='../../dat
 
 def parse_args():
     parser = argparse.ArgumentParser(description="脑神经元GNN分类实验")
-    parser.add_argument('--model', type=str, default='hybrid', choices=['hybrid', 'gcn', 'gat', 'sage'],
+    parser.add_argument('--model', type=str, default='hybrid', 
+                        choices=['hybrid', 'gcn', 'gat', 'sage', 'gin', 'transformer', 'chebnet', 'ensemble'],
                         help='模型类型: hybrid (混合GCN+SAGE+GAT), gcn (纯GCN), gat (纯GAT), sage(纯sage)')
     parser.add_argument('--runs', type=int, default=100, help='实验运行次数')
     parser.add_argument('--dataset', type=str, default='../../data', help='数据集路径')
