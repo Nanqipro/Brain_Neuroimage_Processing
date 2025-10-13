@@ -23,7 +23,7 @@ MODEL_DICT = {
     'hybrid': ImprovedGCN,
     'gcn': PureGCN,
     'gat': PureGAT,
-    # sage': PureGraphSAGE
+    'sage': PureGraphSAGE
 }
 
 def setup_result_directory(model_name):
