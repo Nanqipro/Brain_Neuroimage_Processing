@@ -37,18 +37,18 @@ def oversample_data(features, labels, ramdom_state):
     return features_resampled, labels_resampled
 
 # 计算特征之间的相关性矩阵, Pearson 相关系数
-# def compute_correlation_matrix(features):
-#     features_T = features.T
-#     num_neurons = features_T.shape[0]
-#     correlation_matrix = np.zeros((num_neurons, num_neurons))
+def compute_correlation_matrix(features):
+    features_T = features.T
+    num_neurons = features_T.shape[0]
+    correlation_matrix = np.zeros((num_neurons, num_neurons))
 
-#     for i in range(num_neurons):
-#         for j in range(i, num_neurons):
-#             corr, _ = pearsonr(features_T[i], features_T[j])
-#             correlation_matrix[i, j] = corr
-#             correlation_matrix[j, i] = corr
+    for i in range(num_neurons):
+        for j in range(i, num_neurons):
+            corr, _ = pearsonr(features_T[i], features_T[j])
+            correlation_matrix[i, j] = corr
+            correlation_matrix[j, i] = corr
 
-#     return correlation_matrix
+    return correlation_matrix
 
 def generate_graph(sample_features, correlation_matrix, threshold=0.4):
     num_neurons = len(sample_features)
@@ -102,77 +102,77 @@ def create_pyg_dataset(features, labels, correlation_matrix, threshold=0.4):
     return data_list
     
 # 将生成的拓扑图可视化
-# def visualize_graph(data, sample_index=0, title="神经元连接图", result_dir='result'):
-#     plt.figure(figsize=(10, 10))
-#     graph_data = data[sample_index]
+def visualize_graph(data, sample_index=0, title="神经元连接图", result_dir='result'):
+    plt.figure(figsize=(10, 10))
+    graph_data = data[sample_index]
     
-#     G = nx.Graph()
-#     for i in range(graph_data.x.shape[0]):
-#         node_value = float(graph_data.x[i][0])
-#         G.add_node(i, value=node_value)
-#     for i in range(graph_data.edge_index.shape[1]):
-#         src = int(graph_data.edge_index[0, i])
-#         dst = int(graph_data.edge_index[1, i])
-#         weight = float(graph_data.edge_attr[i]) if graph_data.edge_attr is not None else 1.0
-#         G.add_edge(src, dst, weight=weight)
+    G = nx.Graph()
+    for i in range(graph_data.x.shape[0]):
+        node_value = float(graph_data.x[i][0])
+        G.add_node(i, value=node_value)
+    for i in range(graph_data.edge_index.shape[1]):
+        src = int(graph_data.edge_index[0, i])
+        dst = int(graph_data.edge_index[1, i])
+        weight = float(graph_data.edge_attr[i]) if graph_data.edge_attr is not None else 1.0
+        G.add_edge(src, dst, weight=weight)
 
-#     try:
-#         pos = nx.kamada_kawai_layout(G)
-#     except:
-#         pos = nx.spring_layout(G, seed=42)
+    try:
+        pos = nx.kamada_kawai_layout(G)
+    except:
+        pos = nx.spring_layout(G, seed=42)
 
-#     # 获取节点值以用于颜色映射
-#     node_values = [G.nodes[i]['value'] for i in range(len(G.nodes))]
-#     vmin = min(node_values)
-#     vmax = max(node_values)
+    # 获取节点值以用于颜色映射
+    node_values = [G.nodes[i]['value'] for i in range(len(G.nodes))]
+    vmin = min(node_values)
+    vmax = max(node_values)
     
-#     # 根据边权重确定边的宽度
-#     edge_weights = [G.edges[edge]['weight'] * 3 for edge in G.edges]
+    # 根据边权重确定边的宽度
+    edge_weights = [G.edges[edge]['weight'] * 3 for edge in G.edges]
     
-#     # 创建颜色映射
-#     cmap = plt.cm.coolwarm
+    # 创建颜色映射
+    cmap = plt.cm.coolwarm
 
-#     # 绘制节点
-#     nodes = nx.draw_networkx_nodes(
-#         G, pos, 
-#         node_color=node_values,
-#         cmap=cmap,
-#         node_size=350,
-#         alpha=0.9,
-#         vmin=vmin,
-#         vmax=vmax,
-#         edgecolors='black',
-#         linewidths=0.5
-#     )
+    # 绘制节点
+    nodes = nx.draw_networkx_nodes(
+        G, pos, 
+        node_color=node_values,
+        cmap=cmap,
+        node_size=350,
+        alpha=0.9,
+        vmin=vmin,
+        vmax=vmax,
+        edgecolors='black',
+        linewidths=0.5
+    )
     
-#     # 绘制边
-#     edges = nx.draw_networkx_edges(
-#         G, pos,
-#         width=edge_weights,
-#         edge_color='gray',
-#         alpha=0.6,
-#         connectionstyle='arc3,rad=0.1'  # 使边弯曲，避免重叠
-#     )
+    # 绘制边
+    edges = nx.draw_networkx_edges(
+        G, pos,
+        width=edge_weights,
+        edge_color='gray',
+        alpha=0.6,
+        connectionstyle='arc3,rad=0.1'  # 使边弯曲，避免重叠
+    )
     
-#     # 绘制节点标签
-#     nx.draw_networkx_labels(
-#         G, pos,
-#         font_size=9,
-#         font_family='sans-serif',
-#         font_weight='bold'
-#     )
+    # 绘制节点标签
+    nx.draw_networkx_labels(
+        G, pos,
+        font_size=9,
+        font_family='sans-serif',
+        font_weight='bold'
+    )
     
-#     # 添加颜色条
-#     cbar = plt.colorbar(nodes, label='钙离子浓度', shrink=0.8)
-#     cbar.ax.tick_params(labelsize=9)
+    # 添加颜色条
+    cbar = plt.colorbar(nodes, label='钙离子浓度', shrink=0.8)
+    cbar.ax.tick_params(labelsize=9)
     
-#     # 添加标题和信息
-#     behavior_label = graph_data.y.item()
-#     plt.title(f"{title}\n样本标签: {behavior_label}", fontsize=14, fontweight='bold')
-#     plt.text(0.02, 0.02, f"节点数量: {G.number_of_nodes()}, 边数量: {G.number_of_edges()}",
-#              transform=plt.gca().transAxes, fontsize=10)
+    # 添加标题和信息
+    behavior_label = graph_data.y.item()
+    plt.title(f"{title}\n样本标签: {behavior_label}", fontsize=14, fontweight='bold')
+    plt.text(0.02, 0.02, f"节点数量: {G.number_of_nodes()}, 边数量: {G.number_of_edges()}",
+             transform=plt.gca().transAxes, fontsize=10)
     
-#     plt.axis('off')
-#     plt.tight_layout()
-#     plt.savefig(f'{result_dir}/graph_visualization.png', dpi=300, bbox_inches='tight')
-#     plt.close()
+    plt.axis('off')
+    plt.tight_layout()
+    plt.savefig(f'{result_dir}/graph_visualization.png', dpi=300, bbox_inches='tight')
+    plt.close()

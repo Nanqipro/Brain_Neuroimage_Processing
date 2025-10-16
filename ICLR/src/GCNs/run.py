@@ -14,8 +14,8 @@ import matplotlib as mpl
 from sklearn.metrics import classification_report
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
-from model import ImprovedGCN, PureGCN, PureGAT #, PureGraphSAGE
-from process import load_data, oversample_data # , compute_correlation_matrix, create_pyg_dataset, visualize_graph
+from model import ImprovedGCN, PureGCN, PureGAT, PureGraphSAGE
+from process import load_data, oversample_data, compute_correlation_matrix, create_pyg_dataset, visualize_graph
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics, plot_learning_curve
 
 # 模型字典，方便通过字符串参数选择模型
