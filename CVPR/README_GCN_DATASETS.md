@@ -1,168 +1,268 @@
-# GCN标准数据集下载工具
+# GCN数据集下载工具
 
-一个用于下载常用GCN（图卷积网络）标准数据集的Python脚本。
+一个统一的数据集下载脚本，支持**图分类**和**节点分类**两种类型的GCN数据集。
 
-## 支持的数据集
+## ⚠️ 重要提示
 
-| 数据集 | 节点数 | 边数 | 特征维度 | 类别数 | 任务类型 |
-|--------|--------|------|----------|--------|----------|
-| **Cora** | 2,708 | 5,429 | 1,433 | 7 | 节点分类（论文引用网络） |
-| **CiteSeer** | 3,327 | 4,732 | 3,703 | 6 | 节点分类（论文引用网络） |
-| **Pubmed** | 19,717 | 44,338 | 500 | 3 | 节点分类（论文引用网络） |
-| **Reddit** | 232,965 | 11,606,919 | 602 | 41 | 大规模节点分类（社交网络） |
-| **PPI** | 24图 | - | 50 | 121 | 多标签节点分类（蛋白质网络） |
+**您的代码是图分类任务**（使用 `DataLoader` + `global_pooling`），请下载**图分类数据集**！
 
-## 安装依赖
-
-### 方法1: 使用PyTorch Geometric（推荐）
+## 快速开始
 
 ```bash
-pip install torch torch-geometric
+# 1. 查看所有可用数据集
+python download_gcn_datasets.py --list
+
+# 2. 下载推荐的图分类数据集（适合您的代码）
+python download_gcn_datasets.py --dataset MUTAG --task graph
+
+# 3. 下载中等规模数据集
+python download_gcn_datasets.py --dataset PROTEINS --task graph
+
+# 4. 下载大规模OGB数据集
+python download_gcn_datasets.py --dataset ogbg-molhiv --task graph --source ogb
 ```
 
-### 方法2: 使用DGL
+## 图分类数据集（推荐！）
 
-```bash
-pip install torch dgl
-```
+这些数据集**适合您的代码**，可以直接使用 `DataLoader` + `global_pooling`。
 
-### 方法3: 使用ModelScope
+### TUDataset 系列
 
-```bash
-pip install modelscope
-```
+| 数据集 | 图数量 | 类别数 | 领域 | 描述 |
+|--------|--------|--------|------|------|
+| **MUTAG** | 188 | 2 | 生物化学 | 分子图分类 - 判断化合物致癌性 |
+| **PROTEINS** | 1,113 | 2 | 生物 | 蛋白质图分类 - 判断蛋白质是否为酶 |
+| **PTC_MR** | 344 | 2 | 生物化学 | 化合物致癌性预测 |
+| **ENZYMES** | 600 | 6 | 生物 | 蛋白质图分类 - 酶类型分类 |
+| **NCI1** | 4,110 | 2 | 生物化学 | 化合物抗癌活性预测（标准基准） |
+| **NCI109** | 4,127 | 2 | 生物化学 | 化合物抗癌活性预测 |
+| **IMDB-BINARY** | 1,000 | 2 | 社交网络 | 电影协作网络 - 判断电影类型 |
+| **IMDB-MULTI** | 1,500 | 3 | 社交网络 | 电影协作网络 - 判断电影类型（3类） |
+| **REDDIT-BINARY** | 2,000 | 2 | 社交网络 | Reddit社区图分类 |
+| **DD** | 1,178 | 2 | 生物 | 蛋白质图分类 - 酶/非酶 |
+
+### OGB (Open Graph Benchmark)
+
+| 数据集 | 图数量 | 任务类型 | 领域 | 描述 |
+|--------|--------|----------|------|------|
+| **ogbg-molhiv** | 41,127 | 二分类 | 药物发现 | 分子图 - HIV抑制剂预测 |
+| **ogbg-molpcba** | 437,929 | 多标签分类 | 药物发现 | 分子图 - 生物活性预测（大规模） |
+| **ogbg-ppa** | 158,100 | 多分类 | 生物 | 蛋白质-蛋白质相互作用图 |
 
 ## 使用方法
 
-### 基本用法
+### 查看所有数据集
 
 ```bash
-# 下载Cora数据集（最常用）
-python download_gcn_datasets.py --datasets cora --method pyg
-
-# 下载多个数据集
-python download_gcn_datasets.py --datasets cora citeseer pubmed --method pyg
-
-# 下载所有数据集
-python download_gcn_datasets.py --datasets all --method pyg
+python download_gcn_datasets.py --list
 ```
 
-### 参数说明
-
-- `--datasets`: 要下载的数据集名称
-  - 可选值: `cora`, `citeseer`, `pubmed`, `reddit`, `ppi`, `all`
-  - 可以指定多个数据集，用空格分隔
-  
-- `--method`: 下载方法
-  - `pyg`: 使用PyTorch Geometric（推荐）
-  - `dgl`: 使用Deep Graph Library
-  - `modelscope`: 使用ModelScope（主要用于中文环境）
-  
-- `--data_root`: 数据集保存路径（可选）
-  - 默认值: `./data/gcn_datasets`
-
-### 使用示例
+### 下载图分类数据集
 
 ```bash
-# 示例1: 快速开始 - 下载Cora数据集
-python download_gcn_datasets.py --datasets cora --method pyg
+# TUDataset系列（推荐从小数据集开始）
+python download_gcn_datasets.py --dataset MUTAG --task graph
+python download_gcn_datasets.py --dataset PROTEINS --task graph
+python download_gcn_datasets.py --dataset NCI1 --task graph
 
-# 示例2: 下载论文常用的三个基准数据集
-python download_gcn_datasets.py --datasets cora citeseer pubmed --method pyg
+# OGB系列（需要安装ogb: pip install ogb）
+python download_gcn_datasets.py --dataset ogbg-molhiv --task graph --source ogb
 
-# 示例3: 下载所有数据集
-python download_gcn_datasets.py --datasets all --method pyg
-
-# 示例4: 指定自定义保存路径
-python download_gcn_datasets.py --datasets cora --method pyg --data_root /path/to/your/data
-
-# 示例5: 使用DGL下载
-python download_gcn_datasets.py --datasets cora --method dgl
-
-# 示例6: 查看帮助信息
-python download_gcn_datasets.py --help
+# 指定保存路径
+python download_gcn_datasets.py --dataset MUTAG --task graph --data_root /path/to/data
 ```
 
-## 在代码中使用下载的数据集
+## 在代码中使用数据集
 
-### PyTorch Geometric
+### TUDataset 示例
 
 ```python
-from torch_geometric.datasets import Planetoid
+from torch_geometric.datasets import TUDataset
+from torch_geometric.loader import DataLoader
+from model import ImprovedGCN  # 您的模型
 
-# 加载数据集
-dataset = Planetoid(root='./data/gcn_datasets', name='Cora')
-data = dataset[0]
+# 1. 加载数据集
+dataset = TUDataset(root='./data/TUDataset', name='MUTAG')
 
-# 查看数据集信息
-print(f'节点数: {data.num_nodes}')
-print(f'边数: {data.num_edges}')
-print(f'特征维度: {dataset.num_features}')
-print(f'类别数: {dataset.num_classes}')
+print(f"数据集信息:")
+print(f"  - 图数量: {len(dataset)}")
+print(f"  - 特征维度: {dataset.num_features}")
+print(f"  - 类别数: {dataset.num_classes}")
+
+# 2. 划分训练/验证/测试集
+train_size = int(len(dataset) * 0.8)
+val_size = int(len(dataset) * 0.1)
+
+train_dataset = dataset[:train_size]
+val_dataset = dataset[train_size:train_size+val_size]
+test_dataset = dataset[train_size+val_size:]
+
+# 3. 创建DataLoader（与您的代码兼容）
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32)
+test_loader = DataLoader(test_dataset, batch_size=32)
+
+# 4. 初始化模型
+model = ImprovedGCN(
+    num_features=dataset.num_features,
+    hidden_dim=64,
+    num_classes=dataset.num_classes,
+    dropout=0.3
+)
+
+# 5. 训练模型（使用您现有的train.py）
+# optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+# for epoch in range(200):
+#     train_metrics = train_model(model, train_loader, optimizer, device)
+#     val_metrics = evaluate_model(model, val_loader, device)
+#     ...
 ```
 
-### DGL
+### OGB 示例
 
 ```python
-from dgl.data import CoraGraphDataset
+from ogb.graphproppred import PygGraphPropPredDataset
+from torch_geometric.loader import DataLoader
+from model import ImprovedGCN
 
-# 加载数据集
-dataset = CoraGraphDataset(raw_dir='./data/gcn_datasets')
-graph = dataset[0]
+# 1. 加载数据集（OGB自带数据划分）
+dataset = PygGraphPropPredDataset(name='ogbg-molhiv', root='./data/OGB')
+split_idx = dataset.get_idx_split()
 
-# 查看数据集信息
-print(f'节点数: {graph.num_nodes()}')
-print(f'边数: {graph.num_edges()}')
-print(f'特征维度: {graph.ndata["feat"].shape[1]}')
-print(f'类别数: {dataset.num_classes}')
+print(f"数据集信息:")
+print(f"  - 训练集: {len(split_idx['train'])}")
+print(f"  - 验证集: {len(split_idx['valid'])}")
+print(f"  - 测试集: {len(split_idx['test'])}")
+
+# 2. 创建DataLoader
+train_loader = DataLoader(dataset[split_idx['train']], batch_size=32, shuffle=True)
+val_loader = DataLoader(dataset[split_idx['valid']], batch_size=32)
+test_loader = DataLoader(dataset[split_idx['test']], batch_size=32)
+
+# 3. 初始化模型（注意：OGB使用num_tasks而不是num_classes）
+model = ImprovedGCN(
+    num_features=dataset.num_features,
+    hidden_dim=64,
+    num_classes=dataset.num_tasks,  # OGB使用num_tasks
+    dropout=0.3
+)
 ```
 
-## 数据集选择建议
+## 推荐的学习路径
 
-- **快速原型开发**: 使用 **Cora**（规模最小，速度最快）
-- **标准论文基准**: 使用 **Cora + CiteSeer + Pubmed**（最常用组合）
-- **大规模图测试**: 使用 **Reddit**（需要GPU）
-- **归纳学习测试**: 使用 **PPI**（多图、多标签）
+| 阶段 | 数据集 | 原因 |
+|------|--------|------|
+| 1️⃣ 快速测试 | MUTAG (188图) | 最小数据集，快速验证代码 |
+| 2️⃣ 初步实验 | PROTEINS (1,113图) | 中小规模，适合调参 |
+| 3️⃣ 标准基准 | NCI1 (4,110图) | 论文常用基准，结果可对比 |
+| 4️⃣ 多分类测试 | ENZYMES (600图, 6类) | 测试多分类性能 |
+| 5️⃣ 大规模测试 | ogbg-molhiv (41,127图) | 大规模标准基准 |
 
-## 常见问题
+## 节点分类数据集（仅供参考）
 
-### Q1: 下载失败或速度很慢？
+⚠️ **这些数据集与您当前的图分类代码不兼容！** 需要不同的代码结构。
+
+- **Cora**: 论文引用网络 (2,708节点, 7类)
+- **CiteSeer**: 论文引用网络 (3,327节点, 6类)
+- **Pubmed**: 论文引用网络 (19,717节点, 3类)
+
+如需下载节点分类数据集：
 ```bash
-# 尝试使用DGL替代PyG
-python download_gcn_datasets.py --datasets cora --method dgl
-
-# 或设置代理
-export http_proxy=http://your-proxy:port
-export https_proxy=http://your-proxy:port
+python download_gcn_datasets.py --dataset cora --task node --source pyg
 ```
 
-### Q2: 显示"未安装 torch_geometric"错误？
+## 安装依赖
+
+### 基础依赖（TUDataset）
+
 ```bash
 pip install torch torch-geometric
 ```
 
-### Q3: Reddit数据集太大？
-Reddit数据集约7GB，如果存储空间不足，建议只下载Cora/CiteSeer/Pubmed。
+### OGB数据集
 
-### Q4: 如何查看已下载的数据集？
 ```bash
-ls -lh ./data/gcn_datasets/
+pip install ogb
 ```
+
+### 完整安装
+
+```bash
+# PyTorch Geometric完整安装
+pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.0.0+cu118.html
+pip install torch-geometric
+
+# OGB
+pip install ogb
+```
+
+## 常见问题
+
+### Q1: 如何选择合适的数据集？
+
+- **快速验证代码**: MUTAG (188图，几秒钟)
+- **调参实验**: PROTEINS (1,113图，几分钟)
+- **论文对比**: NCI1 (4,110图，标准基准)
+- **大规模实验**: ogbg-molhiv (41,127图，需要GPU)
+
+### Q2: 数据集下载很慢？
+
+- 首次下载会从网络获取，请耐心等待
+- 数据会缓存在本地，下次使用会很快
+- 可以尝试设置代理加速下载
+
+### Q3: 如何查看数据集详细信息？
+
+```python
+from torch_geometric.datasets import TUDataset
+
+dataset = TUDataset(root='./data/TUDataset', name='MUTAG')
+print(f"图数量: {len(dataset)}")
+print(f"特征维度: {dataset.num_features}")
+print(f"类别数: {dataset.num_classes}")
+
+# 查看第一个图
+data = dataset[0]
+print(f"节点数: {data.num_nodes}")
+print(f"边数: {data.num_edges}")
+print(f"节点特征: {data.x.shape}")
+print(f"标签: {data.y}")
+```
+
+### Q4: Cora等数据集能用吗？
+
+不能！Cora/CiteSeer/Pubmed是**节点分类数据集**（单个大图），您的代码是**图分类任务**（多个小图）。请使用MUTAG、PROTEINS、NCI1等图分类数据集。
+
+### Q5: 如何知道我的代码是图分类还是节点分类？
+
+看您的模型代码：
+- ✅ **图分类**: 使用 `global_mean_pool` 或 `global_add_pool` → 用MUTAG等
+- ❌ **节点分类**: 没有global pooling，直接输出节点特征 → 用Cora等
+
+您的代码是图分类！
 
 ## 参考文献
 
-- **GCN原论文**: [Semi-Supervised Classification with Graph Convolutional Networks (ICLR 2017)](https://arxiv.org/abs/1609.02907)
-- **Cora/CiteSeer/Pubmed**: [Revisiting Semi-Supervised Learning with Graph Embeddings](https://arxiv.org/abs/1603.08861)
-- **Reddit**: [Inductive Representation Learning on Large Graphs (NeurIPS 2017)](https://arxiv.org/abs/1706.02216)
-- **PPI**: [Predicting Multicellular Function through Multi-layer Tissue Networks](https://arxiv.org/abs/1707.04638)
+### TUDataset
+- [TUDataset: A collection of benchmark datasets for graph classification](https://chrsmrrs.github.io/datasets/)
 
-## 相关资源
+### OGB
+- **ogbg-molhiv**: [Open Graph Benchmark: Datasets for Machine Learning on Graphs](https://ogb.stanford.edu/)
+- 论文: Hu et al. "Open Graph Benchmark: Datasets for Machine Learning on Graphs" (NeurIPS 2020)
 
+### 相关资源
 - [PyTorch Geometric 文档](https://pytorch-geometric.readthedocs.io/)
-- [DGL 文档](https://www.dgl.ai/)
-- [Open Graph Benchmark](https://ogb.stanford.edu/)
+- [OGB 官方网站](https://ogb.stanford.edu/)
+- [TUDataset 数据集列表](https://chrsmrrs.github.io/datasets/docs/datasets/)
 
-## 许可证
+## 技术支持
 
-本脚本遵循MIT许可证。数据集版权归原作者所有。
+遇到问题？
+1. 检查是否安装了 `torch-geometric`
+2. 查看 `python download_gcn_datasets.py --list` 确认数据集名称
+3. 确保网络连接正常
+4. OGB数据集需要额外安装: `pip install ogb`
 
+---
+
+**祝您实验顺利！** 🚀
