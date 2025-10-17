@@ -29,17 +29,26 @@ from sklearn.model_selection import train_test_split
 from torch_geometric.loader import DataLoader
 
 # 导入模型和工具函数
-from model import ImprovedGCN, PureGCN, PureGAT, PureGraphSAGE
+from model import (
+    ImprovedGCN, PureGCN, PureGAT, PureGraphSAGE,
+    GIN, ChebNet, EdgeConvNet, GraphUNet
+)
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics
 from process import (load_data, oversample_data, compute_correlation_matrix, 
                      create_pyg_dataset, visualize_graph)
 
 # 模型字典
 MODEL_DICT = {
+    # 原有基础模型
     'hybrid': ImprovedGCN,
     'gcn': PureGCN,
     'gat': PureGAT,
-    'sage': PureGraphSAGE
+    'sage': PureGraphSAGE,
+    # 新增先进模型 (2016-2019)
+    'gin': GIN,              # Graph Isomorphism Network (ICLR 2019) - 理论最强
+    'chebnet': ChebNet,      # Chebyshev GCN (NIPS 2016) - 高效
+    'edgeconv': EdgeConvNet, # Dynamic Graph CNN (TOG 2019) - 动态图
+    'gunet': GraphUNet,      # Graph U-Net (ICML 2019) - 多尺度
 }
 
 
@@ -434,8 +443,8 @@ def main():
     
     # 模型参数
     parser.add_argument('--model', type=str, default='gcn',
-                        choices=['gcn', 'gat', 'sage', 'hybrid'],
-                        help='模型类型')
+                        choices=['gcn', 'gat', 'sage', 'hybrid', 'gin', 'chebnet', 'edgeconv', 'gunet'],
+                        help='模型类型: gcn, gat, sage, hybrid, gin, chebnet, edgeconv, gunet')
     parser.add_argument('--hidden_dim', type=int, default=64,
                         help='隐藏层维度')
     parser.add_argument('--dropout', type=float, default=0.5,
