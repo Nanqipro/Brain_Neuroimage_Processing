@@ -31,7 +31,8 @@ from torch_geometric.loader import DataLoader
 # 导入模型和工具函数
 from model import (
     ImprovedGCN, PureGCN, PureGAT, PureGraphSAGE,
-    GIN, ChebNet, EdgeConvNet, GraphUNet
+    GIN, ChebNet, EdgeConvNet, GraphUNet,
+    PNA, GATv2, DeeperGCN
 )
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics
 from process import (load_data, oversample_data, compute_correlation_matrix, 
@@ -44,11 +45,15 @@ MODEL_DICT = {
     'gcn': PureGCN,
     'gat': PureGAT,
     'sage': PureGraphSAGE,
-    # 新增先进模型 (2016-2019)
+    # 先进模型 (2016-2019)
     'gin': GIN,              # Graph Isomorphism Network (ICLR 2019) - 理论最强
     'chebnet': ChebNet,      # Chebyshev GCN (NIPS 2016) - 高效
     'edgeconv': EdgeConvNet, # Dynamic Graph CNN (TOG 2019) - 动态图
     'gunet': GraphUNet,      # Graph U-Net (ICML 2019) - 多尺度
+    # 最新模型 (2020-2022)
+    'pna': PNA,              # Principal Neighbourhood Aggregation (NeurIPS 2020) - 多聚合器
+    'gatv2': GATv2,          # Graph Attention v2 (ICLR 2022) - 改进注意力
+    'deepergcn': DeeperGCN,  # DeeperGCN (ICLR 2020) - 深层网络
 }
 
 
@@ -443,8 +448,9 @@ def main():
     
     # 模型参数
     parser.add_argument('--model', type=str, default='gcn',
-                        choices=['gcn', 'gat', 'sage', 'hybrid', 'gin', 'chebnet', 'edgeconv', 'gunet'],
-                        help='模型类型: gcn, gat, sage, hybrid, gin, chebnet, edgeconv, gunet')
+                        choices=['gcn', 'gat', 'sage', 'hybrid', 'gin', 'chebnet', 'edgeconv', 'gunet', 
+                                 'pna', 'gatv2', 'deepergcn'],
+                        help='模型类型')
     parser.add_argument('--hidden_dim', type=int, default=64,
                         help='隐藏层维度')
     parser.add_argument('--dropout', type=float, default=0.5,
