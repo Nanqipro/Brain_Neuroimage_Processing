@@ -11,7 +11,18 @@ from scipy.stats import pearsonr
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
+# ============================================================================
+# 以下函数用于原始的神经元数据（从CSV构建图）
+# 如果使用TUDataset等标准数据集，这些函数不需要使用
+# ============================================================================
+
 def load_data(data_path):
+    """
+    【仅用于原始神经元CSV数据】
+    从CSV文件加载神经元数据并进行预处理
+    
+    注意: 如果使用TUDataset等标准数据集，不需要调用此函数
+    """
     data = pd.read_csv(data_path)
     features = data.loc[:, 'n1':'n43'].values
     labels = data['behavior'].values
@@ -31,6 +42,12 @@ def load_data(data_path):
     return features_scaled, labels_encoded, class_weights, encoder.classes_
 
 def oversample_data(features, labels, ramdom_state):
+    """
+    【仅用于原始神经元CSV数据】
+    使用SMOTE进行数据过采样
+    
+    注意: 如果使用TUDataset等标准数据集，不需要调用此函数
+    """
     smote = SMOTE(random_state=ramdom_state)
     features_resampled, labels_resampled = smote.fit_resample(features, labels)
     print("SMOTE 后样本分布:", Counter(labels_resampled))
@@ -38,6 +55,12 @@ def oversample_data(features, labels, ramdom_state):
 
 # 计算特征之间的相关性矩阵, Pearson 相关系数
 def compute_correlation_matrix(features):
+    """
+    【仅用于原始神经元CSV数据】
+    计算神经元之间的Pearson相关系数矩阵
+    
+    注意: 如果使用TUDataset等标准数据集，不需要调用此函数
+    """
     features_T = features.T
     num_neurons = features_T.shape[0]
     correlation_matrix = np.zeros((num_neurons, num_neurons))
@@ -51,6 +74,12 @@ def compute_correlation_matrix(features):
     return correlation_matrix
 
 def generate_graph(sample_features, correlation_matrix, threshold=0.4):
+    """
+    【仅用于原始神经元CSV数据】
+    根据相关性矩阵生成图结构
+    
+    注意: 如果使用TUDataset等标准数据集，不需要调用此函数
+    """
     num_neurons = len(sample_features)
     edges_src = [] # 源节点
     edges_dst = [] # 目标节点
@@ -86,6 +115,13 @@ def generate_graph(sample_features, correlation_matrix, threshold=0.4):
 
 # 生成 PyG 数据对象
 def create_pyg_dataset(features, labels, correlation_matrix, threshold=0.4):
+    """
+    【仅用于原始神经元CSV数据】
+    从神经元特征创建PyG数据对象列表
+    
+    注意: 如果使用TUDataset等标准数据集，不需要调用此函数
+          标准数据集已经是PyG格式，可以直接使用
+    """
     data_list = []
     for i in range(len(features)):
         sample = features[i]
@@ -100,9 +136,20 @@ def create_pyg_dataset(features, labels, correlation_matrix, threshold=0.4):
         
         data_list.append(data)
     return data_list
-    
+
+
+# ============================================================================
+# 以下函数是通用的可视化工具，可以用于任何PyG图数据
+# ============================================================================
+
 # 将生成的拓扑图可视化
 def visualize_graph(data, sample_index=0, title="神经元连接图", result_dir='result'):
+    """
+    【通用函数】
+    可视化PyG图数据
+    
+    适用于任何PyG格式的图数据，包括TUDataset
+    """
     plt.figure(figsize=(10, 10))
     graph_data = data[sample_index]
     
