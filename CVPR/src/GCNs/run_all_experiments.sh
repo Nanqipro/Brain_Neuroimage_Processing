@@ -86,6 +86,7 @@ for dataset_config in "${DATASETS[@]}"; do
             --batch_size $batch_size \
             --hidden_dim 64 \
             --dropout 0.5 \
+            --patience 100 \
             --print_every 20 \
             --save_results \
             2>&1 | tee "$EXP_LOG"

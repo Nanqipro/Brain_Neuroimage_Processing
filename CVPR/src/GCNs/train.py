@@ -119,9 +119,9 @@ def plot_confusion_matrix(y_true, y_pred, class_names, result_dir='result'):
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
                xticklabels=class_names, yticklabels=class_names)
-    plt.xlabel('预测标签')
-    plt.ylabel('真实标签')
-    plt.title('混淆矩阵')
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.title('Confusion Matrix')
     plt.tight_layout()
     plt.savefig(f'{result_dir}/confusion_matrix.png')
     plt.close()
