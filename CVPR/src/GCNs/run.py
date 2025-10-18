@@ -3,13 +3,17 @@
 """
 通用图分类模型训练脚本
 
-支持两种数据源：
+支持三种数据源：
 1. 原始CSV数据（神经元数据）- 需要构建图
 2. TUDataset标准数据集 - 已有图结构
+3. OGB数据集 - Open Graph Benchmark大规模图基准
 
 使用方法：
     # 使用TUDataset（推荐用于标准基准测试）
     python run.py --data_source tudataset --dataset MUTAG --model gcn
+    
+    # 使用OGB数据集（大规模图基准测试）
+    python run.py --data_source ogb --dataset ogbg-molhiv --model gin
     
     # 使用原始CSV数据（用于神经元数据）
     python run.py --data_source csv --dataset dataset/processed3.csv --model gcn
@@ -202,6 +206,67 @@ def load_tudataset_data(dataset_name, data_root, seed, train_ratio=0.8, val_rati
     return train_loader, val_loader, test_loader, dataset.num_features, dataset.num_classes, None, None
 
 
+def load_ogb_data(dataset_name, data_root, batch_size=32):
+    """
+    加载OGB (Open Graph Benchmark) 数据集
+    
+    Args:
+        dataset_name: OGB数据集名称，如'ogbg-molhiv', 'ogbg-molpcba'等
+        data_root: 数据集根目录
+        batch_size: 批大小
+    
+    Returns:
+        train_loader, val_loader, test_loader, num_features, num_classes, None, None
+    """
+    from ogb.graphproppred import PygGraphPropPredDataset, Evaluator
+    
+    print(f"\n加载OGB数据集: {dataset_name}")
+    
+    # 加载数据集
+    dataset = PygGraphPropPredDataset(name=dataset_name, root=data_root)
+    
+    # 获取预定义的划分
+    split_idx = dataset.get_idx_split()
+    
+    print(f"\n数据集信息:")
+    print(f"  - 图数量: {len(dataset)}")
+    print(f"  - 特征维度: {dataset.num_features}")
+    print(f"  - 任务类型: {dataset.task_type}")
+    print(f"  - 评估指标: {dataset.eval_metric}")
+    
+    if len(dataset) > 0:
+        sample = dataset[0]
+        print(f"  - 示例图节点数: {sample.num_nodes}")
+        print(f"  - 示例图边数: {sample.num_edges}")
+    
+    # 创建子数据集
+    train_dataset = [dataset[i] for i in split_idx['train']]
+    val_dataset = [dataset[i] for i in split_idx['valid']]
+    test_dataset = [dataset[i] for i in split_idx['test']]
+    
+    print(f"\n数据集划分 (预定义):")
+    print(f"  - 训练集: {len(train_dataset)} 图")
+    print(f"  - 验证集: {len(val_dataset)} 图")
+    print(f"  - 测试集: {len(test_dataset)} 图")
+    
+    # 创建DataLoader
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size)
+    
+    # OGB数据集的类别数处理
+    # 对于二分类任务，num_tasks为1，但我们需要2个输出类别
+    if dataset.task_type == 'binary classification':
+        num_classes = 2
+    elif dataset.task_type == 'multiclass classification':
+        num_classes = dataset.num_classes
+    else:
+        # 对于回归或多标签任务
+        num_classes = dataset.num_tasks
+    
+    return train_loader, val_loader, test_loader, dataset.num_features, num_classes, None, None
+
+
 # ============================================================================
 # 训练函数
 # ============================================================================
@@ -212,7 +277,10 @@ def setup_result_directory(model_name, data_source, dataset_name):
     
     if data_source == 'csv':
         base_dir = f"result/csv/{model_name}"
-    else:
+    elif data_source == 'ogb':
+        dataset_simple = dataset_name.split('/')[-1]
+        base_dir = f"result/ogb/{dataset_simple}/{model_name}"
+    else:  # tudataset
         dataset_simple = dataset_name.split('/')[-1].replace('.csv', '')
         base_dir = f"result/tudataset/{dataset_simple}/{model_name}"
     
@@ -231,7 +299,13 @@ def run_experiment(args):
     np.random.seed(args.seed)
     
     # 设置设备
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        if args.gpu_id >= 0:
+            device = torch.device(f'cuda:{args.gpu_id}')
+        else:
+            device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
     
     print("=" * 80)
     print("通用图分类模型训练")
@@ -250,11 +324,18 @@ def run_experiment(args):
         train_loader, val_loader, test_loader, num_features, num_classes, class_weights, class_names = \
             load_csv_data(args.dataset, args.seed, args.train_ratio, args.val_ratio)
         class_weights = class_weights.to(device) if class_weights is not None else None
-    else:  # tudataset
+    elif args.data_source == 'tudataset':
         train_loader, val_loader, test_loader, num_features, num_classes, _, _ = \
             load_tudataset_data(
                 args.dataset, args.data_root, args.seed,
                 args.train_ratio, args.val_ratio, args.batch_size
+            )
+        class_weights = None
+        class_names = [str(i) for i in range(num_classes)]
+    else:  # ogb
+        train_loader, val_loader, test_loader, num_features, num_classes, _, _ = \
+            load_ogb_data(
+                args.dataset, args.ogb_root, args.batch_size
             )
         class_weights = None
         class_names = [str(i) for i in range(num_classes)]
@@ -417,30 +498,43 @@ def run_experiment(args):
 
 
 def main():
+    # 获取脚本所在目录，用于构建正确的相对路径
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_data_root = os.path.join(script_dir, '../../data/TUDataset')
+    default_ogb_root = os.path.join(script_dir, '../../data/OGB')
+    
     parser = argparse.ArgumentParser(
-        description='通用图分类模型训练 - 支持CSV数据和TUDataset',
+        description='通用图分类模型训练 - 支持CSV数据、TUDataset和OGB数据集',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
   # TUDataset（标准基准测试）
   python run.py --data_source tudataset --dataset MUTAG --model gcn
   
+  # OGB数据集（大规模图基准测试）
+  python run.py --data_source ogb --dataset ogbg-molhiv --model gin --gpu_id 1
+  
   # CSV数据（神经元数据）
   python run.py --data_source csv --dataset dataset/processed3.csv --model gcn
   
+  # 使用指定GPU训练
+  python run.py --data_source tudataset --dataset MUTAG --model gcn --gpu_id 1
+  
   # 保存完整结果
-  python run.py --data_source tudataset --dataset MUTAG --model gcn --save_results
+  python run.py --data_source ogb --dataset ogbg-molhiv --model gin --save_results
         """
     )
     
     # 数据源参数
     parser.add_argument('--data_source', type=str, required=True,
-                        choices=['csv', 'tudataset'],
-                        help='数据源类型: csv (CSV文件), tudataset (TUDataset)')
+                        choices=['csv', 'tudataset', 'ogb'],
+                        help='数据源类型: csv (CSV文件), tudataset (TUDataset), ogb (OGB数据集)')
     parser.add_argument('--dataset', type=str, required=True,
                         help='数据集名称或CSV文件路径')
-    parser.add_argument('--data_root', type=str, default='../../data/TUDataset',
+    parser.add_argument('--data_root', type=str, default=default_data_root,
                         help='TUDataset根目录（仅用于tudataset）')
+    parser.add_argument('--ogb_root', type=str, default=default_ogb_root,
+                        help='OGB数据集根目录（仅用于ogb）')
     parser.add_argument('--train_ratio', type=float, default=0.8,
                         help='训练集比例')
     parser.add_argument('--val_ratio', type=float, default=0.1,
@@ -463,7 +557,7 @@ def main():
                         help='学习率')
     parser.add_argument('--weight_decay', type=float, default=5e-4,
                         help='权重衰减')
-    parser.add_argument('--epochs', type=int, default=200,
+    parser.add_argument('--epochs', type=int, default=10,
                         help='最大训练轮数')
     parser.add_argument('--patience', type=int, default=20,
                         help='Early stopping耐心值')
@@ -471,6 +565,8 @@ def main():
                         help='随机种子')
     parser.add_argument('--print_every', type=int, default=10,
                         help='打印间隔')
+    parser.add_argument('--gpu_id', type=int, default=3,
+                        help='使用的GPU ID (例如：0, 1, 2)，-1表示使用默认GPU')
     
     # 保存参数
     parser.add_argument('--save_results', action='store_true',

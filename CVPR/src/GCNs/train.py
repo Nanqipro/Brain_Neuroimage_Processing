@@ -33,11 +33,14 @@ def train_model(model, train_loader, optimizer, device, class_weights=None):
         optimizer.zero_grad()
         out = model(data)
 
+        # 处理 OGB 数据集的标签格式 (batch_size, 1) -> (batch_size,)
+        y = data.y.squeeze() if data.y.dim() > 1 else data.y
+
         if class_weights is not None:
             weights = class_weights.to(device)
-            loss = F.nll_loss(out, data.y, weight=weights)
+            loss = F.nll_loss(out, y, weight=weights)
         else:
-            loss = F.nll_loss(out, data.y)
+            loss = F.nll_loss(out, y)
 
         # Backward pass
         loss.backward()
@@ -82,11 +85,15 @@ def evaluate_model(model, loader, device):
                         
             outputs = model(data)
             _, pred = outputs.max(dim=1)
-            correct += pred.eq(data.y).sum().item()
+            
+            # 处理 OGB 数据集的标签格式 (batch_size, 1) -> (batch_size,)
+            y = data.y.squeeze() if data.y.dim() > 1 else data.y
+            
+            correct += pred.eq(y).sum().item()
             
             # 收集每个批次的预测结果和标签
             all_preds.extend(pred.cpu().numpy())
-            all_labels.extend(data.y.cpu().numpy())
+            all_labels.extend(y.cpu().numpy())
 
     # 计算各项指标
     accuracy = correct / len(loader.dataset)
