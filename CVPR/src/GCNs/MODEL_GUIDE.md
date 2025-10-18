@@ -36,7 +36,7 @@
 
 **论文**: How Powerful are Graph Neural Networks? (ICLR 2019)  
 **作者**: Xu et al.  
-**链接**: https://arxiv.org/abs/1810.00826
+**链接**: https://arxiv.org/pdf/1810.00826
 
 **核心思想**:
 - 理论证明与WL（Weisfeiler-Lehman）图同构测试等价
