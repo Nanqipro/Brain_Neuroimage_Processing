@@ -1,0 +1,57 @@
+{
+    "description": "批量实验配置示例",
+    "experiments": [
+        {
+            "data_source": "tudataset",
+            "dataset": "MUTAG",
+            "data_root": "../../data/TUDataset",
+            "model": "gcn",
+            "hidden_dim": 64,
+            "dropout": 0.5,
+            "batch_size": 32,
+            "lr": 0.001,
+            "weight_decay": 0.0005,
+            "epochs": 200,
+            "patience": 20,
+            "seed": 42,
+            "train_ratio": 0.8,
+            "val_ratio": 0.1,
+            "print_every": 10
+        },
+        {
+            "data_source": "tudataset",
+            "dataset": "PROTEINS",
+            "data_root": "../../data/TUDataset",
+            "model": "gcn",
+            "hidden_dim": 64,
+            "dropout": 0.5,
+            "batch_size": 32,
+            "lr": 0.001,
+            "weight_decay": 0.0005,
+            "epochs": 200,
+            "patience": 20,
+            "seed": 42,
+            "train_ratio": 0.8,
+            "val_ratio": 0.1,
+            "print_every": 10
+        },
+        {
+            "data_source": "tudataset",
+            "dataset": "MUTAG",
+            "data_root": "../../data/TUDataset",
+            "model": "gin",
+            "hidden_dim": 64,
+            "dropout": 0.5,
+            "batch_size": 32,
+            "lr": 0.001,
+            "weight_decay": 0.0005,
+            "epochs": 200,
+            "patience": 20,
+            "seed": 42,
+            "train_ratio": 0.8,
+            "val_ratio": 0.1,
+            "print_every": 10
+        }
+    ]
+}
+

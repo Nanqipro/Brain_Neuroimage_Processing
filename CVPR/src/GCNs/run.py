@@ -7,11 +7,22 @@
 1. 原始CSV数据（神经元数据）- 需要构建图
 2. TUDataset标准数据集 - 已有图结构
 
+新功能：
+- 支持多数据集批量训练
+- 支持配置文件批量运行
+- 生成汇总报告
+
 使用方法：
-    # 使用TUDataset（推荐用于标准基准测试）
+    # 单个数据集
     python run.py --data_source tudataset --dataset MUTAG --model gcn
     
-    # 使用原始CSV数据（用于神经元数据）
+    # 多个数据集（用逗号分隔）
+    python run.py --data_source tudataset --dataset MUTAG,PROTEINS,DD --model gcn
+    
+    # 使用配置文件批量运行
+    python run.py --config experiments_config.json
+    
+    # 使用CSV数据
     python run.py --data_source csv --dataset dataset/processed3.csv --model gcn
 """
 
@@ -27,6 +38,7 @@ import argparse
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 from torch_geometric.loader import DataLoader
+from typing import List, Dict, Any
 
 # 导入模型和工具函数
 from model import (
@@ -416,29 +428,222 @@ def run_experiment(args):
     return test_metrics
 
 
+def load_config(config_path: str) -> Dict[str, Any]:
+    """从JSON配置文件加载实验配置"""
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    return config
+
+
+def run_multiple_datasets(args):
+    """在多个数据集上运行实验并生成汇总报告"""
+    
+    # 解析数据集列表
+    if ',' in args.dataset:
+        datasets = [d.strip() for d in args.dataset.split(',')]
+    else:
+        datasets = [args.dataset]
+    
+    print("\n" + "=" * 80)
+    print(f"将在 {len(datasets)} 个数据集上运行实验")
+    print(f"数据集: {', '.join(datasets)}")
+    print("=" * 80 + "\n")
+    
+    # 存储所有结果
+    all_results = []
+    
+    # 对每个数据集运行实验
+    for idx, dataset in enumerate(datasets, 1):
+        print(f"\n{'#' * 80}")
+        print(f"# 实验 {idx}/{len(datasets)}: {dataset}")
+        print(f"{'#' * 80}\n")
+        
+        # 创建新的args副本
+        dataset_args = argparse.Namespace(**vars(args))
+        dataset_args.dataset = dataset
+        
+        try:
+            # 运行实验
+            test_metrics = run_experiment(dataset_args)
+            
+            # 记录结果
+            result = {
+                'dataset': dataset,
+                'model': args.model,
+                'accuracy': float(test_metrics['accuracy']),
+                'precision': float(test_metrics['precision']),
+                'recall': float(test_metrics['recall']),
+                'f1': float(test_metrics['f1']),
+                'status': 'success'
+            }
+            all_results.append(result)
+            
+        except Exception as e:
+            print(f"\n❌ 数据集 {dataset} 训练失败: {str(e)}")
+            result = {
+                'dataset': dataset,
+                'model': args.model,
+                'status': 'failed',
+                'error': str(e)
+            }
+            all_results.append(result)
+        
+        print(f"\n完成 {idx}/{len(datasets)}\n")
+    
+    # 生成汇总报告
+    print("\n" + "=" * 80)
+    print("实验汇总报告")
+    print("=" * 80 + "\n")
+    
+    # 创建汇总表格
+    summary_df = pd.DataFrame([r for r in all_results if r['status'] == 'success'])
+    
+    if len(summary_df) > 0:
+        print(f"模型: {args.model}\n")
+        print(summary_df[['dataset', 'accuracy', 'precision', 'recall', 'f1']].to_string(index=False))
+        
+        print(f"\n平均性能:")
+        print(f"  - 准确率: {summary_df['accuracy'].mean():.4f} ± {summary_df['accuracy'].std():.4f}")
+        print(f"  - 精确率: {summary_df['precision'].mean():.4f} ± {summary_df['precision'].std():.4f}")
+        print(f"  - 召回率: {summary_df['recall'].mean():.4f} ± {summary_df['recall'].std():.4f}")
+        print(f"  - F1分数: {summary_df['f1'].mean():.4f} ± {summary_df['f1'].std():.4f}")
+    
+    # 显示失败的实验
+    failed = [r for r in all_results if r['status'] == 'failed']
+    if failed:
+        print(f"\n失败的实验 ({len(failed)}):")
+        for r in failed:
+            print(f"  - {r['dataset']}: {r['error']}")
+    
+    print("\n" + "=" * 80)
+    
+    # 保存汇总报告
+    if args.save_results:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        summary_dir = f"result/summary/{args.model}"
+        os.makedirs(summary_dir, exist_ok=True)
+        
+        summary_path = f"{summary_dir}/summary_{timestamp}.json"
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            json.dump({
+                'model': args.model,
+                'datasets': datasets,
+                'results': all_results,
+                'timestamp': timestamp
+            }, f, ensure_ascii=False, indent=4)
+        
+        # 保存CSV格式
+        if len(summary_df) > 0:
+            csv_path = f"{summary_dir}/summary_{timestamp}.csv"
+            summary_df.to_csv(csv_path, index=False, encoding='utf-8')
+            print(f"\n汇总报告已保存到: {summary_dir}")
+    
+    return all_results
+
+
+def run_from_config(config_path: str):
+    """从配置文件运行批量实验"""
+    
+    config = load_config(config_path)
+    print(f"\n从配置文件加载实验: {config_path}")
+    print(f"实验数量: {len(config.get('experiments', []))}")
+    
+    all_results = []
+    
+    # 运行每个实验
+    for idx, exp_config in enumerate(config.get('experiments', []), 1):
+        print(f"\n{'#' * 80}")
+        print(f"# 配置实验 {idx}/{len(config['experiments'])}")
+        print(f"{'#' * 80}\n")
+        
+        # 创建args对象
+        args = argparse.Namespace(**exp_config)
+        
+        # 设置默认值
+        if not hasattr(args, 'save_results'):
+            args.save_results = True
+        if not hasattr(args, 'save_model'):
+            args.save_model = False
+        
+        try:
+            # 如果有多个数据集，使用批量运行
+            if hasattr(args, 'dataset') and ',' in str(args.dataset):
+                results = run_multiple_datasets(args)
+                all_results.extend(results)
+            else:
+                test_metrics = run_experiment(args)
+                result = {
+                    'dataset': args.dataset,
+                    'model': args.model,
+                    'accuracy': float(test_metrics['accuracy']),
+                    'precision': float(test_metrics['precision']),
+                    'recall': float(test_metrics['recall']),
+                    'f1': float(test_metrics['f1']),
+                    'status': 'success'
+                }
+                all_results.append(result)
+        except Exception as e:
+            print(f"\n❌ 实验失败: {str(e)}")
+            result = {
+                'dataset': args.dataset if hasattr(args, 'dataset') else 'unknown',
+                'model': args.model if hasattr(args, 'model') else 'unknown',
+                'status': 'failed',
+                'error': str(e)
+            }
+            all_results.append(result)
+    
+    # 保存总体汇总
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    summary_dir = f"result/batch_summary"
+    os.makedirs(summary_dir, exist_ok=True)
+    
+    summary_path = f"{summary_dir}/batch_results_{timestamp}.json"
+    with open(summary_path, 'w', encoding='utf-8') as f:
+        json.dump({
+            'config_file': config_path,
+            'total_experiments': len(all_results),
+            'results': all_results,
+            'timestamp': timestamp
+        }, f, ensure_ascii=False, indent=4)
+    
+    print(f"\n批量实验结果已保存到: {summary_path}")
+    
+    return all_results
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description='通用图分类模型训练 - 支持CSV数据和TUDataset',
+        description='通用图分类模型训练 - 支持CSV数据、TUDataset和批量实验',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
-  # TUDataset（标准基准测试）
-  python run_unified.py --data_source tudataset --dataset MUTAG --model gcn
+  # 单个TUDataset
+  python run.py --data_source tudataset --dataset MUTAG --model gcn
   
-  # CSV数据（神经元数据）
-  python run_unified.py --data_source csv --dataset dataset/processed3.csv --model gcn
+  # 多个TUDataset（用逗号分隔）
+  python run.py --data_source tudataset --dataset MUTAG,PROTEINS,DD --model gcn --save_results
   
-  # 保存完整结果
-  python run_unified.py --data_source tudataset --dataset MUTAG --model gcn --save_results
+  # CSV数据
+  python run.py --data_source csv --dataset dataset/processed3.csv --model gcn
+  
+  # 使用配置文件批量运行
+  python run.py --config experiments_config.json
+  
+  # 在所有常用数据集上测试模型
+  python run.py --data_source tudataset --dataset MUTAG,ENZYMES,PROTEINS,COLLAB --model gin --save_results
         """
     )
     
+    # 配置文件选项
+    parser.add_argument('--config', type=str, default=None,
+                        help='从JSON配置文件运行批量实验')
+    
     # 数据源参数
-    parser.add_argument('--data_source', type=str, required=True,
+    parser.add_argument('--data_source', type=str, default=None,
                         choices=['csv', 'tudataset'],
                         help='数据源类型: csv (CSV文件), tudataset (TUDataset)')
-    parser.add_argument('--dataset', type=str, required=True,
-                        help='数据集名称或CSV文件路径')
+    parser.add_argument('--dataset', type=str, default=None,
+                        help='数据集名称或CSV文件路径（支持逗号分隔多个数据集）')
     parser.add_argument('--data_root', type=str, default='../../data/TUDataset',
                         help='TUDataset根目录（仅用于tudataset）')
     parser.add_argument('--train_ratio', type=float, default=0.8,
@@ -480,7 +685,19 @@ def main():
     
     args = parser.parse_args()
     
-    run_experiment(args)
+    # 如果指定了配置文件，从配置文件运行
+    if args.config:
+        run_from_config(args.config)
+    # 如果dataset包含多个数据集，批量运行
+    elif args.dataset and ',' in args.dataset:
+        if not args.data_source:
+            parser.error("使用多数据集时必须指定 --data_source")
+        run_multiple_datasets(args)
+    # 否则运行单个实验
+    else:
+        if not args.data_source or not args.dataset:
+            parser.error("必须指定 --data_source 和 --dataset，或使用 --config")
+        run_experiment(args)
 
 
 if __name__ == "__main__":
