@@ -239,15 +239,23 @@ def load_ogb_data(dataset_name, data_root, batch_size=32):
         print(f"  - 示例图节点数: {sample.num_nodes}")
         print(f"  - 示例图边数: {sample.num_edges}")
     
-    # 创建子数据集
-    train_dataset = [dataset[i] for i in split_idx['train']]
-    val_dataset = [dataset[i] for i in split_idx['valid']]
-    test_dataset = [dataset[i] for i in split_idx['test']]
+    # 创建子数据集并转换特征类型
+    # OGB数据集的节点特征通常是int64类型，需要转换为float32以兼容所有GNN模型
+    def convert_data_to_float(data):
+        """将图数据的节点特征转换为float32类型"""
+        if data.x is not None and data.x.dtype != torch.float32:
+            data.x = data.x.float()
+        return data
+    
+    train_dataset = [convert_data_to_float(dataset[i]) for i in split_idx['train']]
+    val_dataset = [convert_data_to_float(dataset[i]) for i in split_idx['valid']]
+    test_dataset = [convert_data_to_float(dataset[i]) for i in split_idx['test']]
     
     print(f"\n数据集划分 (预定义):")
     print(f"  - 训练集: {len(train_dataset)} 图")
     print(f"  - 验证集: {len(val_dataset)} 图")
     print(f"  - 测试集: {len(test_dataset)} 图")
+    print(f"  - 节点特征已转换为float32类型")
     
     # 创建DataLoader
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
