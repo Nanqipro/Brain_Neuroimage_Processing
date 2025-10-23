@@ -367,7 +367,7 @@ def run_experiment(args):
     # 优化器和学习率调度器
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=20, verbose=False
+        optimizer, mode='max', factor=0.5, patience=20
     )
     
     # 训练历史
@@ -601,9 +601,10 @@ def main():
         print("=" * 80 + "\n")
         
         all_results = []
+        initial_seed = args.seed  # 保存初始seed
         
         for run_idx in range(args.num_runs):
-            current_seed = args.seed + run_idx
+            current_seed = initial_seed + run_idx  # 使用初始seed
             args.seed = current_seed
             
             print("\n" + "🔄" * 40)
@@ -649,7 +650,7 @@ def main():
         with open(summary_file, 'w', encoding='utf-8') as f:
             json.dump({
                 'num_runs': args.num_runs,
-                'initial_seed': args.seed - args.num_runs + 1,
+                'initial_seed': initial_seed,
                 'statistics': {
                     'accuracy': {'mean': float(np.mean(accuracies)), 'std': float(np.std(accuracies))},
                     'precision': {'mean': float(np.mean(precisions)), 'std': float(np.std(precisions))},
