@@ -367,7 +367,7 @@ def run_experiment(args):
     # 优化器和学习率调度器
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=10, verbose=False
+        optimizer, mode='max', factor=0.5, patience=20, verbose=False
     )
     
     # 训练历史
