@@ -525,11 +525,17 @@ def main():
   # CSV数据（神经元数据）
   python run.py --data_source csv --dataset dataset/processed3.csv --model gcn
   
-  # 使用指定GPU训练
-  python run.py --data_source tudataset --dataset MUTAG --model gcn --gpu_id 1
+  # 20次重复训练（每次seed递增，数据划分不同）
+  python run.py --data_source tudataset --dataset MUTAG --model gcn --num_runs 20 --seed 42
   
-  # 保存完整结果
-  python run.py --data_source ogb --dataset ogbg-molhiv --model gin --save_results
+  # 自定义数据集划分比例（训练60%，验证20%，测试20%）
+  python run.py --data_source tudataset --dataset MUTAG --model gcn --train_ratio 0.6 --val_ratio 0.2
+  
+  # 完整示例：20次训练 + 自定义比例 + 保存结果
+  python run.py --data_source tudataset --dataset MUTAG --model gcn \
+                --num_runs 20 --seed 42 \
+                --train_ratio 0.6 --val_ratio 0.2 \
+                --save_results --gpu_id 1
         """
     )
     
@@ -543,10 +549,10 @@ def main():
                         help='TUDataset根目录（仅用于tudataset）')
     parser.add_argument('--ogb_root', type=str, default=default_ogb_root,
                         help='OGB数据集根目录（仅用于ogb）')
-    parser.add_argument('--train_ratio', type=float, default=0.8,
-                        help='训练集比例')
-    parser.add_argument('--val_ratio', type=float, default=0.1,
-                        help='验证集比例')
+    parser.add_argument('--train_ratio', type=float, default=0.6,
+                        help='训练集比例 (默认60%)')
+    parser.add_argument('--val_ratio', type=float, default=0.2,
+                        help='验证集比例 (默认20%, 测试集也是20%)')
     
     # 模型参数
     parser.add_argument('--model', type=str, default='gcn',
@@ -570,7 +576,9 @@ def main():
     parser.add_argument('--patience', type=int, default=20,
                         help='Early stopping耐心值')
     parser.add_argument('--seed', type=int, default=42,
-                        help='随机种子')
+                        help='随机种子（初始值）')
+    parser.add_argument('--num_runs', type=int, default=1,
+                        help='重复训练次数（每次seed递增，确保数据划分不同）')
     parser.add_argument('--print_every', type=int, default=10,
                         help='打印间隔')
     parser.add_argument('--gpu_id', type=int, default=3,
@@ -584,7 +592,78 @@ def main():
     
     args = parser.parse_args()
     
-    run_experiment(args)
+    # 多次运行实验（每次seed递增）
+    if args.num_runs > 1:
+        print("\n" + "=" * 80)
+        print(f"将进行 {args.num_runs} 次独立训练实验")
+        print(f"初始seed: {args.seed}, 每次递增1")
+        print(f"数据集划分比例: 训练集{args.train_ratio*100:.0f}%, 验证集{args.val_ratio*100:.0f}%, 测试集{(1-args.train_ratio-args.val_ratio)*100:.0f}%")
+        print("=" * 80 + "\n")
+        
+        all_results = []
+        
+        for run_idx in range(args.num_runs):
+            current_seed = args.seed + run_idx
+            args.seed = current_seed
+            
+            print("\n" + "🔄" * 40)
+            print(f"🚀 开始第 {run_idx + 1}/{args.num_runs} 次训练 (Seed = {current_seed})")
+            print("🔄" * 40 + "\n")
+            
+            test_metrics = run_experiment(args)
+            all_results.append({
+                'run': run_idx + 1,
+                'seed': current_seed,
+                'test_accuracy': float(test_metrics['accuracy']),
+                'test_precision': float(test_metrics['precision']),
+                'test_recall': float(test_metrics['recall']),
+                'test_f1': float(test_metrics['f1'])
+            })
+        
+        # 打印汇总结果
+        print("\n" + "=" * 80)
+        print("📊 多次训练汇总结果")
+        print("=" * 80)
+        
+        accuracies = [r['test_accuracy'] for r in all_results]
+        precisions = [r['test_precision'] for r in all_results]
+        recalls = [r['test_recall'] for r in all_results]
+        f1_scores = [r['test_f1'] for r in all_results]
+        
+        print(f"\n测试集准确率: {np.mean(accuracies):.4f} ± {np.std(accuracies):.4f}")
+        print(f"测试集精确率: {np.mean(precisions):.4f} ± {np.std(precisions):.4f}")
+        print(f"测试集召回率: {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
+        print(f"测试集F1分数: {np.mean(f1_scores):.4f} ± {np.std(f1_scores):.4f}")
+        
+        print(f"\n详细结果:")
+        for result in all_results:
+            print(f"  Run {result['run']} (Seed={result['seed']}): "
+                  f"Acc={result['test_accuracy']:.4f}, "
+                  f"Prec={result['test_precision']:.4f}, "
+                  f"Recall={result['test_recall']:.4f}, "
+                  f"F1={result['test_f1']:.4f}")
+        
+        # 保存汇总结果
+        summary_file = f"result/multi_run_summary_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        os.makedirs('result', exist_ok=True)
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'num_runs': args.num_runs,
+                'initial_seed': args.seed - args.num_runs + 1,
+                'statistics': {
+                    'accuracy': {'mean': float(np.mean(accuracies)), 'std': float(np.std(accuracies))},
+                    'precision': {'mean': float(np.mean(precisions)), 'std': float(np.std(precisions))},
+                    'recall': {'mean': float(np.mean(recalls)), 'std': float(np.std(recalls))},
+                    'f1': {'mean': float(np.mean(f1_scores)), 'std': float(np.std(f1_scores))}
+                },
+                'all_results': all_results
+            }, f, ensure_ascii=False, indent=4)
+        
+        print(f"\n汇总结果已保存到: {summary_file}")
+        print("=" * 80 + "\n")
+    else:
+        # 单次运行
+        run_experiment(args)
 
 
 if __name__ == "__main__":
