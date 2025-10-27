@@ -8,9 +8,10 @@ MODELS=("gcn" "gat" "sage" "hybrid" "gin" "chebnet" "edgeconv" "gunet" "pna" "ga
 # 定义数据集配置
 # 格式: "data_source:dataset:batch_size:epochs"
 DATASETS=(
-    "tudataset:MUTAG:32:300"
-    "ogb:ogbg-molhiv:128:300"
-    "tudataset:PROTEINS:32:300"
+    # "tudataset:MUTAG:32:300"
+    # "ogb:ogbg-molhiv:128:300"
+    "ogb:ogbg-ppa:128:300"
+    # "tudataset:PROTEINS:32:300"
 )
 
 # GPU设置
@@ -25,7 +26,7 @@ mkdir -p "$LOG_DIR"
 MAIN_LOG="$LOG_DIR/experiment_summary.log"
 
 echo "======================================================================"
-echo "运行完整实验：3个数据集 × 11个模型 = 33个实验"
+echo "运行完整实验：4个数据集 × 11个模型 = 44个实验"
 echo "GPU: cuda:$GPU_ID"
 echo "日志目录: $LOG_DIR"
 echo "======================================================================"
@@ -146,9 +147,10 @@ else
     echo "" | tee -a "$MAIN_LOG"
     echo "📁 结果保存位置：" | tee -a "$MAIN_LOG"
     echo "   - 实验日志: $LOG_DIR/" | tee -a "$MAIN_LOG"
-    echo "   - 训练结果: result/tudataset_MUTAG_*/" | tee -a "$MAIN_LOG"
+    echo "   - 训练结果: result/ogb_ogbg-ppa_*/" | tee -a "$MAIN_LOG"
     echo "              result/ogb_ogbg-molhiv_*/" | tee -a "$MAIN_LOG"
     echo "              result/tudataset_PROTEINS_*/" | tee -a "$MAIN_LOG"
+    echo "              result/tudataset_MUTAG_*/" | tee -a "$MAIN_LOG"
     echo "" | tee -a "$MAIN_LOG"
     exit 0
 fi
