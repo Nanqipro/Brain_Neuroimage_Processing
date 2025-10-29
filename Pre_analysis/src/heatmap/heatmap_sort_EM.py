@@ -13,7 +13,7 @@ from scipy import stats
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EMtrace01.xlsx'
+    INPUT_FILE = '../../datasets/29790930糖水铁网糖水trace2.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort-'
     # 时间戳区间默认值（None表示不限制）
