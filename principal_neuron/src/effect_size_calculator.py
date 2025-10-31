@@ -132,6 +132,7 @@ class EffectSizeCalculator:
         self.label_encoder = LabelEncoder()
         self.scaler = StandardScaler()
         self.nan_info = {}  # 存储NaN值处理信息
+        self.neuron_column_names = None  # 存储原始神经元列名
         
     def remove_nan_rows(self, neuron_data: np.ndarray, behavior_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -360,7 +361,7 @@ class EffectSizeCalculator:
         
         return effect_sizes
     
-    def identify_key_neurons(self, effect_sizes: Dict[str, np.ndarray], threshold: float = 0.4) -> Dict[str, List[int]]:
+    def identify_key_neurons(self, effect_sizes: Dict[str, np.ndarray], threshold: float = 0.4) -> Dict[str, List[Any]]:
         """
         基于效应量阈值识别关键神经元
         
@@ -376,8 +377,8 @@ class EffectSizeCalculator:
             
         返回
         ----------
-        key_neurons : Dict[str, List[int]]
-            每种行为的关键神经元ID列表（1-based索引）
+        key_neurons : Dict[str, List[Any]]
+            每种行为的关键神经元名称/ID列表（使用原始列名或1-based索引）
         """
         print(f"\n基于阈值 {threshold} 识别关键神经元...")
         
@@ -386,13 +387,19 @@ class EffectSizeCalculator:
         for behavior, effect_size_array in effect_sizes.items():
             # 找出超过阈值的神经元
             significant_indices = np.where(effect_size_array >= threshold)[0]
-            # 转换为1-based索引
-            key_neuron_ids = [idx + 1 for idx in significant_indices]
-            key_neurons[behavior] = sorted(key_neuron_ids)
+            
+            # 使用原始神经元列名（如果可用）
+            if self.neuron_column_names is not None:
+                key_neuron_ids = [self.neuron_column_names[idx] for idx in significant_indices]
+            else:
+                # 转换为1-based索引
+                key_neuron_ids = [idx + 1 for idx in significant_indices]
+            
+            key_neurons[behavior] = key_neuron_ids
             
             print(f"行为 '{behavior}': {len(key_neuron_ids)} 个关键神经元")
             if len(key_neuron_ids) > 0:
-                print(f"  神经元ID: {key_neuron_ids}")
+                print(f"  神经元: {key_neuron_ids}")
                 # 显示对应的效应量
                 effect_values = effect_size_array[significant_indices]
                 print(f"  效应量: {[f'{val:.4f}' for val in effect_values]}")
@@ -402,7 +409,8 @@ class EffectSizeCalculator:
         return key_neurons
     
     def export_effect_sizes_to_csv(self, effect_sizes: Dict[str, np.ndarray], 
-                                  output_path: str, neuron_ids: List[int] = None) -> str:
+                                  output_path: str, neuron_ids: List[int] = None,
+                                  neuron_column_names: List[str] = None) -> str:
         """
         将效应量结果导出为CSV文件
         
@@ -417,6 +425,9 @@ class EffectSizeCalculator:
             输出CSV文件路径
         neuron_ids : List[int], 可选
             神经元ID列表，如果未提供则使用连续编号
+        neuron_column_names : List[str], 可选
+            原始神经元列名列表（如 ['n1', 'n4', 'n5', ...]），
+            如果提供则使用原始列名，否则使用neuron_ids生成列名
             
         返回
         ----------
@@ -425,27 +436,39 @@ class EffectSizeCalculator:
         """
         print(f"\n导出效应量数据到: {output_path}")
         
-        # 准备数据
-        if neuron_ids is None:
-            # 假设神经元数量等于第一个行为的效应量数组长度
-            first_behavior = list(effect_sizes.keys())[0]
-            n_neurons = len(effect_sizes[first_behavior])
-            neuron_ids = list(range(1, n_neurons + 1))
+        # 确定使用的列名
+        first_behavior = list(effect_sizes.keys())[0]
+        n_neurons = len(effect_sizes[first_behavior])
         
-        # 创建DataFrame
-        data_dict = {}
-        for behavior, effect_array in effect_sizes.items():
-            for i, neuron_id in enumerate(neuron_ids):
-                if i < len(effect_array):
-                    data_dict[f'Neuron_{neuron_id}'] = data_dict.get(f'Neuron_{neuron_id}', {})
-                    data_dict[f'Neuron_{neuron_id}'][behavior] = effect_array[i]
+        if neuron_column_names is not None:
+            # 使用原始神经元列名
+            if len(neuron_column_names) != n_neurons:
+                print(f"警告: 神经元列名数量({len(neuron_column_names)})与效应量数据列数({n_neurons})不匹配")
+                # 调整列名数量
+                if len(neuron_column_names) > n_neurons:
+                    neuron_column_names = neuron_column_names[:n_neurons]
+                else:
+                    # 补充缺失的列名
+                    for i in range(len(neuron_column_names), n_neurons):
+                        neuron_column_names.append(f'Neuron_{i+1}')
+            column_names = neuron_column_names
+            print(f"使用原始神经元列名: {column_names[:3]}...{column_names[-2:]} (共{len(column_names)}列)")
+        elif neuron_ids is not None:
+            # 使用提供的neuron_ids
+            column_names = [f'Neuron_{nid}' for nid in neuron_ids]
+        else:
+            # 使用默认连续编号
+            column_names = [f'Neuron_{i+1}' for i in range(n_neurons)]
         
-        # 转换为DataFrame格式
+        # 创建DataFrame（行为作为行，神经元作为列）
         rows = []
-        for behavior in effect_sizes.keys():
+        for behavior, effect_array in effect_sizes.items():
             row = {'Behavior': behavior}
-            for neuron_key in sorted(data_dict.keys(), key=lambda x: int(x.split('_')[1])):
-                row[neuron_key] = data_dict[neuron_key].get(behavior, 0.0)
+            for i, col_name in enumerate(column_names):
+                if i < len(effect_array):
+                    row[col_name] = effect_array[i]
+                else:
+                    row[col_name] = 0.0
             rows.append(row)
         
         df = pd.DataFrame(rows)
@@ -474,7 +497,7 @@ class EffectSizeCalculator:
         返回
         ----------
         top_neurons : Dict[str, Dict[str, Any]]
-            每种行为的top神经元信息，包含神经元ID和效应量
+            每种行为的top神经元信息，包含神经元名称/ID和效应量
         """
         print(f"\n获取每种行为的top-{top_n}关键神经元...")
         
@@ -485,8 +508,13 @@ class EffectSizeCalculator:
             sorted_indices = np.argsort(effect_array)[::-1]
             top_indices = sorted_indices[:top_n]
             
-            # 转换为1-based索引
-            top_neuron_ids = [idx + 1 for idx in top_indices]
+            # 使用原始神经元列名（如果可用）
+            if self.neuron_column_names is not None:
+                top_neuron_ids = [self.neuron_column_names[idx] for idx in top_indices]
+            else:
+                # 转换为1-based索引
+                top_neuron_ids = [idx + 1 for idx in top_indices]
+            
             top_effect_values = effect_array[top_indices]
             
             top_neurons[behavior] = {
@@ -497,7 +525,7 @@ class EffectSizeCalculator:
             
             print(f"行为 '{behavior}' top-{top_n} 神经元:")
             for i, (neuron_id, effect_val) in enumerate(zip(top_neuron_ids, top_effect_values)):
-                print(f"  {i+1:2d}. 神经元 {neuron_id:2d}: 效应量 = {effect_val:.4f}")
+                print(f"  {i+1:2d}. 神经元 {neuron_id}: 效应量 = {effect_val:.4f}")
         
         return top_neurons
     
@@ -594,29 +622,50 @@ def load_and_calculate_effect_sizes(neuron_data_path: str = None, behavior_col: 
         print("数据中没有发现NaN值")
     
     # 分离神经元数据和行为标签
+    neuron_column_names = None  # 保存神经元列名用于导出
+    
     if behavior_col is None:
         # 使用最后一列作为行为标签
         neuron_data = data.iloc[:, :-1].values
         behavior_data = data.iloc[:, -1].values
+        neuron_column_names = data.columns[:-1].tolist()
         print(f"使用最后一列 '{data.columns[-1]}' 作为行为标签")
     else:
         if behavior_col not in data.columns:
             raise ValueError(f"指定的行为标签列 '{behavior_col}' 不存在")
-        neuron_data = data.drop(columns=[behavior_col]).values
+        
+        # 排除行为标签列和非神经元列（如时间戳列）
+        non_neuron_columns = [behavior_col]
+        
+        # 检测并排除可能的时间戳列
+        for col in data.columns:
+            if col.lower() in ['stamp', 'timestamp', 'time', 'index']:
+                non_neuron_columns.append(col)
+                print(f"检测到非神经元列 '{col}'，将被排除")
+        
+        # 获取神经元列名
+        neuron_column_names = [col for col in data.columns if col not in non_neuron_columns]
+        
+        neuron_data = data.drop(columns=non_neuron_columns).values
         behavior_data = data[behavior_col].values
         print(f"使用列 '{behavior_col}' 作为行为标签")
+        print(f"排除的列: {non_neuron_columns}")
+        print(f"保留的神经元列: {neuron_column_names[:5]}...{neuron_column_names[-3:]} (共{len(neuron_column_names)}列)")
     
     print(f"神经元数据: {neuron_data.shape}, 行为数据: {behavior_data.shape}")
     
     # 创建效应量计算器并计算
     calculator = EffectSizeCalculator()
+    # 保存神经元列名到计算器实例中
+    calculator.neuron_column_names = neuron_column_names
+    
     effect_sizes, X_scaled, y_encoded = calculator.calculate_effect_sizes_from_raw_data(
         neuron_data, behavior_data
     )
     
-    # 导出效应量数据
+    # 导出效应量数据（使用原始神经元列名）
     csv_path = PATH_CONFIG.get_output_path(PATH_CONFIG.effect_sizes_filename)
-    calculator.export_effect_sizes_to_csv(effect_sizes, csv_path)
+    calculator.export_effect_sizes_to_csv(effect_sizes, csv_path, neuron_column_names=neuron_column_names)
     
     # 获取top神经元
     top_neurons = calculator.get_top_neurons_per_behavior(effect_sizes, top_n=10)
