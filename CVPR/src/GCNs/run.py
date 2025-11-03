@@ -42,6 +42,84 @@ from train import train_model, evaluate_model, plot_confusion_matrix, plot_train
 from process import (load_data, oversample_data, compute_correlation_matrix, 
                      create_pyg_dataset, visualize_graph)
 
+# 添加绘制时间曲线的函数
+def plot_epoch_time(epoch_times, cumulative_times, result_dir='result'):
+    """绘制累积执行时间曲线
+    
+    Args:
+        epoch_times: 每个epoch的单独执行时间列表（秒）
+        cumulative_times: 从训练开始的累积时间列表（秒）
+        result_dir: 结果保存目录
+    """
+    import matplotlib.pyplot as plt
+    
+    plt.figure(figsize=(12, 6))
+    epochs = list(range(1, len(cumulative_times) + 1))
+    
+    # 绘制累积时间曲线
+    plt.plot(epochs, cumulative_times, 'b-o', linewidth=2, markersize=6, label='Cumulative Time')
+    plt.xlabel('Epoch', fontsize=12)
+    plt.ylabel('Cumulative Time (seconds)', fontsize=12)
+    plt.title('Cumulative Training Time from Start', fontsize=14, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=11)
+    
+    # 添加最终累积时间标注
+    final_time = cumulative_times[-1] if cumulative_times else 0
+    plt.axhline(y=final_time, color='r', linestyle='--', linewidth=2, alpha=0.5,
+                label=f'Total Time: {final_time:.3f}s')
+    plt.legend(fontsize=11)
+    
+    plt.tight_layout()
+    plt.savefig(f'{result_dir}/epoch_time.png', dpi=300)
+    plt.close()
+    
+    # 统计信息
+    avg_epoch_time = np.mean(epoch_times) if epoch_times else 0
+    print(f"\n时间统计:")
+    print(f"  - 累积总时间: {final_time:.3f}秒")
+    print(f"  - 平均每个epoch时间: {avg_epoch_time:.3f}秒")
+    print(f"  - 最快epoch时间: {min(epoch_times):.3f}秒" if epoch_times else "  - 最快epoch时间: 0秒")
+    print(f"  - 最慢epoch时间: {max(epoch_times):.3f}秒" if epoch_times else "  - 最慢epoch时间: 0秒")
+    print(f"  - epoch时间标准差: {np.std(epoch_times):.3f}秒" if epoch_times else "  - epoch时间标准差: 0秒")
+
+
+def save_training_history_csv(history, result_dir='result'):
+    """保存训练历史到CSV文件
+    
+    Args:
+        history: 训练历史字典
+        result_dir: 结果保存目录
+    """
+    # 构建DataFrame
+    num_epochs = len(history['epoch_times'])
+    
+    data = {
+        'epoch': list(range(1, num_epochs + 1)),
+        'epoch_time': history['epoch_times'],
+        'cumulative_time': history['cumulative_times'],
+        'train_loss': history['train']['loss'],
+        'train_accuracy': history['train']['accuracy'],
+        'train_precision': history['train']['precision'],
+        'train_recall': history['train']['recall'],
+        'train_f1': history['train']['f1'],
+        'val_accuracy': history['val']['accuracy'],
+        'val_precision': history['val']['precision'],
+        'val_recall': history['val']['recall'],
+        'val_f1': history['val']['f1']
+    }
+    
+    df = pd.DataFrame(data)
+    
+    # 保存到CSV
+    csv_path = f'{result_dir}/training_history.csv'
+    df.to_csv(csv_path, index=False, encoding='utf-8')
+    
+    print(f"\n训练历史已保存到: {csv_path}")
+    print(f"  - 包含 {num_epochs} 个epoch的详细数据")
+    print(f"  - 可直接用于绘图和分析")
+
+
 # 模型字典
 MODEL_DICT = {
     # 原有基础模型
@@ -373,7 +451,9 @@ def run_experiment(args):
     # 训练历史
     history = {
         'train': {'loss': [], 'accuracy': [], 'precision': [], 'recall': [], 'f1': []},
-        'val': {'accuracy': [], 'precision': [], 'recall': [], 'f1': []}
+        'val': {'accuracy': [], 'precision': [], 'recall': [], 'f1': []},
+        'epoch_times': [],  # 记录每个epoch的单独执行时间
+        'cumulative_times': []  # 记录从训练开始的累积时间
     }
     
     best_val_f1 = 0
@@ -383,13 +463,28 @@ def run_experiment(args):
     print(f"\n开始训练 (最多 {args.epochs} 轮)...")
     print("=" * 80)
     
+    # 记录训练开始时间（用于计算累积时间）
+    training_start_time = time.time()
+    
     # 训练循环
     for epoch in range(1, args.epochs + 1):
+        # 记录epoch开始时间（只记录模型执行时间）
+        epoch_start_time = time.time()
+        
         # 训练
         train_metrics = train_model(model, train_loader, optimizer, device, class_weights)
         
         # 验证
         val_metrics = evaluate_model(model, val_loader, device)
+        
+        # 记录epoch结束时间（包含训练和验证的模型执行时间）
+        epoch_end_time = time.time()
+        epoch_time = epoch_end_time - epoch_start_time
+        history['epoch_times'].append(epoch_time)
+        
+        # 记录累积时间（从训练开始到当前epoch结束）
+        cumulative_time = epoch_end_time - training_start_time
+        history['cumulative_times'].append(cumulative_time)
         
         # 学习率调度
         scheduler.step(val_metrics['f1'])
@@ -419,7 +514,7 @@ def run_experiment(args):
         if epoch % args.print_every == 0:
             print(f"Epoch {epoch:03d}: Loss={train_metrics['loss']:.4f}, "
                   f"Train F1={train_metrics['f1']:.4f}, Val F1={val_metrics['f1']:.4f}, "
-                  f"Val Acc={val_metrics['accuracy']:.4f}")
+                  f"Val Acc={val_metrics['accuracy']:.4f}, Time={epoch_time:.3f}s")
         
         # Early stopping
         if patience_counter >= args.patience:
@@ -460,6 +555,11 @@ def run_experiment(args):
             class_names=class_names,
             result_dir=result_dir
         )
+        # 绘制累积时间曲线
+        plot_epoch_time(history['epoch_times'], history['cumulative_times'], result_dir=result_dir)
+        
+        # 保存训练历史到CSV文件（方便后续直接画图）
+        save_training_history_csv(history, result_dir=result_dir)
         
         # 保存结果JSON
         result = {
@@ -487,7 +587,16 @@ def run_experiment(args):
             "history": {
                 "train_loss": history['train']['loss'],
                 "train_f1": history['train']['f1'],
-                "val_f1": history['val']['f1']
+                "val_f1": history['val']['f1'],
+                "epoch_times": history['epoch_times'],
+                "cumulative_times": history['cumulative_times']
+            },
+            "time_statistics": {
+                "avg_epoch_time": float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
+                "min_epoch_time": float(np.min(history['epoch_times'])) if history['epoch_times'] else 0,
+                "max_epoch_time": float(np.max(history['epoch_times'])) if history['epoch_times'] else 0,
+                "std_epoch_time": float(np.std(history['epoch_times'])) if history['epoch_times'] else 0,
+                "total_cumulative_time": float(history['cumulative_times'][-1]) if history['cumulative_times'] else 0
             },
             "classification_report": classification_report(
                 test_metrics['labels'],
@@ -502,7 +611,12 @@ def run_experiment(args):
         
         print(f"\n结果已保存到: {result_dir}")
     
-    return test_metrics
+    # 返回测试结果和时间统计
+    return {
+        **test_metrics,
+        'avg_epoch_time': float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
+        'total_training_time': training_time
+    }
 
 
 def main():
@@ -611,14 +725,16 @@ def main():
             print(f"🚀 开始第 {run_idx + 1}/{args.num_runs} 次训练 (Seed = {current_seed})")
             print("🔄" * 40 + "\n")
             
-            test_metrics = run_experiment(args)
+            result = run_experiment(args)
             all_results.append({
                 'run': run_idx + 1,
                 'seed': current_seed,
-                'test_accuracy': float(test_metrics['accuracy']),
-                'test_precision': float(test_metrics['precision']),
-                'test_recall': float(test_metrics['recall']),
-                'test_f1': float(test_metrics['f1'])
+                'test_accuracy': float(result['accuracy']),
+                'test_precision': float(result['precision']),
+                'test_recall': float(result['recall']),
+                'test_f1': float(result['f1']),
+                'avg_epoch_time': float(result['avg_epoch_time']),
+                'total_training_time': float(result['total_training_time'])
             })
         
         # 打印汇总结果
@@ -630,11 +746,16 @@ def main():
         precisions = [r['test_precision'] for r in all_results]
         recalls = [r['test_recall'] for r in all_results]
         f1_scores = [r['test_f1'] for r in all_results]
+        avg_epoch_times = [r['avg_epoch_time'] for r in all_results]
+        total_times = [r['total_training_time'] for r in all_results]
         
         print(f"\n测试集准确率: {np.mean(accuracies):.4f} ± {np.std(accuracies):.4f}")
         print(f"测试集精确率: {np.mean(precisions):.4f} ± {np.std(precisions):.4f}")
         print(f"测试集召回率: {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
         print(f"测试集F1分数: {np.mean(f1_scores):.4f} ± {np.std(f1_scores):.4f}")
+        print(f"\n时间统计:")
+        print(f"平均每轮epoch时间: {np.mean(avg_epoch_times):.3f} ± {np.std(avg_epoch_times):.3f}秒")
+        print(f"平均总训练时间: {np.mean(total_times):.2f} ± {np.std(total_times):.2f}秒")
         
         print(f"\n详细结果:")
         for result in all_results:
@@ -642,7 +763,9 @@ def main():
                   f"Acc={result['test_accuracy']:.4f}, "
                   f"Prec={result['test_precision']:.4f}, "
                   f"Recall={result['test_recall']:.4f}, "
-                  f"F1={result['test_f1']:.4f}")
+                  f"F1={result['test_f1']:.4f}, "
+                  f"AvgEpochTime={result['avg_epoch_time']:.3f}s, "
+                  f"TotalTime={result['total_training_time']:.2f}s")
         
         # 保存汇总结果
         summary_file = f"result/multi_run_summary_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -655,7 +778,9 @@ def main():
                     'accuracy': {'mean': float(np.mean(accuracies)), 'std': float(np.std(accuracies))},
                     'precision': {'mean': float(np.mean(precisions)), 'std': float(np.std(precisions))},
                     'recall': {'mean': float(np.mean(recalls)), 'std': float(np.std(recalls))},
-                    'f1': {'mean': float(np.mean(f1_scores)), 'std': float(np.std(f1_scores))}
+                    'f1': {'mean': float(np.mean(f1_scores)), 'std': float(np.std(f1_scores))},
+                    'avg_epoch_time': {'mean': float(np.mean(avg_epoch_times)), 'std': float(np.std(avg_epoch_times))},
+                    'total_training_time': {'mean': float(np.mean(total_times)), 'std': float(np.std(total_times))}
                 },
                 'all_results': all_results
             }, f, ensure_ascii=False, indent=4)

@@ -9,10 +9,10 @@ MODELS=("gcn" "gat" "sage" "hybrid" "gin" "chebnet" "edgeconv" "gunet" "pna" "ga
 # 定义数据集配置
 # 格式: "data_source:dataset:batch_size:epochs"
 DATASETS=(
-    # "tudataset:MUTAG:32:500"
-    # "ogb:ogbg-molhiv:128:500"
-    "ogb:ogbg-ppa:128:500"
-    # "tudataset:PROTEINS:32:500"
+    "tudataset:MUTAG:32:500"
+    "ogb:ogbg-molhiv:128:500"
+    # "ogb:ogbg-ppa:128:500"
+    "tudataset:PROTEINS:32:500"
 )
 
 # 训练设置
