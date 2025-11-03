@@ -40,7 +40,7 @@ from model import (
 )
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics
 from process import (load_data, oversample_data, compute_correlation_matrix, 
-                     create_pyg_dataset, visualize_graph)
+                     create_pyg_dataset, visualize_graph, load_custom_graph_dataset)
 
 # 添加绘制时间曲线的函数
 def plot_epoch_time(epoch_times, cumulative_times, result_dir='result'):
@@ -353,6 +353,72 @@ def load_ogb_data(dataset_name, data_root, batch_size=32):
     return train_loader, val_loader, test_loader, dataset.num_features, num_classes, None, None
 
 
+def load_custom_data(data_dir, seed, train_ratio=0.8, val_ratio=0.1, batch_size=32, 
+                     feature_dim=16, num_classes=2, use_degree_feature=False):
+    """
+    加载自定义图结构数据集（如random数据集）
+    
+    Args:
+        data_dir: 数据集目录路径
+        seed: 随机种子
+        train_ratio: 训练集比例
+        val_ratio: 验证集比例
+        batch_size: 批大小
+        feature_dim: 随机节点特征维度
+        num_classes: 类别数
+        use_degree_feature: 是否使用节点度数作为特征
+    
+    Returns:
+        train_loader, val_loader, test_loader, num_features, num_classes, None, None
+    """
+    print(f"\n加载自定义图数据集: {data_dir}")
+    
+    # 加载数据集
+    data_list, num_features, actual_num_classes = load_custom_graph_dataset(
+        data_dir, 
+        feature_dim=feature_dim,
+        num_classes=num_classes,
+        use_degree_feature=use_degree_feature
+    )
+    
+    # 划分数据集
+    num_graphs = len(data_list)
+    indices = list(range(num_graphs))
+    
+    # 分层抽样
+    labels = [data.y.item() for data in data_list]
+    
+    train_idx, temp_idx = train_test_split(
+        indices, train_size=train_ratio, 
+        random_state=seed, stratify=labels
+    )
+    
+    temp_labels = [labels[i] for i in temp_idx]
+    val_size = val_ratio / (1 - train_ratio)
+    
+    val_idx, test_idx = train_test_split(
+        temp_idx, train_size=val_size,
+        random_state=seed, stratify=temp_labels
+    )
+    
+    # 创建子数据集
+    train_dataset = [data_list[i] for i in train_idx]
+    val_dataset = [data_list[i] for i in val_idx]
+    test_dataset = [data_list[i] for i in test_idx]
+    
+    print(f"\n数据集划分:")
+    print(f"  - 训练集: {len(train_dataset)} 图")
+    print(f"  - 验证集: {len(val_dataset)} 图")
+    print(f"  - 测试集: {len(test_dataset)} 图")
+    
+    # 创建DataLoader
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size)
+    
+    return train_loader, val_loader, test_loader, num_features, actual_num_classes, None, None
+
+
 # ============================================================================
 # 训练函数
 # ============================================================================
@@ -366,6 +432,9 @@ def setup_result_directory(model_name, data_source, dataset_name):
     elif data_source == 'ogb':
         dataset_simple = dataset_name.split('/')[-1]
         base_dir = f"result/ogb/{dataset_simple}/{model_name}"
+    elif data_source == 'custom':
+        dataset_simple = dataset_name.split('/')[-1]
+        base_dir = f"result/custom/{dataset_simple}/{model_name}"
     else:  # tudataset
         dataset_simple = dataset_name.split('/')[-1].replace('.csv', '')
         base_dir = f"result/tudataset/{dataset_simple}/{model_name}"
@@ -418,10 +487,18 @@ def run_experiment(args):
             )
         class_weights = None
         class_names = [str(i) for i in range(num_classes)]
-    else:  # ogb
+    elif args.data_source == 'ogb':
         train_loader, val_loader, test_loader, num_features, num_classes, _, _ = \
             load_ogb_data(
                 args.dataset, args.ogb_root, args.batch_size
+            )
+        class_weights = None
+        class_names = [str(i) for i in range(num_classes)]
+    else:  # custom
+        train_loader, val_loader, test_loader, num_features, num_classes, _, _ = \
+            load_custom_data(
+                args.dataset, args.seed, args.train_ratio, args.val_ratio, args.batch_size,
+                args.feature_dim, args.num_classes, args.use_degree_feature
             )
         class_weights = None
         class_names = [str(i) for i in range(num_classes)]
@@ -639,6 +716,18 @@ def main():
   # CSV数据（神经元数据）
   python run.py --data_source csv --dataset dataset/processed3.csv --model gcn
   
+  # 自定义图数据集（如random数据集）- 使用随机特征
+  python run.py --data_source custom --dataset /path/to/graphs_100 --model gcn --feature_dim 16
+  
+  # 自定义图数据集 - 使用节点度数特征
+  python run.py --data_source custom --dataset /path/to/graphs_100 --model gcn --use_degree_feature
+  
+  # Random数据集完整示例（4个规模）
+  python run.py --data_source custom --dataset ../../data/random/graphs_100 --model gin --save_results
+  python run.py --data_source custom --dataset ../../data/random/graphs_1000 --model gin --save_results
+  python run.py --data_source custom --dataset ../../data/random/graphs_10000 --model gin --save_results
+  python run.py --data_source custom --dataset ../../data/random/graphs_100000 --model gin --save_results
+  
   # 20次重复训练（每次seed递增，数据划分不同）
   python run.py --data_source tudataset --dataset MUTAG --model gcn --num_runs 20 --seed 42
   
@@ -655,10 +744,10 @@ def main():
     
     # 数据源参数
     parser.add_argument('--data_source', type=str, required=True,
-                        choices=['csv', 'tudataset', 'ogb'],
-                        help='数据源类型: csv (CSV文件), tudataset (TUDataset), ogb (OGB数据集)')
+                        choices=['csv', 'tudataset', 'ogb', 'custom'],
+                        help='数据源类型: csv (CSV文件), tudataset (TUDataset), ogb (OGB数据集), custom (自定义图数据集)')
     parser.add_argument('--dataset', type=str, required=True,
-                        help='数据集名称或CSV文件路径')
+                        help='数据集名称或路径')
     parser.add_argument('--data_root', type=str, default=default_data_root,
                         help='TUDataset根目录（仅用于tudataset）')
     parser.add_argument('--ogb_root', type=str, default=default_ogb_root,
@@ -667,6 +756,14 @@ def main():
                         help='训练集比例 (默认60%)')
     parser.add_argument('--val_ratio', type=float, default=0.2,
                         help='验证集比例 (默认20%, 测试集也是20%)')
+    
+    # 自定义数据集参数（仅用于custom数据源）
+    parser.add_argument('--feature_dim', type=int, default=16,
+                        help='随机节点特征维度（仅用于custom数据源，默认16）')
+    parser.add_argument('--num_classes', type=int, default=2,
+                        help='类别数（仅用于custom数据源，默认2）')
+    parser.add_argument('--use_degree_feature', action='store_true',
+                        help='使用节点度数作为特征（仅用于custom数据源）')
     
     # 模型参数
     parser.add_argument('--model', type=str, default='gcn',
