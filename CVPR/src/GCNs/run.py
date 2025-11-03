@@ -600,29 +600,74 @@ def run_experiment(args):
     
     print("=" * 80)
     
+    # 计算到达早停（或最大epoch）时的实际训练指标
+    actual_epochs = len(history['epoch_times'])
+    total_training_time = history['cumulative_times'][-1] if history['cumulative_times'] else 0
+    avg_training_time = total_training_time / actual_epochs if actual_epochs > 0 else 0
+    
     # 测试
     print(f"\n在测试集上评估...")
     test_metrics = evaluate_model(model, test_loader, device)
     
-    # 计算训练时间
-    training_time = time.time() - begin_time
+    # 计算脚本总运行时间
+    total_elapsed_time = time.time() - begin_time
     
     # 打印结果
     print(f"\n{'=' * 80}")
     print(f"实验结果:")
     print(f"{'=' * 80}")
     print(f"最佳验证F1 (Epoch {best_epoch}): {best_val_f1:.4f}")
+    print(f"实际训练轮数: {actual_epochs} epochs")
     print(f"\n测试集性能:")
     print(f"  - 准确率: {test_metrics['accuracy']:.4f}")
     print(f"  - 精确率: {test_metrics['precision']:.4f}")
     print(f"  - 召回率: {test_metrics['recall']:.4f}")
     print(f"  - F1分数: {test_metrics['f1']:.4f}")
-    print(f"\n训练时间: {training_time:.2f}秒")
+    print(f"\n训练时间统计:")
+    print(f"  - 总训练时间（到达收敛）: {total_training_time:.3f}秒")
+    print(f"  - 平均训练时间（每epoch）: {avg_training_time:.3f}秒")
+    print(f"  - 脚本总运行时间: {total_elapsed_time:.2f}秒")
     print(f"{'=' * 80}")
     
     # 保存详细结果
     if args.save_results:
         result_dir = setup_result_directory(args.model, args.data_source, args.dataset)
+        
+        # 保存训练时间统计到TXT文件
+        time_stats_file = f'{result_dir}/training_time_stats.txt'
+        with open(time_stats_file, 'w', encoding='utf-8') as f:
+            f.write("=" * 80 + "\n")
+            f.write("训练时间统计报告\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"模型: {args.model}\n")
+            f.write(f"数据集: {args.dataset}\n")
+            f.write(f"数据源: {args.data_source}\n")
+            f.write(f"随机种子: {args.seed}\n\n")
+            f.write("-" * 80 + "\n")
+            f.write("核心训练时间指标\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"1. 模型到达收敛的总训练时间: {total_training_time:.3f} 秒\n")
+            f.write(f"2. 平均训练时间（每epoch）: {avg_training_time:.3f} 秒\n\n")
+            f.write("-" * 80 + "\n")
+            f.write("详细训练信息\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"实际训练轮数: {actual_epochs} epochs\n")
+            f.write(f"最佳验证轮数: {best_epoch} epoch\n")
+            f.write(f"最快epoch时间: {min(history['epoch_times']):.3f} 秒\n" if history['epoch_times'] else "最快epoch时间: 0.000 秒\n")
+            f.write(f"最慢epoch时间: {max(history['epoch_times']):.3f} 秒\n" if history['epoch_times'] else "最慢epoch时间: 0.000 秒\n")
+            f.write(f"epoch时间标准差: {np.std(history['epoch_times']):.3f} 秒\n" if history['epoch_times'] else "epoch时间标准差: 0.000 秒\n")
+            f.write(f"脚本总运行时间: {total_elapsed_time:.2f} 秒\n\n")
+            f.write("-" * 80 + "\n")
+            f.write("测试集性能指标\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"准确率: {test_metrics['accuracy']:.4f}\n")
+            f.write(f"精确率: {test_metrics['precision']:.4f}\n")
+            f.write(f"召回率: {test_metrics['recall']:.4f}\n")
+            f.write(f"F1分数: {test_metrics['f1']:.4f}\n")
+            f.write(f"最佳验证F1: {best_val_f1:.4f}\n\n")
+            f.write("=" * 80 + "\n")
+        
+        print(f"\n训练时间统计已保存到: {time_stats_file}")
         
         # 绘制图表
         plot_training_metrics(history['train'], history['val'], result_dir=result_dir)
@@ -652,7 +697,8 @@ def run_experiment(args):
                 "weight_decay": args.weight_decay,
                 "total_params": total_params,
                 "best_epoch": best_epoch,
-                "training_time": training_time
+                "actual_epochs": actual_epochs,
+                "total_elapsed_time": total_elapsed_time
             },
             "test_metrics": {
                 "accuracy": float(test_metrics['accuracy']),
@@ -669,11 +715,15 @@ def run_experiment(args):
                 "cumulative_times": history['cumulative_times']
             },
             "time_statistics": {
+                "total_training_time": float(total_training_time),  # 核心指标1: 总训练时间
+                "avg_training_time_per_epoch": float(avg_training_time),  # 核心指标2: 平均训练时间
+                "actual_epochs": actual_epochs,
                 "avg_epoch_time": float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
                 "min_epoch_time": float(np.min(history['epoch_times'])) if history['epoch_times'] else 0,
                 "max_epoch_time": float(np.max(history['epoch_times'])) if history['epoch_times'] else 0,
                 "std_epoch_time": float(np.std(history['epoch_times'])) if history['epoch_times'] else 0,
-                "total_cumulative_time": float(history['cumulative_times'][-1]) if history['cumulative_times'] else 0
+                "total_cumulative_time": float(history['cumulative_times'][-1]) if history['cumulative_times'] else 0,
+                "total_elapsed_time": float(total_elapsed_time)
             },
             "classification_report": classification_report(
                 test_metrics['labels'],
@@ -691,8 +741,11 @@ def run_experiment(args):
     # 返回测试结果和时间统计
     return {
         **test_metrics,
+        'actual_epochs': actual_epochs,
+        'total_training_time': float(total_training_time),  # 核心指标1: 总训练时间
+        'avg_training_time': float(avg_training_time),  # 核心指标2: 平均训练时间
         'avg_epoch_time': float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
-        'total_training_time': training_time
+        'total_elapsed_time': total_elapsed_time
     }
 
 
@@ -830,8 +883,11 @@ def main():
                 'test_precision': float(result['precision']),
                 'test_recall': float(result['recall']),
                 'test_f1': float(result['f1']),
+                'actual_epochs': int(result['actual_epochs']),
+                'total_training_time': float(result['total_training_time']),
+                'avg_training_time': float(result['avg_training_time']),
                 'avg_epoch_time': float(result['avg_epoch_time']),
-                'total_training_time': float(result['total_training_time'])
+                'total_elapsed_time': float(result['total_elapsed_time'])
             })
         
         # 打印汇总结果
@@ -843,26 +899,31 @@ def main():
         precisions = [r['test_precision'] for r in all_results]
         recalls = [r['test_recall'] for r in all_results]
         f1_scores = [r['test_f1'] for r in all_results]
+        actual_epochs = [r['actual_epochs'] for r in all_results]
+        total_training_times = [r['total_training_time'] for r in all_results]
+        avg_training_times = [r['avg_training_time'] for r in all_results]
         avg_epoch_times = [r['avg_epoch_time'] for r in all_results]
-        total_times = [r['total_training_time'] for r in all_results]
+        total_elapsed_times = [r['total_elapsed_time'] for r in all_results]
         
         print(f"\n测试集准确率: {np.mean(accuracies):.4f} ± {np.std(accuracies):.4f}")
         print(f"测试集精确率: {np.mean(precisions):.4f} ± {np.std(precisions):.4f}")
         print(f"测试集召回率: {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
         print(f"测试集F1分数: {np.mean(f1_scores):.4f} ± {np.std(f1_scores):.4f}")
-        print(f"\n时间统计:")
-        print(f"平均每轮epoch时间: {np.mean(avg_epoch_times):.3f} ± {np.std(avg_epoch_times):.3f}秒")
-        print(f"平均总训练时间: {np.mean(total_times):.2f} ± {np.std(total_times):.2f}秒")
+        print(f"\n训练时间统计:")
+        print(f"平均实际训练轮数: {np.mean(actual_epochs):.1f} ± {np.std(actual_epochs):.1f} epochs")
+        print(f"平均总训练时间（到达收敛）: {np.mean(total_training_times):.3f} ± {np.std(total_training_times):.3f}秒")
+        print(f"平均训练时间（每epoch）: {np.mean(avg_training_times):.3f} ± {np.std(avg_training_times):.3f}秒")
+        print(f"平均epoch时间: {np.mean(avg_epoch_times):.3f} ± {np.std(avg_epoch_times):.3f}秒")
+        print(f"平均脚本运行时间: {np.mean(total_elapsed_times):.2f} ± {np.std(total_elapsed_times):.2f}秒")
         
         print(f"\n详细结果:")
         for result in all_results:
             print(f"  Run {result['run']} (Seed={result['seed']}): "
                   f"Acc={result['test_accuracy']:.4f}, "
-                  f"Prec={result['test_precision']:.4f}, "
-                  f"Recall={result['test_recall']:.4f}, "
                   f"F1={result['test_f1']:.4f}, "
-                  f"AvgEpochTime={result['avg_epoch_time']:.3f}s, "
-                  f"TotalTime={result['total_training_time']:.2f}s")
+                  f"Epochs={result['actual_epochs']}, "
+                  f"TotalTrainTime={result['total_training_time']:.3f}s, "
+                  f"AvgTrainTime={result['avg_training_time']:.3f}s")
         
         # 保存汇总结果
         summary_file = f"result/multi_run_summary_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -876,8 +937,11 @@ def main():
                     'precision': {'mean': float(np.mean(precisions)), 'std': float(np.std(precisions))},
                     'recall': {'mean': float(np.mean(recalls)), 'std': float(np.std(recalls))},
                     'f1': {'mean': float(np.mean(f1_scores)), 'std': float(np.std(f1_scores))},
+                    'actual_epochs': {'mean': float(np.mean(actual_epochs)), 'std': float(np.std(actual_epochs))},
+                    'total_training_time': {'mean': float(np.mean(total_training_times)), 'std': float(np.std(total_training_times))},
+                    'avg_training_time_per_epoch': {'mean': float(np.mean(avg_training_times)), 'std': float(np.std(avg_training_times))},
                     'avg_epoch_time': {'mean': float(np.mean(avg_epoch_times)), 'std': float(np.std(avg_epoch_times))},
-                    'total_training_time': {'mean': float(np.mean(total_times)), 'std': float(np.std(total_times))}
+                    'total_elapsed_time': {'mean': float(np.mean(total_elapsed_times)), 'std': float(np.std(total_elapsed_times))}
                 },
                 'all_results': all_results
             }, f, ensure_ascii=False, indent=4)

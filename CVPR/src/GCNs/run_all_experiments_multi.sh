@@ -10,13 +10,13 @@ MODELS=("gcn" "gat" "sage" "hybrid" "gin" "chebnet" "edgeconv" "gunet" "pna" "ga
 # 定义数据集配置
 # 格式: "data_source:dataset:batch_size:epochs:gpu_id"
 DATASETS=(
-    "tudataset:MUTAG:32:500:0"                                                      # GPU 0
-    "ogb:ogbg-molhiv:128:500:1"                                                     # GPU 1
-    "tudataset:PROTEINS:32:500:2"                                                   # GPU 2
-    "custom:../../data/random/graphs_100:32:500:3"                                  # GPU 3 - Random 100图
-    "custom:../../data/random/graphs_1000:32:500:3"                                 # GPU 3 - Random 1000图
-    "custom:../../data/random/graphs_10000:64:500:3"                                # GPU 3 - Random 10000图
-    "custom:../../data/random/graphs_100000:128:500:3"                              # GPU 3 - Random 100000图
+    # "tudataset:MUTAG:32:500:0"                                                      # GPU 0
+    # "ogb:ogbg-molhiv:128:500:1"                                                     # GPU 1
+    # "tudataset:PROTEINS:32:500:2"                                                   # GPU 2
+    "custom:../../data/random/graphs_100:32:500:0"                                  # GPU 0 - Random 100图 (并行)
+    "custom:../../data/random/graphs_1000:32:500:1"                                 # GPU 1 - Random 1000图 (并行)
+    "custom:../../data/random/graphs_10000:64:500:2"                                # GPU 2 - Random 10000图 (并行)
+    "custom:../../data/random/graphs_100000:128:500:3"                              # GPU 3 - Random 100000图 (并行)
     # "ogb:ogbg-ppa:128:500:3"                                                      # GPU 3 (备用)
 )
 
