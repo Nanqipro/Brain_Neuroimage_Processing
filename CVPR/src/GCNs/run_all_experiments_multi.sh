@@ -2,7 +2,7 @@
 # 运行所有模型在所有数据集上的20次训练实验
 # 数据划分: 训练60%, 验证20%, 测试20%
 # 每次训练seed递增，确保数据划分不同
-# 并行执行：三个数据集分别在三个GPU上同时运行
+# 并行执行：7个数据集（3个标准数据集 + 4个random数据集）在4个GPU上运行
 
 # 定义所有模型
 MODELS=("gcn" "gat" "sage" "hybrid" "gin" "chebnet" "edgeconv" "gunet" "pna" "gatv2" "deepergcn")
@@ -10,10 +10,14 @@ MODELS=("gcn" "gat" "sage" "hybrid" "gin" "chebnet" "edgeconv" "gunet" "pna" "ga
 # 定义数据集配置
 # 格式: "data_source:dataset:batch_size:epochs:gpu_id"
 DATASETS=(
-    "tudataset:MUTAG:32:500:0"           # GPU 0
-    "ogb:ogbg-molhiv:128:500:1"          # GPU 1
-    "tudataset:PROTEINS:32:500:2"        # GPU 2
-    # "ogb:ogbg-ppa:128:500:3"           # GPU 3 (备用)
+    "tudataset:MUTAG:32:500:0"                                                      # GPU 0
+    "ogb:ogbg-molhiv:128:500:1"                                                     # GPU 1
+    "tudataset:PROTEINS:32:500:2"                                                   # GPU 2
+    "custom:../../data/random/graphs_100:32:500:3"                                  # GPU 3 - Random 100图
+    "custom:../../data/random/graphs_1000:32:500:3"                                 # GPU 3 - Random 1000图
+    "custom:../../data/random/graphs_10000:64:500:3"                                # GPU 3 - Random 10000图
+    "custom:../../data/random/graphs_100000:128:500:3"                              # GPU 3 - Random 100000图
+    # "ogb:ogbg-ppa:128:500:3"                                                      # GPU 3 (备用)
 )
 
 # 训练设置
@@ -33,11 +37,15 @@ echo "🚀 运行多次训练实验 (并行模式)"
 echo "======================================================================"
 echo "配置: ${#DATASETS[@]}个数据集 × ${#MODELS[@]}个模型 × ${NUM_RUNS}次训练"
 echo "数据划分: 训练60%, 验证20%, 测试20%"
-echo "并行策略: ${#DATASETS[@]}个数据集在不同GPU上同时运行"
+echo "并行策略: ${#DATASETS[@]}个数据集在4个GPU上运行"
+echo ""
+echo "数据集分配:"
 for dataset_config in "${DATASETS[@]}"; do
     IFS=':' read -r data_source dataset _ _ gpu_id <<< "$dataset_config"
-    echo "  - $dataset 使用 GPU $gpu_id"
+    dataset_name=$(basename "$dataset")
+    echo "  - GPU $gpu_id: $data_source/$dataset_name"
 done
+echo ""
 echo "日志目录: $LOG_DIR"
 echo "======================================================================"
 echo ""
@@ -47,7 +55,9 @@ echo "======================================================================"  |
 echo "🚀 多次训练实验开始时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$MAIN_LOG"
 echo "配置: ${#DATASETS[@]}个数据集 × ${#MODELS[@]}个模型 × ${NUM_RUNS}次训练" | tee -a "$MAIN_LOG"
 echo "数据划分: 训练60%, 验证20%, 测试20%" | tee -a "$MAIN_LOG"
-echo "⚡ 并行模式: ${#DATASETS[@]}个数据集在不同GPU上同时运行" | tee -a "$MAIN_LOG"
+echo "⚡ 并行模式: ${#DATASETS[@]}个数据集在4个GPU上同时运行" | tee -a "$MAIN_LOG"
+echo "  - GPU 0-2: 各1个标准数据集" | tee -a "$MAIN_LOG"
+echo "  - GPU 3: 4个random数据集（顺序执行）" | tee -a "$MAIN_LOG"
 echo "======================================================================"  | tee -a "$MAIN_LOG"
 echo "" | tee -a "$MAIN_LOG"
 
@@ -70,8 +80,11 @@ run_dataset_experiments() {
     # 解析数据集配置
     IFS=':' read -r data_source dataset batch_size epochs gpu_id <<< "$dataset_config"
     
+    # 获取数据集名称（处理路径）
+    local dataset_name=$(basename "$dataset")
+    
     # 为该数据集创建专属日志
-    local DATASET_LOG="$LOG_DIR/${dataset}_dataset.log"
+    local DATASET_LOG="$LOG_DIR/${dataset_name}_dataset.log"
     
     echo "======================================================================" | tee -a "$DATASET_LOG"
     echo "📊 数据集: $data_source - $dataset" | tee -a "$DATASET_LOG"
@@ -97,7 +110,7 @@ run_dataset_experiments() {
         local exp_start=$(date +%s)
         
         # 为每个实验创建独立的日志文件
-        local exp_log="$LOG_DIR/${dataset}_${model}_multi.log"
+        local exp_log="$LOG_DIR/${dataset_name}_${model}_multi.log"
         
         # 运行多次训练实验并保存日志
         python run.py \
@@ -135,7 +148,7 @@ run_dataset_experiments() {
             echo "❌ 失败 (耗时: ${exp_time}秒)" | tee -a "$DATASET_LOG"
             echo "错误日志: $exp_log" | tee -a "$DATASET_LOG"
             ((failed++))
-            failed_exps+=("$dataset + $model")
+            failed_exps+=("$dataset_name + $model")
         fi
         
         echo "" | tee -a "$DATASET_LOG"
@@ -149,7 +162,7 @@ run_dataset_experiments() {
     local seconds=$((dataset_time % 60))
     
     echo "======================================================================" | tee -a "$DATASET_LOG"
-    echo "📊 数据集 $dataset 完成！" | tee -a "$DATASET_LOG"
+    echo "📊 数据集 $dataset_name 完成！" | tee -a "$DATASET_LOG"
     echo "✅ 成功: $completed" | tee -a "$DATASET_LOG"
     echo "❌ 失败: $failed" | tee -a "$DATASET_LOG"
     echo "⏱️  耗时: ${hours}h ${minutes}m ${seconds}s" | tee -a "$DATASET_LOG"
@@ -157,10 +170,10 @@ run_dataset_experiments() {
     echo "======================================================================" | tee -a "$DATASET_LOG"
     
     # 保存统计信息到文件（供主进程读取）
-    echo "$completed" > "$LOG_DIR/${dataset}_completed.txt"
-    echo "$failed" > "$LOG_DIR/${dataset}_failed.txt"
+    echo "$completed" > "$LOG_DIR/${dataset_name}_completed.txt"
+    echo "$failed" > "$LOG_DIR/${dataset_name}_failed.txt"
     if [ $failed -gt 0 ]; then
-        printf "%s\n" "${failed_exps[@]}" > "$LOG_DIR/${dataset}_failed_exps.txt"
+        printf "%s\n" "${failed_exps[@]}" > "$LOG_DIR/${dataset_name}_failed_exps.txt"
     fi
     
     return $failed
@@ -179,15 +192,16 @@ dataset_index=0
 for dataset_config in "${DATASETS[@]}"; do
     # 解析数据集名称（仅用于显示）
     IFS=':' read -r data_source dataset batch_size epochs gpu_id <<< "$dataset_config"
+    dataset_name=$(basename "$dataset")
     
-    echo "🚀 启动数据集 $dataset 在 GPU $gpu_id 上..." | tee -a "$MAIN_LOG"
+    echo "🚀 启动数据集 $dataset_name 在 GPU $gpu_id 上..." | tee -a "$MAIN_LOG"
     
     # 在后台运行数据集训练
     run_dataset_experiments "$dataset_config" $dataset_index &
     
     # 记录PID和数据集名称
     PIDS+=($!)
-    DATASET_NAMES+=("$dataset")
+    DATASET_NAMES+=("$dataset_name")
     
     ((dataset_index++))
 done
@@ -222,21 +236,22 @@ ALL_FAILED_EXPS=()
 
 for dataset_config in "${DATASETS[@]}"; do
     IFS=':' read -r data_source dataset _ _ _ <<< "$dataset_config"
+    dataset_name=$(basename "$dataset")
     
     # 读取统计文件
-    if [ -f "$LOG_DIR/${dataset}_completed.txt" ]; then
-        completed=$(cat "$LOG_DIR/${dataset}_completed.txt")
+    if [ -f "$LOG_DIR/${dataset_name}_completed.txt" ]; then
+        completed=$(cat "$LOG_DIR/${dataset_name}_completed.txt")
         TOTAL_COMPLETED=$((TOTAL_COMPLETED + completed))
     fi
     
-    if [ -f "$LOG_DIR/${dataset}_failed.txt" ]; then
-        failed=$(cat "$LOG_DIR/${dataset}_failed.txt")
+    if [ -f "$LOG_DIR/${dataset_name}_failed.txt" ]; then
+        failed=$(cat "$LOG_DIR/${dataset_name}_failed.txt")
         TOTAL_FAILED=$((TOTAL_FAILED + failed))
         
-        if [ -f "$LOG_DIR/${dataset}_failed_exps.txt" ]; then
+        if [ -f "$LOG_DIR/${dataset_name}_failed_exps.txt" ]; then
             while IFS= read -r line; do
                 ALL_FAILED_EXPS+=("$line")
-            done < "$LOG_DIR/${dataset}_failed_exps.txt"
+            done < "$LOG_DIR/${dataset_name}_failed_exps.txt"
         fi
     fi
 done
@@ -264,10 +279,11 @@ echo "" | tee -a "$MAIN_LOG"
 echo "📊 各数据集统计:" | tee -a "$MAIN_LOG"
 for dataset_config in "${DATASETS[@]}"; do
     IFS=':' read -r data_source dataset _ _ gpu_id <<< "$dataset_config"
-    if [ -f "$LOG_DIR/${dataset}_completed.txt" ] && [ -f "$LOG_DIR/${dataset}_failed.txt" ]; then
-        completed=$(cat "$LOG_DIR/${dataset}_completed.txt")
-        failed=$(cat "$LOG_DIR/${dataset}_failed.txt")
-        echo "  - $dataset (GPU $gpu_id): ✅ $completed  ❌ $failed" | tee -a "$MAIN_LOG"
+    dataset_name=$(basename "$dataset")
+    if [ -f "$LOG_DIR/${dataset_name}_completed.txt" ] && [ -f "$LOG_DIR/${dataset_name}_failed.txt" ]; then
+        completed=$(cat "$LOG_DIR/${dataset_name}_completed.txt")
+        failed=$(cat "$LOG_DIR/${dataset_name}_failed.txt")
+        echo "  - $dataset_name (GPU $gpu_id): ✅ $completed  ❌ $failed" | tee -a "$MAIN_LOG"
     fi
 done
 echo "" | tee -a "$MAIN_LOG"
