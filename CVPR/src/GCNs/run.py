@@ -166,13 +166,14 @@ def save_training_history_csv(history, result_dir='result'):
     print(f"  - 可直接用于绘图和分析")
 
 
-def save_resource_usage_log(resource_log, num_graphs, total_training_time, result_dir='result'):
+def save_resource_usage_log(resource_log, num_train_graphs, total_training_time, avg_training_time, result_dir='result'):
     """保存资源使用日志到单独的文件
     
     Args:
         resource_log: 资源使用记录字典
-        num_graphs: 图的总数量
-        total_training_time: 总训练时间
+        num_train_graphs: 训练集图的数量
+        total_training_time: 总训练时间（仅训练集，不包括验证集）
+        avg_training_time: 平均每epoch的训练时间（仅训练集）
         result_dir: 结果保存目录
     """
     log_file = f'{result_dir}/resource_usage.txt'
@@ -183,19 +184,20 @@ def save_resource_usage_log(resource_log, num_graphs, total_training_time, resul
     avg_gpu_mem = np.mean(resource_log['gpu_memory_allocated'])
     max_gpu_mem = np.max(resource_log['gpu_memory_max_allocated'])
     
-    # 计算每个图的平均执行时间
-    time_per_graph = total_training_time / num_graphs if num_graphs > 0 else 0
+    # 计算每个图的平均执行时间（仅基于训练集）
+    time_per_graph = total_training_time / num_train_graphs if num_train_graphs > 0 else 0
     
     with open(log_file, 'w', encoding='utf-8') as f:
         f.write("=" * 80 + "\n")
-        f.write("资源使用统计报告\n")
+        f.write("资源使用统计报告（基于训练集时间）\n")
         f.write("=" * 80 + "\n\n")
         
         f.write("-" * 80 + "\n")
-        f.write("时间统计\n")
+        f.write("时间统计（仅训练集，不含验证集）\n")
         f.write("-" * 80 + "\n")
-        f.write(f"图数量: {num_graphs}\n")
+        f.write(f"训练集图数量: {num_train_graphs}\n")
         f.write(f"总训练时间: {total_training_time:.3f} 秒\n")
+        f.write(f"平均每epoch训练时间: {avg_training_time:.3f} 秒\n")
         f.write(f"每个图的平均执行时间: {time_per_graph:.6f} 秒/图\n")
         f.write(f"每个图的平均执行时间: {time_per_graph*1000:.3f} 毫秒/图\n\n")
         
@@ -665,8 +667,10 @@ def run_experiment(args):
     history = {
         'train': {'loss': [], 'accuracy': [], 'precision': [], 'recall': [], 'f1': []},
         'val': {'accuracy': [], 'precision': [], 'recall': [], 'f1': []},
-        'epoch_times': [],  # 记录每个epoch的单独执行时间
-        'cumulative_times': []  # 记录从训练开始的累积时间
+        'train_times': [],  # 每个epoch的训练时间（仅训练集）
+        'val_times': [],  # 每个epoch的验证时间（仅验证集）
+        'epoch_times': [],  # 每个epoch的总时间（训练+验证）
+        'cumulative_train_times': []  # 累积训练时间（仅训练集）
     }
     
     # 资源使用记录
@@ -689,23 +693,31 @@ def run_experiment(args):
     
     # 训练循环
     for epoch in range(1, args.epochs + 1):
-        # 记录epoch开始时间（只记录模型执行时间）
+        # 记录epoch开始时间
         epoch_start_time = time.time()
         
-        # 训练
+        # 训练（只记录训练集时间）
+        train_start_time = time.time()
         train_metrics = train_model(model, train_loader, optimizer, device, class_weights)
+        train_end_time = time.time()
+        train_time = train_end_time - train_start_time
+        history['train_times'].append(train_time)
         
-        # 验证
+        # 验证（记录验证集时间，但不用于 time_per_graph 计算）
+        val_start_time = time.time()
         val_metrics = evaluate_model(model, val_loader, device)
+        val_end_time = time.time()
+        val_time = val_end_time - val_start_time
+        history['val_times'].append(val_time)
         
-        # 记录epoch结束时间（包含训练和验证的模型执行时间）
+        # 记录epoch总时间（训练+验证）
         epoch_end_time = time.time()
         epoch_time = epoch_end_time - epoch_start_time
         history['epoch_times'].append(epoch_time)
         
-        # 记录累积时间（从训练开始到当前epoch结束）
-        cumulative_time = epoch_end_time - training_start_time
-        history['cumulative_times'].append(cumulative_time)
+        # 记录累积训练时间（仅训练集，从训练开始到当前epoch的训练结束）
+        cumulative_train_time = sum(history['train_times'])
+        history['cumulative_train_times'].append(cumulative_train_time)
         
         # 记录资源使用情况
         resource_snapshot = resource_monitor.get_snapshot()
@@ -742,7 +754,8 @@ def run_experiment(args):
         if epoch % args.print_every == 0:
             print(f"Epoch {epoch:03d}: Loss={train_metrics['loss']:.4f}, "
                   f"Train F1={train_metrics['f1']:.4f}, Val F1={val_metrics['f1']:.4f}, "
-                  f"Val Acc={val_metrics['accuracy']:.4f}, Time={epoch_time:.3f}s")
+                  f"Val Acc={val_metrics['accuracy']:.4f}, "
+                  f"Train Time={train_time:.3f}s, Val Time={val_time:.3f}s")
         
         # Early stopping
         if patience_counter >= args.patience:
@@ -751,15 +764,17 @@ def run_experiment(args):
     
     print("=" * 80)
     
-    # 计算到达早停（或最大epoch）时的实际训练指标
-    actual_epochs = len(history['epoch_times'])
-    total_training_time = history['cumulative_times'][-1] if history['cumulative_times'] else 0
-    avg_training_time = total_training_time / actual_epochs if actual_epochs > 0 else 0
+    # 计算到达早停（或最大epoch）时的实际训练指标（仅使用训练集时间）
+    actual_epochs = len(history['train_times'])
+    total_training_time = history['cumulative_train_times'][-1] if history['cumulative_train_times'] else 0  # 仅训练集时间
+    avg_training_time = total_training_time / actual_epochs if actual_epochs > 0 else 0  # 平均每epoch的训练时间
     
-    # 计算每个图的平均执行时间（单个epoch中的平均时间）
-    # 正确计算方式：平均每epoch时间 / 训练集图数
-    # 等价于：总训练时间 / (训练集图数 * epoch数)
-    time_per_graph = avg_training_time / num_train_graphs if num_train_graphs > 0 else 0
+    # 计算验证集总时间（用于参考，但不用于 time_per_graph 计算）
+    total_val_time = sum(history['val_times']) if history['val_times'] else 0
+    total_time_with_val = total_training_time + total_val_time  # 训练+验证总时间
+    
+    # 计算每个图的平均执行时间（仅基于训练集）
+    time_per_graph = total_training_time / num_train_graphs if num_train_graphs > 0 else 0
     
     # 测试
     print(f"\n在测试集上评估...")
@@ -780,9 +795,11 @@ def run_experiment(args):
     print(f"  - 召回率: {test_metrics['recall']:.4f}")
     print(f"  - F1分数: {test_metrics['f1']:.4f}")
     print(f"\n训练时间统计:")
-    print(f"  - 总训练时间（到达收敛）: {total_training_time:.3f}秒")
-    print(f"  - 平均训练时间（每epoch）: {avg_training_time:.3f}秒")
-    print(f"  - 每个图的平均执行时间: {time_per_graph:.6f}秒/图 ({time_per_graph*1000:.3f}毫秒/图)")
+    print(f"  - 总训练时间（仅训练集）: {total_training_time:.3f}秒")
+    print(f"  - 总验证时间: {total_val_time:.3f}秒")
+    print(f"  - 训练+验证总时间: {total_time_with_val:.3f}秒")
+    print(f"  - 平均训练时间（每epoch，仅训练集）: {avg_training_time:.3f}秒")
+    print(f"  - 每个图的平均执行时间（仅训练集）: {time_per_graph:.6f}秒/图 ({time_per_graph*1000:.3f}毫秒/图)")
     print(f"  - 训练集图数: {num_train_graphs}")
     print(f"  - 脚本总运行时间: {total_elapsed_time:.2f}秒")
     
@@ -846,13 +863,14 @@ def run_experiment(args):
             result_dir=result_dir
         )
         # 绘制累积时间曲线
-        plot_epoch_time(history['epoch_times'], history['cumulative_times'], result_dir=result_dir)
+        # 绘制训练时间图（使用训练集时间）
+        plot_epoch_time(history['train_times'], history['cumulative_train_times'], result_dir=result_dir)
         
         # 保存训练历史到CSV文件（方便后续直接画图）
         save_training_history_csv(history, result_dir=result_dir)
         
-        # 保存资源使用日志
-        save_resource_usage_log(resource_log, num_train_graphs, total_training_time, result_dir=result_dir)
+        # 保存资源使用日志（只使用训练集时间）
+        save_resource_usage_log(resource_log, num_train_graphs, total_training_time, avg_training_time, result_dir=result_dir)
         
         # 保存结果JSON
         result = {
@@ -882,22 +900,28 @@ def run_experiment(args):
                 "train_loss": history['train']['loss'],
                 "train_f1": history['train']['f1'],
                 "val_f1": history['val']['f1'],
-                "epoch_times": history['epoch_times'],
-                "cumulative_times": history['cumulative_times']
+                "train_times": history['train_times'],  # 每epoch训练时间（仅训练集）
+                "val_times": history['val_times'],  # 每epoch验证时间
+                "epoch_times": history['epoch_times'],  # 每epoch总时间（训练+验证）
+                "cumulative_train_times": history['cumulative_train_times']  # 累积训练时间（仅训练集）
             },
             "time_statistics": {
-                "total_training_time": float(total_training_time),  # 核心指标1: 总训练时间
-                "avg_training_time_per_epoch": float(avg_training_time),  # 核心指标2: 平均训练时间
-                "time_per_graph": float(time_per_graph),  # 核心指标3: 每个图的平均执行时间
-                "time_per_graph_ms": float(time_per_graph * 1000),  # 每个图的平均执行时间（毫秒）
+                "total_training_time": float(total_training_time),  # 核心指标1: 总训练时间（仅训练集）
+                "total_val_time": float(total_val_time),  # 总验证时间
+                "total_time_with_val": float(total_time_with_val),  # 训练+验证总时间
+                "avg_training_time_per_epoch": float(avg_training_time),  # 核心指标2: 平均每epoch训练时间（仅训练集）
+                "time_per_graph": float(time_per_graph),  # 核心指标3: 每个图的平均执行时间（仅训练集）
+                "time_per_graph_ms": float(time_per_graph * 1000),  # 每个图的平均执行时间（毫秒，仅训练集）
                 "num_train_graphs": num_train_graphs,
                 "num_total_graphs": total_graphs,
                 "actual_epochs": actual_epochs,
+                "avg_train_time_per_epoch": float(np.mean(history['train_times'])) if history['train_times'] else 0,
+                "avg_val_time_per_epoch": float(np.mean(history['val_times'])) if history['val_times'] else 0,
                 "avg_epoch_time": float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
                 "min_epoch_time": float(np.min(history['epoch_times'])) if history['epoch_times'] else 0,
                 "max_epoch_time": float(np.max(history['epoch_times'])) if history['epoch_times'] else 0,
                 "std_epoch_time": float(np.std(history['epoch_times'])) if history['epoch_times'] else 0,
-                "total_cumulative_time": float(history['cumulative_times'][-1]) if history['cumulative_times'] else 0,
+                "total_cumulative_time": float(history['cumulative_train_times'][-1]) if history['cumulative_train_times'] else 0,
                 "total_elapsed_time": float(total_elapsed_time)
             },
             "resource_usage": {
