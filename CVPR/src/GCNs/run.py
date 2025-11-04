@@ -756,8 +756,10 @@ def run_experiment(args):
     total_training_time = history['cumulative_times'][-1] if history['cumulative_times'] else 0
     avg_training_time = total_training_time / actual_epochs if actual_epochs > 0 else 0
     
-    # 计算每个图的平均执行时间
-    time_per_graph = total_training_time / num_train_graphs if num_train_graphs > 0 else 0
+    # 计算每个图的平均执行时间（单个epoch中的平均时间）
+    # 正确计算方式：平均每epoch时间 / 训练集图数
+    # 等价于：总训练时间 / (训练集图数 * epoch数)
+    time_per_graph = avg_training_time / num_train_graphs if num_train_graphs > 0 else 0
     
     # 测试
     print(f"\n在测试集上评估...")
