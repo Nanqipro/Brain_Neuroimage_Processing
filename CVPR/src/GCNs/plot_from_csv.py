@@ -230,18 +230,18 @@ def collect_scaling_data(result_base_dir='result'):
         
     Returns:
         dict: 包含各个模型在不同规模下的时间数据
-              格式: {model_name: {graph_size: {'total_time': [], 'avg_time': []}}}
+              格式: {model_name: {graph_size: {'total_time': [], 'avg_time': [], 'time_per_graph': []}}}
     """
-    data = defaultdict(lambda: defaultdict(lambda: {'total_time': [], 'avg_time': []}))
+    data = defaultdict(lambda: defaultdict(lambda: {'total_time': [], 'avg_time': [], 'time_per_graph': [], 'time_per_graph_ms': []}))
     
-    # 遍历所有training_time_stats.txt文件
+    # 遍历所有experiment_results.json文件（优先，包含完整信息）
     result_path = Path(result_base_dir)
-    stats_files = result_path.rglob('training_time_stats.txt')
+    json_files = result_path.rglob('experiment_results.json')
     
-    for stats_file in stats_files:
+    for json_file in json_files:
         try:
             # 从路径中提取信息: result/custom/graphs_XXX/MODEL/...
-            path_parts = stats_file.parts
+            path_parts = json_file.parts
             
             # 找到graphs_XXX部分
             graph_size = None
@@ -259,36 +259,77 @@ def collect_scaling_data(result_base_dir='result'):
             if graph_size is None or model_name is None:
                 continue
             
-            # 读取文件内容
-            with open(stats_file, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # 读取JSON文件
+            with open(json_file, 'r', encoding='utf-8') as f:
+                result = json.load(f)
                 
-                # 提取总训练时间
-                total_time_match = re.search(r'模型到达收敛的总训练时间:\s*([\d.]+)\s*秒', content)
-                # 提取平均训练时间
-                avg_time_match = re.search(r'平均训练时间（每epoch）:\s*([\d.]+)\s*秒', content)
+                time_stats = result.get('time_statistics', {})
+                total_time = time_stats.get('total_training_time')
+                avg_time = time_stats.get('avg_training_time_per_epoch')
+                time_per_graph = time_stats.get('time_per_graph')
+                time_per_graph_ms = time_stats.get('time_per_graph_ms')
                 
-                if total_time_match and avg_time_match:
-                    total_time = float(total_time_match.group(1))
-                    avg_time = float(avg_time_match.group(1))
-                    
+                if total_time is not None and avg_time is not None:
                     data[model_name][graph_size]['total_time'].append(total_time)
                     data[model_name][graph_size]['avg_time'].append(avg_time)
+                    if time_per_graph is not None:
+                        data[model_name][graph_size]['time_per_graph'].append(time_per_graph)
+                    if time_per_graph_ms is not None:
+                        data[model_name][graph_size]['time_per_graph_ms'].append(time_per_graph_ms)
         
         except Exception as e:
-            print(f"警告: 处理文件 {stats_file} 时出错: {e}")
+            print(f"警告: 处理JSON文件 {json_file} 时出错: {e}")
             continue
+    
+    # 如果JSON文件未找到数据，尝试从txt文件读取（兼容旧版本）
+    if not data:
+        stats_files = result_path.rglob('training_time_stats.txt')
+        
+        for stats_file in stats_files:
+            try:
+                path_parts = stats_file.parts
+                graph_size = None
+                model_name = None
+                for i, part in enumerate(path_parts):
+                    if part.startswith('graphs_'):
+                        match = re.match(r'graphs_(\d+)', part)
+                        if match:
+                            graph_size = int(match.group(1))
+                            if i + 1 < len(path_parts):
+                                model_name = path_parts[i + 1]
+                        break
+                
+                if graph_size is None or model_name is None:
+                    continue
+                
+                with open(stats_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    
+                    total_time_match = re.search(r'模型到达收敛的总训练时间:\s*([\d.]+)\s*秒', content)
+                    avg_time_match = re.search(r'平均训练时间（每epoch）:\s*([\d.]+)\s*秒', content)
+                    
+                    if total_time_match and avg_time_match:
+                        total_time = float(total_time_match.group(1))
+                        avg_time = float(avg_time_match.group(1))
+                        
+                        data[model_name][graph_size]['total_time'].append(total_time)
+                        data[model_name][graph_size]['avg_time'].append(avg_time)
+            
+            except Exception as e:
+                print(f"警告: 处理文件 {stats_file} 时出错: {e}")
+                continue
     
     return data
 
 
-def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots'):
+def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', selected_models=None):
     """
     绘制数据集规模扩展性分析图
     
     Args:
         result_base_dir: 结果目录基础路径
         output_dir: 输出目录
+        selected_models: 指定要绘制的模型列表，None表示绘制所有模型
     """
     # 收集数据
     data = collect_scaling_data(result_base_dir)
@@ -296,6 +337,14 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots'):
     if not data:
         print("❌ 错误: 未找到任何时间统计数据")
         return
+    
+    # 过滤选中的模型
+    if selected_models is not None:
+        selected_models_lower = [m.lower() for m in selected_models]
+        data = {k: v for k, v in data.items() if k.lower() in selected_models_lower}
+        if not data:
+            print(f"❌ 错误: 未找到指定的模型 {selected_models}")
+            return
     
     # 创建输出目录
     os.makedirs(output_dir, exist_ok=True)
@@ -308,22 +357,46 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots'):
         total_times_std = []
         avg_times_mean = []
         avg_times_std = []
+        time_per_graph_mean = []
+        time_per_graph_std = []
+        time_per_graph_ms_mean = []
+        time_per_graph_ms_std = []
         
         for size in sizes:
             total_time_list = size_data[size]['total_time']
             avg_time_list = size_data[size]['avg_time']
+            time_per_graph_list = size_data[size]['time_per_graph']
+            time_per_graph_ms_list = size_data[size]['time_per_graph_ms']
             
             total_times_mean.append(np.mean(total_time_list))
             total_times_std.append(np.std(total_time_list))
             avg_times_mean.append(np.mean(avg_time_list))
             avg_times_std.append(np.std(avg_time_list))
+            
+            if time_per_graph_list:
+                time_per_graph_mean.append(np.mean(time_per_graph_list))
+                time_per_graph_std.append(np.std(time_per_graph_list))
+            else:
+                time_per_graph_mean.append(0)
+                time_per_graph_std.append(0)
+            
+            if time_per_graph_ms_list:
+                time_per_graph_ms_mean.append(np.mean(time_per_graph_ms_list))
+                time_per_graph_ms_std.append(np.std(time_per_graph_ms_list))
+            else:
+                time_per_graph_ms_mean.append(0)
+                time_per_graph_ms_std.append(0)
         
         model_data[model_name] = {
             'sizes': sizes,
             'total_times_mean': total_times_mean,
             'total_times_std': total_times_std,
             'avg_times_mean': avg_times_mean,
-            'avg_times_std': avg_times_std
+            'avg_times_std': avg_times_std,
+            'time_per_graph_mean': time_per_graph_mean,
+            'time_per_graph_std': time_per_graph_std,
+            'time_per_graph_ms_mean': time_per_graph_ms_mean,
+            'time_per_graph_ms_std': time_per_graph_ms_std
         }
     
     colors = plt.cm.tab10(np.linspace(0, 1, len(model_data)))
@@ -389,6 +462,52 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots'):
     plt.close()
     print(f"✅ Average training time plot saved: {output_path}")
     
+    # === Figure 3: Time per Graph vs Dataset Size ===
+    # 检查是否有每个图的执行时间数据
+    has_time_per_graph = any(
+        any(t > 0 for t in mdata['time_per_graph_ms_mean'])
+        for mdata in model_data.values()
+    )
+    
+    if has_time_per_graph:
+        plt.figure(figsize=(12, 7))
+        
+        for idx, (model_name, mdata) in enumerate(model_data.items()):
+            sizes = mdata['sizes']
+            means = mdata['time_per_graph_ms_mean']
+            stds = mdata['time_per_graph_ms_std']
+            
+            # 过滤掉0值
+            filtered_data = [(s, m, std) for s, m, std in zip(sizes, means, stds) if m > 0]
+            if not filtered_data:
+                continue
+            
+            sizes_filtered, means_filtered, stds_filtered = zip(*filtered_data)
+            
+            plt.errorbar(sizes_filtered, means_filtered, yerr=stds_filtered, 
+                        marker=markers[idx % len(markers)], 
+                        linewidth=2.5, markersize=10,
+                        capsize=5, capthick=2,
+                        label=model_name.upper(), 
+                        color=colors[idx],
+                        alpha=0.8)
+        
+        plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
+        plt.ylabel('Time per Graph (milliseconds)', fontsize=14, fontweight='bold')
+        plt.title('Dataset Size vs Time per Graph', fontsize=16, fontweight='bold', pad=20)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.grid(True, alpha=0.3, linestyle='--', which='both')
+        plt.legend(fontsize=12, loc='best', framealpha=0.9)
+        plt.tight_layout()
+        
+        output_path = f'{output_dir}/time_per_graph_vs_scale.png'
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Time per graph plot saved: {output_path}")
+    else:
+        print("⚠️  未找到每个图执行时间数据，跳过该图表")
+    
     # === Print Statistics ===
     print("\n" + "=" * 80)
     print("📊 Dataset Scaling Analysis Statistics")
@@ -396,14 +515,26 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots'):
     
     for model_name, mdata in model_data.items():
         print(f"\n【{model_name.upper()}】")
-        print(f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25}")
-        print("-" * 70)
-        for i, size in enumerate(mdata['sizes']):
-            total_mean = mdata['total_times_mean'][i]
-            total_std = mdata['total_times_std'][i]
-            avg_mean = mdata['avg_times_mean'][i]
-            avg_std = mdata['avg_times_std'][i]
-            print(f"{size:<15} {total_mean:>8.2f} ± {total_std:<9.2f}    {avg_mean:>8.4f} ± {avg_std:<9.4f}")
+        if has_time_per_graph and any(t > 0 for t in mdata['time_per_graph_ms_mean']):
+            print(f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25} {'Time/Graph (ms)':<20}")
+            print("-" * 90)
+            for i, size in enumerate(mdata['sizes']):
+                total_mean = mdata['total_times_mean'][i]
+                total_std = mdata['total_times_std'][i]
+                avg_mean = mdata['avg_times_mean'][i]
+                avg_std = mdata['avg_times_std'][i]
+                time_per_graph_mean = mdata['time_per_graph_ms_mean'][i]
+                time_per_graph_std = mdata['time_per_graph_ms_std'][i]
+                print(f"{size:<15} {total_mean:>8.2f} ± {total_std:<9.2f}    {avg_mean:>8.4f} ± {avg_std:<9.4f}    {time_per_graph_mean:>8.3f} ± {time_per_graph_std:<7.3f}")
+        else:
+            print(f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25}")
+            print("-" * 70)
+            for i, size in enumerate(mdata['sizes']):
+                total_mean = mdata['total_times_mean'][i]
+                total_std = mdata['total_times_std'][i]
+                avg_mean = mdata['avg_times_mean'][i]
+                avg_std = mdata['avg_times_std'][i]
+                print(f"{size:<15} {total_mean:>8.2f} ± {total_std:<9.2f}    {avg_mean:>8.4f} ± {avg_std:<9.4f}")
     
     print("=" * 80 + "\n")
 
@@ -423,8 +554,14 @@ def main():
   # 指定输出目录
   python plot_from_csv.py --csv training_history.csv --output_dir my_plots
   
-  # 数据集规模扩展性分析
+  # 数据集规模扩展性分析（所有模型）
   python plot_from_csv.py --scaling --result_dir result --output_dir scaling_plots
+  
+  # 数据集规模扩展性分析（指定模型）
+  python plot_from_csv.py --scaling --result_dir result --output_dir scaling_plots --models gcn gat gin
+  
+  # 只绘制GCN和GIN的对比
+  python plot_from_csv.py --scaling --models gcn gin --output_dir gcn_vs_gin
         """
     )
     
@@ -440,6 +577,8 @@ def main():
                        help='执行数据集规模扩展性分析')
     parser.add_argument('--result_dir', type=str, default='result',
                        help='结果目录（用于扩展性分析）')
+    parser.add_argument('--models', type=str, nargs='+',
+                       help='指定要绘制的模型列表（如：gcn gat gin），不指定则绘制所有模型')
     
     args = parser.parse_args()
     
@@ -451,9 +590,13 @@ def main():
         print("=" * 80)
         print(f"Result Directory: {args.result_dir}")
         print(f"Output Directory: {args.output_dir}")
+        if args.models:
+            print(f"Selected Models: {', '.join(args.models)}")
+        else:
+            print("Selected Models: All")
         print("=" * 80 + "\n")
         
-        plot_scaling_analysis(args.result_dir, args.output_dir)
+        plot_scaling_analysis(args.result_dir, args.output_dir, args.models)
         
         print("\n" + "=" * 80)
         print("✅ Scaling analysis plots completed!")

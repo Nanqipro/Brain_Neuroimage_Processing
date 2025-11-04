@@ -1,8 +1,8 @@
 #!/bin/bash
-# 运行所有模型在所有数据集上的20次训练实验
+# 运行所有模型在所有数据集上的8次训练实验
 # 数据划分: 训练60%, 验证20%, 测试20%
 # 每次训练seed递增，确保数据划分不同
-# 并行执行：7个数据集（3个标准数据集 + 4个random数据集）在4个GPU上运行
+# 并行执行：5个数据集在4个GPU上运行
 
 # 定义所有模型
 MODELS=("gcn" "gat" "sage" "hybrid" "gin" "chebnet" "edgeconv" "gunet" "pna" "gatv2" "deepergcn")
@@ -14,14 +14,15 @@ DATASETS=(
     # "ogb:ogbg-molhiv:128:500:1"                                                     # GPU 1
     # "tudataset:PROTEINS:32:500:2"                                                   # GPU 2
     "custom:../../data/random/graphs_100:32:500:0"                                  # GPU 0 - Random 100图 (并行)
-    "custom:../../data/random/graphs_1000:32:500:1"                                 # GPU 1 - Random 1000图 (并行)
-    "custom:../../data/random/graphs_10000:64:500:2"                                # GPU 2 - Random 10000图 (并行)
-    "custom:../../data/random/graphs_100000:128:500:3"                              # GPU 3 - Random 100000图 (并行)
+    "custom:../../data/random/graphs_1000:32:500:0"                                 # GPU 1 - Random 1000图 (并行)
+    "custom:../../data/random/graphs_10000:64:500:1"                                # GPU 2 - Random 10000图 (并行)
+    "custom:../../data/random/graphs_100000:128:500:2"                              # GPU 3 - Random 100000图 (并行)
+    "custom:../../data/random/graphs_1000000:256:500:3"                             # GPU 3 - Random 1000000图 (顺序执行)
     # "ogb:ogbg-ppa:128:500:3"                                                      # GPU 3 (备用)
 )
 
 # 训练设置
-NUM_RUNS=20          # 每个模型-数据集组合训练20次
+NUM_RUNS=8           # 每个模型-数据集组合训练8次
 INITIAL_SEED=42      # 初始seed
 
 # 创建统一的日志目录
@@ -33,18 +34,17 @@ mkdir -p "$LOG_DIR"
 MAIN_LOG="$LOG_DIR/experiment_summary.log"
 
 echo "======================================================================"
-echo "🚀 运行多次训练实验 (并行模式)"
+echo "🚀 运行多次训练实验 (并行模式，8次重复)"
 echo "======================================================================"
 echo "配置: ${#DATASETS[@]}个数据集 × ${#MODELS[@]}个模型 × ${NUM_RUNS}次训练"
 echo "数据划分: 训练60%, 验证20%, 测试20%"
-echo "并行策略: ${#DATASETS[@]}个数据集在4个GPU上运行"
+echo "并行策略: ${#DATASETS[@]}个数据集在4个GPU上并行运行"
 echo ""
-echo "数据集分配:"
-for dataset_config in "${DATASETS[@]}"; do
-    IFS=':' read -r data_source dataset _ _ gpu_id <<< "$dataset_config"
-    dataset_name=$(basename "$dataset")
-    echo "  - GPU $gpu_id: $data_source/$dataset_name"
-done
+echo "数据集分配策略:"
+echo "  - GPU 0: graphs_100 + graphs_1000 (两个小数据集并行)"
+echo "  - GPU 1: graphs_10000 (中等数据集)"
+echo "  - GPU 2: graphs_100000 (大数据集)"
+echo "  - GPU 3: graphs_1000000 (超大数据集)"
 echo ""
 echo "日志目录: $LOG_DIR"
 echo "======================================================================"
@@ -55,9 +55,11 @@ echo "======================================================================"  |
 echo "🚀 多次训练实验开始时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$MAIN_LOG"
 echo "配置: ${#DATASETS[@]}个数据集 × ${#MODELS[@]}个模型 × ${NUM_RUNS}次训练" | tee -a "$MAIN_LOG"
 echo "数据划分: 训练60%, 验证20%, 测试20%" | tee -a "$MAIN_LOG"
-echo "⚡ 并行模式: ${#DATASETS[@]}个数据集在4个GPU上同时运行" | tee -a "$MAIN_LOG"
-echo "  - GPU 0-2: 各1个标准数据集" | tee -a "$MAIN_LOG"
-echo "  - GPU 3: 4个random数据集（顺序执行）" | tee -a "$MAIN_LOG"
+echo "⚡ 并行模式: ${#DATASETS[@]}个数据集在4个GPU上并行运行" | tee -a "$MAIN_LOG"
+echo "  - GPU 0: graphs_100 + graphs_1000 (并行)" | tee -a "$MAIN_LOG"
+echo "  - GPU 1: graphs_10000" | tee -a "$MAIN_LOG"
+echo "  - GPU 2: graphs_100000" | tee -a "$MAIN_LOG"
+echo "  - GPU 3: graphs_1000000" | tee -a "$MAIN_LOG"
 echo "======================================================================"  | tee -a "$MAIN_LOG"
 echo "" | tee -a "$MAIN_LOG"
 
@@ -126,7 +128,7 @@ run_dataset_experiments() {
             --batch_size $batch_size \
             --hidden_dim 64 \
             --dropout 0.5 \
-            --patience 100 \
+            --patience 20 \
             --print_every 20 \
             --save_results \
             2>&1 | tee "$exp_log"

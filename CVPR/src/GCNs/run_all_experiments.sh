@@ -1,21 +1,27 @@
 #!/bin/bash
-# 运行所有11个模型在三种数据集上的完整实验
-# 3个数据集 × 11个模型 = 33个实验
+# 运行所有模型在所有数据集上的完整实验（每个实验运行1次）
+# 与 run_all_experiments_multi.sh 的区别：每个实验只运行1次，不是20次
+# 并行执行：5个数据集在4个GPU上运行
 
 # 定义所有模型
 MODELS=("gcn" "gat" "sage" "hybrid" "gin" "chebnet" "edgeconv" "gunet" "pna" "gatv2" "deepergcn")
 
 # 定义数据集配置
-# 格式: "data_source:dataset:batch_size:epochs"
+# 格式: "data_source:dataset:batch_size:epochs:gpu_id"
 DATASETS=(
-    # "tudataset:MUTAG:32:300"
-    # "ogb:ogbg-molhiv:128:300"
-    "ogb:ogbg-ppa:128:300"
-    # "tudataset:PROTEINS:32:300"
+    # "tudataset:MUTAG:32:500:0"                                                      # GPU 0
+    # "ogb:ogbg-molhiv:128:500:1"                                                     # GPU 1
+    # "tudataset:PROTEINS:32:500:2"                                                   # GPU 2
+    "custom:../../data/random/graphs_100:32:500:0"                                  # GPU 0 - Random 100图 (并行)
+    "custom:../../data/random/graphs_1000:32:500:0"                                 # GPU 0 - Random 1000图 (并行)
+    "custom:../../data/random/graphs_10000:64:500:1"                                # GPU 1 - Random 10000图 (并行)
+    "custom:../../data/random/graphs_100000:128:500:2"                              # GPU 2 - Random 100000图 (并行)
+    "custom:../../data/random/graphs_1000000:256:500:3"                             # GPU 3 - Random 1000000图 (并行)
+    # "ogb:ogbg-ppa:128:500:3"                                                      # GPU 3 (备用)
 )
 
-# GPU设置
-GPU_ID=3
+# 训练设置
+SEED=42              # 随机种子
 
 # 创建统一的日志目录
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -26,91 +32,227 @@ mkdir -p "$LOG_DIR"
 MAIN_LOG="$LOG_DIR/experiment_summary.log"
 
 echo "======================================================================"
-echo "运行完整实验：4个数据集 × 11个模型 = 44个实验"
-echo "GPU: cuda:$GPU_ID"
+echo "🚀 运行完整实验 (并行模式，单次运行)"
+echo "======================================================================"
+echo "配置: ${#DATASETS[@]}个数据集 × ${#MODELS[@]}个模型 × 1次训练"
+echo "数据划分: 训练60%, 验证20%, 测试20%"
+echo "并行策略: ${#DATASETS[@]}个数据集在4个GPU上并行运行"
+echo ""
+echo "数据集分配策略:"
+echo "  - GPU 0: graphs_100 + graphs_1000 (两个小数据集并行)"
+echo "  - GPU 1: graphs_10000 (中等数据集)"
+echo "  - GPU 2: graphs_100000 (大数据集)"
+echo "  - GPU 3: graphs_1000000 (超大数据集)"
+echo ""
 echo "日志目录: $LOG_DIR"
 echo "======================================================================"
 echo ""
 
 # 同时输出到终端和日志文件
 echo "======================================================================"  | tee -a "$MAIN_LOG"
-echo "实验开始时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$MAIN_LOG"
-echo "GPU: cuda:$GPU_ID" | tee -a "$MAIN_LOG"
-echo "日志目录: $LOG_DIR" | tee -a "$MAIN_LOG"
+echo "🚀 实验开始时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$MAIN_LOG"
+echo "配置: ${#DATASETS[@]}个数据集 × ${#MODELS[@]}个模型 × 1次训练" | tee -a "$MAIN_LOG"
+echo "数据划分: 训练60%, 验证20%, 测试20%" | tee -a "$MAIN_LOG"
+echo "⚡ 并行模式: ${#DATASETS[@]}个数据集在4个GPU上并行运行" | tee -a "$MAIN_LOG"
+echo "  - GPU 0: graphs_100 + graphs_1000 (并行)" | tee -a "$MAIN_LOG"
+echo "  - GPU 1: graphs_10000" | tee -a "$MAIN_LOG"
+echo "  - GPU 2: graphs_100000" | tee -a "$MAIN_LOG"
+echo "  - GPU 3: graphs_1000000" | tee -a "$MAIN_LOG"
 echo "======================================================================"  | tee -a "$MAIN_LOG"
 echo "" | tee -a "$MAIN_LOG"
 
 # 统计变量
 TOTAL_EXPERIMENTS=$((${#DATASETS[@]} * ${#MODELS[@]}))
-CURRENT_EXP=0
-COMPLETED=0
-FAILED=0
-FAILED_EXPS=()
 
 # 开始时间
 START_TIME=$(date +%s)
 
-# 遍历所有数据集
-for dataset_config in "${DATASETS[@]}"; do
-    # 解析数据集配置
-    IFS=':' read -r data_source dataset batch_size epochs <<< "$dataset_config"
+# 用于存储每个数据集的统计信息
+declare -A DATASET_COMPLETED
+declare -A DATASET_FAILED
+declare -A DATASET_FAILED_EXPS
+
+# 定义单个数据集的训练函数
+run_dataset_experiments() {
+    local dataset_config=$1
+    local dataset_index=$2
     
-    echo "" | tee -a "$MAIN_LOG"
-    echo "======================================================================" | tee -a "$MAIN_LOG"
-    echo "数据集: $data_source - $dataset" | tee -a "$MAIN_LOG"
-    echo "======================================================================" | tee -a "$MAIN_LOG"
+    # 解析数据集配置
+    IFS=':' read -r data_source dataset batch_size epochs gpu_id <<< "$dataset_config"
+    
+    # 获取数据集名称（处理路径）
+    local dataset_name=$(basename "$dataset")
+    
+    # 为该数据集创建专属日志
+    local DATASET_LOG="$LOG_DIR/${dataset_name}_dataset.log"
+    
+    echo "======================================================================" | tee -a "$DATASET_LOG"
+    echo "📊 数据集: $data_source - $dataset" | tee -a "$DATASET_LOG"
+    echo "🎮 GPU: cuda:$gpu_id" | tee -a "$DATASET_LOG"
+    echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$DATASET_LOG"
+    echo "======================================================================" | tee -a "$DATASET_LOG"
+    echo "" | tee -a "$DATASET_LOG"
+    
+    local completed=0
+    local failed=0
+    local failed_exps=()
     
     # 遍历所有模型
     for model in "${MODELS[@]}"; do
-        CURRENT_EXP=$((CURRENT_EXP + 1))
-        
-        echo "" | tee -a "$MAIN_LOG"
-        echo "----------------------------------------------------------------------" | tee -a "$MAIN_LOG"
-        echo "【实验 $CURRENT_EXP/$TOTAL_EXPERIMENTS】$dataset + $model" | tee -a "$MAIN_LOG"
-        echo "配置: epochs=$epochs, batch_size=$batch_size, gpu=$GPU_ID" | tee -a "$MAIN_LOG"
-        echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$MAIN_LOG"
-        echo "----------------------------------------------------------------------" | tee -a "$MAIN_LOG"
+        echo "" | tee -a "$DATASET_LOG"
+        echo "----------------------------------------------------------------------" | tee -a "$DATASET_LOG"
+        echo "🔧 模型: $model (单次训练)" | tee -a "$DATASET_LOG"
+        echo "配置: epochs=$epochs, batch_size=$batch_size, gpu=$gpu_id, seed=$SEED" | tee -a "$DATASET_LOG"
+        echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$DATASET_LOG"
+        echo "----------------------------------------------------------------------" | tee -a "$DATASET_LOG"
         
         # 记录单个实验开始时间
-        EXP_START=$(date +%s)
+        local exp_start=$(date +%s)
         
         # 为每个实验创建独立的日志文件
-        EXP_LOG="$LOG_DIR/${dataset}_${model}.log"
+        local exp_log="$LOG_DIR/${dataset_name}_${model}.log"
         
-        # 运行实验并保存日志
+        # 运行单次训练实验并保存日志
         python run.py \
             --data_source $data_source \
             --dataset $dataset \
             --model $model \
-            --gpu_id $GPU_ID \
+            --seed $SEED \
+            --train_ratio 0.6 \
+            --val_ratio 0.2 \
+            --gpu_id $gpu_id \
             --epochs $epochs \
             --batch_size $batch_size \
             --hidden_dim 64 \
             --dropout 0.5 \
-            --patience 100 \
+            --patience 20 \
             --print_every 20 \
             --save_results \
-            2>&1 | tee "$EXP_LOG"
+            2>&1 | tee "$exp_log"
         
         # 检查退出状态
-        EXIT_CODE=${PIPESTATUS[0]}
-        if [ $EXIT_CODE -eq 0 ]; then
-            EXP_END=$(date +%s)
-            EXP_TIME=$((EXP_END - EXP_START))
-            echo "✅ 完成 (耗时: ${EXP_TIME}秒)" | tee -a "$MAIN_LOG"
-            echo "日志: $EXP_LOG" | tee -a "$MAIN_LOG"
-            COMPLETED=$((COMPLETED + 1))
+        local exit_code=${PIPESTATUS[0]}
+        if [ $exit_code -eq 0 ]; then
+            local exp_end=$(date +%s)
+            local exp_time=$((exp_end - exp_start))
+            local hours=$((exp_time / 3600))
+            local minutes=$(((exp_time % 3600) / 60))
+            local seconds=$((exp_time % 60))
+            echo "✅ 完成 (耗时: ${hours}h ${minutes}m ${seconds}s)" | tee -a "$DATASET_LOG"
+            echo "日志: $exp_log" | tee -a "$DATASET_LOG"
+            ((completed++))
         else
-            EXP_END=$(date +%s)
-            EXP_TIME=$((EXP_END - EXP_START))
-            echo "❌ 失败 (耗时: ${EXP_TIME}秒)" | tee -a "$MAIN_LOG"
-            echo "错误日志: $EXP_LOG" | tee -a "$MAIN_LOG"
-            FAILED=$((FAILED + 1))
-            FAILED_EXPS+=("$dataset + $model")
+            local exp_end=$(date +%s)
+            local exp_time=$((exp_end - exp_start))
+            echo "❌ 失败 (耗时: ${exp_time}秒)" | tee -a "$DATASET_LOG"
+            echo "错误日志: $exp_log" | tee -a "$DATASET_LOG"
+            ((failed++))
+            failed_exps+=("$dataset_name + $model")
         fi
         
-        echo "" | tee -a "$MAIN_LOG"
+        echo "" | tee -a "$DATASET_LOG"
     done
+    
+    # 数据集完成总结
+    local dataset_end=$(date +%s)
+    local dataset_time=$((dataset_end - START_TIME))
+    local hours=$((dataset_time / 3600))
+    local minutes=$(((dataset_time % 3600) / 60))
+    local seconds=$((dataset_time % 60))
+    
+    echo "======================================================================" | tee -a "$DATASET_LOG"
+    echo "📊 数据集 $dataset_name 完成！" | tee -a "$DATASET_LOG"
+    echo "✅ 成功: $completed" | tee -a "$DATASET_LOG"
+    echo "❌ 失败: $failed" | tee -a "$DATASET_LOG"
+    echo "⏱️  耗时: ${hours}h ${minutes}m ${seconds}s" | tee -a "$DATASET_LOG"
+    echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$DATASET_LOG"
+    echo "======================================================================" | tee -a "$DATASET_LOG"
+    
+    # 保存统计信息到文件（供主进程读取）
+    echo "$completed" > "$LOG_DIR/${dataset_name}_completed.txt"
+    echo "$failed" > "$LOG_DIR/${dataset_name}_failed.txt"
+    if [ $failed -gt 0 ]; then
+        printf "%s\n" "${failed_exps[@]}" > "$LOG_DIR/${dataset_name}_failed_exps.txt"
+    fi
+    
+    return $failed
+}
+
+# 并行执行所有数据集（每个数据集在不同GPU上）
+echo "⚡ 启动并行任务..." | tee -a "$MAIN_LOG"
+echo "" | tee -a "$MAIN_LOG"
+
+# 存储后台进程PID
+PIDS=()
+DATASET_NAMES=()
+
+# 启动每个数据集的训练任务
+dataset_index=0
+for dataset_config in "${DATASETS[@]}"; do
+    # 解析数据集名称（仅用于显示）
+    IFS=':' read -r data_source dataset batch_size epochs gpu_id <<< "$dataset_config"
+    dataset_name=$(basename "$dataset")
+    
+    echo "🚀 启动数据集 $dataset_name 在 GPU $gpu_id 上..." | tee -a "$MAIN_LOG"
+    
+    # 在后台运行数据集训练
+    run_dataset_experiments "$dataset_config" $dataset_index &
+    
+    # 记录PID和数据集名称
+    PIDS+=($!)
+    DATASET_NAMES+=("$dataset_name")
+    
+    ((dataset_index++))
+done
+
+echo "" | tee -a "$MAIN_LOG"
+echo "✅ 所有 ${#DATASETS[@]} 个数据集已启动，正在并行训练..." | tee -a "$MAIN_LOG"
+echo "⏳ 等待所有任务完成..." | tee -a "$MAIN_LOG"
+echo "" | tee -a "$MAIN_LOG"
+
+# 等待所有后台任务完成
+for i in "${!PIDS[@]}"; do
+    pid=${PIDS[$i]}
+    dataset_name=${DATASET_NAMES[$i]}
+    echo "⏳ 等待数据集 $dataset_name (PID: $pid) 完成..." | tee -a "$MAIN_LOG"
+    wait $pid
+    exit_code=$?
+    if [ $exit_code -eq 0 ]; then
+        echo "✅ 数据集 $dataset_name 成功完成" | tee -a "$MAIN_LOG"
+    else
+        echo "⚠️  数据集 $dataset_name 有部分失败 (退出码: $exit_code)" | tee -a "$MAIN_LOG"
+    fi
+done
+
+echo "" | tee -a "$MAIN_LOG"
+echo "🎉 所有并行任务已完成！" | tee -a "$MAIN_LOG"
+echo "" | tee -a "$MAIN_LOG"
+
+# 汇总所有数据集的统计信息
+TOTAL_COMPLETED=0
+TOTAL_FAILED=0
+ALL_FAILED_EXPS=()
+
+for dataset_config in "${DATASETS[@]}"; do
+    IFS=':' read -r data_source dataset _ _ _ <<< "$dataset_config"
+    dataset_name=$(basename "$dataset")
+    
+    # 读取统计文件
+    if [ -f "$LOG_DIR/${dataset_name}_completed.txt" ]; then
+        completed=$(cat "$LOG_DIR/${dataset_name}_completed.txt")
+        TOTAL_COMPLETED=$((TOTAL_COMPLETED + completed))
+    fi
+    
+    if [ -f "$LOG_DIR/${dataset_name}_failed.txt" ]; then
+        failed=$(cat "$LOG_DIR/${dataset_name}_failed.txt")
+        TOTAL_FAILED=$((TOTAL_FAILED + failed))
+        
+        if [ -f "$LOG_DIR/${dataset_name}_failed_exps.txt" ]; then
+            while IFS= read -r line; do
+                ALL_FAILED_EXPS+=("$line")
+            done < "$LOG_DIR/${dataset_name}_failed_exps.txt"
+        fi
+    fi
 done
 
 # 结束时间
@@ -122,36 +264,50 @@ SECONDS=$((TOTAL_TIME % 60))
 
 echo "" | tee -a "$MAIN_LOG"
 echo "======================================================================" | tee -a "$MAIN_LOG"
-echo "所有实验完成！" | tee -a "$MAIN_LOG"
+echo "🎊 所有实验完成！" | tee -a "$MAIN_LOG"
 echo "======================================================================" | tee -a "$MAIN_LOG"
 echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$MAIN_LOG"
-echo "总实验数: $TOTAL_EXPERIMENTS" | tee -a "$MAIN_LOG"
-echo "✅ 成功: $COMPLETED" | tee -a "$MAIN_LOG"
-echo "❌ 失败: $FAILED" | tee -a "$MAIN_LOG"
-echo "⏱️  总耗时: ${HOURS}小时 ${MINUTES}分钟 ${SECONDS}秒" | tee -a "$MAIN_LOG"
+echo "总实验数: $TOTAL_EXPERIMENTS (单次训练)" | tee -a "$MAIN_LOG"
+echo "并行数据集: ${#DATASETS[@]} 个" | tee -a "$MAIN_LOG"
+echo "✅ 成功: $TOTAL_COMPLETED" | tee -a "$MAIN_LOG"
+echo "❌ 失败: $TOTAL_FAILED" | tee -a "$MAIN_LOG"
+echo "⏱️  总耗时: ${HOURS}小时 ${MINUTES}分钟 ${SECONDS}秒 (并行)" | tee -a "$MAIN_LOG"
 echo "" | tee -a "$MAIN_LOG"
 
-if [ $FAILED -gt 0 ]; then
+# 显示每个数据集的统计
+echo "📊 各数据集统计:" | tee -a "$MAIN_LOG"
+for dataset_config in "${DATASETS[@]}"; do
+    IFS=':' read -r data_source dataset _ _ gpu_id <<< "$dataset_config"
+    dataset_name=$(basename "$dataset")
+    if [ -f "$LOG_DIR/${dataset_name}_completed.txt" ] && [ -f "$LOG_DIR/${dataset_name}_failed.txt" ]; then
+        completed=$(cat "$LOG_DIR/${dataset_name}_completed.txt")
+        failed=$(cat "$LOG_DIR/${dataset_name}_failed.txt")
+        echo "  - $dataset_name (GPU $gpu_id): ✅ $completed  ❌ $failed" | tee -a "$MAIN_LOG"
+    fi
+done
+echo "" | tee -a "$MAIN_LOG"
+
+if [ $TOTAL_FAILED -gt 0 ]; then
     echo "失败的实验:" | tee -a "$MAIN_LOG"
-    for failed_exp in "${FAILED_EXPS[@]}"; do
+    for failed_exp in "${ALL_FAILED_EXPS[@]}"; do
         echo "  - $failed_exp" | tee -a "$MAIN_LOG"
     done
     echo "" | tee -a "$MAIN_LOG"
-    echo "📁 所有日志已保存到: $LOG_DIR" | tee -a "$MAIN_LOG"
-    echo "   - 总日志: $MAIN_LOG" | tee -a "$MAIN_LOG"
-    echo "   - 各实验日志: $LOG_DIR/<dataset>_<model>.log" | tee -a "$MAIN_LOG"
-    echo "" | tee -a "$MAIN_LOG"
+fi
+
+echo "📁 结果保存位置：" | tee -a "$MAIN_LOG"
+echo "   - 实验日志: $LOG_DIR/" | tee -a "$MAIN_LOG"
+echo "   - 各数据集日志: $LOG_DIR/<dataset>_dataset.log" | tee -a "$MAIN_LOG"
+echo "   - 训练结果: result/<data_source>/<dataset>/<model>/" | tee -a "$MAIN_LOG"
+echo "   - 训练历史CSV: result/<data_source>/<dataset>/<model>/<timestamp>/training_history.csv" | tee -a "$MAIN_LOG"
+echo "   - 资源使用日志: result/<data_source>/<dataset>/<model>/<timestamp>/resource_usage.txt" | tee -a "$MAIN_LOG"
+echo "" | tee -a "$MAIN_LOG"
+
+if [ $TOTAL_FAILED -gt 0 ]; then
+    echo "⚠️  有部分实验失败" | tee -a "$MAIN_LOG"
     exit 1
 else
     echo "🎉 所有实验均成功完成！" | tee -a "$MAIN_LOG"
-    echo "" | tee -a "$MAIN_LOG"
-    echo "📁 结果保存位置：" | tee -a "$MAIN_LOG"
-    echo "   - 实验日志: $LOG_DIR/" | tee -a "$MAIN_LOG"
-    echo "   - 训练结果: result/ogb_ogbg-ppa_*/" | tee -a "$MAIN_LOG"
-    echo "              result/ogb_ogbg-molhiv_*/" | tee -a "$MAIN_LOG"
-    echo "              result/tudataset_PROTEINS_*/" | tee -a "$MAIN_LOG"
-    echo "              result/tudataset_MUTAG_*/" | tee -a "$MAIN_LOG"
-    echo "" | tee -a "$MAIN_LOG"
     exit 0
 fi
 

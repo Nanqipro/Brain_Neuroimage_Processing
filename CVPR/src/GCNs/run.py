@@ -28,6 +28,8 @@ import datetime
 import time
 import json
 import argparse
+import psutil
+import GPUtil
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 from torch_geometric.loader import DataLoader
@@ -41,6 +43,50 @@ from model import (
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics
 from process import (load_data, oversample_data, compute_correlation_matrix, 
                      create_pyg_dataset, visualize_graph, load_custom_graph_dataset)
+
+# ============================================================================
+# 资源监控函数
+# ============================================================================
+
+class ResourceMonitor:
+    """监控CPU内存和GPU显存使用"""
+    
+    def __init__(self, device):
+        self.device = device
+        self.process = psutil.Process()
+        self.gpu_available = torch.cuda.is_available()
+        
+    def get_memory_usage(self):
+        """获取当前内存使用情况（MB）"""
+        mem_info = self.process.memory_info()
+        return mem_info.rss / 1024 / 1024  # 转换为MB
+    
+    def get_gpu_memory_usage(self):
+        """获取当前GPU显存使用情况（MB）"""
+        if not self.gpu_available:
+            return 0.0
+        
+        if torch.cuda.is_available():
+            # PyTorch方式获取显存
+            allocated = torch.cuda.memory_allocated(self.device) / 1024 / 1024
+            reserved = torch.cuda.memory_reserved(self.device) / 1024 / 1024
+            return {
+                'allocated': allocated,  # 实际分配的显存
+                'reserved': reserved,     # 预留的显存
+                'max_allocated': torch.cuda.max_memory_allocated(self.device) / 1024 / 1024
+            }
+        return {'allocated': 0.0, 'reserved': 0.0, 'max_allocated': 0.0}
+    
+    def get_snapshot(self):
+        """获取当前资源使用快照"""
+        gpu_mem = self.get_gpu_memory_usage()
+        return {
+            'cpu_memory_mb': self.get_memory_usage(),
+            'gpu_memory_allocated_mb': gpu_mem.get('allocated', 0.0) if isinstance(gpu_mem, dict) else 0.0,
+            'gpu_memory_reserved_mb': gpu_mem.get('reserved', 0.0) if isinstance(gpu_mem, dict) else 0.0,
+            'gpu_memory_max_allocated_mb': gpu_mem.get('max_allocated', 0.0) if isinstance(gpu_mem, dict) else 0.0
+        }
+
 
 # 添加绘制时间曲线的函数
 def plot_epoch_time(epoch_times, cumulative_times, result_dir='result'):
@@ -118,6 +164,75 @@ def save_training_history_csv(history, result_dir='result'):
     print(f"\n训练历史已保存到: {csv_path}")
     print(f"  - 包含 {num_epochs} 个epoch的详细数据")
     print(f"  - 可直接用于绘图和分析")
+
+
+def save_resource_usage_log(resource_log, num_graphs, total_training_time, result_dir='result'):
+    """保存资源使用日志到单独的文件
+    
+    Args:
+        resource_log: 资源使用记录字典
+        num_graphs: 图的总数量
+        total_training_time: 总训练时间
+        result_dir: 结果保存目录
+    """
+    log_file = f'{result_dir}/resource_usage.txt'
+    
+    # 计算统计信息
+    avg_cpu_mem = np.mean(resource_log['cpu_memory'])
+    max_cpu_mem = np.max(resource_log['cpu_memory'])
+    avg_gpu_mem = np.mean(resource_log['gpu_memory_allocated'])
+    max_gpu_mem = np.max(resource_log['gpu_memory_max_allocated'])
+    
+    # 计算每个图的平均执行时间
+    time_per_graph = total_training_time / num_graphs if num_graphs > 0 else 0
+    
+    with open(log_file, 'w', encoding='utf-8') as f:
+        f.write("=" * 80 + "\n")
+        f.write("资源使用统计报告\n")
+        f.write("=" * 80 + "\n\n")
+        
+        f.write("-" * 80 + "\n")
+        f.write("时间统计\n")
+        f.write("-" * 80 + "\n")
+        f.write(f"图数量: {num_graphs}\n")
+        f.write(f"总训练时间: {total_training_time:.3f} 秒\n")
+        f.write(f"每个图的平均执行时间: {time_per_graph:.6f} 秒/图\n")
+        f.write(f"每个图的平均执行时间: {time_per_graph*1000:.3f} 毫秒/图\n\n")
+        
+        f.write("-" * 80 + "\n")
+        f.write("内存使用统计 (CPU)\n")
+        f.write("-" * 80 + "\n")
+        f.write(f"平均内存使用: {avg_cpu_mem:.2f} MB\n")
+        f.write(f"峰值内存使用: {max_cpu_mem:.2f} MB\n")
+        f.write(f"内存使用范围: {np.min(resource_log['cpu_memory']):.2f} - {max_cpu_mem:.2f} MB\n\n")
+        
+        f.write("-" * 80 + "\n")
+        f.write("显存使用统计 (GPU)\n")
+        f.write("-" * 80 + "\n")
+        f.write(f"平均显存使用 (已分配): {avg_gpu_mem:.2f} MB\n")
+        f.write(f"峰值显存使用: {max_gpu_mem:.2f} MB\n")
+        f.write(f"平均显存预留: {np.mean(resource_log['gpu_memory_reserved']):.2f} MB\n")
+        f.write(f"峰值显存预留: {np.max(resource_log['gpu_memory_reserved']):.2f} MB\n\n")
+        
+        f.write("=" * 80 + "\n")
+    
+    # 同时保存到CSV供后续分析
+    csv_file = f'{result_dir}/resource_usage.csv'
+    df = pd.DataFrame({
+        'epoch': list(range(1, len(resource_log['cpu_memory']) + 1)),
+        'cpu_memory_mb': resource_log['cpu_memory'],
+        'gpu_memory_allocated_mb': resource_log['gpu_memory_allocated'],
+        'gpu_memory_reserved_mb': resource_log['gpu_memory_reserved'],
+        'gpu_memory_max_allocated_mb': resource_log['gpu_memory_max_allocated']
+    })
+    df.to_csv(csv_file, index=False, encoding='utf-8')
+    
+    print(f"\n资源使用日志已保存:")
+    print(f"  - 文本报告: {log_file}")
+    print(f"  - CSV数据: {csv_file}")
+    print(f"  - 每个图平均执行时间: {time_per_graph*1000:.3f} 毫秒/图")
+    print(f"  - 峰值内存: {max_cpu_mem:.2f} MB")
+    print(f"  - 峰值显存: {max_gpu_mem:.2f} MB")
 
 
 # 模型字典
@@ -474,6 +589,9 @@ def run_experiment(args):
     # 记录开始时间
     begin_time = time.time()
     
+    # 初始化资源监控器
+    resource_monitor = ResourceMonitor(device)
+    
     # 根据数据源加载数据
     if args.data_source == 'csv':
         train_loader, val_loader, test_loader, num_features, num_classes, class_weights, class_names = \
@@ -503,6 +621,18 @@ def run_experiment(args):
         class_weights = None
         class_names = [str(i) for i in range(num_classes)]
     
+    # 统计训练集图的数量
+    num_train_graphs = len(train_loader.dataset)
+    num_val_graphs = len(val_loader.dataset)
+    num_test_graphs = len(test_loader.dataset)
+    total_graphs = num_train_graphs + num_val_graphs + num_test_graphs
+    
+    print(f"\n图数量统计:")
+    print(f"  - 训练集图数: {num_train_graphs}")
+    print(f"  - 验证集图数: {num_val_graphs}")
+    print(f"  - 测试集图数: {num_test_graphs}")
+    print(f"  - 总图数: {total_graphs}")
+    
     # 创建模型
     model_class = MODEL_DICT[args.model]
     model = model_class(
@@ -519,6 +649,12 @@ def run_experiment(args):
     print(f"  - 隐藏层维度: {args.hidden_dim}")
     print(f"  - Dropout: {args.dropout}")
     
+    # 在模型创建后重置GPU显存统计（此时CUDA context已完全初始化）
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats(device)
+        torch.cuda.empty_cache()
+        print(f"  - GPU显存统计已重置")
+    
     # 优化器和学习率调度器
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -531,6 +667,14 @@ def run_experiment(args):
         'val': {'accuracy': [], 'precision': [], 'recall': [], 'f1': []},
         'epoch_times': [],  # 记录每个epoch的单独执行时间
         'cumulative_times': []  # 记录从训练开始的累积时间
+    }
+    
+    # 资源使用记录
+    resource_log = {
+        'cpu_memory': [],
+        'gpu_memory_allocated': [],
+        'gpu_memory_reserved': [],
+        'gpu_memory_max_allocated': []
     }
     
     best_val_f1 = 0
@@ -562,6 +706,13 @@ def run_experiment(args):
         # 记录累积时间（从训练开始到当前epoch结束）
         cumulative_time = epoch_end_time - training_start_time
         history['cumulative_times'].append(cumulative_time)
+        
+        # 记录资源使用情况
+        resource_snapshot = resource_monitor.get_snapshot()
+        resource_log['cpu_memory'].append(resource_snapshot['cpu_memory_mb'])
+        resource_log['gpu_memory_allocated'].append(resource_snapshot['gpu_memory_allocated_mb'])
+        resource_log['gpu_memory_reserved'].append(resource_snapshot['gpu_memory_reserved_mb'])
+        resource_log['gpu_memory_max_allocated'].append(resource_snapshot['gpu_memory_max_allocated_mb'])
         
         # 学习率调度
         scheduler.step(val_metrics['f1'])
@@ -605,6 +756,9 @@ def run_experiment(args):
     total_training_time = history['cumulative_times'][-1] if history['cumulative_times'] else 0
     avg_training_time = total_training_time / actual_epochs if actual_epochs > 0 else 0
     
+    # 计算每个图的平均执行时间
+    time_per_graph = total_training_time / num_train_graphs if num_train_graphs > 0 else 0
+    
     # 测试
     print(f"\n在测试集上评估...")
     test_metrics = evaluate_model(model, test_loader, device)
@@ -626,7 +780,19 @@ def run_experiment(args):
     print(f"\n训练时间统计:")
     print(f"  - 总训练时间（到达收敛）: {total_training_time:.3f}秒")
     print(f"  - 平均训练时间（每epoch）: {avg_training_time:.3f}秒")
+    print(f"  - 每个图的平均执行时间: {time_per_graph:.6f}秒/图 ({time_per_graph*1000:.3f}毫秒/图)")
+    print(f"  - 训练集图数: {num_train_graphs}")
     print(f"  - 脚本总运行时间: {total_elapsed_time:.2f}秒")
+    
+    # 打印资源使用统计
+    if resource_log['cpu_memory']:
+        print(f"\n资源使用统计:")
+        print(f"  - 峰值内存使用: {np.max(resource_log['cpu_memory']):.2f} MB")
+        print(f"  - 平均内存使用: {np.mean(resource_log['cpu_memory']):.2f} MB")
+        if resource_log['gpu_memory_max_allocated']:
+            print(f"  - 峰值显存使用: {np.max(resource_log['gpu_memory_max_allocated']):.2f} MB")
+            print(f"  - 平均显存使用: {np.mean(resource_log['gpu_memory_allocated']):.2f} MB")
+    
     print(f"{'=' * 80}")
     
     # 保存详细结果
@@ -683,6 +849,9 @@ def run_experiment(args):
         # 保存训练历史到CSV文件（方便后续直接画图）
         save_training_history_csv(history, result_dir=result_dir)
         
+        # 保存资源使用日志
+        save_resource_usage_log(resource_log, num_train_graphs, total_training_time, result_dir=result_dir)
+        
         # 保存结果JSON
         result = {
             "experiment_info": {
@@ -717,6 +886,10 @@ def run_experiment(args):
             "time_statistics": {
                 "total_training_time": float(total_training_time),  # 核心指标1: 总训练时间
                 "avg_training_time_per_epoch": float(avg_training_time),  # 核心指标2: 平均训练时间
+                "time_per_graph": float(time_per_graph),  # 核心指标3: 每个图的平均执行时间
+                "time_per_graph_ms": float(time_per_graph * 1000),  # 每个图的平均执行时间（毫秒）
+                "num_train_graphs": num_train_graphs,
+                "num_total_graphs": total_graphs,
                 "actual_epochs": actual_epochs,
                 "avg_epoch_time": float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
                 "min_epoch_time": float(np.min(history['epoch_times'])) if history['epoch_times'] else 0,
@@ -725,11 +898,25 @@ def run_experiment(args):
                 "total_cumulative_time": float(history['cumulative_times'][-1]) if history['cumulative_times'] else 0,
                 "total_elapsed_time": float(total_elapsed_time)
             },
+            "resource_usage": {
+                "cpu_memory": {
+                    "average_mb": float(np.mean(resource_log['cpu_memory'])) if resource_log['cpu_memory'] else 0,
+                    "peak_mb": float(np.max(resource_log['cpu_memory'])) if resource_log['cpu_memory'] else 0,
+                    "min_mb": float(np.min(resource_log['cpu_memory'])) if resource_log['cpu_memory'] else 0
+                },
+                "gpu_memory": {
+                    "average_allocated_mb": float(np.mean(resource_log['gpu_memory_allocated'])) if resource_log['gpu_memory_allocated'] else 0,
+                    "peak_allocated_mb": float(np.max(resource_log['gpu_memory_max_allocated'])) if resource_log['gpu_memory_max_allocated'] else 0,
+                    "average_reserved_mb": float(np.mean(resource_log['gpu_memory_reserved'])) if resource_log['gpu_memory_reserved'] else 0,
+                    "peak_reserved_mb": float(np.max(resource_log['gpu_memory_reserved'])) if resource_log['gpu_memory_reserved'] else 0
+                }
+            },
             "classification_report": classification_report(
                 test_metrics['labels'],
                 test_metrics['predictions'],
                 target_names=class_names,
-                output_dict=True
+                output_dict=True,
+                zero_division=0
             )
         }
         
@@ -744,8 +931,15 @@ def run_experiment(args):
         'actual_epochs': actual_epochs,
         'total_training_time': float(total_training_time),  # 核心指标1: 总训练时间
         'avg_training_time': float(avg_training_time),  # 核心指标2: 平均训练时间
+        'time_per_graph': float(time_per_graph),  # 核心指标3: 每个图的平均执行时间
+        'time_per_graph_ms': float(time_per_graph * 1000),
+        'num_train_graphs': num_train_graphs,
         'avg_epoch_time': float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
-        'total_elapsed_time': total_elapsed_time
+        'total_elapsed_time': total_elapsed_time,
+        'peak_cpu_memory_mb': float(np.max(resource_log['cpu_memory'])) if resource_log['cpu_memory'] else 0,
+        'peak_gpu_memory_mb': float(np.max(resource_log['gpu_memory_max_allocated'])) if resource_log['gpu_memory_max_allocated'] else 0,
+        'avg_cpu_memory_mb': float(np.mean(resource_log['cpu_memory'])) if resource_log['cpu_memory'] else 0,
+        'avg_gpu_memory_mb': float(np.mean(resource_log['gpu_memory_allocated'])) if resource_log['gpu_memory_allocated'] else 0
     }
 
 
@@ -886,8 +1080,15 @@ def main():
                 'actual_epochs': int(result['actual_epochs']),
                 'total_training_time': float(result['total_training_time']),
                 'avg_training_time': float(result['avg_training_time']),
+                'time_per_graph': float(result['time_per_graph']),
+                'time_per_graph_ms': float(result['time_per_graph_ms']),
+                'num_train_graphs': int(result['num_train_graphs']),
                 'avg_epoch_time': float(result['avg_epoch_time']),
-                'total_elapsed_time': float(result['total_elapsed_time'])
+                'total_elapsed_time': float(result['total_elapsed_time']),
+                'peak_cpu_memory_mb': float(result['peak_cpu_memory_mb']),
+                'peak_gpu_memory_mb': float(result['peak_gpu_memory_mb']),
+                'avg_cpu_memory_mb': float(result['avg_cpu_memory_mb']),
+                'avg_gpu_memory_mb': float(result['avg_gpu_memory_mb'])
             })
         
         # 打印汇总结果
@@ -902,8 +1103,14 @@ def main():
         actual_epochs = [r['actual_epochs'] for r in all_results]
         total_training_times = [r['total_training_time'] for r in all_results]
         avg_training_times = [r['avg_training_time'] for r in all_results]
+        times_per_graph = [r['time_per_graph'] for r in all_results]
+        times_per_graph_ms = [r['time_per_graph_ms'] for r in all_results]
         avg_epoch_times = [r['avg_epoch_time'] for r in all_results]
         total_elapsed_times = [r['total_elapsed_time'] for r in all_results]
+        peak_cpu_mems = [r['peak_cpu_memory_mb'] for r in all_results]
+        peak_gpu_mems = [r['peak_gpu_memory_mb'] for r in all_results]
+        avg_cpu_mems = [r['avg_cpu_memory_mb'] for r in all_results]
+        avg_gpu_mems = [r['avg_gpu_memory_mb'] for r in all_results]
         
         print(f"\n测试集准确率: {np.mean(accuracies):.4f} ± {np.std(accuracies):.4f}")
         print(f"测试集精确率: {np.mean(precisions):.4f} ± {np.std(precisions):.4f}")
@@ -913,8 +1120,16 @@ def main():
         print(f"平均实际训练轮数: {np.mean(actual_epochs):.1f} ± {np.std(actual_epochs):.1f} epochs")
         print(f"平均总训练时间（到达收敛）: {np.mean(total_training_times):.3f} ± {np.std(total_training_times):.3f}秒")
         print(f"平均训练时间（每epoch）: {np.mean(avg_training_times):.3f} ± {np.std(avg_training_times):.3f}秒")
+        print(f"平均每个图执行时间: {np.mean(times_per_graph):.6f} ± {np.std(times_per_graph):.6f}秒/图")
+        print(f"平均每个图执行时间: {np.mean(times_per_graph_ms):.3f} ± {np.std(times_per_graph_ms):.3f}毫秒/图")
         print(f"平均epoch时间: {np.mean(avg_epoch_times):.3f} ± {np.std(avg_epoch_times):.3f}秒")
         print(f"平均脚本运行时间: {np.mean(total_elapsed_times):.2f} ± {np.std(total_elapsed_times):.2f}秒")
+        
+        print(f"\n资源使用统计:")
+        print(f"平均峰值内存: {np.mean(peak_cpu_mems):.2f} ± {np.std(peak_cpu_mems):.2f} MB")
+        print(f"平均峰值显存: {np.mean(peak_gpu_mems):.2f} ± {np.std(peak_gpu_mems):.2f} MB")
+        print(f"平均内存使用: {np.mean(avg_cpu_mems):.2f} ± {np.std(avg_cpu_mems):.2f} MB")
+        print(f"平均显存使用: {np.mean(avg_gpu_mems):.2f} ± {np.std(avg_gpu_mems):.2f} MB")
         
         print(f"\n详细结果:")
         for result in all_results:
@@ -922,8 +1137,10 @@ def main():
                   f"Acc={result['test_accuracy']:.4f}, "
                   f"F1={result['test_f1']:.4f}, "
                   f"Epochs={result['actual_epochs']}, "
-                  f"TotalTrainTime={result['total_training_time']:.3f}s, "
-                  f"AvgTrainTime={result['avg_training_time']:.3f}s")
+                  f"TotalTime={result['total_training_time']:.3f}s, "
+                  f"TimePerGraph={result['time_per_graph_ms']:.3f}ms, "
+                  f"PeakMem={result['peak_cpu_memory_mb']:.1f}MB, "
+                  f"PeakGPU={result['peak_gpu_memory_mb']:.1f}MB")
         
         # 保存汇总结果
         summary_file = f"result/multi_run_summary_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -940,8 +1157,14 @@ def main():
                     'actual_epochs': {'mean': float(np.mean(actual_epochs)), 'std': float(np.std(actual_epochs))},
                     'total_training_time': {'mean': float(np.mean(total_training_times)), 'std': float(np.std(total_training_times))},
                     'avg_training_time_per_epoch': {'mean': float(np.mean(avg_training_times)), 'std': float(np.std(avg_training_times))},
+                    'time_per_graph': {'mean': float(np.mean(times_per_graph)), 'std': float(np.std(times_per_graph))},
+                    'time_per_graph_ms': {'mean': float(np.mean(times_per_graph_ms)), 'std': float(np.std(times_per_graph_ms))},
                     'avg_epoch_time': {'mean': float(np.mean(avg_epoch_times)), 'std': float(np.std(avg_epoch_times))},
-                    'total_elapsed_time': {'mean': float(np.mean(total_elapsed_times)), 'std': float(np.std(total_elapsed_times))}
+                    'total_elapsed_time': {'mean': float(np.mean(total_elapsed_times)), 'std': float(np.std(total_elapsed_times))},
+                    'peak_cpu_memory_mb': {'mean': float(np.mean(peak_cpu_mems)), 'std': float(np.std(peak_cpu_mems))},
+                    'peak_gpu_memory_mb': {'mean': float(np.mean(peak_gpu_mems)), 'std': float(np.std(peak_gpu_mems))},
+                    'avg_cpu_memory_mb': {'mean': float(np.mean(avg_cpu_mems)), 'std': float(np.std(avg_cpu_mems))},
+                    'avg_gpu_memory_mb': {'mean': float(np.mean(avg_gpu_mems)), 'std': float(np.std(avg_gpu_mems))}
                 },
                 'all_results': all_results
             }, f, ensure_ascii=False, indent=4)

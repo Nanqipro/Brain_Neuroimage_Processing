@@ -1,0 +1,5 @@
+graphs_100000 + gat
+graphs_100000 + hybrid
+graphs_100000 + edgeconv
+graphs_100000 + gatv2
+graphs_100000 + deepergcn
