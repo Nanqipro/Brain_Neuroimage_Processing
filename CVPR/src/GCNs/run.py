@@ -142,8 +142,10 @@ def save_training_history_csv(history, result_dir='result'):
     
     data = {
         'epoch': list(range(1, num_epochs + 1)),
-        'epoch_time': history['epoch_times'],
-        'cumulative_time': history['cumulative_times'],
+        'train_time': history['train_times'],  # 每epoch训练时间
+        'val_time': history['val_times'],  # 每epoch验证时间
+        'epoch_time': history['epoch_times'],  # 每epoch总时间
+        'cumulative_train_time': history['cumulative_train_times'],  # 累积训练时间
         'train_loss': history['train']['loss'],
         'train_accuracy': history['train']['accuracy'],
         'train_precision': history['train']['precision'],
@@ -776,6 +778,9 @@ def run_experiment(args):
     # 计算每个图的平均执行时间（仅基于训练集）
     time_per_graph = total_training_time / num_train_graphs if num_train_graphs > 0 else 0
     
+    # 计算每个图在单个epoch中的平均执行时间（另一种计算方式）
+    time_per_graph_per_epoch = avg_training_time / num_train_graphs if num_train_graphs > 0 else 0
+    
     # 测试
     print(f"\n在测试集上评估...")
     test_metrics = evaluate_model(model, test_loader, device)
@@ -799,7 +804,8 @@ def run_experiment(args):
     print(f"  - 总验证时间: {total_val_time:.3f}秒")
     print(f"  - 训练+验证总时间: {total_time_with_val:.3f}秒")
     print(f"  - 平均训练时间（每epoch，仅训练集）: {avg_training_time:.3f}秒")
-    print(f"  - 每个图的平均执行时间（仅训练集）: {time_per_graph:.6f}秒/图 ({time_per_graph*1000:.3f}毫秒/图)")
+    print(f"  - 每个图的平均执行时间（整个训练过程）: {time_per_graph:.6f}秒/图 ({time_per_graph*1000:.3f}毫秒/图)")
+    print(f"  - 每个图的平均执行时间（单个epoch）: {time_per_graph_per_epoch:.6f}秒/图 ({time_per_graph_per_epoch*1000:.3f}毫秒/图)")
     print(f"  - 训练集图数: {num_train_graphs}")
     print(f"  - 脚本总运行时间: {total_elapsed_time:.2f}秒")
     
@@ -910,8 +916,10 @@ def run_experiment(args):
                 "total_val_time": float(total_val_time),  # 总验证时间
                 "total_time_with_val": float(total_time_with_val),  # 训练+验证总时间
                 "avg_training_time_per_epoch": float(avg_training_time),  # 核心指标2: 平均每epoch训练时间（仅训练集）
-                "time_per_graph": float(time_per_graph),  # 核心指标3: 每个图的平均执行时间（仅训练集）
-                "time_per_graph_ms": float(time_per_graph * 1000),  # 每个图的平均执行时间（毫秒，仅训练集）
+                "time_per_graph": float(time_per_graph),  # 核心指标3: 每个图的平均执行时间（整个训练过程）
+                "time_per_graph_ms": float(time_per_graph * 1000),  # 每个图的平均执行时间（毫秒，整个训练过程）
+                "time_per_graph_per_epoch": float(time_per_graph_per_epoch),  # 核心指标4: 每个图在单个epoch中的平均执行时间
+                "time_per_graph_per_epoch_ms": float(time_per_graph_per_epoch * 1000),  # 每个图在单个epoch中的平均执行时间（毫秒）
                 "num_train_graphs": num_train_graphs,
                 "num_total_graphs": total_graphs,
                 "actual_epochs": actual_epochs,
@@ -957,8 +965,10 @@ def run_experiment(args):
         'actual_epochs': actual_epochs,
         'total_training_time': float(total_training_time),  # 核心指标1: 总训练时间
         'avg_training_time': float(avg_training_time),  # 核心指标2: 平均训练时间
-        'time_per_graph': float(time_per_graph),  # 核心指标3: 每个图的平均执行时间
+        'time_per_graph': float(time_per_graph),  # 核心指标3: 每个图的平均执行时间（整个训练过程）
         'time_per_graph_ms': float(time_per_graph * 1000),
+        'time_per_graph_per_epoch': float(time_per_graph_per_epoch),  # 核心指标4: 每个图在单个epoch中的平均执行时间
+        'time_per_graph_per_epoch_ms': float(time_per_graph_per_epoch * 1000),
         'num_train_graphs': num_train_graphs,
         'avg_epoch_time': float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
         'total_elapsed_time': total_elapsed_time,
@@ -1108,6 +1118,8 @@ def main():
                 'avg_training_time': float(result['avg_training_time']),
                 'time_per_graph': float(result['time_per_graph']),
                 'time_per_graph_ms': float(result['time_per_graph_ms']),
+                'time_per_graph_per_epoch': float(result['time_per_graph_per_epoch']),
+                'time_per_graph_per_epoch_ms': float(result['time_per_graph_per_epoch_ms']),
                 'num_train_graphs': int(result['num_train_graphs']),
                 'avg_epoch_time': float(result['avg_epoch_time']),
                 'total_elapsed_time': float(result['total_elapsed_time']),
@@ -1131,6 +1143,8 @@ def main():
         avg_training_times = [r['avg_training_time'] for r in all_results]
         times_per_graph = [r['time_per_graph'] for r in all_results]
         times_per_graph_ms = [r['time_per_graph_ms'] for r in all_results]
+        times_per_graph_per_epoch = [r['time_per_graph_per_epoch'] for r in all_results]
+        times_per_graph_per_epoch_ms = [r['time_per_graph_per_epoch_ms'] for r in all_results]
         avg_epoch_times = [r['avg_epoch_time'] for r in all_results]
         total_elapsed_times = [r['total_elapsed_time'] for r in all_results]
         peak_cpu_mems = [r['peak_cpu_memory_mb'] for r in all_results]
@@ -1185,6 +1199,8 @@ def main():
                     'avg_training_time_per_epoch': {'mean': float(np.mean(avg_training_times)), 'std': float(np.std(avg_training_times))},
                     'time_per_graph': {'mean': float(np.mean(times_per_graph)), 'std': float(np.std(times_per_graph))},
                     'time_per_graph_ms': {'mean': float(np.mean(times_per_graph_ms)), 'std': float(np.std(times_per_graph_ms))},
+                    'time_per_graph_per_epoch': {'mean': float(np.mean(times_per_graph_per_epoch)), 'std': float(np.std(times_per_graph_per_epoch))},
+                    'time_per_graph_per_epoch_ms': {'mean': float(np.mean(times_per_graph_per_epoch_ms)), 'std': float(np.std(times_per_graph_per_epoch_ms))},
                     'avg_epoch_time': {'mean': float(np.mean(avg_epoch_times)), 'std': float(np.std(avg_epoch_times))},
                     'total_elapsed_time': {'mean': float(np.mean(total_elapsed_times)), 'std': float(np.std(total_elapsed_times))},
                     'peak_cpu_memory_mb': {'mean': float(np.mean(peak_cpu_mems)), 'std': float(np.std(peak_cpu_mems))},

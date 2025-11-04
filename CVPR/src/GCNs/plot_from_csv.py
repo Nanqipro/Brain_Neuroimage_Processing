@@ -230,9 +230,16 @@ def collect_scaling_data(result_base_dir='result'):
         
     Returns:
         dict: 包含各个模型在不同规模下的时间数据
-              格式: {model_name: {graph_size: {'total_time': [], 'avg_time': [], 'time_per_graph': []}}}
+              格式: {model_name: {graph_size: {'total_time': [], 'avg_time': [], 'time_per_graph': [], 'time_per_graph_per_epoch': []}}}
     """
-    data = defaultdict(lambda: defaultdict(lambda: {'total_time': [], 'avg_time': [], 'time_per_graph': [], 'time_per_graph_ms': []}))
+    data = defaultdict(lambda: defaultdict(lambda: {
+        'total_time': [], 
+        'avg_time': [], 
+        'time_per_graph': [], 
+        'time_per_graph_ms': [],
+        'time_per_graph_per_epoch': [],
+        'time_per_graph_per_epoch_ms': []
+    }))
     
     # 遍历所有experiment_results.json文件（优先，包含完整信息）
     result_path = Path(result_base_dir)
@@ -268,6 +275,8 @@ def collect_scaling_data(result_base_dir='result'):
                 avg_time = time_stats.get('avg_training_time_per_epoch')
                 time_per_graph = time_stats.get('time_per_graph')
                 time_per_graph_ms = time_stats.get('time_per_graph_ms')
+                time_per_graph_per_epoch = time_stats.get('time_per_graph_per_epoch')
+                time_per_graph_per_epoch_ms = time_stats.get('time_per_graph_per_epoch_ms')
                 
                 if total_time is not None and avg_time is not None:
                     data[model_name][graph_size]['total_time'].append(total_time)
@@ -276,6 +285,10 @@ def collect_scaling_data(result_base_dir='result'):
                         data[model_name][graph_size]['time_per_graph'].append(time_per_graph)
                     if time_per_graph_ms is not None:
                         data[model_name][graph_size]['time_per_graph_ms'].append(time_per_graph_ms)
+                    if time_per_graph_per_epoch is not None:
+                        data[model_name][graph_size]['time_per_graph_per_epoch'].append(time_per_graph_per_epoch)
+                    if time_per_graph_per_epoch_ms is not None:
+                        data[model_name][graph_size]['time_per_graph_per_epoch_ms'].append(time_per_graph_per_epoch_ms)
         
         except Exception as e:
             print(f"警告: 处理JSON文件 {json_file} 时出错: {e}")
@@ -361,12 +374,18 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         time_per_graph_std = []
         time_per_graph_ms_mean = []
         time_per_graph_ms_std = []
+        time_per_graph_per_epoch_mean = []
+        time_per_graph_per_epoch_std = []
+        time_per_graph_per_epoch_ms_mean = []
+        time_per_graph_per_epoch_ms_std = []
         
         for size in sizes:
             total_time_list = size_data[size]['total_time']
             avg_time_list = size_data[size]['avg_time']
             time_per_graph_list = size_data[size]['time_per_graph']
             time_per_graph_ms_list = size_data[size]['time_per_graph_ms']
+            time_per_graph_per_epoch_list = size_data[size]['time_per_graph_per_epoch']
+            time_per_graph_per_epoch_ms_list = size_data[size]['time_per_graph_per_epoch_ms']
             
             total_times_mean.append(np.mean(total_time_list))
             total_times_std.append(np.std(total_time_list))
@@ -386,6 +405,20 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             else:
                 time_per_graph_ms_mean.append(0)
                 time_per_graph_ms_std.append(0)
+            
+            if time_per_graph_per_epoch_list:
+                time_per_graph_per_epoch_mean.append(np.mean(time_per_graph_per_epoch_list))
+                time_per_graph_per_epoch_std.append(np.std(time_per_graph_per_epoch_list))
+            else:
+                time_per_graph_per_epoch_mean.append(0)
+                time_per_graph_per_epoch_std.append(0)
+            
+            if time_per_graph_per_epoch_ms_list:
+                time_per_graph_per_epoch_ms_mean.append(np.mean(time_per_graph_per_epoch_ms_list))
+                time_per_graph_per_epoch_ms_std.append(np.std(time_per_graph_per_epoch_ms_list))
+            else:
+                time_per_graph_per_epoch_ms_mean.append(0)
+                time_per_graph_per_epoch_ms_std.append(0)
         
         model_data[model_name] = {
             'sizes': sizes,
@@ -396,7 +429,11 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             'time_per_graph_mean': time_per_graph_mean,
             'time_per_graph_std': time_per_graph_std,
             'time_per_graph_ms_mean': time_per_graph_ms_mean,
-            'time_per_graph_ms_std': time_per_graph_ms_std
+            'time_per_graph_ms_std': time_per_graph_ms_std,
+            'time_per_graph_per_epoch_mean': time_per_graph_per_epoch_mean,
+            'time_per_graph_per_epoch_std': time_per_graph_per_epoch_std,
+            'time_per_graph_per_epoch_ms_mean': time_per_graph_per_epoch_ms_mean,
+            'time_per_graph_per_epoch_ms_std': time_per_graph_per_epoch_ms_std
         }
     
     colors = plt.cm.tab10(np.linspace(0, 1, len(model_data)))
@@ -507,6 +544,51 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         print(f"✅ Time per graph plot saved: {output_path}")
     else:
         print("⚠️  未找到每个图执行时间数据，跳过该图表")
+    
+    # === Figure 4: Time per Graph per Epoch vs Dataset Size ===
+    has_time_per_graph_per_epoch = any(
+        any(t > 0 for t in mdata['time_per_graph_per_epoch_ms_mean'])
+        for mdata in model_data.values()
+    )
+    
+    if has_time_per_graph_per_epoch:
+        plt.figure(figsize=(12, 7))
+        
+        for idx, (model_name, mdata) in enumerate(model_data.items()):
+            sizes = mdata['sizes']
+            means = mdata['time_per_graph_per_epoch_ms_mean']
+            stds = mdata['time_per_graph_per_epoch_ms_std']
+            
+            # 过滤掉0值
+            filtered_data = [(s, m, std) for s, m, std in zip(sizes, means, stds) if m > 0]
+            if not filtered_data:
+                continue
+            
+            sizes_filtered, means_filtered, stds_filtered = zip(*filtered_data)
+            
+            plt.errorbar(sizes_filtered, means_filtered, yerr=stds_filtered, 
+                        marker=markers[idx % len(markers)], 
+                        linewidth=2.5, markersize=10,
+                        capsize=5, capthick=2,
+                        label=model_name.upper(), 
+                        color=colors[idx],
+                        alpha=0.8)
+        
+        plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
+        plt.ylabel('Time per Graph per Epoch (milliseconds)', fontsize=14, fontweight='bold')
+        plt.title('Dataset Size vs Time per Graph per Epoch', fontsize=16, fontweight='bold', pad=20)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.grid(True, alpha=0.3, linestyle='--', which='both')
+        plt.legend(fontsize=12, loc='best', framealpha=0.9)
+        plt.tight_layout()
+        
+        output_path = f'{output_dir}/time_per_graph_per_epoch_vs_scale.png'
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Time per graph per epoch plot saved: {output_path}")
+    else:
+        print("⚠️  未找到每个图在单个epoch中执行时间数据，跳过该图表")
     
     # === Print Statistics ===
     print("\n" + "=" * 80)
