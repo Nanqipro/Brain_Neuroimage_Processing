@@ -238,7 +238,11 @@ def collect_scaling_data(result_base_dir='result'):
         'time_per_graph': [], 
         'time_per_graph_ms': [],
         'time_per_graph_per_epoch': [],
-        'time_per_graph_per_epoch_ms': []
+        'time_per_graph_per_epoch_ms': [],
+        'peak_cpu_memory_mb': [],
+        'avg_cpu_memory_mb': [],
+        'peak_gpu_memory_mb': [],
+        'avg_gpu_memory_mb': []
     }))
     
     # 遍历所有experiment_results.json文件（优先，包含完整信息）
@@ -278,6 +282,16 @@ def collect_scaling_data(result_base_dir='result'):
                 time_per_graph_per_epoch = time_stats.get('time_per_graph_per_epoch')
                 time_per_graph_per_epoch_ms = time_stats.get('time_per_graph_per_epoch_ms')
                 
+                # 读取资源使用统计
+                resource_usage = result.get('resource_usage', {})
+                cpu_mem = resource_usage.get('cpu_memory', {})
+                gpu_mem = resource_usage.get('gpu_memory', {})
+                
+                peak_cpu_mem = cpu_mem.get('peak_mb')
+                avg_cpu_mem = cpu_mem.get('average_mb')
+                peak_gpu_mem = gpu_mem.get('peak_allocated_mb')
+                avg_gpu_mem = gpu_mem.get('average_allocated_mb')
+                
                 if total_time is not None and avg_time is not None:
                     data[model_name][graph_size]['total_time'].append(total_time)
                     data[model_name][graph_size]['avg_time'].append(avg_time)
@@ -289,6 +303,16 @@ def collect_scaling_data(result_base_dir='result'):
                         data[model_name][graph_size]['time_per_graph_per_epoch'].append(time_per_graph_per_epoch)
                     if time_per_graph_per_epoch_ms is not None:
                         data[model_name][graph_size]['time_per_graph_per_epoch_ms'].append(time_per_graph_per_epoch_ms)
+                    
+                    # 添加内存数据
+                    if peak_cpu_mem is not None:
+                        data[model_name][graph_size]['peak_cpu_memory_mb'].append(peak_cpu_mem)
+                    if avg_cpu_mem is not None:
+                        data[model_name][graph_size]['avg_cpu_memory_mb'].append(avg_cpu_mem)
+                    if peak_gpu_mem is not None:
+                        data[model_name][graph_size]['peak_gpu_memory_mb'].append(peak_gpu_mem)
+                    if avg_gpu_mem is not None:
+                        data[model_name][graph_size]['avg_gpu_memory_mb'].append(avg_gpu_mem)
         
         except Exception as e:
             print(f"警告: 处理JSON文件 {json_file} 时出错: {e}")
@@ -420,6 +444,50 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                 time_per_graph_per_epoch_ms_mean.append(0)
                 time_per_graph_per_epoch_ms_std.append(0)
         
+        # 处理内存数据
+        peak_cpu_memory_mean = []
+        peak_cpu_memory_std = []
+        avg_cpu_memory_mean = []
+        avg_cpu_memory_std = []
+        peak_gpu_memory_mean = []
+        peak_gpu_memory_std = []
+        avg_gpu_memory_mean = []
+        avg_gpu_memory_std = []
+        
+        for size in sizes:
+            peak_cpu_list = size_data[size]['peak_cpu_memory_mb']
+            avg_cpu_list = size_data[size]['avg_cpu_memory_mb']
+            peak_gpu_list = size_data[size]['peak_gpu_memory_mb']
+            avg_gpu_list = size_data[size]['avg_gpu_memory_mb']
+            
+            if peak_cpu_list:
+                peak_cpu_memory_mean.append(np.mean(peak_cpu_list))
+                peak_cpu_memory_std.append(np.std(peak_cpu_list))
+            else:
+                peak_cpu_memory_mean.append(0)
+                peak_cpu_memory_std.append(0)
+            
+            if avg_cpu_list:
+                avg_cpu_memory_mean.append(np.mean(avg_cpu_list))
+                avg_cpu_memory_std.append(np.std(avg_cpu_list))
+            else:
+                avg_cpu_memory_mean.append(0)
+                avg_cpu_memory_std.append(0)
+            
+            if peak_gpu_list:
+                peak_gpu_memory_mean.append(np.mean(peak_gpu_list))
+                peak_gpu_memory_std.append(np.std(peak_gpu_list))
+            else:
+                peak_gpu_memory_mean.append(0)
+                peak_gpu_memory_std.append(0)
+            
+            if avg_gpu_list:
+                avg_gpu_memory_mean.append(np.mean(avg_gpu_list))
+                avg_gpu_memory_std.append(np.std(avg_gpu_list))
+            else:
+                avg_gpu_memory_mean.append(0)
+                avg_gpu_memory_std.append(0)
+        
         model_data[model_name] = {
             'sizes': sizes,
             'total_times_mean': total_times_mean,
@@ -433,7 +501,15 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             'time_per_graph_per_epoch_mean': time_per_graph_per_epoch_mean,
             'time_per_graph_per_epoch_std': time_per_graph_per_epoch_std,
             'time_per_graph_per_epoch_ms_mean': time_per_graph_per_epoch_ms_mean,
-            'time_per_graph_per_epoch_ms_std': time_per_graph_per_epoch_ms_std
+            'time_per_graph_per_epoch_ms_std': time_per_graph_per_epoch_ms_std,
+            'peak_cpu_memory_mean': peak_cpu_memory_mean,
+            'peak_cpu_memory_std': peak_cpu_memory_std,
+            'avg_cpu_memory_mean': avg_cpu_memory_mean,
+            'avg_cpu_memory_std': avg_cpu_memory_std,
+            'peak_gpu_memory_mean': peak_gpu_memory_mean,
+            'peak_gpu_memory_std': peak_gpu_memory_std,
+            'avg_gpu_memory_mean': avg_gpu_memory_mean,
+            'avg_gpu_memory_std': avg_gpu_memory_std
         }
     
     colors = plt.cm.tab10(np.linspace(0, 1, len(model_data)))
@@ -590,6 +666,96 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     else:
         print("⚠️  未找到每个图在单个epoch中执行时间数据，跳过该图表")
     
+    # === Figure 5: Peak CPU Memory Usage vs Dataset Size ===
+    has_cpu_memory = any(
+        any(m > 0 for m in mdata['peak_cpu_memory_mean'])
+        for mdata in model_data.values()
+    )
+    
+    if has_cpu_memory:
+        plt.figure(figsize=(12, 7))
+        
+        for idx, (model_name, mdata) in enumerate(model_data.items()):
+            sizes = mdata['sizes']
+            means = mdata['peak_cpu_memory_mean']
+            stds = mdata['peak_cpu_memory_std']
+            
+            # 过滤掉0值
+            filtered_data = [(s, m, std) for s, m, std in zip(sizes, means, stds) if m > 0]
+            if not filtered_data:
+                continue
+            
+            sizes_filtered, means_filtered, stds_filtered = zip(*filtered_data)
+            
+            plt.errorbar(sizes_filtered, means_filtered, yerr=stds_filtered, 
+                        marker=markers[idx % len(markers)], 
+                        linewidth=2.5, markersize=10,
+                        capsize=5, capthick=2,
+                        label=model_name.upper(), 
+                        color=colors[idx],
+                        alpha=0.8)
+        
+        plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
+        plt.ylabel('Peak CPU Memory Usage (MB)', fontsize=14, fontweight='bold')
+        plt.title('Dataset Size vs Peak CPU Memory Usage', fontsize=16, fontweight='bold', pad=20)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.grid(True, alpha=0.3, linestyle='--', which='both')
+        plt.legend(fontsize=12, loc='best', framealpha=0.9)
+        plt.tight_layout()
+        
+        output_path = f'{output_dir}/peak_cpu_memory_vs_scale.png'
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Peak CPU memory plot saved: {output_path}")
+    else:
+        print("⚠️  未找到CPU内存占用数据，跳过该图表")
+    
+    # === Figure 6: Peak GPU Memory Usage vs Dataset Size ===
+    has_gpu_memory = any(
+        any(m > 0 for m in mdata['peak_gpu_memory_mean'])
+        for mdata in model_data.values()
+    )
+    
+    if has_gpu_memory:
+        plt.figure(figsize=(12, 7))
+        
+        for idx, (model_name, mdata) in enumerate(model_data.items()):
+            sizes = mdata['sizes']
+            means = mdata['peak_gpu_memory_mean']
+            stds = mdata['peak_gpu_memory_std']
+            
+            # 过滤掉0值
+            filtered_data = [(s, m, std) for s, m, std in zip(sizes, means, stds) if m > 0]
+            if not filtered_data:
+                continue
+            
+            sizes_filtered, means_filtered, stds_filtered = zip(*filtered_data)
+            
+            plt.errorbar(sizes_filtered, means_filtered, yerr=stds_filtered, 
+                        marker=markers[idx % len(markers)], 
+                        linewidth=2.5, markersize=10,
+                        capsize=5, capthick=2,
+                        label=model_name.upper(), 
+                        color=colors[idx],
+                        alpha=0.8)
+        
+        plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
+        plt.ylabel('Peak GPU Memory Usage (MB)', fontsize=14, fontweight='bold')
+        plt.title('Dataset Size vs Peak GPU Memory Usage', fontsize=16, fontweight='bold', pad=20)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.grid(True, alpha=0.3, linestyle='--', which='both')
+        plt.legend(fontsize=12, loc='best', framealpha=0.9)
+        plt.tight_layout()
+        
+        output_path = f'{output_dir}/peak_gpu_memory_vs_scale.png'
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Peak GPU memory plot saved: {output_path}")
+    else:
+        print("⚠️  未找到GPU内存占用数据，跳过该图表")
+    
     # === Print Statistics ===
     print("\n" + "=" * 80)
     print("📊 Dataset Scaling Analysis Statistics")
@@ -597,9 +763,21 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     
     for model_name, mdata in model_data.items():
         print(f"\n【{model_name.upper()}】")
+        
+        # 检查是否有内存数据
+        has_mem_data = (has_cpu_memory and any(m > 0 for m in mdata['peak_cpu_memory_mean'])) or \
+                       (has_gpu_memory and any(m > 0 for m in mdata['peak_gpu_memory_mean']))
+        
+        # 构建表头
         if has_time_per_graph and any(t > 0 for t in mdata['time_per_graph_ms_mean']):
-            print(f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25} {'Time/Graph (ms)':<20}")
-            print("-" * 90)
+            if has_mem_data:
+                header = f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25} {'Time/Graph (ms)':<20} {'Peak CPU (MB)':<20} {'Peak GPU (MB)':<20}"
+                print(header)
+                print("-" * 140)
+            else:
+                print(f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25} {'Time/Graph (ms)':<20}")
+                print("-" * 90)
+            
             for i, size in enumerate(mdata['sizes']):
                 total_mean = mdata['total_times_mean'][i]
                 total_std = mdata['total_times_std'][i]
@@ -607,16 +785,42 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                 avg_std = mdata['avg_times_std'][i]
                 time_per_graph_mean = mdata['time_per_graph_ms_mean'][i]
                 time_per_graph_std = mdata['time_per_graph_ms_std'][i]
-                print(f"{size:<15} {total_mean:>8.2f} ± {total_std:<9.2f}    {avg_mean:>8.4f} ± {avg_std:<9.4f}    {time_per_graph_mean:>8.3f} ± {time_per_graph_std:<7.3f}")
+                
+                line = f"{size:<15} {total_mean:>8.2f} ± {total_std:<9.2f}    {avg_mean:>8.4f} ± {avg_std:<9.4f}    {time_per_graph_mean:>8.3f} ± {time_per_graph_std:<7.3f}"
+                
+                if has_mem_data:
+                    peak_cpu_mean = mdata['peak_cpu_memory_mean'][i]
+                    peak_cpu_std = mdata['peak_cpu_memory_std'][i]
+                    peak_gpu_mean = mdata['peak_gpu_memory_mean'][i]
+                    peak_gpu_std = mdata['peak_gpu_memory_std'][i]
+                    line += f"    {peak_cpu_mean:>8.1f} ± {peak_cpu_std:<7.1f}    {peak_gpu_mean:>8.1f} ± {peak_gpu_std:<7.1f}"
+                
+                print(line)
         else:
-            print(f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25}")
-            print("-" * 70)
+            if has_mem_data:
+                header = f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25} {'Peak CPU (MB)':<20} {'Peak GPU (MB)':<20}"
+                print(header)
+                print("-" * 120)
+            else:
+                print(f"{'Dataset Size':<15} {'Total Time (s)':<25} {'Avg Time (s/epoch)':<25}")
+                print("-" * 70)
+            
             for i, size in enumerate(mdata['sizes']):
                 total_mean = mdata['total_times_mean'][i]
                 total_std = mdata['total_times_std'][i]
                 avg_mean = mdata['avg_times_mean'][i]
                 avg_std = mdata['avg_times_std'][i]
-                print(f"{size:<15} {total_mean:>8.2f} ± {total_std:<9.2f}    {avg_mean:>8.4f} ± {avg_std:<9.4f}")
+                
+                line = f"{size:<15} {total_mean:>8.2f} ± {total_std:<9.2f}    {avg_mean:>8.4f} ± {avg_std:<9.4f}"
+                
+                if has_mem_data:
+                    peak_cpu_mean = mdata['peak_cpu_memory_mean'][i]
+                    peak_cpu_std = mdata['peak_cpu_memory_std'][i]
+                    peak_gpu_mean = mdata['peak_gpu_memory_mean'][i]
+                    peak_gpu_std = mdata['peak_gpu_memory_std'][i]
+                    line += f"    {peak_cpu_mean:>8.1f} ± {peak_cpu_std:<7.1f}    {peak_gpu_mean:>8.1f} ± {peak_gpu_std:<7.1f}"
+                
+                print(line)
     
     print("=" * 80 + "\n")
 
