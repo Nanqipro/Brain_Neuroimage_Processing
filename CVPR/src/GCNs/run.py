@@ -759,7 +759,7 @@ def run_experiment(args):
                   f"Val Acc={val_metrics['accuracy']:.4f}, "
                   f"Train Time={train_time:.3f}s, Val Time={val_time:.3f}s")
         
-        # Early stopping
+        # Early stopping (已禁用，训练固定epoch数)
         if patience_counter >= args.patience:
             print(f"\nEarly stopping at epoch {epoch}")
             break
