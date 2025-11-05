@@ -16,7 +16,7 @@ DATASETS=(
     "custom:../../data/random/graphs_1000:32:300:0"                                 # GPU 0 - Random 1000图 (并行)
     "custom:../../data/random/graphs_10000:64:300:1"                                # GPU 1 - Random 10000图 (并行)
     "custom:../../data/random/graphs_100000:128:300:2"                              # GPU 2 - Random 100000图 (并行)
-    "custom:../../data/random/graphs_1000000:256:300:3"                             # GPU 3 - Random 1000000图 (并行)
+    "custom:../../data/random/graphs_1000000:128:300:3"                             # GPU 3 - Random 1000000图 (并行)
     # "ogb:ogbg-ppa:128:300:3"                                                      # GPU 3 (备用)
 )
 
