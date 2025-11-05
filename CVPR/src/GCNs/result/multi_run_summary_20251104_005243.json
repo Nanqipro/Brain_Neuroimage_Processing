@@ -1,0 +1,304 @@
+{
+    "num_runs": 20,
+    "initial_seed": 42,
+    "statistics": {
+        "accuracy": {
+            "mean": 0.49974999999999997,
+            "std": 0.029303370113350442
+        },
+        "precision": {
+            "mean": 0.5199159172613657,
+            "std": 0.06804823901751966
+        },
+        "recall": {
+            "mean": 0.49974999999999997,
+            "std": 0.029303370113350442
+        },
+        "f1": {
+            "mean": 0.4525940583162072,
+            "std": 0.049913268975141034
+        },
+        "actual_epochs": {
+            "mean": 128.3,
+            "std": 24.36616506551657
+        },
+        "total_training_time": {
+            "mean": 50.41190203428268,
+            "std": 9.81799703743636
+        },
+        "avg_training_time_per_epoch": {
+            "mean": 0.3929235929631483,
+            "std": 0.017188967071752416
+        },
+        "avg_epoch_time": {
+            "mean": 0.3928990788899442,
+            "std": 0.017187915477669458
+        },
+        "total_elapsed_time": {
+            "mean": 50.99898490905762,
+            "std": 9.835839446723075
+        }
+    },
+    "all_results": [
+        {
+            "run": 1,
+            "seed": 42,
+            "test_accuracy": 0.47,
+            "test_precision": 0.46493688639551195,
+            "test_recall": 0.47,
+            "test_f1": 0.4501504305425874,
+            "actual_epochs": 131,
+            "total_training_time": 49.79174280166626,
+            "avg_training_time": 0.380089639707376,
+            "avg_epoch_time": 0.38006594708857644,
+            "total_elapsed_time": 50.63949108123779
+        },
+        {
+            "run": 2,
+            "seed": 43,
+            "test_accuracy": 0.52,
+            "test_precision": 0.576804915514593,
+            "test_recall": 0.52,
+            "test_f1": 0.4111152005888848,
+            "actual_epochs": 106,
+            "total_training_time": 42.953705072402954,
+            "avg_training_time": 0.4052236327585184,
+            "avg_epoch_time": 0.4051986595369735,
+            "total_elapsed_time": 43.54731583595276
+        },
+        {
+            "run": 3,
+            "seed": 44,
+            "test_accuracy": 0.465,
+            "test_precision": 0.4539413080668509,
+            "test_recall": 0.465,
+            "test_f1": 0.43083592648740654,
+            "actual_epochs": 124,
+            "total_training_time": 46.03385591506958,
+            "avg_training_time": 0.37124077350862567,
+            "avg_epoch_time": 0.3712174546334051,
+            "total_elapsed_time": 46.581557750701904
+        },
+        {
+            "run": 4,
+            "seed": 45,
+            "test_accuracy": 0.525,
+            "test_precision": 0.5251231032057079,
+            "test_recall": 0.525,
+            "test_f1": 0.5244174113288779,
+            "actual_epochs": 115,
+            "total_training_time": 45.17575526237488,
+            "avg_training_time": 0.3928326544554337,
+            "avg_epoch_time": 0.392807384159254,
+            "total_elapsed_time": 45.73866152763367
+        },
+        {
+            "run": 5,
+            "seed": 46,
+            "test_accuracy": 0.475,
+            "test_precision": 0.47303419264372776,
+            "test_recall": 0.475,
+            "test_f1": 0.46525425886786687,
+            "actual_epochs": 106,
+            "total_training_time": 39.09969425201416,
+            "avg_training_time": 0.36886504011334115,
+            "avg_epoch_time": 0.368841234243141,
+            "total_elapsed_time": 39.663997650146484
+        },
+        {
+            "run": 6,
+            "seed": 47,
+            "test_accuracy": 0.505,
+            "test_precision": 0.7512562814070352,
+            "test_recall": 0.505,
+            "test_f1": 0.34434915063412697,
+            "actual_epochs": 145,
+            "total_training_time": 56.32081580162048,
+            "avg_training_time": 0.3884194193215206,
+            "avg_epoch_time": 0.38839467476154194,
+            "total_elapsed_time": 56.82947039604187
+        },
+        {
+            "run": 7,
+            "seed": 48,
+            "test_accuracy": 0.495,
+            "test_precision": 0.48669859005054533,
+            "test_recall": 0.495,
+            "test_f1": 0.4016410438697829,
+            "actual_epochs": 195,
+            "total_training_time": 73.06964921951294,
+            "avg_training_time": 0.3747161498436561,
+            "avg_epoch_time": 0.3746921624892797,
+            "total_elapsed_time": 73.71712613105774
+        },
+        {
+            "run": 8,
+            "seed": 49,
+            "test_accuracy": 0.46,
+            "test_precision": 0.45993589743589736,
+            "test_recall": 0.46,
+            "test_f1": 0.45978391356542614,
+            "actual_epochs": 119,
+            "total_training_time": 47.90198063850403,
+            "avg_training_time": 0.4025376524244036,
+            "avg_epoch_time": 0.40251062697723133,
+            "total_elapsed_time": 48.535483837127686
+        },
+        {
+            "run": 9,
+            "seed": 50,
+            "test_accuracy": 0.505,
+            "test_precision": 0.5067576699553995,
+            "test_recall": 0.505,
+            "test_f1": 0.47057407952084285,
+            "actual_epochs": 131,
+            "total_training_time": 48.71052289009094,
+            "avg_training_time": 0.3718360525961141,
+            "avg_epoch_time": 0.37181387056831183,
+            "total_elapsed_time": 49.22225260734558
+        },
+        {
+            "run": 10,
+            "seed": 51,
+            "test_accuracy": 0.54,
+            "test_precision": 0.5649772579597141,
+            "test_recall": 0.54,
+            "test_f1": 0.49109414758269715,
+            "actual_epochs": 115,
+            "total_training_time": 47.082040548324585,
+            "avg_training_time": 0.40940904824630076,
+            "avg_epoch_time": 0.40938331562539804,
+            "total_elapsed_time": 47.66597604751587
+        },
+        {
+            "run": 11,
+            "seed": 52,
+            "test_accuracy": 0.5,
+            "test_precision": 0.5,
+            "test_recall": 0.5,
+            "test_f1": 0.45408887433125883,
+            "actual_epochs": 135,
+            "total_training_time": 57.04247713088989,
+            "avg_training_time": 0.42253686763622145,
+            "avg_epoch_time": 0.42251189373157644,
+            "total_elapsed_time": 57.75136971473694
+        },
+        {
+            "run": 12,
+            "seed": 53,
+            "test_accuracy": 0.565,
+            "test_precision": 0.5701110991263079,
+            "test_recall": 0.565,
+            "test_f1": 0.5569249573476611,
+            "actual_epochs": 183,
+            "total_training_time": 76.31662487983704,
+            "avg_training_time": 0.4170307370482898,
+            "avg_epoch_time": 0.41700394687756814,
+            "total_elapsed_time": 76.86350274085999
+        },
+        {
+            "run": 13,
+            "seed": 54,
+            "test_accuracy": 0.475,
+            "test_precision": 0.4747958463554794,
+            "test_recall": 0.475,
+            "test_f1": 0.4739347178035521,
+            "actual_epochs": 107,
+            "total_training_time": 43.40526008605957,
+            "avg_training_time": 0.4056566363183137,
+            "avg_epoch_time": 0.40563087374250467,
+            "total_elapsed_time": 43.96079230308533
+        },
+        {
+            "run": 14,
+            "seed": 55,
+            "test_accuracy": 0.505,
+            "test_precision": 0.5370096225018505,
+            "test_recall": 0.505,
+            "test_f1": 0.36844119804790915,
+            "actual_epochs": 107,
+            "total_training_time": 43.37285041809082,
+            "avg_training_time": 0.40535374222514786,
+            "avg_epoch_time": 0.4053295460816856,
+            "total_elapsed_time": 43.93036484718323
+        },
+        {
+            "run": 15,
+            "seed": 56,
+            "test_accuracy": 0.52,
+            "test_precision": 0.5679347826086957,
+            "test_recall": 0.52,
+            "test_f1": 0.4171928120446819,
+            "actual_epochs": 136,
+            "total_training_time": 56.27814960479736,
+            "avg_training_time": 0.4138099235646865,
+            "avg_epoch_time": 0.4137844250482671,
+            "total_elapsed_time": 56.903939723968506
+        },
+        {
+            "run": 16,
+            "seed": 57,
+            "test_accuracy": 0.52,
+            "test_precision": 0.5229779411764706,
+            "test_recall": 0.52,
+            "test_f1": 0.5039272426622571,
+            "actual_epochs": 146,
+            "total_training_time": 56.88097357749939,
+            "avg_training_time": 0.38959570943492733,
+            "avg_epoch_time": 0.38957140543689467,
+            "total_elapsed_time": 57.47173881530762
+        },
+        {
+            "run": 17,
+            "seed": 58,
+            "test_accuracy": 0.485,
+            "test_precision": 0.4829059829059829,
+            "test_recall": 0.485,
+            "test_f1": 0.4687298517085751,
+            "actual_epochs": 104,
+            "total_training_time": 38.018765926361084,
+            "avg_training_time": 0.3655650569842412,
+            "avg_epoch_time": 0.3655429665858929,
+            "total_elapsed_time": 38.530768156051636
+        },
+        {
+            "run": 18,
+            "seed": 59,
+            "test_accuracy": 0.44,
+            "test_precision": 0.4255952380952381,
+            "test_recall": 0.44,
+            "test_f1": 0.41151744430432957,
+            "actual_epochs": 111,
+            "total_training_time": 44.76798105239868,
+            "avg_training_time": 0.4033151446162043,
+            "avg_epoch_time": 0.4032904135214316,
+            "total_elapsed_time": 45.28688049316406
+        },
+        {
+            "run": 19,
+            "seed": 60,
+            "test_accuracy": 0.5,
+            "test_precision": 0.5,
+            "test_recall": 0.5,
+            "test_f1": 0.4959169271095877,
+            "actual_epochs": 140,
+            "total_training_time": 52.57941722869873,
+            "avg_training_time": 0.37556726591927664,
+            "avg_epoch_time": 0.375544502053942,
+            "total_elapsed_time": 53.17301368713379
+        },
+        {
+            "run": 20,
+            "seed": 61,
+            "test_accuracy": 0.525,
+            "test_precision": 0.5535217298223079,
+            "test_recall": 0.525,
+            "test_f1": 0.4519915779758299,
+            "actual_epochs": 110,
+            "total_training_time": 43.43577837944031,
+            "avg_training_time": 0.39487071254036643,
+            "avg_epoch_time": 0.3948462746360085,
+            "total_elapsed_time": 43.9659948348999
+        }
+    ]
+}

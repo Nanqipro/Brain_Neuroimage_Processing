@@ -1,0 +1,252 @@
+{
+    "num_runs": 8,
+    "initial_seed": 42,
+    "statistics": {
+        "accuracy": {
+            "mean": 0.50125,
+            "std": 0.0033071891388307415
+        },
+        "precision": {
+            "mean": 0.2842092803030303,
+            "std": 0.0905092482123185
+        },
+        "recall": {
+            "mean": 0.50125,
+            "std": 0.0033071891388307415
+        },
+        "f1": {
+            "mean": 0.3450794763908368,
+            "std": 0.03107737339434217
+        },
+        "actual_epochs": {
+            "mean": 27.75,
+            "std": 7.361215932167728
+        },
+        "total_training_time": {
+            "mean": 8.913383215665817,
+            "std": 2.4897910729374764
+        },
+        "avg_training_time_per_epoch": {
+            "mean": 0.3199957343652435,
+            "std": 0.013797945525609758
+        },
+        "time_per_graph": {
+            "mean": 0.014855638692776361,
+            "std": 0.004149651788229128
+        },
+        "time_per_graph_ms": {
+            "mean": 14.855638692776363,
+            "std": 4.149651788229127
+        },
+        "time_per_graph_per_epoch": {
+            "mean": 0.0005333262239420724,
+            "std": 2.2996575876016274e-05
+        },
+        "time_per_graph_per_epoch_ms": {
+            "mean": 0.5333262239420725,
+            "std": 0.022996575876016275
+        },
+        "avg_epoch_time": {
+            "mean": 0.385457405448695,
+            "std": 0.019159292625819058
+        },
+        "total_elapsed_time": {
+            "mean": 11.35176494717598,
+            "std": 3.02144351225595
+        },
+        "peak_cpu_memory_mb": {
+            "mean": 1306.1328125,
+            "std": 38.61120615946706
+        },
+        "peak_gpu_memory_mb": {
+            "mean": 117.62744140625,
+            "std": 0.0
+        },
+        "avg_cpu_memory_mb": {
+            "mean": 1306.0783777087738,
+            "std": 38.676045349343205
+        },
+        "avg_gpu_memory_mb": {
+            "mean": 19.076171875,
+            "std": 0.0
+        }
+    },
+    "all_results": [
+        {
+            "run": 1,
+            "seed": 42,
+            "test_accuracy": 0.5,
+            "test_precision": 0.25,
+            "test_recall": 0.5,
+            "test_f1": 0.33333333333333326,
+            "actual_epochs": 25,
+            "total_training_time": 8.230435609817505,
+            "avg_training_time": 0.3292174243927002,
+            "time_per_graph": 0.013717392683029175,
+            "time_per_graph_ms": 13.717392683029175,
+            "time_per_graph_per_epoch": 0.000548695707321167,
+            "time_per_graph_per_epoch_ms": 0.548695707321167,
+            "num_train_graphs": 600,
+            "avg_epoch_time": 0.39356099128723143,
+            "total_elapsed_time": 10.645583629608154,
+            "peak_cpu_memory_mb": 1240.0703125,
+            "peak_gpu_memory_mb": 117.62744140625,
+            "avg_cpu_memory_mb": 1239.8578125,
+            "avg_gpu_memory_mb": 19.076171875
+        },
+        {
+            "run": 2,
+            "seed": 43,
+            "test_accuracy": 0.5,
+            "test_precision": 0.25,
+            "test_recall": 0.5,
+            "test_f1": 0.33333333333333326,
+            "actual_epochs": 22,
+            "total_training_time": 6.767396688461304,
+            "avg_training_time": 0.30760894038460473,
+            "time_per_graph": 0.01127899448076884,
+            "time_per_graph_ms": 11.27899448076884,
+            "time_per_graph_per_epoch": 0.0005126815673076745,
+            "time_per_graph_per_epoch_ms": 0.5126815673076746,
+            "num_train_graphs": 600,
+            "avg_epoch_time": 0.3714882893995805,
+            "total_elapsed_time": 8.719416618347168,
+            "peak_cpu_memory_mb": 1268.84375,
+            "peak_gpu_memory_mb": 117.62744140625,
+            "avg_cpu_memory_mb": 1268.7727272727273,
+            "avg_gpu_memory_mb": 19.076171875
+        },
+        {
+            "run": 3,
+            "seed": 44,
+            "test_accuracy": 0.5,
+            "test_precision": 0.25,
+            "test_recall": 0.5,
+            "test_f1": 0.33333333333333326,
+            "actual_epochs": 43,
+            "total_training_time": 13.537667751312256,
+            "avg_training_time": 0.3148294825886571,
+            "time_per_graph": 0.022562779585520425,
+            "time_per_graph_ms": 22.562779585520424,
+            "time_per_graph_per_epoch": 0.0005247158043144286,
+            "time_per_graph_per_epoch_ms": 0.5247158043144285,
+            "num_train_graphs": 600,
+            "avg_epoch_time": 0.3782898603483688,
+            "total_elapsed_time": 16.829354524612427,
+            "peak_cpu_memory_mb": 1272.1953125,
+            "peak_gpu_memory_mb": 117.62744140625,
+            "avg_cpu_memory_mb": 1272.0717659883721,
+            "avg_gpu_memory_mb": 19.076171875
+        },
+        {
+            "run": 4,
+            "seed": 45,
+            "test_accuracy": 0.51,
+            "test_precision": 0.5236742424242424,
+            "test_recall": 0.51,
+            "test_f1": 0.4273024777933614,
+            "actual_epochs": 33,
+            "total_training_time": 10.512124061584473,
+            "avg_training_time": 0.31854921398740826,
+            "time_per_graph": 0.017520206769307455,
+            "time_per_graph_ms": 17.520206769307453,
+            "time_per_graph_per_epoch": 0.0005309153566456804,
+            "time_per_graph_per_epoch_ms": 0.5309153566456805,
+            "num_train_graphs": 600,
+            "avg_epoch_time": 0.38220644719672925,
+            "total_elapsed_time": 13.166324615478516,
+            "peak_cpu_memory_mb": 1336.2578125,
+            "peak_gpu_memory_mb": 117.62744140625,
+            "avg_cpu_memory_mb": 1336.229403409091,
+            "avg_gpu_memory_mb": 19.076171875
+        },
+        {
+            "run": 5,
+            "seed": 46,
+            "test_accuracy": 0.5,
+            "test_precision": 0.25,
+            "test_recall": 0.5,
+            "test_f1": 0.33333333333333326,
+            "actual_epochs": 33,
+            "total_training_time": 11.640429019927979,
+            "avg_training_time": 0.3527402733311509,
+            "time_per_graph": 0.0194007150332133,
+            "time_per_graph_ms": 19.4007150332133,
+            "time_per_graph_per_epoch": 0.0005879004555519182,
+            "time_per_graph_per_epoch_ms": 0.5879004555519182,
+            "num_train_graphs": 600,
+            "avg_epoch_time": 0.433124354391387,
+            "total_elapsed_time": 14.873274803161621,
+            "peak_cpu_memory_mb": 1317.94921875,
+            "peak_gpu_memory_mb": 117.62744140625,
+            "avg_cpu_memory_mb": 1317.94921875,
+            "avg_gpu_memory_mb": 19.076171875
+        },
+        {
+            "run": 6,
+            "seed": 47,
+            "test_accuracy": 0.5,
+            "test_precision": 0.25,
+            "test_recall": 0.5,
+            "test_f1": 0.33333333333333326,
+            "actual_epochs": 21,
+            "total_training_time": 6.574036121368408,
+            "avg_training_time": 0.3130493391127813,
+            "time_per_graph": 0.010956726868947346,
+            "time_per_graph_ms": 10.956726868947346,
+            "time_per_graph_per_epoch": 0.0005217488985213022,
+            "time_per_graph_per_epoch_ms": 0.5217488985213022,
+            "num_train_graphs": 600,
+            "avg_epoch_time": 0.37592678978329613,
+            "total_elapsed_time": 8.406598091125488,
+            "peak_cpu_memory_mb": 1350.44921875,
+            "peak_gpu_memory_mb": 117.62744140625,
+            "avg_cpu_memory_mb": 1350.44921875,
+            "avg_gpu_memory_mb": 19.076171875
+        },
+        {
+            "run": 7,
+            "seed": 48,
+            "test_accuracy": 0.5,
+            "test_precision": 0.25,
+            "test_recall": 0.5,
+            "test_f1": 0.33333333333333326,
+            "actual_epochs": 21,
+            "total_training_time": 6.51232647895813,
+            "avg_training_time": 0.3101107847122919,
+            "time_per_graph": 0.010853877464930217,
+            "time_per_graph_ms": 10.853877464930218,
+            "time_per_graph_per_epoch": 0.0005168513078538198,
+            "time_per_graph_per_epoch_ms": 0.5168513078538198,
+            "num_train_graphs": 600,
+            "avg_epoch_time": 0.37206659998212543,
+            "total_elapsed_time": 8.38925838470459,
+            "peak_cpu_memory_mb": 1350.44921875,
+            "peak_gpu_memory_mb": 117.62744140625,
+            "avg_cpu_memory_mb": 1350.44921875,
+            "avg_gpu_memory_mb": 19.076171875
+        },
+        {
+            "run": 8,
+            "seed": 49,
+            "test_accuracy": 0.5,
+            "test_precision": 0.25,
+            "test_recall": 0.5,
+            "test_f1": 0.33333333333333326,
+            "actual_epochs": 24,
+            "total_training_time": 7.532649993896484,
+            "avg_training_time": 0.3138604164123535,
+            "time_per_graph": 0.01255441665649414,
+            "time_per_graph_ms": 12.55441665649414,
+            "time_per_graph_per_epoch": 0.0005231006940205892,
+            "time_per_graph_per_epoch_ms": 0.5231006940205892,
+            "num_train_graphs": 600,
+            "avg_epoch_time": 0.37699591120084125,
+            "total_elapsed_time": 9.784308910369873,
+            "peak_cpu_memory_mb": 1312.84765625,
+            "peak_gpu_memory_mb": 117.62744140625,
+            "avg_cpu_memory_mb": 1312.84765625,
+            "avg_gpu_memory_mb": 19.076171875
+        }
+    ]
+}
