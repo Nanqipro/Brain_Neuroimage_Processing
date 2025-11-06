@@ -14,8 +14,8 @@ DATASETS=(
     # "tudataset:MUTAG:32:300:0"                                                      # GPU 0
     # "ogb:ogbg-molhiv:32:300:1"                                                      # GPU 1
     # "tudataset:PROTEINS:32:300:2"                                                   # GPU 2
-    "custom:../../data/random/graphs_100:32:300:0"                                  # GPU 0 - Random 100图 (并行)
-    "custom:../../data/random/graphs_1000:32:300:0"                                 # GPU 1 - Random 1000图 (并行)
+    "custom:../../data/random/graphs_100:32:300:1"                                  # GPU 0 - Random 100图 (并行)
+    "custom:../../data/random/graphs_1000:32:300:1"                                 # GPU 1 - Random 1000图 (并行)
     "custom:../../data/random/graphs_10000:32:300:1"                                # GPU 2 - Random 10000图 (并行)
     "custom:../../data/random/graphs_100000:32:300:2"                              # GPU 3 - Random 100000图 (并行)
     "custom:../../data/random/graphs_1000000:32:300:3"                             # GPU 3 - Random 1000000图 (顺序执行)
