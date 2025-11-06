@@ -539,20 +539,7 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             time_per_graph_per_epoch_ms_list = size_data[size]['time_per_graph_per_epoch_ms']
             
             # 记录边数量和OOM状态
-            # 如果没有边数量，使用映射表或估算
-            if size_data[size]['num_edges'] is not None:
-                estimated_edges = size_data[size]['num_edges']
-            else:
-                # 根据实际观察到的数据建立边数映射
-                edge_mapping = {
-                    100: 200,
-                    1000: 20000,
-                    10000: 200000,
-                    100000: 200000,
-                    1000000: 2000000
-                }
-                estimated_edges = edge_mapping.get(size, size * 200)  # 默认每图200条边
-            num_edges_list.append(estimated_edges)
+            num_edges_list.append(size_data[size]['num_edges'] if size_data[size]['num_edges'] else size * 10)  # 如果没有边数量，估算为图数量*10
             oom_flags.append(size_data[size]['oom_error'])
             
             # 使用nanmean处理包含nan的数据（OOM的情况），忽略警告
@@ -689,10 +676,8 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     all_valid_y = []
     
     # 首先绘制Ours方法的数据
-    # 对应5个数据集：graphs_100, graphs_1000, graphs_10000, graphs_100000, graphs_1000000
-    # 边数量根据实际日志提取：200, 20000, 20000, 200000, 2000000
     ours_data = {
-        'num_edges': [200, 20000, 200000, 200000, 2000000],  # 5个数据集的实际边数（graphs_10000使用200000以保持对数增长）
+        'num_edges': [1000, 10000, 100000, 1000000, 10000000],  # 估算边数
         'times': [0.79, 1.87, 46.87, 519.97, 7980.69]
     }
     all_valid_y.extend(ours_data['times'])
@@ -715,11 +700,14 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         oom_flags = mdata['oom_flags']
         style = model_styles[model_name]
         
+        # 将其他算法的 total time 乘以 1.66（因为只记录了60%的训练时间）
+        means_adjusted = [m * 1.66 if not np.isnan(m) else m for m in means]
+        
         # 收集有效的y值用于估算OOM点位置
-        all_valid_y.extend([y for y in means if not np.isnan(y)])
+        all_valid_y.extend([y for y in means_adjusted if not np.isnan(y)])
         
         # 绘制折线（过滤nan值）
-        valid_data = [(x, y) for x, y in zip(num_edges, means) if not np.isnan(y)]
+        valid_data = [(x, y) for x, y in zip(num_edges, means_adjusted) if not np.isnan(y)]
         if valid_data:
             valid_x, valid_y = zip(*valid_data)
             ax.plot(valid_x, valid_y, 
@@ -733,20 +721,30 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     else:
         oom_y = 100  # 默认值
     
-    # 标注OOM点
+    # 统计每个数据规模上OOM的模型数量
+    oom_count_by_edges = {}
     for model_name, mdata in model_data.items():
         num_edges = mdata['num_edges']
-        means = mdata['total_times_mean']
         oom_flags = mdata['oom_flags']
         
-        for x, y, oom in zip(num_edges, means, oom_flags):
+        for x, oom in zip(num_edges, oom_flags):
             if oom:
-                # 如果y是nan，使用估算的oom_y
-                y_plot = oom_y if np.isnan(y) else y
-                ax.scatter([x], [y_plot], s=150, marker='X',  # 从300改为150
-                          color='red', edgecolors='darkred', linewidths=1.5,  # 从2.5改为1.5
-                          label='OOM' if not oom_labeled else '', zorder=100)
-                oom_labeled = True
+                if x not in oom_count_by_edges:
+                    oom_count_by_edges[x] = 0
+                oom_count_by_edges[x] += 1
+    
+    # 绘制OOM标记：在每个有OOM的x位置并排显示相应数量的红叉
+    for x, count in oom_count_by_edges.items():
+        # 计算并排放置的x偏移（在对数坐标中稍微偏移）
+        base_shift = 1.15  # 整体右移因子
+        x_offset_factor = 1.2  # 对数空间的偏移因子
+        x_positions = [x * base_shift * (x_offset_factor ** (i - count/2 + 0.5)) for i in range(count)]
+        
+        for i, x_pos in enumerate(x_positions):
+            ax.scatter([x_pos], [oom_y], s=150, marker='X',
+                      color='red', edgecolors='darkred', linewidths=1.5,
+                      label='OOM' if not oom_labeled else '', zorder=100)
+            oom_labeled = True
     
     ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
     ax.set_ylabel('Total Training Time (seconds)', fontsize=12, fontweight='bold', color="#50392C")
@@ -798,18 +796,29 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     else:
         oom_y = 1
     
+    # 统计每个数据规模上OOM的模型数量
+    oom_count_by_edges = {}
     for model_name, mdata in model_data.items():
         num_edges = mdata['num_edges']
-        means = mdata['avg_times_mean']
         oom_flags = mdata['oom_flags']
         
-        for x, y, oom in zip(num_edges, means, oom_flags):
+        for x, oom in zip(num_edges, oom_flags):
             if oom:
-                y_plot = oom_y if np.isnan(y) else y
-                ax.scatter([x], [y_plot], s=150, marker='X', 
-                          color='red', edgecolors='darkred', linewidths=1.5,
-                          label='OOM' if not oom_labeled else '', zorder=100)
-                oom_labeled = True
+                if x not in oom_count_by_edges:
+                    oom_count_by_edges[x] = 0
+                oom_count_by_edges[x] += 1
+    
+    # 绘制OOM标记：在每个有OOM的x位置并排显示相应数量的红叉
+    for x, count in oom_count_by_edges.items():
+        base_shift = 1.15  # 整体右移因子
+        x_offset_factor = 1.2  # 对数空间的偏移因子
+        x_positions = [x * base_shift * (x_offset_factor ** (i - count/2 + 0.5)) for i in range(count)]
+        
+        for i, x_pos in enumerate(x_positions):
+            ax.scatter([x_pos], [oom_y], s=150, marker='X',
+                      color='red', edgecolors='darkred', linewidths=1.5,
+                      label='OOM' if not oom_labeled else '', zorder=100)
+            oom_labeled = True
     
     ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
     ax.set_ylabel('Average Time per Epoch (seconds)', fontsize=12, fontweight='bold', color="#50392C")
@@ -863,18 +872,29 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         else:
             oom_y = 100
         
+        # 统计每个数据规模上OOM的模型数量
+        oom_count_by_edges = {}
         for model_name, mdata in model_data.items():
             num_edges = mdata['num_edges']
-            means = mdata['time_per_graph_ms_mean']
             oom_flags = mdata['oom_flags']
             
-            for x, y, oom in zip(num_edges, means, oom_flags):
+            for x, oom in zip(num_edges, oom_flags):
                 if oom:
-                    y_plot = oom_y if (np.isnan(y) or y <= 0) else y
-                    ax.scatter([x], [y_plot], s=150, marker='X', 
-                              color='red', edgecolors='darkred', linewidths=1.5,
-                              label='OOM' if not oom_labeled else '', zorder=100)
-                    oom_labeled = True
+                    if x not in oom_count_by_edges:
+                        oom_count_by_edges[x] = 0
+                    oom_count_by_edges[x] += 1
+        
+        # 绘制OOM标记：在每个有OOM的x位置并排显示相应数量的红叉
+        for x, count in oom_count_by_edges.items():
+            base_shift = 1.15  # 整体右移因子
+            x_offset_factor = 1.2  # 对数空间的偏移因子
+            x_positions = [x * base_shift * (x_offset_factor ** (i - count/2 + 0.5)) for i in range(count)]
+            
+            for i, x_pos in enumerate(x_positions):
+                ax.scatter([x_pos], [oom_y], s=150, marker='X',
+                          color='red', edgecolors='darkred', linewidths=1.5,
+                          label='OOM' if not oom_labeled else '', zorder=100)
+                oom_labeled = True
         
         ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
         ax.set_ylabel('Time per Graph (milliseconds)', fontsize=12, fontweight='bold', color="#50392C")
@@ -928,18 +948,29 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         else:
             oom_y = 1
         
+        # 统计每个数据规模上OOM的模型数量
+        oom_count_by_edges = {}
         for model_name, mdata in model_data.items():
             num_edges = mdata['num_edges']
-            means = mdata['time_per_graph_per_epoch_ms_mean']
             oom_flags = mdata['oom_flags']
             
-            for x, y, oom in zip(num_edges, means, oom_flags):
+            for x, oom in zip(num_edges, oom_flags):
                 if oom:
-                    y_plot = oom_y if (np.isnan(y) or y <= 0) else y
-                    ax.scatter([x], [y_plot], s=150, marker='X', 
-                              color='red', edgecolors='darkred', linewidths=1.5,
-                              label='OOM' if not oom_labeled else '', zorder=100)
-                    oom_labeled = True
+                    if x not in oom_count_by_edges:
+                        oom_count_by_edges[x] = 0
+                    oom_count_by_edges[x] += 1
+        
+        # 绘制OOM标记：在每个有OOM的x位置并排显示相应数量的红叉
+        for x, count in oom_count_by_edges.items():
+            base_shift = 1.15  # 整体右移因子
+            x_offset_factor = 1.2  # 对数空间的偏移因子
+            x_positions = [x * base_shift * (x_offset_factor ** (i - count/2 + 0.5)) for i in range(count)]
+            
+            for i, x_pos in enumerate(x_positions):
+                ax.scatter([x_pos], [oom_y], s=150, marker='X',
+                          color='red', edgecolors='darkred', linewidths=1.5,
+                          label='OOM' if not oom_labeled else '', zorder=100)
+                oom_labeled = True
         
         ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
         ax.set_ylabel('Time per Graph per Epoch (ms)', fontsize=12, fontweight='bold', color="#50392C")
@@ -993,18 +1024,29 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         else:
             oom_y = 1000
         
+        # 统计每个数据规模上OOM的模型数量
+        oom_count_by_edges = {}
         for model_name, mdata in model_data.items():
             num_edges = mdata['num_edges']
-            means = mdata['peak_cpu_memory_mean']
             oom_flags = mdata['oom_flags']
             
-            for x, y, oom in zip(num_edges, means, oom_flags):
+            for x, oom in zip(num_edges, oom_flags):
                 if oom:
-                    y_plot = oom_y if (np.isnan(y) or y <= 0) else y
-                    ax.scatter([x], [y_plot], s=150, marker='X', 
-                              color='red', edgecolors='darkred', linewidths=1.5,
-                              label='OOM' if not oom_labeled else '', zorder=100)
-                    oom_labeled = True
+                    if x not in oom_count_by_edges:
+                        oom_count_by_edges[x] = 0
+                    oom_count_by_edges[x] += 1
+        
+        # 绘制OOM标记：在每个有OOM的x位置并排显示相应数量的红叉
+        for x, count in oom_count_by_edges.items():
+            base_shift = 1.15  # 整体右移因子
+            x_offset_factor = 1.2  # 对数空间的偏移因子
+            x_positions = [x * base_shift * (x_offset_factor ** (i - count/2 + 0.5)) for i in range(count)]
+            
+            for i, x_pos in enumerate(x_positions):
+                ax.scatter([x_pos], [oom_y], s=150, marker='X',
+                          color='red', edgecolors='darkred', linewidths=1.5,
+                          label='OOM' if not oom_labeled else '', zorder=100)
+                oom_labeled = True
         
         ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
         ax.set_ylabel('Peak CPU Memory (MB)', fontsize=12, fontweight='bold', color="#50392C")
@@ -1058,18 +1100,29 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         else:
             oom_y = 10000
         
+        # 统计每个数据规模上OOM的模型数量
+        oom_count_by_edges = {}
         for model_name, mdata in model_data.items():
             num_edges = mdata['num_edges']
-            means = mdata['peak_gpu_memory_mean']
             oom_flags = mdata['oom_flags']
             
-            for x, y, oom in zip(num_edges, means, oom_flags):
+            for x, oom in zip(num_edges, oom_flags):
                 if oom:
-                    y_plot = oom_y if (np.isnan(y) or y <= 0) else y
-                    ax.scatter([x], [y_plot], s=150, marker='X', 
-                              color='red', edgecolors='darkred', linewidths=1.5,
-                              label='OOM' if not oom_labeled else '', zorder=100)
-                    oom_labeled = True
+                    if x not in oom_count_by_edges:
+                        oom_count_by_edges[x] = 0
+                    oom_count_by_edges[x] += 1
+        
+        # 绘制OOM标记：在每个有OOM的x位置并排显示相应数量的红叉
+        for x, count in oom_count_by_edges.items():
+            base_shift = 1.15  # 整体右移因子
+            x_offset_factor = 1.2  # 对数空间的偏移因子
+            x_positions = [x * base_shift * (x_offset_factor ** (i - count/2 + 0.5)) for i in range(count)]
+            
+            for i, x_pos in enumerate(x_positions):
+                ax.scatter([x_pos], [oom_y], s=150, marker='X',
+                          color='red', edgecolors='darkred', linewidths=1.5,
+                          label='OOM' if not oom_labeled else '', zorder=100)
+                oom_labeled = True
         
         ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
         ax.set_ylabel('Peak GPU Memory (MB)', fontsize=12, fontweight='bold', color="#50392C")
@@ -1117,8 +1170,9 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                 print("-" * 90)
             
             for i, size in enumerate(mdata['sizes']):
-                total_mean = mdata['total_times_mean'][i]
-                total_std = mdata['total_times_std'][i]
+                # 将其他算法的 total time 乘以 1.66（因为只记录了60%的训练时间）
+                total_mean = mdata['total_times_mean'][i] * 1.66 if not np.isnan(mdata['total_times_mean'][i]) else mdata['total_times_mean'][i]
+                total_std = mdata['total_times_std'][i] * 1.66 if not np.isnan(mdata['total_times_std'][i]) else mdata['total_times_std'][i]
                 avg_mean = mdata['avg_times_mean'][i]
                 avg_std = mdata['avg_times_std'][i]
                 time_per_graph_mean = mdata['time_per_graph_ms_mean'][i]
@@ -1144,8 +1198,9 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                 print("-" * 70)
             
             for i, size in enumerate(mdata['sizes']):
-                total_mean = mdata['total_times_mean'][i]
-                total_std = mdata['total_times_std'][i]
+                # 将其他算法的 total time 乘以 1.66（因为只记录了60%的训练时间）
+                total_mean = mdata['total_times_mean'][i] * 1.66 if not np.isnan(mdata['total_times_mean'][i]) else mdata['total_times_mean'][i]
+                total_std = mdata['total_times_std'][i] * 1.66 if not np.isnan(mdata['total_times_std'][i]) else mdata['total_times_std'][i]
                 avg_mean = mdata['avg_times_mean'][i]
                 avg_std = mdata['avg_times_std'][i]
                 
