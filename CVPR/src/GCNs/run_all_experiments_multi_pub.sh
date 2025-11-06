@@ -5,13 +5,13 @@
 # 并行执行：5个数据集在4个GPU上运行
 
 # 定义所有模型
-MODELS=("gcn" "gat" "sage" "hybrid" "gin" "chebnet" "edgeconv" "gunet" "pna" "gatv2" "deepergcn")
-
+MODELS=("gcn" "gat" "sage" "gin" "chebnet" "edgeconv"  "pna" "gatv2" "deepergcn")
+# "gunet"  "hybrid" 
 # 定义数据集配置
 # 格式: "data_source:dataset:batch_size:epochs:gpu_id"
 DATASETS=(
     # "tudataset:MUTAG:32:300:0"                                                      # GPU 0
-    "ogb:ogbg-molhiv:128:300:1"                                                     # GPU 1
+    # "ogb:ogbg-molhiv:128:300:1"                                                     # GPU 1
     # "tudataset:PROTEINS:32:300:0"                                                   # GPU 2
     # "custom:../../data/random/graphs_100:32:300:0"                                  # GPU 0 - Random 100图 (并行)
     # "custom:../../data/random/graphs_1000:32:300:0"                                 # GPU 1 - Random 1000图 (并行)

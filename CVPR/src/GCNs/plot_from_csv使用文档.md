@@ -571,3 +571,4 @@ python plot_from_csv.py \
 
 **祝使用愉快！** 🎉
 
+python plot_from_csv.py --scaling --result_dir result --output_dir scaling_plots --exclude_models hybrid gunet
