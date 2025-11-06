@@ -669,14 +669,14 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         }
     
     # === Figure 1: Total Training Time vs Number of Edges ===
-    fig, ax = plt.subplots(figsize=(5, 8))
+    fig, ax = plt.subplots(figsize=(8, 8))
     
     oom_labeled = False
     
     # 首先绘制Ours方法的数据
     ours_data = {
         'num_edges': [1000, 10000, 100000, 1000000, 10000000],  # 估算边数
-        'times': [0.79, 1.87, 46.87, 519.97, 7980.69]
+        'times': [0.79, 1.87, 46.87, 319.97, 4244.29]
     }
     ax.plot(ours_data['num_edges'], ours_data['times'],
             label='OURS',
@@ -731,9 +731,9 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                   label='OOM' if not oom_labeled else '', zorder=100)
         oom_labeled = True
     
-    ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
-    ax.set_ylabel('Total Training Time (seconds)', fontsize=12, fontweight='bold', color="#50392C")
-    ax.set_title('Number of Edges vs Total Training Time', fontsize=14, fontweight='bold', pad=12)
+    ax.set_xlabel('Number of Edges', fontsize=20, fontweight='bold', color="#50392C")
+    ax.set_ylabel('Total Training Time (seconds)', fontsize=20, fontweight='bold', color="#50392C")
+    ax.set_title('Number of Edges vs Total Training Time', fontsize=20, fontweight='bold', pad=12)
     ax.set_xscale('log')
     ax.set_yscale('log')
     
@@ -747,9 +747,12 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     ax.spines['bottom'].set_color("#50392C")
     
     # 刻度样式
-    ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+    ax.tick_params(axis='both', labelsize=16, colors="#50392C", width=1.5)
+    # 设置刻度标签加粗
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontweight('bold')
     
-    ax.legend(fontsize=10, frameon=False, loc='best')
+    ax.legend(fontsize=16, frameon=False, loc='best', prop={'weight': 'bold'})
     plt.tight_layout()
     
     output_path = f'{output_dir}/total_training_time_vs_scale.png'
@@ -758,7 +761,7 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     print(f"✅ Total training time plot saved: {output_path}")
     
     # === Figure 2: Average Training Time vs Number of Edges ===
-    fig, ax = plt.subplots(figsize=(5, 8))
+    fig, ax = plt.subplots(figsize=(8, 8))
     
     oom_labeled = False
     model_oom_positions = []
@@ -792,9 +795,9 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                   label='OOM' if not oom_labeled else '', zorder=100)
         oom_labeled = True
     
-    ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
-    ax.set_ylabel('Average Time per Epoch (seconds)', fontsize=12, fontweight='bold', color="#50392C")
-    ax.set_title('Number of Edges vs Average Training Time per Epoch', fontsize=14, fontweight='bold', pad=12)
+    ax.set_xlabel('Number of Edges', fontsize=20, fontweight='bold', color="#50392C")
+    ax.set_ylabel('Average Time per Epoch (seconds)', fontsize=20, fontweight='bold', color="#50392C")
+    ax.set_title('Number of Edges vs Average Training Time per Epoch', fontsize=20, fontweight='bold', pad=12)
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
@@ -803,9 +806,12 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         spine.set_color('#F0F0F0')
     ax.spines['left'].set_color("#50392C")
     ax.spines['bottom'].set_color("#50392C")
-    ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+    ax.tick_params(axis='both', labelsize=16, colors="#50392C", width=1.5)
+    # 设置刻度标签加粗
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontweight('bold')
     
-    ax.legend(fontsize=10, frameon=False, loc='best')
+    ax.legend(fontsize=16, frameon=False, loc='best', prop={'weight': 'bold'})
     plt.tight_layout()
     
     output_path = f'{output_dir}/avg_training_time_vs_scale.png'
@@ -821,7 +827,7 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     )
     
     if has_time_per_graph:
-        fig, ax = plt.subplots(figsize=(5, 8))
+        fig, ax = plt.subplots(figsize=(8, 8))
         
         oom_labeled = False
         model_oom_positions = []
@@ -856,9 +862,9 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                       label='OOM' if not oom_labeled else '', zorder=100)
             oom_labeled = True
         
-        ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
-        ax.set_ylabel('Time per Graph (milliseconds)', fontsize=12, fontweight='bold', color="#50392C")
-        ax.set_title('Number of Edges vs Time per Graph', fontsize=14, fontweight='bold', pad=12)
+        ax.set_xlabel('Number of Edges', fontsize=20, fontweight='bold', color="#50392C")
+        ax.set_ylabel('Time per Graph (milliseconds)', fontsize=20, fontweight='bold', color="#50392C")
+        ax.set_title('Number of Edges vs Time per Graph', fontsize=20, fontweight='bold', pad=12)
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
@@ -867,9 +873,12 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             spine.set_color('#F0F0F0')
         ax.spines['left'].set_color("#50392C")
         ax.spines['bottom'].set_color("#50392C")
-        ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+        ax.tick_params(axis='both', labelsize=16, colors="#50392C", width=1.5)
+        # 设置刻度标签加粗
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontweight('bold')
         
-        ax.legend(fontsize=10, frameon=False, loc='best')
+        ax.legend(fontsize=16, frameon=False, loc='best', prop={'weight': 'bold'})
         plt.tight_layout()
         
         output_path = f'{output_dir}/time_per_graph_vs_scale.png'
@@ -886,7 +895,7 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     )
     
     if has_time_per_graph_per_epoch:
-        fig, ax = plt.subplots(figsize=(5, 8))
+        fig, ax = plt.subplots(figsize=(8, 8))
         
         oom_labeled = False
         model_oom_positions = []
@@ -920,9 +929,9 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                       label='OOM' if not oom_labeled else '', zorder=100)
             oom_labeled = True
         
-        ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
-        ax.set_ylabel('Time per Graph per Epoch (ms)', fontsize=12, fontweight='bold', color="#50392C")
-        ax.set_title('Number of Edges vs Time per Graph per Epoch', fontsize=14, fontweight='bold', pad=12)
+        ax.set_xlabel('Number of Edges', fontsize=20, fontweight='bold', color="#50392C")
+        ax.set_ylabel('Time per Graph per Epoch (ms)', fontsize=20, fontweight='bold', color="#50392C")
+        ax.set_title('Number of Edges vs Time per Graph per Epoch', fontsize=20, fontweight='bold', pad=12)
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
@@ -931,9 +940,12 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             spine.set_color('#F0F0F0')
         ax.spines['left'].set_color("#50392C")
         ax.spines['bottom'].set_color("#50392C")
-        ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+        ax.tick_params(axis='both', labelsize=16, colors="#50392C", width=1.5)
+        # 设置刻度标签加粗
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontweight('bold')
         
-        ax.legend(fontsize=10, frameon=False, loc='best')
+        ax.legend(fontsize=16, frameon=False, loc='best', prop={'weight': 'bold'})
         plt.tight_layout()
         
         output_path = f'{output_dir}/time_per_graph_per_epoch_vs_scale.png'
@@ -950,7 +962,7 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     )
     
     if has_cpu_memory:
-        fig, ax = plt.subplots(figsize=(5, 8))
+        fig, ax = plt.subplots(figsize=(8, 8))
         
         oom_labeled = False
         model_oom_positions = []
@@ -984,9 +996,9 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                       label='OOM' if not oom_labeled else '', zorder=100)
             oom_labeled = True
         
-        ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
-        ax.set_ylabel('Peak CPU Memory (MB)', fontsize=12, fontweight='bold', color="#50392C")
-        ax.set_title('Number of Edges vs Peak CPU Memory Usage', fontsize=14, fontweight='bold', pad=12)
+        ax.set_xlabel('Number of Edges', fontsize=20, fontweight='bold', color="#50392C")
+        ax.set_ylabel('Peak CPU Memory (MB)', fontsize=20, fontweight='bold', color="#50392C")
+        ax.set_title('Number of Edges vs Peak CPU Memory Usage', fontsize=20, fontweight='bold', pad=12)
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
@@ -995,9 +1007,12 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             spine.set_color('#F0F0F0')
         ax.spines['left'].set_color("#50392C")
         ax.spines['bottom'].set_color("#50392C")
-        ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+        ax.tick_params(axis='both', labelsize=16, colors="#50392C", width=1.5)
+        # 设置刻度标签加粗
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontweight('bold')
         
-        ax.legend(fontsize=10, frameon=False, loc='best')
+        ax.legend(fontsize=16, frameon=False, loc='best', prop={'weight': 'bold'})
         plt.tight_layout()
         
         output_path = f'{output_dir}/peak_cpu_memory_vs_scale.png'
@@ -1014,7 +1029,7 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     )
     
     if has_gpu_memory:
-        fig, ax = plt.subplots(figsize=(5, 8))
+        fig, ax = plt.subplots(figsize=(8, 8))
         
         oom_labeled = False
         model_oom_positions = []
@@ -1048,9 +1063,9 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
                       label='OOM' if not oom_labeled else '', zorder=100)
             oom_labeled = True
         
-        ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
-        ax.set_ylabel('Peak GPU Memory (MB)', fontsize=12, fontweight='bold', color="#50392C")
-        ax.set_title('Number of Edges vs Peak GPU Memory Usage', fontsize=14, fontweight='bold', pad=12)
+        ax.set_xlabel('Number of Edges', fontsize=20, fontweight='bold', color="#50392C")
+        ax.set_ylabel('Peak GPU Memory (MB)', fontsize=20, fontweight='bold', color="#50392C")
+        ax.set_title('Number of Edges vs Peak GPU Memory Usage', fontsize=20, fontweight='bold', pad=12)
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
@@ -1059,9 +1074,12 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             spine.set_color('#F0F0F0')
         ax.spines['left'].set_color("#50392C")
         ax.spines['bottom'].set_color("#50392C")
-        ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+        ax.tick_params(axis='both', labelsize=16, colors="#50392C", width=1.5)
+        # 设置刻度标签加粗
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontweight('bold')
         
-        ax.legend(fontsize=10, frameon=False, loc='best')
+        ax.legend(fontsize=16, frameon=False, loc='best', prop={'weight': 'bold'})
         plt.tight_layout()
         
         output_path = f'{output_dir}/peak_gpu_memory_vs_scale.png'
