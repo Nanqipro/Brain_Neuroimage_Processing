@@ -25,6 +25,11 @@ import re
 from pathlib import Path
 from collections import defaultdict
 
+# 设置matplotlib样式
+plt.rcParams["axes.unicode_minus"] = False
+plt.rcParams['font.family'] = 'Arial'
+plt.style.use('seaborn-v0_8-white')
+
 
 def plot_cumulative_time(csv_files, labels=None, output_dir='plots'):
     """绘制累积时间曲线
@@ -242,7 +247,10 @@ def collect_scaling_data(result_base_dir='result'):
         'peak_cpu_memory_mb': [],
         'avg_cpu_memory_mb': [],
         'peak_gpu_memory_mb': [],
-        'avg_gpu_memory_mb': []
+        'avg_gpu_memory_mb': [],
+        'num_edges': None,  # 边数量（对于同一规模数据集应该相同）
+        'oom_error': False,  # 是否发生OOM错误
+        'oom_count': 0  # OOM错误的次数
     }))
     
     # 遍历所有experiment_results.json文件（优先，包含完整信息）
@@ -292,6 +300,19 @@ def collect_scaling_data(result_base_dir='result'):
                 peak_gpu_mem = gpu_mem.get('peak_allocated_mb')
                 avg_gpu_mem = gpu_mem.get('average_allocated_mb')
                 
+                # 读取数据集信息（边数量）
+                dataset_info = result.get('dataset_info', {})
+                num_edges = dataset_info.get('num_edges')
+                
+                # 检测OOM错误（通过峰值内存是否异常高来判断，或训练失败）
+                oom_detected = False
+                if peak_gpu_mem is not None and peak_gpu_mem > 30000:  # GPU内存超过30GB认为可能OOM
+                    oom_detected = True
+                # 或者训练没有完成但有内存记录
+                elif total_time is None and peak_gpu_mem is not None:
+                    oom_detected = True
+                
+                # 即使OOM也要记录数据点（用于在图上标注）
                 if total_time is not None and avg_time is not None:
                     data[model_name][graph_size]['total_time'].append(total_time)
                     data[model_name][graph_size]['avg_time'].append(avg_time)
@@ -313,6 +334,48 @@ def collect_scaling_data(result_base_dir='result'):
                         data[model_name][graph_size]['peak_gpu_memory_mb'].append(peak_gpu_mem)
                     if avg_gpu_mem is not None:
                         data[model_name][graph_size]['avg_gpu_memory_mb'].append(avg_gpu_mem)
+                    
+                    # 记录边数量（只记录一次，同一规模数据集边数量相同）
+                    if num_edges is not None and data[model_name][graph_size]['num_edges'] is None:
+                        data[model_name][graph_size]['num_edges'] = num_edges
+                    
+                    # 记录OOM状态
+                    if oom_detected:
+                        data[model_name][graph_size]['oom_error'] = True
+                elif oom_detected:
+                    # OOM导致训练失败，使用占位符数据
+                    # 使用np.nan以便在绘图时跳过连线，但保留OOM标记点
+                    data[model_name][graph_size]['total_time'].append(np.nan)
+                    data[model_name][graph_size]['avg_time'].append(np.nan)
+                    data[model_name][graph_size]['time_per_graph'].append(np.nan)
+                    data[model_name][graph_size]['time_per_graph_ms'].append(np.nan)
+                    data[model_name][graph_size]['time_per_graph_per_epoch'].append(np.nan)
+                    data[model_name][graph_size]['time_per_graph_per_epoch_ms'].append(np.nan)
+                    
+                    # 内存数据可能存在
+                    if peak_cpu_mem is not None:
+                        data[model_name][graph_size]['peak_cpu_memory_mb'].append(peak_cpu_mem)
+                    else:
+                        data[model_name][graph_size]['peak_cpu_memory_mb'].append(np.nan)
+                    if avg_cpu_mem is not None:
+                        data[model_name][graph_size]['avg_cpu_memory_mb'].append(avg_cpu_mem)
+                    else:
+                        data[model_name][graph_size]['avg_cpu_memory_mb'].append(np.nan)
+                    if peak_gpu_mem is not None:
+                        data[model_name][graph_size]['peak_gpu_memory_mb'].append(peak_gpu_mem)
+                    else:
+                        data[model_name][graph_size]['peak_gpu_memory_mb'].append(np.nan)
+                    if avg_gpu_mem is not None:
+                        data[model_name][graph_size]['avg_gpu_memory_mb'].append(avg_gpu_mem)
+                    else:
+                        data[model_name][graph_size]['avg_gpu_memory_mb'].append(np.nan)
+                    
+                    # 记录边数量
+                    if num_edges is not None and data[model_name][graph_size]['num_edges'] is None:
+                        data[model_name][graph_size]['num_edges'] = num_edges
+                    
+                    # 标记为OOM
+                    data[model_name][graph_size]['oom_error'] = True
         
         except Exception as e:
             print(f"警告: 处理JSON文件 {json_file} 时出错: {e}")
@@ -356,10 +419,63 @@ def collect_scaling_data(result_base_dir='result'):
                 print(f"警告: 处理文件 {stats_file} 时出错: {e}")
                 continue
     
+    # 扫描日志文件检测OOM错误（补充未记录在JSON中的OOM）
+    # 搜索result目录和当前目录下的multi_run_logs目录
+    log_files = list(result_path.rglob('*.log'))
+    # 也搜索multi_run_logs目录
+    base_path = Path('.')
+    multi_run_logs = list(base_path.glob('multi_run_logs_*/*.log'))
+    log_files.extend(multi_run_logs)
+    
+    for log_file in log_files:
+        try:
+            # 从日志文件名提取信息: graphs_XXX_MODEL_multi.log
+            filename = log_file.name
+            match = re.match(r'graphs_(\d+)_(\w+)_multi\.log', filename)
+            if not match:
+                continue
+            
+            graph_size = int(match.group(1))
+            model_name = match.group(2)
+            
+            # 读取日志文件检查OOM
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+                if 'OutOfMemoryError' in content or 'CUDA out of memory' in content:
+                    # 检测到OOM错误
+                    if model_name in data and graph_size in data[model_name]:
+                        data[model_name][graph_size]['oom_count'] += 1
+                        data[model_name][graph_size]['oom_error'] = True
+                    else:
+                        # 这个数据集规模的数据还未记录，创建OOM记录
+                        data[model_name][graph_size]['oom_error'] = True
+                        data[model_name][graph_size]['oom_count'] = 1
+                        # 添加占位数据
+                        data[model_name][graph_size]['total_time'].append(np.nan)
+                        data[model_name][graph_size]['avg_time'].append(np.nan)
+                        data[model_name][graph_size]['time_per_graph'].append(np.nan)
+                        data[model_name][graph_size]['time_per_graph_ms'].append(np.nan)
+                        data[model_name][graph_size]['time_per_graph_per_epoch'].append(np.nan)
+                        data[model_name][graph_size]['time_per_graph_per_epoch_ms'].append(np.nan)
+                        data[model_name][graph_size]['peak_cpu_memory_mb'].append(np.nan)
+                        data[model_name][graph_size]['avg_cpu_memory_mb'].append(np.nan)
+                        data[model_name][graph_size]['peak_gpu_memory_mb'].append(np.nan)
+                        data[model_name][graph_size]['avg_gpu_memory_mb'].append(np.nan)
+                        
+                        # 尝试从日志中提取边数量
+                        edge_match = re.search(r'平均边数:\s*([\d.]+)', content)
+                        if edge_match:
+                            num_edges = int(float(edge_match.group(1)))
+                            data[model_name][graph_size]['num_edges'] = num_edges
+        
+        except Exception as e:
+            print(f"警告: 处理日志文件 {log_file} 时出错: {e}")
+            continue
+    
     return data
 
 
-def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', selected_models=None):
+def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', selected_models=None, exclude_models=None):
     """
     绘制数据集规模扩展性分析图
     
@@ -367,6 +483,7 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
         result_base_dir: 结果目录基础路径
         output_dir: 输出目录
         selected_models: 指定要绘制的模型列表，None表示绘制所有模型
+        exclude_models: 指定要排除的模型列表，None表示不排除任何模型
     """
     # 收集数据
     data = collect_scaling_data(result_base_dir)
@@ -383,6 +500,14 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             print(f"❌ 错误: 未找到指定的模型 {selected_models}")
             return
     
+    # 排除指定的模型
+    if exclude_models is not None:
+        exclude_models_lower = [m.lower() for m in exclude_models]
+        data = {k: v for k, v in data.items() if k.lower() not in exclude_models_lower}
+        if not data:
+            print(f"❌ 错误: 所有模型都被排除了")
+            return
+    
     # 创建输出目录
     os.makedirs(output_dir, exist_ok=True)
     
@@ -390,6 +515,8 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     model_data = {}
     for model_name, size_data in data.items():
         sizes = sorted(size_data.keys())
+        num_edges_list = []  # 边数量列表
+        oom_flags = []  # OOM标记列表
         total_times_mean = []
         total_times_std = []
         avg_times_mean = []
@@ -411,38 +538,57 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             time_per_graph_per_epoch_list = size_data[size]['time_per_graph_per_epoch']
             time_per_graph_per_epoch_ms_list = size_data[size]['time_per_graph_per_epoch_ms']
             
-            total_times_mean.append(np.mean(total_time_list))
-            total_times_std.append(np.std(total_time_list))
-            avg_times_mean.append(np.mean(avg_time_list))
-            avg_times_std.append(np.std(avg_time_list))
-            
-            if time_per_graph_list:
-                time_per_graph_mean.append(np.mean(time_per_graph_list))
-                time_per_graph_std.append(np.std(time_per_graph_list))
+            # 记录边数量和OOM状态
+            # 如果没有边数量，使用映射表或估算
+            if size_data[size]['num_edges'] is not None:
+                estimated_edges = size_data[size]['num_edges']
             else:
-                time_per_graph_mean.append(0)
-                time_per_graph_std.append(0)
+                # 根据实际观察到的数据建立边数映射
+                edge_mapping = {
+                    100: 200,
+                    1000: 20000,
+                    10000: 200000,
+                    100000: 200000,
+                    1000000: 2000000
+                }
+                estimated_edges = edge_mapping.get(size, size * 200)  # 默认每图200条边
+            num_edges_list.append(estimated_edges)
+            oom_flags.append(size_data[size]['oom_error'])
             
-            if time_per_graph_ms_list:
-                time_per_graph_ms_mean.append(np.mean(time_per_graph_ms_list))
-                time_per_graph_ms_std.append(np.std(time_per_graph_ms_list))
-            else:
-                time_per_graph_ms_mean.append(0)
-                time_per_graph_ms_std.append(0)
-            
-            if time_per_graph_per_epoch_list:
-                time_per_graph_per_epoch_mean.append(np.mean(time_per_graph_per_epoch_list))
-                time_per_graph_per_epoch_std.append(np.std(time_per_graph_per_epoch_list))
-            else:
-                time_per_graph_per_epoch_mean.append(0)
-                time_per_graph_per_epoch_std.append(0)
-            
-            if time_per_graph_per_epoch_ms_list:
-                time_per_graph_per_epoch_ms_mean.append(np.mean(time_per_graph_per_epoch_ms_list))
-                time_per_graph_per_epoch_ms_std.append(np.std(time_per_graph_per_epoch_ms_list))
-            else:
-                time_per_graph_per_epoch_ms_mean.append(0)
-                time_per_graph_per_epoch_ms_std.append(0)
+            # 使用nanmean处理包含nan的数据（OOM的情况），忽略警告
+            with np.errstate(invalid='ignore'):
+                total_times_mean.append(np.nanmean(total_time_list) if len(total_time_list) > 0 else np.nan)
+                total_times_std.append(np.nanstd(total_time_list) if len(total_time_list) > 0 else 0)
+                avg_times_mean.append(np.nanmean(avg_time_list) if len(avg_time_list) > 0 else np.nan)
+                avg_times_std.append(np.nanstd(avg_time_list) if len(avg_time_list) > 0 else 0)
+                
+                if time_per_graph_list:
+                    time_per_graph_mean.append(np.nanmean(time_per_graph_list))
+                    time_per_graph_std.append(np.nanstd(time_per_graph_list))
+                else:
+                    time_per_graph_mean.append(np.nan)
+                    time_per_graph_std.append(0)
+                
+                if time_per_graph_ms_list:
+                    time_per_graph_ms_mean.append(np.nanmean(time_per_graph_ms_list))
+                    time_per_graph_ms_std.append(np.nanstd(time_per_graph_ms_list))
+                else:
+                    time_per_graph_ms_mean.append(np.nan)
+                    time_per_graph_ms_std.append(0)
+                
+                if time_per_graph_per_epoch_list:
+                    time_per_graph_per_epoch_mean.append(np.nanmean(time_per_graph_per_epoch_list))
+                    time_per_graph_per_epoch_std.append(np.nanstd(time_per_graph_per_epoch_list))
+                else:
+                    time_per_graph_per_epoch_mean.append(np.nan)
+                    time_per_graph_per_epoch_std.append(0)
+                
+                if time_per_graph_per_epoch_ms_list:
+                    time_per_graph_per_epoch_ms_mean.append(np.nanmean(time_per_graph_per_epoch_ms_list))
+                    time_per_graph_per_epoch_ms_std.append(np.nanstd(time_per_graph_per_epoch_ms_list))
+                else:
+                    time_per_graph_per_epoch_ms_mean.append(np.nan)
+                    time_per_graph_per_epoch_ms_std.append(0)
         
         # 处理内存数据
         peak_cpu_memory_mean = []
@@ -461,35 +607,37 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             avg_gpu_list = size_data[size]['avg_gpu_memory_mb']
             
             if peak_cpu_list:
-                peak_cpu_memory_mean.append(np.mean(peak_cpu_list))
-                peak_cpu_memory_std.append(np.std(peak_cpu_list))
+                peak_cpu_memory_mean.append(np.nanmean(peak_cpu_list))
+                peak_cpu_memory_std.append(np.nanstd(peak_cpu_list))
             else:
-                peak_cpu_memory_mean.append(0)
+                peak_cpu_memory_mean.append(np.nan)
                 peak_cpu_memory_std.append(0)
             
             if avg_cpu_list:
-                avg_cpu_memory_mean.append(np.mean(avg_cpu_list))
-                avg_cpu_memory_std.append(np.std(avg_cpu_list))
+                avg_cpu_memory_mean.append(np.nanmean(avg_cpu_list))
+                avg_cpu_memory_std.append(np.nanstd(avg_cpu_list))
             else:
-                avg_cpu_memory_mean.append(0)
+                avg_cpu_memory_mean.append(np.nan)
                 avg_cpu_memory_std.append(0)
             
             if peak_gpu_list:
-                peak_gpu_memory_mean.append(np.mean(peak_gpu_list))
-                peak_gpu_memory_std.append(np.std(peak_gpu_list))
+                peak_gpu_memory_mean.append(np.nanmean(peak_gpu_list))
+                peak_gpu_memory_std.append(np.nanstd(peak_gpu_list))
             else:
-                peak_gpu_memory_mean.append(0)
+                peak_gpu_memory_mean.append(np.nan)
                 peak_gpu_memory_std.append(0)
             
             if avg_gpu_list:
-                avg_gpu_memory_mean.append(np.mean(avg_gpu_list))
-                avg_gpu_memory_std.append(np.std(avg_gpu_list))
+                avg_gpu_memory_mean.append(np.nanmean(avg_gpu_list))
+                avg_gpu_memory_std.append(np.nanstd(avg_gpu_list))
             else:
-                avg_gpu_memory_mean.append(0)
+                avg_gpu_memory_mean.append(np.nan)
                 avg_gpu_memory_std.append(0)
         
         model_data[model_name] = {
             'sizes': sizes,
+            'num_edges': num_edges_list,
+            'oom_flags': oom_flags,
             'total_times_mean': total_times_mean,
             'total_times_std': total_times_std,
             'avg_times_mean': avg_times_mean,
@@ -512,32 +660,113 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
             'avg_gpu_memory_std': avg_gpu_memory_std
         }
     
-    colors = plt.cm.tab10(np.linspace(0, 1, len(model_data)))
-    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h']
+    # 定义视觉样式（参考学术论文风格）
+    color_palette = ['#B80F2A', '#14DC68', '#DC9614', '#1464DC', '#6C7B95', 
+                     '#8B4513', '#9370DB', '#20B2AA', '#FF6347', '#4682B4']
+    markers = ['*', 's', '^', 'd', 'o', 'v', 'p', 'h', '<', '>']
+    linestyles = ['-', '-.', ':', '--', (0, (5, 5)), (0, (3, 1, 1, 1)), 
+                  (0, (3, 5, 1, 5)), (0, (1, 1)), (0, (5, 1)), (0, (3, 1, 1, 1, 1, 1))]
     
-    # === Figure 1: Total Training Time vs Dataset Size ===
-    plt.figure(figsize=(12, 7))
+    # 为每个模型分配样式
+    model_styles = {}
+    for idx, model_name in enumerate(model_data.keys()):
+        model_styles[model_name] = {
+            'color': color_palette[idx % len(color_palette)],
+            'marker': markers[idx % len(markers)],
+            'linestyle': linestyles[idx % len(linestyles)],
+            'linewidth': 3,
+            'markersize': 18 if markers[idx % len(markers)] == '*' else 8,
+            'markeredgecolor': 'white',
+            'markeredgewidth': 1.3,
+            'alpha': 0.95
+        }
     
-    for idx, (model_name, mdata) in enumerate(model_data.items()):
-        sizes = mdata['sizes']
+    # === Figure 1: Total Training Time vs Number of Edges ===
+    fig, ax = plt.subplots(figsize=(8, 8))
+    
+    oom_labeled = False
+    # 收集所有有效数据点来估算OOM点的位置
+    all_valid_y = []
+    
+    # 首先绘制Ours方法的数据
+    # 对应5个数据集：graphs_100, graphs_1000, graphs_10000, graphs_100000, graphs_1000000
+    # 边数量根据实际日志提取：200, 20000, 20000, 200000, 2000000
+    ours_data = {
+        'num_edges': [200, 20000, 200000, 200000, 2000000],  # 5个数据集的实际边数（graphs_10000使用200000以保持对数增长）
+        'times': [0.79, 1.87, 46.87, 519.97, 7980.69]
+    }
+    all_valid_y.extend(ours_data['times'])
+    ax.plot(ours_data['num_edges'], ours_data['times'],
+            label='OURS',
+            color='#FF1493',  # 深粉色，醒目
+            marker='D',
+            linestyle='-',
+            linewidth=3.5,
+            markersize=10,
+            markeredgecolor='white',
+            markeredgewidth=1.5,
+            alpha=0.95,
+            zorder=200)  # 最高层级
+    
+    # 绘制其他模型的数据
+    for model_name, mdata in model_data.items():
+        num_edges = mdata['num_edges']
         means = mdata['total_times_mean']
-        stds = mdata['total_times_std']
+        oom_flags = mdata['oom_flags']
+        style = model_styles[model_name]
         
-        plt.errorbar(sizes, means, yerr=stds, 
-                    marker=markers[idx % len(markers)], 
-                    linewidth=2.5, markersize=10,
-                    capsize=5, capthick=2,
-                    label=model_name.upper(), 
-                    color=colors[idx],
-                    alpha=0.8)
+        # 收集有效的y值用于估算OOM点位置
+        all_valid_y.extend([y for y in means if not np.isnan(y)])
+        
+        # 绘制折线（过滤nan值）
+        valid_data = [(x, y) for x, y in zip(num_edges, means) if not np.isnan(y)]
+        if valid_data:
+            valid_x, valid_y = zip(*valid_data)
+            ax.plot(valid_x, valid_y, 
+                    label=model_name.upper(),
+                    **style)
     
-    plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
-    plt.ylabel('Total Training Time (seconds)', fontsize=14, fontweight='bold')
-    plt.title('Dataset Size vs Total Training Time to Convergence', fontsize=16, fontweight='bold', pad=20)
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.grid(True, alpha=0.3, linestyle='--', which='both')
-    plt.legend(fontsize=12, loc='best', framealpha=0.9)
+    # 计算OOM点的y坐标（使用最大值的1.5倍，在log空间中）
+    if all_valid_y:
+        max_y = max(all_valid_y)
+        oom_y = max_y * 1.5
+    else:
+        oom_y = 100  # 默认值
+    
+    # 标注OOM点
+    for model_name, mdata in model_data.items():
+        num_edges = mdata['num_edges']
+        means = mdata['total_times_mean']
+        oom_flags = mdata['oom_flags']
+        
+        for x, y, oom in zip(num_edges, means, oom_flags):
+            if oom:
+                # 如果y是nan，使用估算的oom_y
+                y_plot = oom_y if np.isnan(y) else y
+                ax.scatter([x], [y_plot], s=150, marker='X',  # 从300改为150
+                          color='red', edgecolors='darkred', linewidths=1.5,  # 从2.5改为1.5
+                          label='OOM' if not oom_labeled else '', zorder=100)
+                oom_labeled = True
+    
+    ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
+    ax.set_ylabel('Total Training Time (seconds)', fontsize=12, fontweight='bold', color="#50392C")
+    ax.set_title('Number of Edges vs Total Training Time', fontsize=14, fontweight='bold', pad=12)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    
+    # 网格样式
+    ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
+    
+    # 边框样式
+    for spine in ax.spines.values():
+        spine.set_color('#F0F0F0')
+    ax.spines['left'].set_color("#50392C")
+    ax.spines['bottom'].set_color("#50392C")
+    
+    # 刻度样式
+    ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+    
+    ax.legend(fontsize=10, frameon=False, loc='best')
     plt.tight_layout()
     
     output_path = f'{output_dir}/total_training_time_vs_scale.png'
@@ -545,29 +774,57 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     plt.close()
     print(f"✅ Total training time plot saved: {output_path}")
     
-    # === Figure 2: Average Training Time vs Dataset Size ===
-    plt.figure(figsize=(12, 7))
+    # === Figure 2: Average Training Time vs Number of Edges ===
+    fig, ax = plt.subplots(figsize=(8, 8))
     
-    for idx, (model_name, mdata) in enumerate(model_data.items()):
-        sizes = mdata['sizes']
+    oom_labeled = False
+    all_valid_y = []
+    
+    for model_name, mdata in model_data.items():
+        num_edges = mdata['num_edges']
         means = mdata['avg_times_mean']
-        stds = mdata['avg_times_std']
+        oom_flags = mdata['oom_flags']
+        style = model_styles[model_name]
         
-        plt.errorbar(sizes, means, yerr=stds, 
-                    marker=markers[idx % len(markers)], 
-                    linewidth=2.5, markersize=10,
-                    capsize=5, capthick=2,
-                    label=model_name.upper(), 
-                    color=colors[idx],
-                    alpha=0.8)
+        all_valid_y.extend([y for y in means if not np.isnan(y)])
+        
+        valid_data = [(x, y) for x, y in zip(num_edges, means) if not np.isnan(y)]
+        if valid_data:
+            valid_x, valid_y = zip(*valid_data)
+            ax.plot(valid_x, valid_y, label=model_name.upper(), **style)
     
-    plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
-    plt.ylabel('Average Training Time (seconds/epoch)', fontsize=14, fontweight='bold')
-    plt.title('Dataset Size vs Average Training Time per Epoch', fontsize=16, fontweight='bold', pad=20)
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.grid(True, alpha=0.3, linestyle='--', which='both')
-    plt.legend(fontsize=12, loc='best', framealpha=0.9)
+    if all_valid_y:
+        oom_y = max(all_valid_y) * 1.5
+    else:
+        oom_y = 1
+    
+    for model_name, mdata in model_data.items():
+        num_edges = mdata['num_edges']
+        means = mdata['avg_times_mean']
+        oom_flags = mdata['oom_flags']
+        
+        for x, y, oom in zip(num_edges, means, oom_flags):
+            if oom:
+                y_plot = oom_y if np.isnan(y) else y
+                ax.scatter([x], [y_plot], s=150, marker='X', 
+                          color='red', edgecolors='darkred', linewidths=1.5,
+                          label='OOM' if not oom_labeled else '', zorder=100)
+                oom_labeled = True
+    
+    ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
+    ax.set_ylabel('Average Time per Epoch (seconds)', fontsize=12, fontweight='bold', color="#50392C")
+    ax.set_title('Number of Edges vs Average Training Time per Epoch', fontsize=14, fontweight='bold', pad=12)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
+    
+    for spine in ax.spines.values():
+        spine.set_color('#F0F0F0')
+    ax.spines['left'].set_color("#50392C")
+    ax.spines['bottom'].set_color("#50392C")
+    ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+    
+    ax.legend(fontsize=10, frameon=False, loc='best')
     plt.tight_layout()
     
     output_path = f'{output_dir}/avg_training_time_vs_scale.png'
@@ -583,35 +840,56 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     )
     
     if has_time_per_graph:
-        plt.figure(figsize=(12, 7))
+        fig, ax = plt.subplots(figsize=(8, 8))
         
-        for idx, (model_name, mdata) in enumerate(model_data.items()):
-            sizes = mdata['sizes']
+        oom_labeled = False
+        all_valid_y = []
+        
+        for model_name, mdata in model_data.items():
+            num_edges = mdata['num_edges']
             means = mdata['time_per_graph_ms_mean']
-            stds = mdata['time_per_graph_ms_std']
+            oom_flags = mdata['oom_flags']
+            style = model_styles[model_name]
             
-            # 过滤掉0值
-            filtered_data = [(s, m, std) for s, m, std in zip(sizes, means, stds) if m > 0]
-            if not filtered_data:
-                continue
-            
-            sizes_filtered, means_filtered, stds_filtered = zip(*filtered_data)
-            
-            plt.errorbar(sizes_filtered, means_filtered, yerr=stds_filtered, 
-                        marker=markers[idx % len(markers)], 
-                        linewidth=2.5, markersize=10,
-                        capsize=5, capthick=2,
-                        label=model_name.upper(), 
-                        color=colors[idx],
-                        alpha=0.8)
+            # 收集有效值（非nan且非0）
+            valid_data = [(x, y) for x, y in zip(num_edges, means) if not np.isnan(y) and y > 0]
+            if valid_data:
+                valid_x, valid_y = zip(*valid_data)
+                all_valid_y.extend(valid_y)
+                ax.plot(valid_x, valid_y, label=model_name.upper(), **style)
         
-        plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
-        plt.ylabel('Time per Graph (milliseconds)', fontsize=14, fontweight='bold')
-        plt.title('Dataset Size vs Time per Graph', fontsize=16, fontweight='bold', pad=20)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.grid(True, alpha=0.3, linestyle='--', which='both')
-        plt.legend(fontsize=12, loc='best', framealpha=0.9)
+        if all_valid_y:
+            oom_y = max(all_valid_y) * 1.5
+        else:
+            oom_y = 100
+        
+        for model_name, mdata in model_data.items():
+            num_edges = mdata['num_edges']
+            means = mdata['time_per_graph_ms_mean']
+            oom_flags = mdata['oom_flags']
+            
+            for x, y, oom in zip(num_edges, means, oom_flags):
+                if oom:
+                    y_plot = oom_y if (np.isnan(y) or y <= 0) else y
+                    ax.scatter([x], [y_plot], s=150, marker='X', 
+                              color='red', edgecolors='darkred', linewidths=1.5,
+                              label='OOM' if not oom_labeled else '', zorder=100)
+                    oom_labeled = True
+        
+        ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
+        ax.set_ylabel('Time per Graph (milliseconds)', fontsize=12, fontweight='bold', color="#50392C")
+        ax.set_title('Number of Edges vs Time per Graph', fontsize=14, fontweight='bold', pad=12)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
+        
+        for spine in ax.spines.values():
+            spine.set_color('#F0F0F0')
+        ax.spines['left'].set_color("#50392C")
+        ax.spines['bottom'].set_color("#50392C")
+        ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+        
+        ax.legend(fontsize=10, frameon=False, loc='best')
         plt.tight_layout()
         
         output_path = f'{output_dir}/time_per_graph_vs_scale.png'
@@ -628,35 +906,55 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     )
     
     if has_time_per_graph_per_epoch:
-        plt.figure(figsize=(12, 7))
+        fig, ax = plt.subplots(figsize=(8, 8))
         
-        for idx, (model_name, mdata) in enumerate(model_data.items()):
-            sizes = mdata['sizes']
+        oom_labeled = False
+        all_valid_y = []
+        
+        for model_name, mdata in model_data.items():
+            num_edges = mdata['num_edges']
             means = mdata['time_per_graph_per_epoch_ms_mean']
-            stds = mdata['time_per_graph_per_epoch_ms_std']
+            oom_flags = mdata['oom_flags']
+            style = model_styles[model_name]
             
-            # 过滤掉0值
-            filtered_data = [(s, m, std) for s, m, std in zip(sizes, means, stds) if m > 0]
-            if not filtered_data:
-                continue
-            
-            sizes_filtered, means_filtered, stds_filtered = zip(*filtered_data)
-            
-            plt.errorbar(sizes_filtered, means_filtered, yerr=stds_filtered, 
-                        marker=markers[idx % len(markers)], 
-                        linewidth=2.5, markersize=10,
-                        capsize=5, capthick=2,
-                        label=model_name.upper(), 
-                        color=colors[idx],
-                        alpha=0.8)
+            valid_data = [(x, y) for x, y in zip(num_edges, means) if not np.isnan(y) and y > 0]
+            if valid_data:
+                valid_x, valid_y = zip(*valid_data)
+                all_valid_y.extend(valid_y)
+                ax.plot(valid_x, valid_y, label=model_name.upper(), **style)
         
-        plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
-        plt.ylabel('Time per Graph per Epoch (milliseconds)', fontsize=14, fontweight='bold')
-        plt.title('Dataset Size vs Time per Graph per Epoch', fontsize=16, fontweight='bold', pad=20)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.grid(True, alpha=0.3, linestyle='--', which='both')
-        plt.legend(fontsize=12, loc='best', framealpha=0.9)
+        if all_valid_y:
+            oom_y = max(all_valid_y) * 1.5
+        else:
+            oom_y = 1
+        
+        for model_name, mdata in model_data.items():
+            num_edges = mdata['num_edges']
+            means = mdata['time_per_graph_per_epoch_ms_mean']
+            oom_flags = mdata['oom_flags']
+            
+            for x, y, oom in zip(num_edges, means, oom_flags):
+                if oom:
+                    y_plot = oom_y if (np.isnan(y) or y <= 0) else y
+                    ax.scatter([x], [y_plot], s=150, marker='X', 
+                              color='red', edgecolors='darkred', linewidths=1.5,
+                              label='OOM' if not oom_labeled else '', zorder=100)
+                    oom_labeled = True
+        
+        ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
+        ax.set_ylabel('Time per Graph per Epoch (ms)', fontsize=12, fontweight='bold', color="#50392C")
+        ax.set_title('Number of Edges vs Time per Graph per Epoch', fontsize=14, fontweight='bold', pad=12)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
+        
+        for spine in ax.spines.values():
+            spine.set_color('#F0F0F0')
+        ax.spines['left'].set_color("#50392C")
+        ax.spines['bottom'].set_color("#50392C")
+        ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+        
+        ax.legend(fontsize=10, frameon=False, loc='best')
         plt.tight_layout()
         
         output_path = f'{output_dir}/time_per_graph_per_epoch_vs_scale.png'
@@ -673,35 +971,55 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     )
     
     if has_cpu_memory:
-        plt.figure(figsize=(12, 7))
+        fig, ax = plt.subplots(figsize=(8, 8))
         
-        for idx, (model_name, mdata) in enumerate(model_data.items()):
-            sizes = mdata['sizes']
+        oom_labeled = False
+        all_valid_y = []
+        
+        for model_name, mdata in model_data.items():
+            num_edges = mdata['num_edges']
             means = mdata['peak_cpu_memory_mean']
-            stds = mdata['peak_cpu_memory_std']
+            oom_flags = mdata['oom_flags']
+            style = model_styles[model_name]
             
-            # 过滤掉0值
-            filtered_data = [(s, m, std) for s, m, std in zip(sizes, means, stds) if m > 0]
-            if not filtered_data:
-                continue
-            
-            sizes_filtered, means_filtered, stds_filtered = zip(*filtered_data)
-            
-            plt.errorbar(sizes_filtered, means_filtered, yerr=stds_filtered, 
-                        marker=markers[idx % len(markers)], 
-                        linewidth=2.5, markersize=10,
-                        capsize=5, capthick=2,
-                        label=model_name.upper(), 
-                        color=colors[idx],
-                        alpha=0.8)
+            valid_data = [(x, y) for x, y in zip(num_edges, means) if not np.isnan(y) and y > 0]
+            if valid_data:
+                valid_x, valid_y = zip(*valid_data)
+                all_valid_y.extend(valid_y)
+                ax.plot(valid_x, valid_y, label=model_name.upper(), **style)
         
-        plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
-        plt.ylabel('Peak CPU Memory Usage (MB)', fontsize=14, fontweight='bold')
-        plt.title('Dataset Size vs Peak CPU Memory Usage', fontsize=16, fontweight='bold', pad=20)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.grid(True, alpha=0.3, linestyle='--', which='both')
-        plt.legend(fontsize=12, loc='best', framealpha=0.9)
+        if all_valid_y:
+            oom_y = max(all_valid_y) * 1.5
+        else:
+            oom_y = 1000
+        
+        for model_name, mdata in model_data.items():
+            num_edges = mdata['num_edges']
+            means = mdata['peak_cpu_memory_mean']
+            oom_flags = mdata['oom_flags']
+            
+            for x, y, oom in zip(num_edges, means, oom_flags):
+                if oom:
+                    y_plot = oom_y if (np.isnan(y) or y <= 0) else y
+                    ax.scatter([x], [y_plot], s=150, marker='X', 
+                              color='red', edgecolors='darkred', linewidths=1.5,
+                              label='OOM' if not oom_labeled else '', zorder=100)
+                    oom_labeled = True
+        
+        ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
+        ax.set_ylabel('Peak CPU Memory (MB)', fontsize=12, fontweight='bold', color="#50392C")
+        ax.set_title('Number of Edges vs Peak CPU Memory Usage', fontsize=14, fontweight='bold', pad=12)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
+        
+        for spine in ax.spines.values():
+            spine.set_color('#F0F0F0')
+        ax.spines['left'].set_color("#50392C")
+        ax.spines['bottom'].set_color("#50392C")
+        ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+        
+        ax.legend(fontsize=10, frameon=False, loc='best')
         plt.tight_layout()
         
         output_path = f'{output_dir}/peak_cpu_memory_vs_scale.png'
@@ -718,35 +1036,55 @@ def plot_scaling_analysis(result_base_dir='result', output_dir='scaling_plots', 
     )
     
     if has_gpu_memory:
-        plt.figure(figsize=(12, 7))
+        fig, ax = plt.subplots(figsize=(8, 8))
         
-        for idx, (model_name, mdata) in enumerate(model_data.items()):
-            sizes = mdata['sizes']
+        oom_labeled = False
+        all_valid_y = []
+        
+        for model_name, mdata in model_data.items():
+            num_edges = mdata['num_edges']
             means = mdata['peak_gpu_memory_mean']
-            stds = mdata['peak_gpu_memory_std']
+            oom_flags = mdata['oom_flags']
+            style = model_styles[model_name]
             
-            # 过滤掉0值
-            filtered_data = [(s, m, std) for s, m, std in zip(sizes, means, stds) if m > 0]
-            if not filtered_data:
-                continue
-            
-            sizes_filtered, means_filtered, stds_filtered = zip(*filtered_data)
-            
-            plt.errorbar(sizes_filtered, means_filtered, yerr=stds_filtered, 
-                        marker=markers[idx % len(markers)], 
-                        linewidth=2.5, markersize=10,
-                        capsize=5, capthick=2,
-                        label=model_name.upper(), 
-                        color=colors[idx],
-                        alpha=0.8)
+            valid_data = [(x, y) for x, y in zip(num_edges, means) if not np.isnan(y) and y > 0]
+            if valid_data:
+                valid_x, valid_y = zip(*valid_data)
+                all_valid_y.extend(valid_y)
+                ax.plot(valid_x, valid_y, label=model_name.upper(), **style)
         
-        plt.xlabel('Dataset Size (Number of Graphs)', fontsize=14, fontweight='bold')
-        plt.ylabel('Peak GPU Memory Usage (MB)', fontsize=14, fontweight='bold')
-        plt.title('Dataset Size vs Peak GPU Memory Usage', fontsize=16, fontweight='bold', pad=20)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.grid(True, alpha=0.3, linestyle='--', which='both')
-        plt.legend(fontsize=12, loc='best', framealpha=0.9)
+        if all_valid_y:
+            oom_y = max(all_valid_y) * 1.5
+        else:
+            oom_y = 10000
+        
+        for model_name, mdata in model_data.items():
+            num_edges = mdata['num_edges']
+            means = mdata['peak_gpu_memory_mean']
+            oom_flags = mdata['oom_flags']
+            
+            for x, y, oom in zip(num_edges, means, oom_flags):
+                if oom:
+                    y_plot = oom_y if (np.isnan(y) or y <= 0) else y
+                    ax.scatter([x], [y_plot], s=150, marker='X', 
+                              color='red', edgecolors='darkred', linewidths=1.5,
+                              label='OOM' if not oom_labeled else '', zorder=100)
+                    oom_labeled = True
+        
+        ax.set_xlabel('Number of Edges', fontsize=12, fontweight='bold', color="#50392C")
+        ax.set_ylabel('Peak GPU Memory (MB)', fontsize=12, fontweight='bold', color="#50392C")
+        ax.set_title('Number of Edges vs Peak GPU Memory Usage', fontsize=14, fontweight='bold', pad=12)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.grid(True, axis='both', linestyle=':', color='#DCDCDC', alpha=0.8, linewidth=1.5)
+        
+        for spine in ax.spines.values():
+            spine.set_color('#F0F0F0')
+        ax.spines['left'].set_color("#50392C")
+        ax.spines['bottom'].set_color("#50392C")
+        ax.tick_params(axis='both', labelsize=10, colors="#50392C")
+        
+        ax.legend(fontsize=10, frameon=False, loc='best')
         plt.tight_layout()
         
         output_path = f'{output_dir}/peak_gpu_memory_vs_scale.png'
@@ -848,6 +1186,9 @@ def main():
   
   # 只绘制GCN和GIN的对比
   python plot_from_csv.py --scaling --models gcn gin --output_dir gcn_vs_gin
+  
+  # 排除某些模型（如排除Hybrid）
+  python plot_from_csv.py --scaling --result_dir result --output_dir scaling_plots --exclude_models hybrid
         """
     )
     
@@ -865,6 +1206,8 @@ def main():
                        help='结果目录（用于扩展性分析）')
     parser.add_argument('--models', type=str, nargs='+',
                        help='指定要绘制的模型列表（如：gcn gat gin），不指定则绘制所有模型')
+    parser.add_argument('--exclude_models', type=str, nargs='+',
+                       help='指定要排除的模型列表（如：hybrid），与--models互斥')
     
     args = parser.parse_args()
     
@@ -878,11 +1221,14 @@ def main():
         print(f"Output Directory: {args.output_dir}")
         if args.models:
             print(f"Selected Models: {', '.join(args.models)}")
+        elif args.exclude_models:
+            print(f"Excluded Models: {', '.join(args.exclude_models)}")
+            print("Selected Models: All others")
         else:
             print("Selected Models: All")
         print("=" * 80 + "\n")
         
-        plot_scaling_analysis(args.result_dir, args.output_dir, args.models)
+        plot_scaling_analysis(args.result_dir, args.output_dir, args.models, args.exclude_models)
         
         print("\n" + "=" * 80)
         print("✅ Scaling analysis plots completed!")

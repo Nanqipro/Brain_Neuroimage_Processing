@@ -436,12 +436,33 @@ def load_ogb_data(dataset_name, data_root, batch_size=32):
         print(f"  - 示例图节点数: {sample.num_nodes}")
         print(f"  - 示例图边数: {sample.num_edges}")
     
+    # 检查是否有节点特征
+    has_node_features = dataset.num_features > 0
+    
     # 创建子数据集并转换特征类型
     # OGB数据集的节点特征通常是int64类型，需要转换为float32以兼容所有GNN模型
     def convert_data_to_float(data):
-        """将图数据的节点特征转换为float32类型"""
-        if data.x is not None and data.x.dtype != torch.float32:
+        """将图数据的节点特征转换为float32类型，或为无特征数据集生成特征"""
+        # 检查是否需要生成特征
+        needs_features = (data.x is None or 
+                         (hasattr(data.x, 'shape') and (len(data.x.shape) == 0 or data.x.shape[1] == 0)))
+        
+        if needs_features:
+            # 如果没有节点特征，使用节点度数作为特征
+            from torch_geometric.utils import degree
+            edge_index = data.edge_index
+            num_nodes = data.num_nodes
+            
+            # 计算节点度数（入度 + 出度）
+            row, col = edge_index
+            deg = degree(row, num_nodes, dtype=torch.float) + degree(col, num_nodes, dtype=torch.float)
+            
+            # 将度数转换为特征 (num_nodes, 1)
+            data.x = deg.view(-1, 1).float()
+        elif data.x is not None and data.x.dtype != torch.float32:
+            # 转换为 float32
             data.x = data.x.float()
+        
         return data
     
     train_dataset = [convert_data_to_float(dataset[i]) for i in split_idx['train']]
@@ -452,7 +473,11 @@ def load_ogb_data(dataset_name, data_root, batch_size=32):
     print(f"  - 训练集: {len(train_dataset)} 图")
     print(f"  - 验证集: {len(val_dataset)} 图")
     print(f"  - 测试集: {len(test_dataset)} 图")
-    print(f"  - 节点特征已转换为float32类型")
+    if has_node_features:
+        print(f"  - 节点特征已转换为float32类型")
+    else:
+        print(f"  - ⚠️  原数据集无节点特征，已自动生成度数特征 (维度=1)")
+        print(f"  - 使用节点度数 (入度+出度) 作为节点特征")
     
     # 创建DataLoader
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -469,7 +494,10 @@ def load_ogb_data(dataset_name, data_root, batch_size=32):
         # 对于回归或多标签任务
         num_classes = dataset.num_tasks
     
-    return train_loader, val_loader, test_loader, dataset.num_features, num_classes, None, None
+    # 更新特征维度（如果生成了度数特征）
+    actual_num_features = dataset.num_features if has_node_features else 1
+    
+    return train_loader, val_loader, test_loader, actual_num_features, num_classes, None, None
 
 
 def load_custom_data(data_dir, seed, train_ratio=0.8, val_ratio=0.1, batch_size=32, 
@@ -781,9 +809,12 @@ def run_experiment(args):
     # 计算每个图在单个epoch中的平均执行时间（另一种计算方式）
     time_per_graph_per_epoch = avg_training_time / num_train_graphs if num_train_graphs > 0 else 0
     
-    # 测试
+    # 测试（记录推理时间）
     print(f"\n在测试集上评估...")
+    test_start_time = time.time()
     test_metrics = evaluate_model(model, test_loader, device)
+    test_end_time = time.time()
+    test_inference_time = test_end_time - test_start_time
     
     # 计算脚本总运行时间
     total_elapsed_time = time.time() - begin_time
@@ -799,6 +830,7 @@ def run_experiment(args):
     print(f"  - 精确率: {test_metrics['precision']:.4f}")
     print(f"  - 召回率: {test_metrics['recall']:.4f}")
     print(f"  - F1分数: {test_metrics['f1']:.4f}")
+    print(f"  - AUC-ROC: {test_metrics['auc_roc']:.4f}")
     print(f"\n训练时间统计:")
     print(f"  - 总训练时间（仅训练集）: {total_training_time:.3f}秒")
     print(f"  - 总验证时间: {total_val_time:.3f}秒")
@@ -807,6 +839,8 @@ def run_experiment(args):
     print(f"  - 每个图的平均执行时间（整个训练过程）: {time_per_graph:.6f}秒/图 ({time_per_graph*1000:.3f}毫秒/图)")
     print(f"  - 每个图的平均执行时间（单个epoch）: {time_per_graph_per_epoch:.6f}秒/图 ({time_per_graph_per_epoch*1000:.3f}毫秒/图)")
     print(f"  - 训练集图数: {num_train_graphs}")
+    print(f"  - 测试集推理时间: {test_inference_time:.3f}秒")
+    print(f"  - 测试集每个图推理时间: {test_inference_time/num_test_graphs*1000:.3f}毫秒/图" if num_test_graphs > 0 else "  - 测试集每个图推理时间: N/A")
     print(f"  - 脚本总运行时间: {total_elapsed_time:.2f}秒")
     
     # 打印资源使用统计
@@ -855,7 +889,15 @@ def run_experiment(args):
             f.write(f"精确率: {test_metrics['precision']:.4f}\n")
             f.write(f"召回率: {test_metrics['recall']:.4f}\n")
             f.write(f"F1分数: {test_metrics['f1']:.4f}\n")
+            f.write(f"AUC-ROC: {test_metrics['auc_roc']:.4f}\n")
             f.write(f"最佳验证F1: {best_val_f1:.4f}\n\n")
+            f.write("-" * 80 + "\n")
+            f.write("推理时间统计\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"测试集推理时间: {test_inference_time:.3f} 秒\n")
+            f.write(f"测试集图数量: {num_test_graphs}\n")
+            f.write(f"每个图推理时间: {test_inference_time/num_test_graphs*1000:.3f} 毫秒/图\n" if num_test_graphs > 0 else "每个图推理时间: N/A\n")
+            f.write("\n")
             f.write("=" * 80 + "\n")
         
         print(f"\n训练时间统计已保存到: {time_stats_file}")
@@ -899,7 +941,13 @@ def run_experiment(args):
                 "accuracy": float(test_metrics['accuracy']),
                 "precision": float(test_metrics['precision']),
                 "recall": float(test_metrics['recall']),
-                "f1": float(test_metrics['f1'])
+                "f1": float(test_metrics['f1']),
+                "auc_roc": float(test_metrics['auc_roc'])
+            },
+            "inference_time": {
+                "test_inference_time_seconds": float(test_inference_time),
+                "test_inference_time_per_graph_ms": float(test_inference_time / num_test_graphs * 1000) if num_test_graphs > 0 else 0.0,
+                "num_test_graphs": num_test_graphs
             },
             "best_val_f1": float(best_val_f1),
             "history": {
@@ -969,7 +1017,10 @@ def run_experiment(args):
         'time_per_graph_ms': float(time_per_graph * 1000),
         'time_per_graph_per_epoch': float(time_per_graph_per_epoch),  # 核心指标4: 每个图在单个epoch中的平均执行时间
         'time_per_graph_per_epoch_ms': float(time_per_graph_per_epoch * 1000),
+        'test_inference_time': float(test_inference_time),  # 测试集推理时间
+        'test_inference_time_per_graph_ms': float(test_inference_time / num_test_graphs * 1000) if num_test_graphs > 0 else 0.0,
         'num_train_graphs': num_train_graphs,
+        'num_test_graphs': num_test_graphs,
         'avg_epoch_time': float(np.mean(history['epoch_times'])) if history['epoch_times'] else 0,
         'total_elapsed_time': total_elapsed_time,
         'peak_cpu_memory_mb': float(np.max(resource_log['cpu_memory'])) if resource_log['cpu_memory'] else 0,
@@ -1113,6 +1164,7 @@ def main():
                 'test_precision': float(result['precision']),
                 'test_recall': float(result['recall']),
                 'test_f1': float(result['f1']),
+                'test_auc_roc': float(result['auc_roc']),
                 'actual_epochs': int(result['actual_epochs']),
                 'total_training_time': float(result['total_training_time']),
                 'avg_training_time': float(result['avg_training_time']),
@@ -1120,7 +1172,10 @@ def main():
                 'time_per_graph_ms': float(result['time_per_graph_ms']),
                 'time_per_graph_per_epoch': float(result['time_per_graph_per_epoch']),
                 'time_per_graph_per_epoch_ms': float(result['time_per_graph_per_epoch_ms']),
+                'test_inference_time': float(result['test_inference_time']),
+                'test_inference_time_per_graph_ms': float(result['test_inference_time_per_graph_ms']),
                 'num_train_graphs': int(result['num_train_graphs']),
+                'num_test_graphs': int(result['num_test_graphs']),
                 'avg_epoch_time': float(result['avg_epoch_time']),
                 'total_elapsed_time': float(result['total_elapsed_time']),
                 'peak_cpu_memory_mb': float(result['peak_cpu_memory_mb']),
@@ -1138,6 +1193,7 @@ def main():
         precisions = [r['test_precision'] for r in all_results]
         recalls = [r['test_recall'] for r in all_results]
         f1_scores = [r['test_f1'] for r in all_results]
+        auc_rocs = [r['test_auc_roc'] for r in all_results]
         actual_epochs = [r['actual_epochs'] for r in all_results]
         total_training_times = [r['total_training_time'] for r in all_results]
         avg_training_times = [r['avg_training_time'] for r in all_results]
@@ -1145,6 +1201,8 @@ def main():
         times_per_graph_ms = [r['time_per_graph_ms'] for r in all_results]
         times_per_graph_per_epoch = [r['time_per_graph_per_epoch'] for r in all_results]
         times_per_graph_per_epoch_ms = [r['time_per_graph_per_epoch_ms'] for r in all_results]
+        test_inference_times = [r['test_inference_time'] for r in all_results]
+        test_inference_times_per_graph_ms = [r['test_inference_time_per_graph_ms'] for r in all_results]
         avg_epoch_times = [r['avg_epoch_time'] for r in all_results]
         total_elapsed_times = [r['total_elapsed_time'] for r in all_results]
         peak_cpu_mems = [r['peak_cpu_memory_mb'] for r in all_results]
@@ -1156,6 +1214,7 @@ def main():
         print(f"测试集精确率: {np.mean(precisions):.4f} ± {np.std(precisions):.4f}")
         print(f"测试集召回率: {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
         print(f"测试集F1分数: {np.mean(f1_scores):.4f} ± {np.std(f1_scores):.4f}")
+        print(f"测试集AUC-ROC: {np.mean(auc_rocs):.4f} ± {np.std(auc_rocs):.4f}")
         print(f"\n训练时间统计:")
         print(f"平均实际训练轮数: {np.mean(actual_epochs):.1f} ± {np.std(actual_epochs):.1f} epochs")
         print(f"平均总训练时间（到达收敛）: {np.mean(total_training_times):.3f} ± {np.std(total_training_times):.3f}秒")
@@ -1164,6 +1223,10 @@ def main():
         print(f"平均每个图执行时间: {np.mean(times_per_graph_ms):.3f} ± {np.std(times_per_graph_ms):.3f}毫秒/图")
         print(f"平均epoch时间: {np.mean(avg_epoch_times):.3f} ± {np.std(avg_epoch_times):.3f}秒")
         print(f"平均脚本运行时间: {np.mean(total_elapsed_times):.2f} ± {np.std(total_elapsed_times):.2f}秒")
+        
+        print(f"\n推理时间统计:")
+        print(f"平均测试集推理时间: {np.mean(test_inference_times):.3f} ± {np.std(test_inference_times):.3f}秒")
+        print(f"平均每个图推理时间: {np.mean(test_inference_times_per_graph_ms):.3f} ± {np.std(test_inference_times_per_graph_ms):.3f}毫秒/图")
         
         print(f"\n资源使用统计:")
         print(f"平均峰值内存: {np.mean(peak_cpu_mems):.2f} ± {np.std(peak_cpu_mems):.2f} MB")
@@ -1176,8 +1239,10 @@ def main():
             print(f"  Run {result['run']} (Seed={result['seed']}): "
                   f"Acc={result['test_accuracy']:.4f}, "
                   f"F1={result['test_f1']:.4f}, "
+                  f"AUC-ROC={result['test_auc_roc']:.4f}, "
                   f"Epochs={result['actual_epochs']}, "
-                  f"TotalTime={result['total_training_time']:.3f}s, "
+                  f"TrainTime={result['total_training_time']:.3f}s, "
+                  f"InferTime={result['test_inference_time']:.3f}s, "
                   f"TimePerGraph={result['time_per_graph_ms']:.3f}ms, "
                   f"PeakMem={result['peak_cpu_memory_mb']:.1f}MB, "
                   f"PeakGPU={result['peak_gpu_memory_mb']:.1f}MB")
@@ -1194,6 +1259,7 @@ def main():
                     'precision': {'mean': float(np.mean(precisions)), 'std': float(np.std(precisions))},
                     'recall': {'mean': float(np.mean(recalls)), 'std': float(np.std(recalls))},
                     'f1': {'mean': float(np.mean(f1_scores)), 'std': float(np.std(f1_scores))},
+                    'auc_roc': {'mean': float(np.mean(auc_rocs)), 'std': float(np.std(auc_rocs))},
                     'actual_epochs': {'mean': float(np.mean(actual_epochs)), 'std': float(np.std(actual_epochs))},
                     'total_training_time': {'mean': float(np.mean(total_training_times)), 'std': float(np.std(total_training_times))},
                     'avg_training_time_per_epoch': {'mean': float(np.mean(avg_training_times)), 'std': float(np.std(avg_training_times))},
@@ -1201,6 +1267,8 @@ def main():
                     'time_per_graph_ms': {'mean': float(np.mean(times_per_graph_ms)), 'std': float(np.std(times_per_graph_ms))},
                     'time_per_graph_per_epoch': {'mean': float(np.mean(times_per_graph_per_epoch)), 'std': float(np.std(times_per_graph_per_epoch))},
                     'time_per_graph_per_epoch_ms': {'mean': float(np.mean(times_per_graph_per_epoch_ms)), 'std': float(np.std(times_per_graph_per_epoch_ms))},
+                    'test_inference_time': {'mean': float(np.mean(test_inference_times)), 'std': float(np.std(test_inference_times))},
+                    'test_inference_time_per_graph_ms': {'mean': float(np.mean(test_inference_times_per_graph_ms)), 'std': float(np.std(test_inference_times_per_graph_ms))},
                     'avg_epoch_time': {'mean': float(np.mean(avg_epoch_times)), 'std': float(np.std(avg_epoch_times))},
                     'total_elapsed_time': {'mean': float(np.mean(total_elapsed_times)), 'std': float(np.std(total_elapsed_times))},
                     'peak_cpu_memory_mb': {'mean': float(np.mean(peak_cpu_mems)), 'std': float(np.std(peak_cpu_mems))},

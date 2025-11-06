@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, roc_auc_score
 from torch_geometric.data import DataLoader
 
 
@@ -73,6 +73,7 @@ def evaluate_model(model, loader, device):
     correct = 0
     all_preds = []
     all_labels = []
+    all_probs = []  # 存储预测概率用于计算 AUC-ROC
 
     with torch.no_grad():
         for data in loader:
@@ -86,6 +87,9 @@ def evaluate_model(model, loader, device):
             outputs = model(data)
             _, pred = outputs.max(dim=1)
             
+            # 计算预测概率（用于 AUC-ROC）
+            probs = torch.exp(outputs)  # 从 log_softmax 转换为概率
+            
             # 处理 OGB 数据集的标签格式 (batch_size, 1) -> (batch_size,)
             y = data.y.squeeze() if data.y.dim() > 1 else data.y
             
@@ -94,6 +98,7 @@ def evaluate_model(model, loader, device):
             # 收集每个批次的预测结果和标签
             all_preds.extend(pred.cpu().numpy())
             all_labels.extend(y.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
 
     # 计算各项指标
     accuracy = correct / len(loader.dataset)
@@ -101,13 +106,38 @@ def evaluate_model(model, loader, device):
     recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
     f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
     
+    # 计算 AUC-ROC
+    auc_roc = 0.0
+    try:
+        all_probs_array = np.array(all_probs)
+        all_labels_array = np.array(all_labels)
+        
+        # 检查类别数
+        num_classes = all_probs_array.shape[1] if len(all_probs_array.shape) > 1 else 2
+        unique_labels = np.unique(all_labels_array)
+        
+        if len(unique_labels) > 1:  # 至少有两个类别才能计算 AUC-ROC
+            if num_classes == 2:
+                # 二分类：使用正类的概率
+                auc_roc = roc_auc_score(all_labels_array, all_probs_array[:, 1])
+            else:
+                # 多分类：使用 ovr (one-vs-rest) 策略
+                auc_roc = roc_auc_score(all_labels_array, all_probs_array, multi_class='ovr', average='weighted')
+        else:
+            auc_roc = 0.0  # 只有一个类别，无法计算 AUC-ROC
+    except Exception as e:
+        # 如果计算失败，设置为 0
+        auc_roc = 0.0
+    
     metrics = {
         'accuracy': accuracy,
         'precision': precision,
         'recall': recall,
         'f1': f1,
+        'auc_roc': auc_roc,
         'predictions': all_preds,
-        'labels': all_labels
+        'labels': all_labels,
+        'probabilities': all_probs
     }
     
     return metrics
