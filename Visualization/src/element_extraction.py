@@ -2,7 +2,11 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 from scipy.signal import find_peaks, peak_widths, savgol_filter, butter, filtfilt
-from numpy import trapezoid
+# 兼容不同版本的 NumPy
+try:
+    from numpy import trapezoid
+except ImportError:
+    from numpy import trapz as trapezoid
 import matplotlib.pyplot as plt
 import os
 import argparse
@@ -1708,7 +1712,7 @@ if __name__ == "__main__":
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
-    parser.add_argument('--data', type=str, default='../datasets/new-mice/bla6250EM0626goodtrace.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/bla6250EM0626goodtrace.xlsx',
                         help='数据文件路径，支持.xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
