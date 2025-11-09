@@ -951,6 +951,508 @@ def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpea
     
     return features, transients
 
+def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_dict, fs=4.8,
+                                           neuron_ids=None, save_dir=None, show_subpeaks=True,
+                                           line_width=2.0, figsize=(20, 6),
+                                           layout='separate'):
+    """
+    为每个神经元单独生成 trace 图，标注检测到的钙波
+    
+    参数
+    ----------
+    raw_data : pandas.DataFrame or dict
+        原始钙离子浓度数据
+    smoothed_data : pandas.DataFrame or dict
+        平滑后的数据
+    transients_dict : dict
+        检测到的钙爆发特征字典，键为神经元ID，值为transients列表
+    fs : float, 可选
+        采样频率，默认为4.8Hz
+    neuron_ids : list, 可选
+        要显示的神经元ID列表，默认为None（显示所有）
+    save_dir : str, 可选
+        保存目录，默认为None
+    show_subpeaks : bool, 可选
+        是否显示子峰，默认为True
+    line_width : float, 可选
+        trace线条宽度，默认为2.0
+    figsize : tuple, 可选
+        单个图像尺寸，默认为(20, 6)
+    layout : str, 可选
+        布局方式：'separate'（每个神经元独立文件）或'subplots'（多个子图在一个文件中）
+        
+    返回
+    -------
+    saved_files : list
+        保存的文件路径列表
+    """
+    import matplotlib.cm as cm
+    from matplotlib.colors import Normalize
+    from matplotlib.patches import Patch
+    
+    # 转换数据格式
+    if isinstance(raw_data, pd.DataFrame):
+        raw_data_dict = {col: raw_data[col].values for col in raw_data.columns}
+        smoothed_data_dict = {col: smoothed_data[col].values for col in smoothed_data.columns}
+    elif isinstance(raw_data, dict):
+        raw_data_dict = raw_data
+        smoothed_data_dict = smoothed_data
+    else:
+        raw_data_dict = {'neuron_0': raw_data}
+        smoothed_data_dict = {'neuron_0': smoothed_data}
+    
+    # 确定要显示的神经元
+    if neuron_ids is None:
+        neuron_ids = list(raw_data_dict.keys())
+    
+    # 生成时间轴
+    time_points = len(list(raw_data_dict.values())[0])
+    time_axis = np.arange(time_points) / fs
+    
+    saved_files = []
+    
+    if layout == 'separate':
+        # 方案A：每个神经元保存为独立文件
+        for neuron_id in neuron_ids:
+            if neuron_id not in raw_data_dict:
+                print(f"警告: 神经元 {neuron_id} 不在数据中，跳过")
+                continue
+            
+            # 创建单独的图
+            fig, ax = plt.subplots(figsize=figsize)
+            
+            raw_trace = raw_data_dict[neuron_id]
+            smoothed_trace = smoothed_data_dict[neuron_id]
+            
+            # 绘制原始数据（半透明）
+            ax.plot(time_axis, raw_trace,
+                   linewidth=line_width * 0.7,
+                   alpha=0.4,
+                   color='gray',
+                   label='Raw Data')
+            
+            # 绘制平滑后的数据
+            ax.plot(time_axis, smoothed_trace,
+                   linewidth=line_width,
+                   alpha=0.9,
+                   color='black',
+                   label='Smoothed Data')
+            
+            # 标注钙波
+            if neuron_id in transients_dict:
+                transients = transients_dict[neuron_id]
+                
+                # 使用形态评分确定颜色
+                if len(transients) > 0 and 'morphology_score' in transients[0]:
+                    scores = [t.get('morphology_score', 0.5) for t in transients]
+                    norm = Normalize(vmin=min(scores), vmax=max(scores))
+                    cmap = cm.viridis
+                else:
+                    norm = None
+                    cmap = None
+                
+                for j, transient in enumerate(transients):
+                    start_time = transient['start_idx'] / fs
+                    end_time = transient['end_idx'] / fs
+                    peak_time = transient['peak_idx'] / fs
+                    peak_value = transient['peak_value']
+                    
+                    # 确定颜色
+                    if norm is not None and cmap is not None:
+                        color = cmap(norm(transient.get('morphology_score', 0.5)))
+                    else:
+                        color = 'red'
+                    
+                    # 绘制钙波区间（半透明背景）
+                    ax.axvspan(start_time, end_time,
+                              alpha=0.25, color=color,
+                              label='Calcium Wave' if j == 0 else "")
+                    
+                    # 标记区间边界（垂直虚线）
+                    ax.axvline(start_time, color=color, linestyle='--',
+                              linewidth=1.5, alpha=0.7)
+                    ax.axvline(end_time, color=color, linestyle='--',
+                              linewidth=1.5, alpha=0.7)
+                    
+                    # 标记峰值
+                    ax.scatter(peak_time, peak_value,
+                              color=color, s=120, marker='o', zorder=5,
+                              edgecolors='black', linewidth=1.5,
+                              label='Peak' if j == 0 else "")
+                    
+                    # 添加钙波编号和评分
+                    if 'morphology_score' in transient:
+                        score_text = f"#{j+1}\nScore:{transient['morphology_score']:.2f}"
+                    else:
+                        score_text = f"#{j+1}"
+                    
+                    y_offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.05
+                    ax.text(peak_time, peak_value + y_offset,
+                           score_text,
+                           horizontalalignment='center',
+                           verticalalignment='bottom',
+                           fontsize=11,
+                           fontweight='bold',
+                           bbox=dict(boxstyle='round,pad=0.3',
+                                   facecolor=color, alpha=0.3,
+                                   edgecolor='black', linewidth=0.5))
+                    
+                    # 标记子峰
+                    if show_subpeaks and 'subpeaks' in transient and transient['subpeaks']:
+                        for sp in transient['subpeaks']:
+                            sp_time = sp['index'] / fs
+                            sp_value = sp['value']
+                            ax.scatter(sp_time, sp_value,
+                                      color='magenta', s=80, marker='*', zorder=5,
+                                      edgecolors='black', linewidth=0.5,
+                                      label='Subpeak' if j == 0 else "")
+            
+            # 设置标题和标签
+            n_waves = len(transients_dict.get(neuron_id, []))
+            ax.set_title(f'Neuron {neuron_id} - Calcium Transient Detection ({n_waves} waves)',
+                        fontsize=16, fontweight='bold', pad=15)
+            ax.set_xlabel('Time (seconds)', fontsize=14, fontweight='bold')
+            ax.set_ylabel('Calcium Signal Intensity', fontsize=14, fontweight='bold')
+            
+            # 设置刻度
+            ax.tick_params(axis='both', labelsize=12)
+            for label in ax.get_xticklabels() + ax.get_yticklabels():
+                label.set_fontweight('bold')
+            
+            # 添加网格
+            ax.grid(True, alpha=0.3, linestyle='--')
+            
+            # 添加图例（去重）
+            handles, labels = ax.get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            ax.legend(by_label.values(), by_label.keys(),
+                     loc='upper right', fontsize=11, framealpha=0.9)
+            
+            plt.tight_layout()
+            
+            # 保存图像
+            if save_dir:
+                os.makedirs(save_dir, exist_ok=True)
+                save_path = os.path.join(save_dir, f'{neuron_id}_trace.png')
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                saved_files.append(save_path)
+                print(f"  已保存: {save_path}")
+                plt.close()
+            else:
+                plt.show()
+    
+    else:  # layout == 'subplots'
+        # 方案B：所有神经元作为子图在一个文件中
+        n_neurons = len(neuron_ids)
+        n_cols = 1
+        n_rows = n_neurons
+        
+        fig, axes = plt.subplots(n_rows, n_cols,
+                                figsize=(figsize[0], figsize[1] * n_neurons),
+                                squeeze=False)
+        
+        for idx, neuron_id in enumerate(neuron_ids):
+            ax = axes[idx, 0]
+            
+            if neuron_id not in raw_data_dict:
+                ax.text(0.5, 0.5, f'神经元 {neuron_id} 数据缺失',
+                       ha='center', va='center', transform=ax.transAxes)
+                ax.set_title(f'Neuron {neuron_id}')
+                continue
+            
+            raw_trace = raw_data_dict[neuron_id]
+            smoothed_trace = smoothed_data_dict[neuron_id]
+            
+            # 绘制数据
+            ax.plot(time_axis, raw_trace, linewidth=line_width * 0.7,
+                   alpha=0.4, color='gray', label='Raw')
+            ax.plot(time_axis, smoothed_trace, linewidth=line_width,
+                   alpha=0.9, color='black', label='Smoothed')
+            
+            # 标注钙波
+            if neuron_id in transients_dict:
+                transients = transients_dict[neuron_id]
+                
+                if len(transients) > 0 and 'morphology_score' in transients[0]:
+                    scores = [t.get('morphology_score', 0.5) for t in transients]
+                    norm = Normalize(vmin=min(scores), vmax=max(scores))
+                    cmap = cm.viridis
+                else:
+                    norm = None
+                    cmap = None
+                
+                for j, transient in enumerate(transients):
+                    start_time = transient['start_idx'] / fs
+                    end_time = transient['end_idx'] / fs
+                    peak_time = transient['peak_idx'] / fs
+                    peak_value = transient['peak_value']
+                    
+                    color = cmap(norm(transient.get('morphology_score', 0.5))) if norm else 'red'
+                    
+                    ax.axvspan(start_time, end_time, alpha=0.25, color=color)
+                    ax.axvline(start_time, color=color, linestyle='--', linewidth=1, alpha=0.7)
+                    ax.axvline(end_time, color=color, linestyle='--', linewidth=1, alpha=0.7)
+                    ax.scatter(peak_time, peak_value, color=color, s=80,
+                              marker='o', zorder=5, edgecolors='black', linewidth=1)
+                    
+                    # 标注编号
+                    y_offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.03
+                    ax.text(peak_time, peak_value + y_offset, f'#{j+1}',
+                           ha='center', va='bottom', fontsize=9, fontweight='bold')
+                    
+                    # 子峰
+                    if show_subpeaks and 'subpeaks' in transient and transient['subpeaks']:
+                        for sp in transient['subpeaks']:
+                            ax.scatter(sp['index'] / fs, sp['value'],
+                                      color='magenta', s=50, marker='*', zorder=5)
+            
+            # 设置标题和标签
+            n_waves = len(transients_dict.get(neuron_id, []))
+            ax.set_title(f'Neuron {neuron_id} ({n_waves} waves)',
+                        fontsize=13, fontweight='bold')
+            ax.set_ylabel('Signal', fontsize=11, fontweight='bold')
+            ax.tick_params(axis='both', labelsize=10)
+            ax.grid(True, alpha=0.3, linestyle='--')
+            
+            # 只在最后一个子图显示x轴标签
+            if idx == n_neurons - 1:
+                ax.set_xlabel('Time (seconds)', fontsize=11, fontweight='bold')
+            else:
+                ax.set_xticklabels([])
+        
+        plt.tight_layout()
+        
+        # 保存
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+            save_path = os.path.join(save_dir, 'all_neurons_subplots.png')
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            saved_files.append(save_path)
+            print(f"已保存多子图: {save_path}")
+            plt.close()
+        else:
+            plt.show()
+    
+    return saved_files
+
+
+def visualize_calcium_transients_trace(raw_data, smoothed_data, transients_dict, fs=4.8, 
+                                       neuron_ids=None, save_path=None, show_subpeaks=True,
+                                       trace_offset=60, scaling_factor=80, line_width=2.0,
+                                       figsize=(60, 25)):
+    """
+    绘制类似 show_trace.py 风格的 trace 图，标注检测到的钙波区间
+    
+    参数
+    ----------
+    raw_data : pandas.DataFrame or dict
+        原始钙离子浓度数据，可以是DataFrame（列为神经元）或字典（键为神经元ID）
+    smoothed_data : pandas.DataFrame or dict
+        平滑后的数据，格式同raw_data
+    transients_dict : dict
+        检测到的钙爆发特征字典，键为神经元ID，值为transients列表
+    fs : float, 可选
+        采样频率，默认为4.8Hz
+    neuron_ids : list, 可选
+        要显示的神经元ID列表，默认为None（显示所有）
+    save_path : str, 可选
+        图像保存路径，默认为None（不保存）
+    show_subpeaks : bool, 可选
+        是否显示子峰，默认为True
+    trace_offset : float, 可选
+        不同神经元trace之间的垂直偏移量，默认为60
+    scaling_factor : float, 可选
+        信号振幅缩放因子，默认为80
+    line_width : float, 可选
+        trace线条宽度，默认为2.0
+    figsize : tuple, 可选
+        图像尺寸，默认为(60, 25)
+    """
+    # 转换数据格式
+    if isinstance(raw_data, pd.DataFrame):
+        raw_data_dict = {col: raw_data[col].values for col in raw_data.columns}
+        smoothed_data_dict = {col: smoothed_data[col].values for col in smoothed_data.columns}
+    elif isinstance(raw_data, dict):
+        raw_data_dict = raw_data
+        smoothed_data_dict = smoothed_data
+    else:
+        # 单个神经元数据
+        raw_data_dict = {'neuron_0': raw_data}
+        smoothed_data_dict = {'neuron_0': smoothed_data}
+    
+    # 确定要显示的神经元
+    if neuron_ids is None:
+        neuron_ids = list(raw_data_dict.keys())
+    
+    # 创建图形
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # 生成时间轴
+    time_points = len(list(raw_data_dict.values())[0])
+    time_axis = np.arange(time_points) / fs
+    
+    # 颜色映射
+    import matplotlib.cm as cm
+    from matplotlib.colors import Normalize
+    
+    # 绘制每个神经元的trace
+    for i, neuron_id in enumerate(neuron_ids):
+        if neuron_id not in raw_data_dict:
+            print(f"警告: 神经元 {neuron_id} 不在数据中，跳过")
+            continue
+        
+        position = len(neuron_ids) - i  # 反向排列，第一个在上方
+        raw_trace = raw_data_dict[neuron_id]
+        smoothed_trace = smoothed_data_dict[neuron_id]
+        
+        # 绘制原始数据（半透明）
+        ax.plot(time_axis, 
+                raw_trace * scaling_factor + position * trace_offset,
+                linewidth=line_width * 0.5,
+                alpha=0.3,
+                color='gray',
+                label=f'{neuron_id} (raw)' if i == 0 else "")
+        
+        # 绘制平滑后的数据
+        ax.plot(time_axis,
+                smoothed_trace * scaling_factor + position * trace_offset,
+                linewidth=line_width,
+                alpha=0.8,
+                color='black',
+                label=f'{neuron_id} (smoothed)' if i == 0 else "")
+        
+        # 标注检测到的钙波区间
+        if neuron_id in transients_dict:
+            transients = transients_dict[neuron_id]
+            
+            # 使用形态评分确定颜色
+            if len(transients) > 0 and 'morphology_score' in transients[0]:
+                scores = [t.get('morphology_score', 0.5) for t in transients]
+                norm = Normalize(vmin=min(scores), vmax=max(scores))
+                cmap = cm.viridis
+            else:
+                norm = None
+                cmap = None
+            
+            for j, transient in enumerate(transients):
+                start_time = transient['start_idx'] / fs
+                end_time = transient['end_idx'] / fs
+                peak_time = transient['peak_idx'] / fs
+                peak_value = transient['peak_value']
+                
+                # 确定颜色
+                if norm is not None and cmap is not None:
+                    color = cmap(norm(transient.get('morphology_score', 0.5)))
+                else:
+                    color = 'red'
+                
+                # 绘制钙波区间（用半透明背景色）
+                ax.axvspan(start_time, end_time, 
+                          ymin=(position - 0.5) * trace_offset / (len(neuron_ids) * trace_offset),
+                          ymax=(position + 0.5) * trace_offset / (len(neuron_ids) * trace_offset),
+                          alpha=0.2, color=color)
+                
+                # 标记区间边界（垂直虚线）
+                ax.axvline(start_time, 
+                          ymin=(position - 0.5) / len(neuron_ids),
+                          ymax=(position + 0.5) / len(neuron_ids),
+                          color=color, linestyle='--', linewidth=1.5, alpha=0.7)
+                ax.axvline(end_time,
+                          ymin=(position - 0.5) / len(neuron_ids),
+                          ymax=(position + 0.5) / len(neuron_ids),
+                          color=color, linestyle='--', linewidth=1.5, alpha=0.7)
+                
+                # 标记峰值位置
+                ax.scatter(peak_time,
+                          peak_value * scaling_factor + position * trace_offset,
+                          color=color, s=100, marker='o', zorder=5,
+                          edgecolors='black', linewidth=1.5)
+                
+                # 添加钙波编号和形态评分
+                if 'morphology_score' in transient:
+                    score_text = f"{j+1}\n{transient['morphology_score']:.2f}"
+                else:
+                    score_text = f"{j+1}"
+                
+                ax.text(peak_time, 
+                       peak_value * scaling_factor + position * trace_offset + trace_offset * 0.15,
+                       score_text,
+                       horizontalalignment='center',
+                       verticalalignment='bottom',
+                       fontsize=10,
+                       fontweight='bold',
+                       color=color)
+                
+                # 标记子峰（如果有且启用显示）
+                if show_subpeaks and 'subpeaks' in transient and transient['subpeaks']:
+                    for subpeak in transient['subpeaks']:
+                        sp_time = subpeak['index'] / fs
+                        sp_value = subpeak['value']
+                        ax.scatter(sp_time,
+                                  sp_value * scaling_factor + position * trace_offset,
+                                  color='magenta', s=60, marker='*', zorder=5,
+                                  edgecolors='black', linewidth=0.5)
+    
+    # 设置Y轴标签
+    yticks = []
+    ytick_labels = []
+    for i, neuron_id in enumerate(neuron_ids):
+        position = len(neuron_ids) - i
+        yticks.append(position * trace_offset)
+        ytick_labels.append(str(neuron_id))
+    
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ytick_labels)
+    
+    # 设置轴标签
+    ax.set_xlabel('Time (seconds)', fontsize=40, fontweight='bold')
+    ax.set_ylabel('Neuron ID', fontsize=40, fontweight='bold')
+    ax.set_title('Calcium Transient Detection Results', fontsize=45, fontweight='bold', pad=20)
+    
+    # 设置刻度标签字体
+    ax.tick_params(axis='x', labelsize=25, rotation=45)
+    ax.tick_params(axis='y', labelsize=20)
+    
+    # 设置刻度标签加粗
+    for label in ax.get_xticklabels():
+        label.set_fontweight('bold')
+    for label in ax.get_yticklabels():
+        label.set_fontweight('bold')
+    
+    # 添加网格
+    ax.grid(False)
+    
+    # 设置X轴范围
+    ax.set_xlim(0, time_axis[-1])
+    
+    # 添加图例说明
+    from matplotlib.patches import Patch
+    legend_elements = [
+        plt.Line2D([0], [0], color='gray', linewidth=line_width*0.5, alpha=0.3, label='Raw Data'),
+        plt.Line2D([0], [0], color='black', linewidth=line_width, alpha=0.8, label='Smoothed Data'),
+        Patch(facecolor='red', alpha=0.2, label='Calcium Wave Region'),
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='red', 
+                   markersize=10, markeredgecolor='black', markeredgewidth=1.5, label='Peak'),
+    ]
+    if show_subpeaks:
+        legend_elements.append(
+            plt.Line2D([0], [0], marker='*', color='w', markerfacecolor='magenta',
+                      markersize=12, markeredgecolor='black', markeredgewidth=0.5, label='Subpeak')
+        )
+    
+    ax.legend(handles=legend_elements, loc='upper right', fontsize=20, framealpha=0.9)
+    
+    plt.tight_layout()
+    
+    # 保存图像
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Trace图已保存到: {save_path}")
+    
+    return fig, ax
+
+
 def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=4.8):
     """
     可视化钙离子浓度数据和检测到的钙爆发，包括形态评分信息
@@ -1277,7 +1779,13 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
                             butterworth_cutoff=20,
                             butterworth_strength=0.05,
                             apply_normalization=False,
-                            normalization_method='standard'):
+                            normalization_method='standard',
+                            # 新增的可视化参数
+                            visualize_trace=False,
+                            trace_save_path=None,
+                            max_neurons_visualize=20,
+                            individual_plots=False,
+                            plot_layout='separate'):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
     
@@ -1315,6 +1823,16 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
         是否应用归一化，默认为False
     normalization_method : str, 可选
         归一化方法，默认为'standard'
+    visualize_trace : bool, 可选
+        是否生成trace可视化图，默认为False
+    trace_save_path : str, 可选
+        trace图保存路径，默认为None（使用默认路径）
+    max_neurons_visualize : int, 可选
+        最多可视化的神经元数量，默认为20
+    individual_plots : bool, 可选
+        是否为每个神经元生成独立的trace图，默认为False
+    plot_layout : str, 可选
+        布局方式：'separate'（每个神经元独立文件）或'subplots'（多子图），默认为'separate'
         
     返回
     -------
@@ -1325,6 +1843,11 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
     """
     all_transients = []
     transient_id = start_id  # 使用传入的起始ID
+    
+    # 用于存储原始数据和平滑数据（如果需要可视化）
+    raw_data_dict = {}
+    smoothed_data_dict = {}
+    transients_dict = {}
     
     for neuron in neuron_columns:
         print(f"处理神经元 {neuron} 的钙爆发...")
@@ -1348,6 +1871,12 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
             apply_normalization=apply_normalization,
             normalization_method=normalization_method
         )
+        
+        # 如果需要可视化，存储数据
+        if visualize_trace:
+            raw_data_dict[neuron] = neuron_data
+            smoothed_data_dict[neuron] = smoothed_data
+            transients_dict[neuron] = transients
         
         # 为该神经元的每个钙爆发分配ID并添加到列表
         for t in transients:
@@ -1377,6 +1906,77 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         all_transients_df.to_excel(save_path, index=False)
         print(f"成功将所有钙爆发数据保存到: {save_path}")
+    
+    # 生成trace可视化图
+    if visualize_trace and len(transients_dict) > 0:
+        print(f"\n正在生成钙波检测trace可视化图...")
+        
+        # 限制可视化的神经元数量
+        if max_neurons_visualize is None:
+            neurons_to_visualize = neuron_columns
+            print(f"  将生成所有 {len(neuron_columns)} 个神经元的trace图")
+        else:
+            neurons_to_visualize = neuron_columns[:max_neurons_visualize]
+            print(f"  将生成前 {min(max_neurons_visualize, len(neuron_columns))} 个神经元的trace图")
+        
+        if individual_plots:
+            # 方案A：为每个神经元生成独立的trace图
+            print(f"  模式: 每个神经元独立保存")
+            
+            # 确定保存目录
+            if save_path is not None:
+                base_dir = os.path.dirname(save_path)
+                save_dir = os.path.join(base_dir, "individual_traces")
+            else:
+                save_dir = "individual_traces"
+            
+            try:
+                saved_files = visualize_calcium_transients_individual(
+                    raw_data=raw_data_dict,
+                    smoothed_data=smoothed_data_dict,
+                    transients_dict=transients_dict,
+                    fs=fs,
+                    neuron_ids=neurons_to_visualize,
+                    save_dir=save_dir,
+                    show_subpeaks=True,
+                    layout=plot_layout
+                )
+                print(f"✓ 已生成 {len(saved_files)} 个神经元trace图")
+                abs_save_dir = os.path.abspath(save_dir)
+                print(f"  保存位置: {abs_save_dir}/")
+                print(f"  示例文件: {os.path.basename(saved_files[0]) if saved_files else 'n1_trace.png'}")
+            except Exception as e:
+                print(f"警告: 生成独立trace图时出错: {str(e)}")
+                import traceback
+                traceback.print_exc()
+        else:
+            # 原有方案：堆叠显示
+            print(f"  模式: 堆叠显示")
+            
+            # 确定保存路径
+            if trace_save_path is None and save_path is not None:
+                # 如果没有指定trace保存路径，根据Excel保存路径生成
+                base_path = os.path.splitext(save_path)[0]
+                trace_save_path = f"{base_path}_trace_visualization.png"
+            elif trace_save_path is None:
+                # 如果都没有指定，使用默认路径
+                trace_save_path = "calcium_transients_trace.png"
+            
+            try:
+                visualize_calcium_transients_trace(
+                    raw_data=raw_data_dict,
+                    smoothed_data=smoothed_data_dict,
+                    transients_dict=transients_dict,
+                    fs=fs,
+                    neuron_ids=neurons_to_visualize,
+                    save_path=trace_save_path,
+                    show_subpeaks=True
+                )
+                print(f"✓ Trace可视化图已生成: {trace_save_path}")
+            except Exception as e:
+                print(f"警告: 生成trace可视化图时出错: {str(e)}")
+                import traceback
+                traceback.print_exc()
     
     return all_transients_df, transient_id
 
@@ -1739,7 +2339,29 @@ if __name__ == "__main__":
     parser.add_argument('--normalization_method', type=str, default='standard',
                         choices=['standard', 'minmax', 'robust', 'log_standard', 'log_minmax'],
                         help='归一化方法（默认为standard）')
+    
+    # 新增可视化参数
+    parser.add_argument('--visualize_trace', action='store_true',
+                        help='生成钙波检测trace可视化图（默认禁用）')
+    parser.add_argument('--max_neurons_visualize', type=int, default=None,
+                        help='最多可视化的神经元数量（默认为所有神经元）')
+    parser.add_argument('--individual_plots', action='store_true', default=True,
+                        help='为每个神经元生成独立的trace图（默认启用）')
+    parser.add_argument('--disable_individual_plots', action='store_true',
+                        help='禁用独立trace图生成')
+    parser.add_argument('--plot_layout', type=str, default='separate',
+                        choices=['separate', 'subplots'],
+                        help='布局方式：separate（独立文件）或subplots（多子图），默认为separate')
+    
     args = parser.parse_args()
+    
+    # 处理禁用参数
+    if args.disable_individual_plots:
+        args.individual_plots = False
+    
+    # 如果启用了 individual_plots，自动启用 visualize_trace
+    if args.individual_plots:
+        args.visualize_trace = True
     
     # 检查文件是否存在
     if os.path.exists(args.data):
@@ -1763,6 +2385,15 @@ if __name__ == "__main__":
                 print(f"  - Butterworth滤波: {'启用' if not args.disable_butterworth else '禁用'} (截止频率: {args.butterworth_cutoff}, 强度: {args.butterworth_strength})")
                 print(f"  - 归一化: {'启用' if args.enable_normalization else '禁用'} (方法: {args.normalization_method})")
             print(f"  - 过滤强度: {args.filter_strength}")
+            
+            print(f"\n可视化配置:")
+            print(f"  - 独立trace图: {'启用' if args.individual_plots else '禁用'} (默认启用)")
+            if args.individual_plots:
+                if args.max_neurons_visualize is None:
+                    print(f"  - 可视化神经元数: 所有神经元 ({len(neuron_columns)}个)")
+                else:
+                    print(f"  - 最多可视化神经元数: {args.max_neurons_visualize}")
+                print(f"  - 布局方式: {args.plot_layout}")
             
             # 根据数据文件名生成输出目录
             if args.output is None:
@@ -1806,9 +2437,24 @@ if __name__ == "__main__":
                 butterworth_cutoff=args.butterworth_cutoff,
                 butterworth_strength=args.butterworth_strength,
                 apply_normalization=args.enable_normalization,
-                normalization_method=args.normalization_method
+                normalization_method=args.normalization_method,
+                # 传递可视化参数
+                visualize_trace=args.visualize_trace,
+                trace_save_path=None,  # 自动生成路径
+                max_neurons_visualize=args.max_neurons_visualize,
+                individual_plots=args.individual_plots,
+                plot_layout=args.plot_layout
             )
-            print(f"共检测到 {len(all_transients)} 个钙爆发")
+            print(f"\n共检测到 {len(all_transients)} 个钙爆发")
+            
+            # 输出文件位置总结
+            print(f"\n" + "="*70)
+            print("生成的文件：")
+            print(f"  1. 钙波数据: {os.path.abspath(all_transients_path)}")
+            if args.individual_plots:
+                individual_traces_dir = os.path.join(os.path.dirname(all_transients_path), "individual_traces")
+                print(f"  2. 独立trace图: {os.path.abspath(individual_traces_dir)}/")
+            print("="*70)
             
             # 如果指定了行为标签列，则进行行为相关分析
             if args.behavior_col and args.behavior_col in df.columns:
