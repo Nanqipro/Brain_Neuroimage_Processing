@@ -406,12 +406,469 @@ def preprocess_neural_signal(
     
     return processed_data
 
+def estimate_sliding_baseline(data, window_size=None, percentile=8, fs=4.8):
+    """
+    使用滑动窗口估计局部baseline
+    
+    参数
+    ------
+    data : np.ndarray
+        输入信号
+    window_size : int, optional
+        窗口大小（采样点数），默认为数据长度的10%
+    percentile : float
+        百分位数，默认8
+    fs : float
+        采样频率（用于计算默认窗口大小）
+        
+    返回
+    ------
+    baseline : np.ndarray
+        与data同长度的baseline数组
+    """
+    if window_size is None:
+        window_size = max(int(len(data) * 0.1), 50)  # 至少50个点
+    
+    # 确保窗口大小为奇数
+    if window_size % 2 == 0:
+        window_size += 1
+    
+    # 确保窗口不超过数据长度
+    window_size = min(window_size, len(data))
+    
+    baseline = np.zeros_like(data, dtype=float)
+    half_window = window_size // 2
+    
+    for i in range(len(data)):
+        # 确定窗口范围
+        start = max(0, i - half_window)
+        end = min(len(data), i + half_window + 1)
+        
+        # 计算窗口内的百分位数
+        window_data = data[start:end]
+        baseline[i] = np.percentile(window_data, percentile)
+    
+    # 平滑baseline（防止过度波动）
+    if len(baseline) > 5:
+        try:
+            smooth_window = min(window_size // 2, len(baseline))
+            if smooth_window % 2 == 0:
+                smooth_window -= 1
+            if smooth_window >= 5:
+                baseline = signal.savgol_filter(baseline, smooth_window, 2)
+        except:
+            pass  # 如果平滑失败，使用原始baseline
+    
+    return baseline
+
+
+def auto_select_baseline_method(data, fs=4.8, noise_threshold=2.0):
+    """
+    根据数据特性自动选择baseline估计方法
+    
+    参数
+    ------
+    data : np.ndarray
+        输入信号
+    fs : float
+        采样频率
+    noise_threshold : float
+        判断基线漂移的阈值（漂移/噪声比）
+        
+    返回
+    ------
+    method : str
+        'global' 或 'sliding'
+    params : dict
+        相应参数
+    """
+    # 评估基线稳定性
+    n_segments = min(10, len(data) // 100)  # 至少每段100个点
+    if n_segments < 3:
+        # 数据太短，直接用全局方法
+        return 'global', {}
+    
+    segment_length = len(data) // n_segments
+    baseline_per_segment = []
+    
+    for i in range(n_segments):
+        segment = data[i*segment_length:(i+1)*segment_length]
+        if len(segment) > 0:
+            baseline_per_segment.append(np.percentile(segment, 8))
+    
+    baseline_drift = np.max(baseline_per_segment) - np.min(baseline_per_segment)
+    noise_level = np.std(data[data < np.percentile(data, 50)])
+    drift_ratio = baseline_drift / noise_level if noise_level > 0 else 0
+    
+    # 决策
+    if drift_ratio < noise_threshold:
+        return 'global', {}
+    else:
+        # 根据漂移程度调整窗口大小
+        window_seconds = max(10, min(60, len(data) / fs / (drift_ratio * 2)))
+        window_size = int(window_seconds * fs)
+        return 'sliding', {'baseline_window_size': window_size}
+
+
+def find_significant_valleys(data, start_idx, end_idx, min_depth_ratio=0.2):
+    """
+    在指定区间内寻找显著的波谷（局部最小值）
+    
+    参数
+    ------
+    data : np.ndarray
+        信号数据
+    start_idx, end_idx : int
+        搜索区间
+    min_depth_ratio : float
+        最小深度比例（相对于区间内的信号范围）
+        
+    返回
+    ------
+    valley_indices : list
+        显著波谷的索引列表
+    """
+    if end_idx <= start_idx + 2:
+        return []
+    
+    segment = data[start_idx:end_idx+1]
+    segment_range = np.max(segment) - np.min(segment)
+    
+    # 使用scipy.signal.find_peaks的负信号来找波谷
+    valley_candidates, valley_props = find_peaks(
+        -segment,
+        prominence=min_depth_ratio * segment_range,
+        distance=3
+    )
+    
+    # 转换为原始索引
+    valley_indices = [v + start_idx for v in valley_candidates]
+    
+    return valley_indices
+
+
+def evaluate_subpeak_quality(
+    smoothed_data, 
+    sp_idx, 
+    sp_start, 
+    sp_end, 
+    baseline, 
+    noise_level,
+    fs=4.8,
+    min_snr=2.0
+):
+    """
+    评估子峰的质量，判断是否为真实的钙波子峰
+    
+    参数
+    ------
+    smoothed_data : np.ndarray
+        平滑后的信号
+    sp_idx : int
+        子峰索引
+    sp_start, sp_end : int
+        子峰边界
+    baseline : float
+        基线值
+    noise_level : float
+        噪声水平
+    fs : float
+        采样频率
+    min_snr : float
+        最小信噪比要求
+        
+    返回
+    ------
+    quality_score : float
+        质量评分 (0-1)，越高表示越可能是真实子峰
+    is_valid : bool
+        是否通过基本验证
+    """
+    if sp_end <= sp_start + 2:
+        return 0.0, False
+    
+    sp_value = smoothed_data[sp_idx]
+    sp_amplitude = sp_value - baseline
+    
+    # 1. SNR检查
+    snr = sp_amplitude / noise_level if noise_level > 0 else 0
+    if snr < min_snr:
+        return 0.0, False
+    
+    # 2. 持续时间检查（子峰通常较短）
+    sp_duration = (sp_end - sp_start) / fs
+    if sp_duration < 0.5 or sp_duration > 20:  # 0.5-20秒
+        return 0.0, False
+    
+    # 3. 形态特征评估
+    sp_rise_time = (sp_idx - sp_start) / fs
+    sp_decay_time = (sp_end - sp_idx) / fs
+    
+    # 上升/衰减比例（钙波通常上升快）
+    if sp_decay_time > 0:
+        rise_decay_ratio = sp_rise_time / sp_decay_time
+        rise_decay_score = 1.0 if rise_decay_ratio < 0.5 else max(0, 1.0 - (rise_decay_ratio - 0.5) / 1.5)
+    else:
+        rise_decay_score = 0.0
+    
+    # 4. 检查上升沿的单调性
+    rise_segment = smoothed_data[sp_start:sp_idx+1]
+    if len(rise_segment) > 2:
+        rise_diff = np.diff(rise_segment)
+        non_monotonic_ratio = np.sum(rise_diff < 0) / len(rise_diff)
+        monotonic_score = max(0, 1.0 - non_monotonic_ratio / 0.5)
+    else:
+        monotonic_score = 0.5
+    
+    # 5. 检查衰减沿的平滑下降
+    decay_segment = smoothed_data[sp_idx:sp_end+1]
+    if len(decay_segment) > 2:
+        decay_diff = np.diff(decay_segment)
+        # 衰减应该主要是负值
+        decay_direction_score = np.sum(decay_diff < 0) / len(decay_diff)
+    else:
+        decay_direction_score = 0.5
+    
+    # 6. SNR评分（归一化）
+    snr_score = min(1.0, snr / 5.0)  # SNR=5时得分为1
+    
+    # 综合质量评分
+    quality_score = (
+        0.30 * snr_score +
+        0.25 * rise_decay_score +
+        0.25 * monotonic_score +
+        0.20 * decay_direction_score
+    )
+    
+    # 基本有效性检查
+    is_valid = (snr >= min_snr and 
+                quality_score >= 0.3 and 
+                rise_decay_ratio < 2.0)
+    
+    return quality_score, is_valid
+
+
+def detect_subpeaks_advanced(
+    smoothed_data,
+    start_idx,
+    end_idx,
+    main_peak_idx,
+    main_amplitude,
+    baseline,
+    noise_level,
+    fs=4.8,
+    subpeak_prominence=0.15,
+    subpeak_width=5,
+    subpeak_distance=8,
+    max_duration=800,
+    min_subpeak_snr=2.0,
+    min_quality_score=0.30
+):
+    """
+    改进的子峰检测算法
+    
+    特点：
+    1. 多级过滤：prominence + SNR + 形态学质量评分
+    2. 智能边界检测：使用显著波谷分割
+    3. 避免主峰上升/下降沿的误检
+    4. 自适应阈值
+    
+    参数
+    ------
+    smoothed_data : np.ndarray
+        平滑后的数据
+    start_idx, end_idx : int
+        主峰的边界
+    main_peak_idx : int
+        主峰索引
+    main_amplitude : float
+        主峰振幅
+    baseline : float
+        基线值
+    noise_level : float
+        噪声水平
+    fs : float
+        采样频率
+    subpeak_prominence : float
+        子峰突出度阈值（相对主峰）
+    subpeak_width : int
+        子峰最小宽度
+    subpeak_distance : int
+        子峰之间最小距离
+    max_duration : int
+        最大持续时间
+    min_subpeak_snr : float
+        子峰最小SNR
+    min_quality_score : float
+        最小质量评分
+        
+    返回
+    ------
+    subpeaks : list of dict
+        检测到的子峰列表
+    """
+    subpeaks = []
+    
+    # 检查主波形是否足够长
+    if (end_idx - start_idx) < 3 * subpeak_width:
+        return subpeaks
+    
+    # 步骤1: 初步峰值检测
+    wave_segment = smoothed_data[start_idx:end_idx+1]
+    
+    # 自适应prominence阈值
+    # 方法1: 基于主峰振幅
+    abs_prominence_main = subpeak_prominence * main_amplitude
+    # 方法2: 基于噪声水平
+    abs_prominence_noise = 2.0 * noise_level
+    # 使用较大者，确保不会误检噪声
+    abs_prominence = max(abs_prominence_main, abs_prominence_noise)
+    
+    # 在波形内找到所有可能的子峰
+    candidate_peaks, properties = find_peaks(
+        wave_segment,
+        prominence=abs_prominence,
+        width=subpeak_width,
+        distance=subpeak_distance
+    )
+    
+    if len(candidate_peaks) == 0:
+        return subpeaks
+    
+    # 转换为原始数据索引
+    candidate_peaks = candidate_peaks + start_idx
+    
+    # 步骤2: 排除主峰及其直接邻近区域
+    # 定义主峰的"禁区"：主峰前后一定范围
+    main_peak_exclusion_radius = max(subpeak_distance, int(5 * fs))  # 至少5秒
+    candidate_peaks = [
+        sp for sp in candidate_peaks 
+        if abs(sp - main_peak_idx) > main_peak_exclusion_radius
+    ]
+    
+    if len(candidate_peaks) == 0:
+        return subpeaks
+    
+    # 步骤3: 寻找显著波谷，用于子峰边界分割
+    valleys = find_significant_valleys(
+        smoothed_data, 
+        start_idx, 
+        end_idx,
+        min_depth_ratio=0.15
+    )
+    
+    # 步骤4: 为每个候选子峰确定边界并评估质量
+    for sp_idx in candidate_peaks:
+        # 寻找子峰的左边界
+        sp_start = sp_idx
+        possible_left_valleys = [v for v in valleys if v < sp_idx]
+        
+        if possible_left_valleys:
+            # 使用最近的波谷作为左边界
+            sp_start = max(possible_left_valleys)
+        else:
+            # 如果没有显著波谷，使用局部最小值
+            left_search_limit = max(start_idx, sp_idx - max_duration//2)
+            sp_start = sp_idx
+            while sp_start > left_search_limit:
+                if smoothed_data[sp_start] <= smoothed_data[sp_start-1]:
+                    break
+                sp_start -= 1
+        
+        # 寻找子峰的右边界
+        sp_end = sp_idx
+        possible_right_valleys = [v for v in valleys if v > sp_idx]
+        
+        if possible_right_valleys:
+            # 使用最近的波谷作为右边界
+            sp_end = min(possible_right_valleys)
+        else:
+            # 如果没有显著波谷，使用局部最小值
+            right_search_limit = min(end_idx, sp_idx + max_duration//2)
+            sp_end = sp_idx
+            while sp_end < right_search_limit:
+                if smoothed_data[sp_end] <= smoothed_data[sp_end+1]:
+                    break
+                sp_end += 1
+        
+        # 步骤5: 评估子峰质量
+        quality_score, is_valid = evaluate_subpeak_quality(
+            smoothed_data,
+            sp_idx,
+            sp_start,
+            sp_end,
+            baseline,
+            noise_level,
+            fs=fs,
+            min_snr=min_subpeak_snr
+        )
+        
+        # 只保留高质量的子峰
+        if not is_valid or quality_score < min_quality_score:
+            continue
+        
+        # 步骤6: 计算子峰特征
+        try:
+            sp_value = smoothed_data[sp_idx]
+            sp_amplitude = sp_value - baseline
+            
+            # 半高宽
+            sp_widths, _, sp_left_ips, sp_right_ips = peak_widths(
+                smoothed_data, [sp_idx], rel_height=0.5
+            )
+            sp_fwhm = sp_widths[0] / fs
+            
+            # 持续时间
+            sp_duration = (sp_end - sp_start) / fs
+            
+            # 上升和衰减时间
+            sp_rise_time = (sp_idx - sp_start) / fs
+            sp_decay_time = (sp_end - sp_idx) / fs
+            
+            # 面积 (AUC)
+            sp_segment = smoothed_data[sp_start:sp_end+1] - baseline
+            sp_auc = trapezoid(sp_segment, dx=1.0/fs)
+            
+            # SNR
+            sp_snr = sp_amplitude / noise_level if noise_level > 0 else 0
+            
+            # 添加子峰信息
+            subpeaks.append({
+                'index': sp_idx,
+                'value': sp_value,
+                'amplitude': sp_amplitude,
+                'start_idx': sp_start,
+                'end_idx': sp_end,
+                'duration': sp_duration,
+                'fwhm': sp_fwhm,
+                'rise_time': sp_rise_time,
+                'decay_time': sp_decay_time,
+                'auc': sp_auc,
+                'snr': sp_snr,
+                'quality_score': quality_score,  # 新增：质量评分
+                'rise_decay_ratio': sp_rise_time / sp_decay_time if sp_decay_time > 0 else float('inf')
+            })
+            
+        except Exception as e:
+            # 子峰特征计算失败，跳过
+            continue
+    
+    # 步骤7: 按位置排序
+    subpeaks.sort(key=lambda x: x['index'])
+    
+    return subpeaks
+
+
 def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smooth_window=31, 
                              peak_distance=24, baseline_percentile=8, max_duration=800,
                              detect_subpeaks=False, subpeak_prominence=0.15, 
                              subpeak_width=5, subpeak_distance=8, params=None, 
                              min_morphology_score=0.20, min_exp_decay_score=0.12,
                              filter_strength=1.0,
+                             # Baseline自适应参数（新增）
+                             baseline_method='global',
+                             baseline_window_size=None,
+                             baseline_auto_select=False,
                              # 新增的预处理参数（与smooth_data.py保持一致）
                              apply_preprocessing=True,
                              apply_moving_average=True,
@@ -598,12 +1055,57 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         if not apply_savgol:
             print(f"  Savitzky-Golay smoothing disabled")
     
-    # 2. 估计基线和噪声水平
-    baseline = np.percentile(smoothed_data, baseline_percentile)
-    noise_level = np.std(smoothed_data[smoothed_data < np.percentile(smoothed_data, 50)])
+    # 2. 估计基线和噪声水平（改进：支持自适应baseline）
+    # 自动选择baseline方法（如果启用）
+    if baseline_auto_select:
+        selected_method, auto_params = auto_select_baseline_method(smoothed_data, fs=fs)
+        baseline_method = selected_method
+        if 'baseline_window_size' in auto_params and baseline_window_size is None:
+            baseline_window_size = auto_params['baseline_window_size']
+        print(f"  自动选择baseline方法: {baseline_method}")
     
-    # 3. 检测主要峰值 - 使用更强的峰值筛选条件
-    threshold = baseline + min_snr * noise_level
+    # 根据方法估计baseline
+    if baseline_method == 'global':
+        # 全局baseline（原有方法）
+        baseline_value = np.percentile(smoothed_data, baseline_percentile)
+        baseline_array = np.full_like(smoothed_data, baseline_value, dtype=float)
+        is_baseline_array = False
+        print(f"  使用全局baseline: {baseline_value:.4f}")
+    
+    elif baseline_method == 'sliding':
+        # 滑动窗口baseline（新方法）
+        baseline_array = estimate_sliding_baseline(
+            smoothed_data,
+            window_size=baseline_window_size,
+            percentile=baseline_percentile,
+            fs=fs
+        )
+        baseline_value = np.median(baseline_array)  # 用于兼容性
+        is_baseline_array = True
+        print(f"  使用滑动baseline: 窗口大小={baseline_window_size if baseline_window_size else 'auto'}, "
+              f"中位数={baseline_value:.4f}")
+    else:
+        raise ValueError(f"未知的baseline方法: {baseline_method}")
+    
+    # 计算噪声水平
+    if is_baseline_array:
+        # 对滑动baseline，计算去趋势后的噪声
+        detrended = smoothed_data - baseline_array
+        noise_level = np.std(detrended[detrended < np.percentile(detrended, 50)])
+    else:
+        # 对全局baseline，使用原有方法
+        noise_level = np.std(smoothed_data[smoothed_data < np.percentile(smoothed_data, 50)])
+    
+    # 3. 检测主要峰值 - 使用更强的峰值筛选条件（改进：支持滑动baseline）
+    if is_baseline_array:
+        # 滑动baseline：先去趋势，然后检测峰值
+        detrended_signal = smoothed_data - baseline_array
+        threshold = min_snr * noise_level
+        detection_signal = detrended_signal
+    else:
+        # 全局baseline：直接检测
+        threshold = baseline_value + min_snr * noise_level
+        detection_signal = smoothed_data
     
     # 增加prominence参数来要求峰值必须明显突出于背景
     # 调整prominence_threshold，随filter_strength变化
@@ -614,7 +1116,7 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
     min_width = min_duration // 6  # 进一步降低最小宽度要求，改为1/6
     
     # 首次检测所有可能的峰值，使用较低的distance要求
-    initial_peaks, peak_props = find_peaks(smoothed_data, height=threshold, 
+    initial_peaks, peak_props = find_peaks(detection_signal, height=threshold, 
                                           prominence=prominence_threshold, width=min_width)
     
     # 对找到的峰值使用更智能的选择策略，而不是简单地应用固定距离
@@ -669,33 +1171,61 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
     
     # 第一遍检测：主要钙爆发
     for i, peak_idx in enumerate(peaks):
-        # 寻找左侧边界（从峰值向左搜索）
+        # 寻找左侧边界（从峰值向左搜索）（改进：支持滑动baseline）
         start_idx = peak_idx
         # 向左搜索到信号低于基线或达到最大距离或达到前一个峰值的右边界
         left_limit = 0 if i == 0 else peaks[i-1]
-        while start_idx > left_limit and smoothed_data[start_idx] > baseline:
-            start_idx -= 1
-            # 如果搜索范围过大，在局部最小值处停止
-            if peak_idx - start_idx > max_duration:
-                # 找到从peak_idx向左max_duration点范围内的局部最小值
-                local_min_idx = start_idx + np.argmin(smoothed_data[start_idx:start_idx+max_duration])
-                start_idx = local_min_idx
-                break
         
-        # 寻找右侧边界（从峰值向右搜索）
+        if is_baseline_array:
+            # 滑动baseline：使用局部baseline数组
+            while start_idx > left_limit and smoothed_data[start_idx] > baseline_array[start_idx]:
+                start_idx -= 1
+                # 如果搜索范围过大，在局部最小值处停止
+                if peak_idx - start_idx > max_duration:
+                    # 找到从peak_idx向左max_duration点范围内的局部最小值
+                    local_min_idx = start_idx + np.argmin(smoothed_data[start_idx:start_idx+max_duration])
+                    start_idx = local_min_idx
+                    break
+        else:
+            # 全局baseline：使用固定baseline值
+            while start_idx > left_limit and smoothed_data[start_idx] > baseline_value:
+                start_idx -= 1
+                # 如果搜索范围过大，在局部最小值处停止
+                if peak_idx - start_idx > max_duration:
+                    # 找到从peak_idx向左max_duration点范围内的局部最小值
+                    local_min_idx = start_idx + np.argmin(smoothed_data[start_idx:start_idx+max_duration])
+                    start_idx = local_min_idx
+                    break
+        
+        # 寻找右侧边界（从峰值向右搜索）（改进：支持滑动baseline）
         end_idx = peak_idx
         # 向右搜索到信号低于基线或达到最大距离或达到下一个峰值的左边界
         right_limit = len(smoothed_data) - 1 if i == len(peaks) - 1 else peaks[i+1]
-        while end_idx < right_limit and smoothed_data[end_idx] > baseline:
-            end_idx += 1
-            # 如果搜索范围过大，在局部最小值处停止
-            if end_idx - peak_idx > max_duration:
-                # 找到从peak_idx向右max_duration点范围内的局部最小值
-                search_end = min(end_idx + max_duration, len(smoothed_data))
-                if peak_idx < search_end - 1:
-                    local_min_idx = peak_idx + np.argmin(smoothed_data[peak_idx:search_end])
-                    end_idx = local_min_idx
-                break
+        
+        if is_baseline_array:
+            # 滑动baseline：使用局部baseline数组
+            while end_idx < right_limit and smoothed_data[end_idx] > baseline_array[end_idx]:
+                end_idx += 1
+                # 如果搜索范围过大，在局部最小值处停止
+                if end_idx - peak_idx > max_duration:
+                    # 找到从peak_idx向右max_duration点范围内的局部最小值
+                    search_end = min(end_idx + max_duration, len(smoothed_data))
+                    if peak_idx < search_end - 1:
+                        local_min_idx = peak_idx + np.argmin(smoothed_data[peak_idx:search_end])
+                        end_idx = local_min_idx
+                    break
+        else:
+            # 全局baseline：使用固定baseline值
+            while end_idx < right_limit and smoothed_data[end_idx] > baseline_value:
+                end_idx += 1
+                # 如果搜索范围过大，在局部最小值处停止
+                if end_idx - peak_idx > max_duration:
+                    # 找到从peak_idx向右max_duration点范围内的局部最小值
+                    search_end = min(end_idx + max_duration, len(smoothed_data))
+                    if peak_idx < search_end - 1:
+                        local_min_idx = peak_idx + np.argmin(smoothed_data[peak_idx:search_end])
+                        end_idx = local_min_idx
+                    break
         
         # 如果峰值之间的信号始终高于基线，则使用峰值之间的最低点作为分界
         if i < len(peaks) - 1 and end_idx >= peaks[i+1]:
@@ -730,9 +1260,11 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         #     if pre_slope <= 0 or post_slope >= 0:
         #         continue  # 峰值前后斜率不符合预期，可能是噪声
                 
-        # 计算特征
+        # 计算特征（改进：使用局部baseline）
         peak_value = smoothed_data[peak_idx]
-        amplitude = peak_value - baseline
+        # 使用峰值处的局部baseline
+        local_baseline = baseline_array[peak_idx] if is_baseline_array else baseline_value
+        amplitude = peak_value - local_baseline
         
         # 改进建议1：计算二阶差分特征
         ddf_features = None
@@ -760,8 +1292,11 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         rise_time = (peak_idx - start_idx) / fs
         decay_time = (end_idx - peak_idx) / fs
         
-        # 计算峰面积 (AUC)
-        segment = smoothed_data[start_idx:end_idx+1] - baseline
+        # 计算峰面积 (AUC)（改进：使用局部baseline）
+        if is_baseline_array:
+            segment = smoothed_data[start_idx:end_idx+1] - baseline_array[start_idx:end_idx+1]
+        else:
+            segment = smoothed_data[start_idx:end_idx+1] - baseline_value
         auc = trapezoid(segment, dx=1.0/fs)
         
         # 新增：计算典型钙波形态特征评分
@@ -769,9 +1304,13 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         rise_decay_ratio = rise_time / decay_time if decay_time > 0 else float('inf')
         
         # 2. 计算波形对称性 - 钙波通常是非对称的（快速上升，缓慢下降）
-        # 理想钙波的对称性应该较低
-        left_half = smoothed_data[start_idx:peak_idx+1] - baseline
-        right_half = smoothed_data[peak_idx:end_idx+1] - baseline
+        # 理想钙波的对称性应该较低（改进：使用局部baseline）
+        if is_baseline_array:
+            left_half = smoothed_data[start_idx:peak_idx+1] - baseline_array[start_idx:peak_idx+1]
+            right_half = smoothed_data[peak_idx:end_idx+1] - baseline_array[peak_idx:end_idx+1]
+        else:
+            left_half = smoothed_data[start_idx:peak_idx+1] - baseline_value
+            right_half = smoothed_data[peak_idx:end_idx+1] - baseline_value
         
         # 对齐左右两侧长度
         min_half_len = min(len(left_half), len(right_half))
@@ -808,10 +1347,13 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
             non_monotonic_ratio = 1
             rise_smoothness = float('inf')
             
-        # 4. 下降沿的指数衰减特性
+        # 4. 下降沿的指数衰减特性（改进：使用局部baseline）
         if end_idx > peak_idx + 3:
             # 提取衰减部分并归一化
-            decay_segment = smoothed_data[peak_idx:end_idx+1] - baseline
+            if is_baseline_array:
+                decay_segment = smoothed_data[peak_idx:end_idx+1] - baseline_array[peak_idx:end_idx+1]
+            else:
+                decay_segment = smoothed_data[peak_idx:end_idx+1] - baseline_value
             decay_segment = decay_segment / decay_segment[0]  # 归一化
             
             # 对数变换前过滤无效值
@@ -889,99 +1431,39 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         if non_monotonic_ratio > 0.7:  # 放宽非单调性要求，从0.5改为0.7
             continue  # 跳过上升沿过于不规则的峰值
         
-        # 检测波形的子峰值（如果启用）
+        # 检测波形的子峰值（如果启用） - 使用改进的检测算法
         subpeaks = []
-        if detect_subpeaks and (end_idx - start_idx) > 3 * subpeak_width:
-            # 计算当前波形区间
-            wave_segment = smoothed_data[start_idx:end_idx+1]
-            
-            # 计算相对突出度阈值（基于主峰的振幅）
-            abs_prominence = subpeak_prominence * amplitude
-            
-            # 在此波形内找到所有局部峰值
-            sub_peaks, sub_properties = find_peaks(
-                wave_segment,
-                prominence=abs_prominence,
-                width=subpeak_width,
-                distance=subpeak_distance
+        if detect_subpeaks:
+            subpeaks = detect_subpeaks_advanced(
+                smoothed_data=smoothed_data,
+                start_idx=start_idx,
+                end_idx=end_idx,
+                main_peak_idx=peak_idx,
+                main_amplitude=amplitude,
+                baseline=local_baseline,  # 使用局部baseline
+                noise_level=noise_level,
+                fs=fs,
+                subpeak_prominence=subpeak_prominence,
+                subpeak_width=subpeak_width,
+                subpeak_distance=subpeak_distance,
+                max_duration=max_duration,
+                min_subpeak_snr=2.0,  # 子峰最小SNR
+                min_quality_score=0.30  # 子峰最小质量评分
             )
-            
-            # 转换为原始数据索引
-            sub_peaks = sub_peaks + start_idx
-            
-            # 排除与主峰相同的峰
-            sub_peaks = [sp for sp in sub_peaks if abs(sp - peak_idx) > subpeak_distance]
-            
-            # 记录子峰特征
-            for sp_idx in sub_peaks:
-                # 计算子峰特征
-                sp_value = smoothed_data[sp_idx]
-                sp_amplitude = sp_value - baseline
-                
-                # 子峰的半高宽特性
-                try:
-                    sp_widths, _, sp_left_ips, sp_right_ips = peak_widths(
-                        smoothed_data, [sp_idx], rel_height=0.5
-                    )
-                    sp_fwhm = sp_widths[0] / fs
-                    
-                    # 找出子峰的边界（局部最小值点）
-                    # 向左寻找局部最小值
-                    sp_start = sp_idx
-                    left_search_limit = max(start_idx, sp_idx - max_duration//2)
-                    while sp_start > left_search_limit:
-                        if sp_start == left_search_limit + 1 or smoothed_data[sp_start] <= smoothed_data[sp_start-1]:
-                            break
-                        sp_start -= 1
-                    
-                    # 向右寻找局部最小值
-                    sp_end = sp_idx
-                    right_search_limit = min(end_idx, sp_idx + max_duration//2)
-                    while sp_end < right_search_limit:
-                        if sp_end == right_search_limit - 1 or smoothed_data[sp_end] <= smoothed_data[sp_end+1]:
-                            break
-                        sp_end += 1
-                    
-                    # 子峰持续时间
-                    sp_duration = (sp_end - sp_start) / fs
-                    
-                    # 上升和衰减时间
-                    sp_rise_time = (sp_idx - sp_start) / fs
-                    sp_decay_time = (sp_end - sp_idx) / fs
-                    
-                    # 计算子峰面积
-                    sp_segment = smoothed_data[sp_start:sp_end+1] - baseline
-                    sp_auc = trapezoid(sp_segment, dx=1.0/fs)
-                    
-                    # 添加子峰信息
-                    subpeaks.append({
-                        'index': sp_idx,
-                        'value': sp_value,
-                        'amplitude': sp_amplitude,
-                        'start_idx': sp_start,
-                        'end_idx': sp_end,
-                        'duration': sp_duration,
-                        'fwhm': sp_fwhm,
-                        'rise_time': sp_rise_time,
-                        'decay_time': sp_decay_time,
-                        'auc': sp_auc
-                    })
-                except Exception as e:
-                    # 子峰分析失败，跳过该子峰
-                    pass
         
         # 收集主波形对象特征
         wave_type = "complex" if len(subpeaks) > 0 else "simple"
         subpeaks_count = len(subpeaks)
         
-        # 存储此次钙爆发的特征
+        # 存储此次钙爆发的特征（改进：记录局部baseline）
         transient = {
             'start_idx': start_idx,
             'peak_idx': peak_idx,
             'end_idx': end_idx,
             'amplitude': amplitude,
             'peak_value': peak_value,
-            'baseline': baseline,
+            'baseline': local_baseline,  # 使用局部baseline
+            'baseline_method': baseline_method,  # 记录使用的baseline方法
             'duration': duration,
             'fwhm': fwhm,
             'rise_time': rise_time,
