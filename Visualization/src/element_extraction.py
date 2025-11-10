@@ -1140,12 +1140,15 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
             valley_value = smoothed_data[valley_idx]
             
             # 计算谷值相对于两个峰的深度
-            left_peak_height = smoothed_data[last_peak] - baseline
-            right_peak_height = smoothed_data[peak_idx] - baseline
+            left_baseline = baseline_array[last_peak] if is_baseline_array else baseline_value
+            right_baseline = baseline_array[peak_idx] if is_baseline_array else baseline_value
+            valley_baseline = baseline_array[valley_idx] if is_baseline_array else baseline_value
+            left_peak_height = smoothed_data[last_peak] - left_baseline
+            right_peak_height = smoothed_data[peak_idx] - right_baseline
             min_peak_height = min(left_peak_height, right_peak_height)
             
             # 计算谷值深度占峰值高度的比例
-            valley_depth = smoothed_data[valley_idx] - baseline
+            valley_depth = smoothed_data[valley_idx] - valley_baseline
             valley_depth_ratio = valley_depth / min_peak_height if min_peak_height > 0 else 1.0
             
             # 如果谷值足够深（低于峰值高度的70%），则认为是两个独立的钙波，保留当前峰值
@@ -1270,7 +1273,7 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         ddf_features = None
         if use_second_derivative:
             ddf_features = compute_second_derivative_features(
-                smoothed_data, peak_idx, start_idx, baseline, 
+                smoothed_data, peak_idx, start_idx, local_baseline, 
                 ddf_threshold=ddf_threshold * filter_strength
             )
             
@@ -1284,7 +1287,7 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
                 # 高SNR情况下，给予警告但继续处理
         
         # 计算半高宽 (FWHM)
-        half_max = baseline + amplitude / 2
+        half_max = local_baseline + amplitude / 2
         widths, width_heights, left_ips, right_ips = peak_widths(smoothed_data, [peak_idx], rel_height=0.5)
         fwhm = widths[0] / fs
         
