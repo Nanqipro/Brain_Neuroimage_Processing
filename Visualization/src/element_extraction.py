@@ -203,6 +203,145 @@ def normalize_neural_data(
     normalized_data = scaler.fit_transform(data_2d)
     return normalized_data.flatten()
 
+def adaptive_threshold_by_snr(data: np.ndarray, base_threshold: float = 3.5) -> tuple:
+    """
+    根据信号特征自适应调整阈值（改进建议2）
+    
+    参数
+    ------
+    data : np.ndarray
+        输入的神经元信号数据
+    base_threshold : float, 可选
+        基础SNR阈值，默认为3.5
+        
+    返回
+    ------
+    tuple : (adjusted_threshold, snr, quality_metrics)
+        adjusted_threshold: 调整后的阈值
+        snr: 计算得到的信噪比
+        quality_metrics: 信号质量指标字典
+    """
+    # 评估信号质量
+    signal_range = np.percentile(data, 95) - np.percentile(data, 5)
+    baseline_region = data[data < np.percentile(data, 30)]
+    noise_level = np.std(baseline_region) if len(baseline_region) > 0 else np.std(data) * 0.5
+    
+    # 计算信噪比
+    snr = signal_range / noise_level if noise_level > 0 else 10
+    
+    # 评估基线稳定性
+    sorted_data = np.sort(data)
+    lower_third = sorted_data[:len(sorted_data)//3]
+    baseline_variability = np.std(lower_third) / np.mean(lower_third) if np.mean(lower_third) > 0 else 0
+    
+    # 评估信号动态范围
+    dynamic_range = (np.percentile(data, 99) - np.percentile(data, 1)) / np.median(data) if np.median(data) > 0 else 1
+    
+    # 根据SNR自适应调整阈值
+    if snr > 10:
+        # 高SNR：可以使用更严格的阈值，减少假阳性
+        adjusted_threshold = base_threshold * 1.2
+        quality = "high"
+    elif snr > 7:
+        # 中等SNR：使用标准阈值
+        adjusted_threshold = base_threshold * 1.0
+        quality = "medium"
+    elif snr > 4:
+        # 较低SNR：降低阈值，提高灵敏度
+        adjusted_threshold = base_threshold * 0.8
+        quality = "low"
+    else:
+        # 很低SNR：显著降低阈值，但可能增加假阳性
+        adjusted_threshold = base_threshold * 0.6
+        quality = "very_low"
+    
+    # 如果基线不稳定，进一步调整
+    if baseline_variability > 0.3:
+        adjusted_threshold *= 1.15  # 提高阈值以应对不稳定基线
+    
+    quality_metrics = {
+        'snr': snr,
+        'quality': quality,
+        'baseline_variability': baseline_variability,
+        'dynamic_range': dynamic_range,
+        'noise_level': noise_level,
+        'signal_range': signal_range
+    }
+    
+    return adjusted_threshold, snr, quality_metrics
+
+def compute_second_derivative_features(data: np.ndarray, peak_idx: int, start_idx: int, 
+                                      baseline: float, ddf_threshold: float = -0.52) -> dict:
+    """
+    计算二阶差分特征，用于验证钙波的快速上升特性（改进建议1）
+    借鉴MATLAB项目中的二阶差分检测方法
+    
+    参数
+    ------
+    data : np.ndarray
+        平滑后的信号数据
+    peak_idx : int
+        峰值索引
+    start_idx : int
+        起始索引
+    baseline : float
+        基线值
+    ddf_threshold : float, 可选
+        二阶差分阈值（负值表示加速上升），默认为-0.52（来自MATLAB项目）
+        
+    返回
+    ------
+    dict : 二阶差分特征字典
+        包含min_ddf, ddf_score, has_rapid_rise等特征
+    """
+    features = {
+        'min_ddf': 0.0,
+        'ddf_score': 0.0,
+        'has_rapid_rise': False,
+        'ddf_peak_idx': -1,
+        'mean_ddf': 0.0
+    }
+    
+    # 需要至少3个点才能计算二阶差分
+    if peak_idx - start_idx < 3:
+        return features
+    
+    # 提取上升段
+    rise_segment = data[start_idx:peak_idx+1]
+    
+    # 计算一阶差分（速度）
+    first_diff = np.diff(rise_segment)
+    
+    # 计算二阶差分（加速度）
+    if len(first_diff) > 1:
+        second_diff = np.diff(first_diff)
+        
+        # 找到最小的二阶差分值（最大的负加速度，表示快速上升）
+        min_ddf = np.min(second_diff)
+        min_ddf_idx = np.argmin(second_diff) + start_idx
+        mean_ddf = np.mean(second_diff)
+        
+        # 计算二阶差分评分（0-1之间，越高表示上升越陡峭）
+        # 使用归一化的二阶差分值
+        if min_ddf < 0:
+            ddf_score = min(1.0, abs(min_ddf) / abs(ddf_threshold))
+        else:
+            ddf_score = 0.0
+        
+        # 判断是否有快速上升特征
+        # 二阶差分显著为负，表示加速上升
+        has_rapid_rise = min_ddf < ddf_threshold
+        
+        features.update({
+            'min_ddf': min_ddf,
+            'ddf_score': ddf_score,
+            'has_rapid_rise': has_rapid_rise,
+            'ddf_peak_idx': min_ddf_idx,
+            'mean_ddf': mean_ddf
+        })
+    
+    return features
+
 def preprocess_neural_signal(
     data: np.ndarray,
     apply_moving_average: bool = True,
@@ -268,7 +407,7 @@ def preprocess_neural_signal(
     return processed_data
 
 def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smooth_window=31, 
-                             peak_distance=5, baseline_percentile=8, max_duration=800,
+                             peak_distance=24, baseline_percentile=8, max_duration=800,
                              detect_subpeaks=False, subpeak_prominence=0.15, 
                              subpeak_width=5, subpeak_distance=8, params=None, 
                              min_morphology_score=0.20, min_exp_decay_score=0.12,
@@ -281,7 +420,14 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
                              butterworth_cutoff=20,
                              butterworth_strength=0.05,
                              apply_normalization=False,
-                             normalization_method='standard'):
+                             normalization_method='standard',
+                             # Savitzky-Golay平滑控制
+                             apply_savgol=True,
+                             # 改进建议1和2的新参数
+                             use_adaptive_threshold=True,
+                             use_second_derivative=True,
+                             ddf_threshold=-0.52,
+                             min_ddf_score=0.3):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
@@ -292,7 +438,7 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         min_snr: 最小信噪比阈值，默认为3.5
         min_duration: 最小持续时间(采样点数)，默认为12
         smooth_window: Savitzky-Golay平滑窗口大小，默认为31
-        peak_distance: 峰值之间的最小距离，默认为5
+        peak_distance: 峰值之间的最小距离，默认为24
         baseline_percentile: 用于估计基线的百分位数，默认为8
         max_duration: 最大持续时间(采样点数)，默认为800
         detect_subpeaks: 是否检测子峰，默认为False
@@ -313,6 +459,11 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         butterworth_strength: Butterworth滤波强度，默认为0.05（与smooth_data.py保持一致）
         apply_normalization: 是否应用归一化，默认为False
         normalization_method: 归一化方法，默认为'standard'
+        apply_savgol: 是否应用Savitzky-Golay平滑，默认为True
+        use_adaptive_threshold: 是否使用自适应阈值（改进建议2），根据信号SNR动态调整检测阈值，默认为True
+        use_second_derivative: 是否使用二阶差分验证（改进建议1），检测钙波快速上升特性，默认为True
+        ddf_threshold: 二阶差分阈值，默认为-0.52（来自MATLAB项目）
+        min_ddf_score: 最小二阶差分评分，低于此值的峰值可能被过滤，默认为0.3
                          
     返回:
         transients: 检测到的钙爆发列表，每个元素包含开始、峰值、结束时间以及其他特征
@@ -374,6 +525,21 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
     lower_half = sorted_data[:len(sorted_data)//3]  # 使用下三分之一作为基线估计
     baseline_variability = np.std(lower_half) / np.mean(lower_half) if np.mean(lower_half) > 0 else 0
     
+    # 改进建议2：自适应阈值调整
+    if use_adaptive_threshold:
+        adjusted_snr_threshold, calculated_snr, quality_metrics = adaptive_threshold_by_snr(
+            preprocessed_data, base_threshold=min_snr
+        )
+        # 使用自适应调整后的阈值
+        original_min_snr = min_snr
+        min_snr = adjusted_snr_threshold
+        print(f"  自适应阈值: SNR={calculated_snr:.2f} (质量:{quality_metrics['quality']}), "
+              f"阈值调整: {original_min_snr:.2f} -> {min_snr:.2f}")
+        print(f"  信号质量指标: 基线变异={quality_metrics['baseline_variability']:.3f}, "
+              f"动态范围={quality_metrics['dynamic_range']:.2f}")
+    else:
+        quality_metrics = None
+    
     # 如果提供了自定义参数，覆盖默认参数
     # 确保params是字典类型
     if params is None:
@@ -406,7 +572,7 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
     min_exp_decay_score = params['min_exp_decay_score']
     
     # 1. 应用Savitzky-Golay平滑滤波器（在预处理之后）
-    if smooth_window > 1:
+    if apply_savgol and smooth_window > 1:
         # 确保smooth_window是奇数
         if smooth_window % 2 == 0:
             smooth_window += 1
@@ -423,11 +589,14 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
                 # 确保为奇数
                 if smooth_window % 2 == 0:
                     smooth_window -= 1
-                print(f"  警告: 预处理后数据长度({len(preprocessed_data)})小于平滑窗口({smooth_window}原始值)，已调整为{smooth_window}")
+                print(f"  Warning: Data length ({len(preprocessed_data)}) after preprocessing is less than smooth window (original {smooth_window}), adjusted to {smooth_window}")
         
         smoothed_data = signal.savgol_filter(preprocessed_data, smooth_window, 3)
+        print(f"  Savitzky-Golay smoothing applied (window={smooth_window})")
     else:
         smoothed_data = preprocessed_data.copy()
+        if not apply_savgol:
+            print(f"  Savitzky-Golay smoothing disabled")
     
     # 2. 估计基线和噪声水平
     baseline = np.percentile(smoothed_data, baseline_percentile)
@@ -564,6 +733,23 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         # 计算特征
         peak_value = smoothed_data[peak_idx]
         amplitude = peak_value - baseline
+        
+        # 改进建议1：计算二阶差分特征
+        ddf_features = None
+        if use_second_derivative:
+            ddf_features = compute_second_derivative_features(
+                smoothed_data, peak_idx, start_idx, baseline, 
+                ddf_threshold=ddf_threshold * filter_strength
+            )
+            
+            # 如果二阶差分评分过低，说明上升不够陡峭，可能是噪声或伪峰
+            if ddf_features['ddf_score'] < min_ddf_score:
+                # 记录但可能跳过（取决于其他特征）
+                # 如果信号质量很好，可以放宽要求
+                if quality_metrics is None or quality_metrics['snr'] < 7:
+                    # 低SNR情况下，二阶差分不明显的峰值直接跳过
+                    continue
+                # 高SNR情况下，给予警告但继续处理
         
         # 计算半高宽 (FWHM)
         half_max = baseline + amplitude / 2
@@ -811,6 +997,19 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
             'exp_decay_score': exp_decay_score
         }
         
+        # 添加二阶差分特征（改进建议1）
+        if ddf_features is not None:
+            transient['ddf_min'] = ddf_features['min_ddf']
+            transient['ddf_score'] = ddf_features['ddf_score']
+            transient['has_rapid_rise'] = ddf_features['has_rapid_rise']
+            transient['ddf_mean'] = ddf_features['mean_ddf']
+        
+        # 添加信号质量指标（改进建议2）
+        if quality_metrics is not None:
+            transient['signal_snr'] = quality_metrics['snr']
+            transient['signal_quality'] = quality_metrics['quality']
+            transient['baseline_variability'] = quality_metrics['baseline_variability']
+        
         transients.append(transient)
     
     # 检测是否有复杂波形或组合波形（不同特征的波）
@@ -839,7 +1038,13 @@ def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpea
                            butterworth_cutoff=20,
                            butterworth_strength=0.05,
                            apply_normalization=False,
-                           normalization_method='standard'):
+                           normalization_method='standard',
+                           apply_savgol=True,
+                           # 改进建议1和2的参数
+                           use_adaptive_threshold=True,
+                           use_second_derivative=True,
+                           ddf_threshold=-0.52,
+                           min_ddf_score=0.3):
     """
     从钙离子浓度数据中提取关键特征
     
@@ -897,7 +1102,12 @@ def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpea
         butterworth_cutoff=butterworth_cutoff,
         butterworth_strength=butterworth_strength,
         apply_normalization=apply_normalization,
-        normalization_method=normalization_method
+        normalization_method=normalization_method,
+        apply_savgol=apply_savgol,
+        use_adaptive_threshold=use_adaptive_threshold,
+        use_second_derivative=use_second_derivative,
+        ddf_threshold=ddf_threshold,
+        min_ddf_score=min_ddf_score
     )
     
     # 如果没有检测到钙爆发，返回空特征
@@ -953,7 +1163,8 @@ def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpea
 
 def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_dict, fs=4.8,
                                            neuron_ids=None, save_dir=None, show_subpeaks=True,
-                                           line_width=2.0, figsize=(20, 6),
+                                           line_width=2.0, figsize=None,
+                                           auto_figsize=False,
                                            layout='separate'):
     """
     为每个神经元单独生成 trace 图，标注检测到的钙波
@@ -977,7 +1188,7 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
     line_width : float, 可选
         trace线条宽度，默认为2.0
     figsize : tuple, 可选
-        单个图像尺寸，默认为(20, 6)
+        单个图像尺寸，默认为根据时间长度自适应（最少20x6）
     layout : str, 可选
         布局方式：'separate'（每个神经元独立文件）或'subplots'（多个子图在一个文件中）
         
@@ -1008,6 +1219,15 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
     # 生成时间轴
     time_points = len(list(raw_data_dict.values())[0])
     time_axis = np.arange(time_points) / fs
+    duration_seconds = time_axis[-1] if len(time_axis) > 0 else 0
+    
+    # 图像尺寸控制
+    if auto_figsize:
+        auto_width = max(24.0, duration_seconds / 6.0)
+        auto_height = 6.0
+        base_figsize = (auto_width, auto_height)
+    else:
+        base_figsize = figsize if figsize is not None else (20.0, 6.0)
     
     saved_files = []
     
@@ -1019,7 +1239,7 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
                 continue
             
             # 创建单独的图
-            fig, ax = plt.subplots(figsize=figsize)
+            fig, ax = plt.subplots(figsize=base_figsize)
             
             raw_trace = raw_data_dict[neuron_id]
             smoothed_trace = smoothed_data_dict[neuron_id]
@@ -1042,26 +1262,18 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
             if neuron_id in transients_dict:
                 transients = transients_dict[neuron_id]
                 
-                # 使用形态评分确定颜色
-                if len(transients) > 0 and 'morphology_score' in transients[0]:
-                    scores = [t.get('morphology_score', 0.5) for t in transients]
-                    norm = Normalize(vmin=min(scores), vmax=max(scores))
-                    cmap = cm.viridis
-                else:
-                    norm = None
-                    cmap = None
-                
                 for j, transient in enumerate(transients):
                     start_time = transient['start_idx'] / fs
                     end_time = transient['end_idx'] / fs
                     peak_time = transient['peak_idx'] / fs
                     peak_value = transient['peak_value']
                     
-                    # 确定颜色
-                    if norm is not None and cmap is not None:
-                        color = cmap(norm(transient.get('morphology_score', 0.5)))
+                    # Determine color based on wave type
+                    wave_type = transient.get('wave_type', 'simple')
+                    if wave_type == 'complex':
+                        color = '#9B59B6'  # Purple - Complex wave (with subpeaks)
                     else:
-                        color = 'red'
+                        color = '#F39C12'  # Yellow - Simple wave
                     
                     # 绘制钙波区间（半透明背景）
                     ax.axvspan(start_time, end_time,
@@ -1108,8 +1320,11 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
                                       label='Subpeak' if j == 0 else "")
             
             # 设置标题和标签
-            n_waves = len(transients_dict.get(neuron_id, []))
-            ax.set_title(f'Neuron {neuron_id} - Calcium Transient Detection ({n_waves} waves)',
+            transients_list = transients_dict.get(neuron_id, [])
+            n_waves = len(transients_list)
+            n_simple = sum(1 for t in transients_list if t.get('wave_type') == 'simple')
+            n_complex = sum(1 for t in transients_list if t.get('wave_type') == 'complex')
+            ax.set_title(f'Neuron {neuron_id} - Calcium Transient Detection ({n_waves} waves: {n_simple} simple, {n_complex} complex)',
                         fontsize=16, fontweight='bold', pad=15)
             ax.set_xlabel('Time (seconds)', fontsize=14, fontweight='bold')
             ax.set_ylabel('Calcium Signal Intensity', fontsize=14, fontweight='bold')
@@ -1125,7 +1340,17 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
             # 添加图例（去重）
             handles, labels = ax.get_legend_handles_labels()
             by_label = dict(zip(labels, handles))
-            ax.legend(by_label.values(), by_label.keys(),
+            
+            # 添加波形类型说明
+            from matplotlib.patches import Patch
+            wave_legend = [
+                Patch(facecolor='#F39C12', alpha=0.25, label='Simple Wave'),
+                Patch(facecolor='#9B59B6', alpha=0.25, label='Complex Wave (with subpeaks)')
+            ]
+            all_handles = list(by_label.values()) + wave_legend
+            all_labels = list(by_label.keys()) + ['Simple Wave', 'Complex Wave (with subpeaks)']
+            
+            ax.legend(all_handles, all_labels,
                      loc='upper right', fontsize=11, framealpha=0.9)
             
             plt.tight_layout()
@@ -1147,8 +1372,11 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
         n_cols = 1
         n_rows = n_neurons
         
+        subplot_width = base_figsize[0]
+        height_per_plot = base_figsize[1]
+        fig_height = height_per_plot * n_neurons
         fig, axes = plt.subplots(n_rows, n_cols,
-                                figsize=(figsize[0], figsize[1] * n_neurons),
+                                figsize=(subplot_width, fig_height),
                                 squeeze=False)
         
         for idx, neuron_id in enumerate(neuron_ids):
@@ -1173,21 +1401,18 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
             if neuron_id in transients_dict:
                 transients = transients_dict[neuron_id]
                 
-                if len(transients) > 0 and 'morphology_score' in transients[0]:
-                    scores = [t.get('morphology_score', 0.5) for t in transients]
-                    norm = Normalize(vmin=min(scores), vmax=max(scores))
-                    cmap = cm.viridis
-                else:
-                    norm = None
-                    cmap = None
-                
                 for j, transient in enumerate(transients):
                     start_time = transient['start_idx'] / fs
                     end_time = transient['end_idx'] / fs
                     peak_time = transient['peak_idx'] / fs
                     peak_value = transient['peak_value']
                     
-                    color = cmap(norm(transient.get('morphology_score', 0.5))) if norm else 'red'
+                    # Determine color based on wave type
+                    wave_type = transient.get('wave_type', 'simple')
+                    if wave_type == 'complex':
+                        color = '#9B59B6'  # Purple - Complex wave (with subpeaks)
+                    else:
+                        color = '#F39C12'  # Yellow - Simple wave
                     
                     ax.axvspan(start_time, end_time, alpha=0.25, color=color)
                     ax.axvline(start_time, color=color, linestyle='--', linewidth=1, alpha=0.7)
@@ -1207,8 +1432,11 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
                                       color='magenta', s=50, marker='*', zorder=5)
             
             # 设置标题和标签
-            n_waves = len(transients_dict.get(neuron_id, []))
-            ax.set_title(f'Neuron {neuron_id} ({n_waves} waves)',
+            transients_list = transients_dict.get(neuron_id, [])
+            n_waves = len(transients_list)
+            n_simple = sum(1 for t in transients_list if t.get('wave_type') == 'simple')
+            n_complex = sum(1 for t in transients_list if t.get('wave_type') == 'complex')
+            ax.set_title(f'Neuron {neuron_id} ({n_waves} waves: {n_simple}S/{n_complex}C)',
                         fontsize=13, fontweight='bold')
             ax.set_ylabel('Signal', fontsize=11, fontweight='bold')
             ax.tick_params(axis='both', labelsize=10)
@@ -1239,7 +1467,8 @@ def visualize_calcium_transients_individual(raw_data, smoothed_data, transients_
 def visualize_calcium_transients_trace(raw_data, smoothed_data, transients_dict, fs=4.8, 
                                        neuron_ids=None, save_path=None, show_subpeaks=True,
                                        trace_offset=60, scaling_factor=80, line_width=2.0,
-                                       figsize=(60, 25)):
+                                       figsize=None,
+                                       auto_figsize=False):
     """
     绘制类似 show_trace.py 风格的 trace 图，标注检测到的钙波区间
     
@@ -1284,12 +1513,21 @@ def visualize_calcium_transients_trace(raw_data, smoothed_data, transients_dict,
     if neuron_ids is None:
         neuron_ids = list(raw_data_dict.keys())
     
-    # 创建图形
-    fig, ax = plt.subplots(figsize=figsize)
-    
     # 生成时间轴
     time_points = len(list(raw_data_dict.values())[0])
     time_axis = np.arange(time_points) / fs
+    duration_seconds = time_axis[-1] if len(time_axis) > 0 else 0
+    
+    # 图像尺寸控制
+    if auto_figsize:
+        auto_width = max(60.0, duration_seconds / 5.0)
+        auto_height = 25.0
+        figsize = (auto_width, auto_height)
+    else:
+        figsize = figsize if figsize is not None else (60.0, 25.0)
+    
+    # 创建图形
+    fig, ax = plt.subplots(figsize=figsize)
     
     # 颜色映射
     import matplotlib.cm as cm
@@ -1325,26 +1563,18 @@ def visualize_calcium_transients_trace(raw_data, smoothed_data, transients_dict,
         if neuron_id in transients_dict:
             transients = transients_dict[neuron_id]
             
-            # 使用形态评分确定颜色
-            if len(transients) > 0 and 'morphology_score' in transients[0]:
-                scores = [t.get('morphology_score', 0.5) for t in transients]
-                norm = Normalize(vmin=min(scores), vmax=max(scores))
-                cmap = cm.viridis
-            else:
-                norm = None
-                cmap = None
-            
             for j, transient in enumerate(transients):
                 start_time = transient['start_idx'] / fs
                 end_time = transient['end_idx'] / fs
                 peak_time = transient['peak_idx'] / fs
                 peak_value = transient['peak_value']
                 
-                # 确定颜色
-                if norm is not None and cmap is not None:
-                    color = cmap(norm(transient.get('morphology_score', 0.5)))
+                # 根据波形类型确定颜色
+                wave_type = transient.get('wave_type', 'simple')
+                if wave_type == 'complex':
+                    color = '#9B59B6'  # 紫色 - 复合峰（有子峰）
                 else:
-                    color = 'red'
+                    color = '#F39C12'  # 黄色 - 单峰
                 
                 # 绘制钙波区间（用半透明背景色）
                 ax.axvspan(start_time, end_time, 
@@ -1430,8 +1660,9 @@ def visualize_calcium_transients_trace(raw_data, smoothed_data, transients_dict,
     legend_elements = [
         plt.Line2D([0], [0], color='gray', linewidth=line_width*0.5, alpha=0.3, label='Raw Data'),
         plt.Line2D([0], [0], color='black', linewidth=line_width, alpha=0.8, label='Smoothed Data'),
-        Patch(facecolor='red', alpha=0.2, label='Calcium Wave Region'),
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='red', 
+        Patch(facecolor='#F39C12', alpha=0.2, label='Simple Wave'),
+        Patch(facecolor='#9B59B6', alpha=0.2, label='Complex Wave (with subpeaks)'),
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='#F39C12', 
                    markersize=10, markeredgecolor='black', markeredgewidth=1.5, label='Peak'),
     ]
     if show_subpeaks:
@@ -1723,7 +1954,7 @@ def estimate_neuron_params(neuron_data, filter_strength=1.0):
         'min_snr': 3.5,                    # 降低信噪比要求，检测更微弱的钙波
         'min_duration': 12,                # 允许更短的钙波事件
         'smooth_window': 31,               # 减少平滑，保留更多细节
-        'peak_distance': 5,                # 允许检测更密集的钙波
+        'peak_distance': 24,               # 峰值之间的最小距离（与UI界面一致）
         'baseline_percentile': 8,         # 使用更低的基线估计
         'max_duration': 800,               # 保持较大的最大持续时间
         'subpeak_prominence': 0.15,         # 降低子峰检测阈值
@@ -1780,12 +2011,22 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
                             butterworth_strength=0.05,
                             apply_normalization=False,
                             normalization_method='standard',
+                            apply_savgol=True,
                             # 新增的可视化参数
                             visualize_trace=False,
                             trace_save_path=None,
                             max_neurons_visualize=20,
                             individual_plots=False,
-                            plot_layout='separate'):
+                            plot_layout='separate',
+                            trace_figsize=None,
+                            individual_figsize=None,
+                            auto_trace_figsize=False,
+                            auto_individual_figsize=False,
+                            # 改进建议1和2的参数
+                            use_adaptive_threshold=True,
+                            use_second_derivative=True,
+                            ddf_threshold=-0.52,
+                            min_ddf_score=0.3):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
     
@@ -1833,6 +2074,14 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
         是否为每个神经元生成独立的trace图，默认为False
     plot_layout : str, 可选
         布局方式：'separate'（每个神经元独立文件）或'subplots'（多子图），默认为'separate'
+    trace_figsize : tuple, 可选
+        整体Trace图的固定尺寸(宽, 高)，默认为None（使用默认比例）
+    individual_figsize : tuple, 可选
+        单神经元Trace图的固定尺寸(宽, 高)，默认为None（使用默认比例）
+    auto_trace_figsize : bool, 可选
+        是否对整体Trace图使用自适应尺寸，默认为False
+    auto_individual_figsize : bool, 可选
+        是否对单神经元Trace图使用自适应尺寸，默认为False
         
     返回
     -------
@@ -1859,9 +2108,10 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
             print(f"  估计神经元 {neuron} 的最优参数...")
             custom_params = estimate_neuron_params(neuron_data, filter_strength)
         
-        # 检测钙爆发
+        # 检测钙爆发（启用子峰检测）
         transients, smoothed_data = detect_calcium_transients(
             neuron_data, fs=fs, params=custom_params, filter_strength=filter_strength,
+            detect_subpeaks=True,  # 启用子峰检测
             apply_preprocessing=apply_preprocessing,
             apply_moving_average=apply_moving_average,
             moving_avg_window=moving_avg_window,
@@ -1869,7 +2119,12 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
             butterworth_cutoff=butterworth_cutoff,
             butterworth_strength=butterworth_strength,
             apply_normalization=apply_normalization,
-            normalization_method=normalization_method
+            normalization_method=normalization_method,
+            apply_savgol=apply_savgol,
+            use_adaptive_threshold=use_adaptive_threshold,
+            use_second_derivative=use_second_derivative,
+            ddf_threshold=ddf_threshold,
+            min_ddf_score=min_ddf_score
         )
         
         # 如果需要可视化，存储数据
@@ -1914,14 +2169,14 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
         # 限制可视化的神经元数量
         if max_neurons_visualize is None:
             neurons_to_visualize = neuron_columns
-            print(f"  将生成所有 {len(neuron_columns)} 个神经元的trace图")
+            print(f"  Will generate trace plots for all {len(neuron_columns)} neurons")
         else:
             neurons_to_visualize = neuron_columns[:max_neurons_visualize]
-            print(f"  将生成前 {min(max_neurons_visualize, len(neuron_columns))} 个神经元的trace图")
+            print(f"  Will generate trace plots for the first {min(max_neurons_visualize, len(neuron_columns))} neurons")
         
         if individual_plots:
-            # 方案A：为每个神经元生成独立的trace图
-            print(f"  模式: 每个神经元独立保存")
+            # Method A: Generate individual trace plots for each neuron
+            print(f"  Mode: Individual file for each neuron")
             
             # 确定保存目录
             if save_path is not None:
@@ -1939,19 +2194,33 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
                     neuron_ids=neurons_to_visualize,
                     save_dir=save_dir,
                     show_subpeaks=True,
-                    layout=plot_layout
+                    layout=plot_layout,
+                    figsize=individual_figsize,
+                    auto_figsize=auto_individual_figsize
                 )
-                print(f"✓ 已生成 {len(saved_files)} 个神经元trace图")
+                # Count simple and complex waves
+                total_simple = 0
+                total_complex = 0
+                for neuron_id in neurons_to_visualize:
+                    if neuron_id in transients_dict:
+                        for t in transients_dict[neuron_id]:
+                            if t.get('wave_type') == 'complex':
+                                total_complex += 1
+                            else:
+                                total_simple += 1
+                
+                print(f"✓ Generated trace plots for {len(saved_files)} neurons")
                 abs_save_dir = os.path.abspath(save_dir)
-                print(f"  保存位置: {abs_save_dir}/")
-                print(f"  示例文件: {os.path.basename(saved_files[0]) if saved_files else 'n1_trace.png'}")
+                print(f"  Save location: {abs_save_dir}/")
+                print(f"  Sample file: {os.path.basename(saved_files[0]) if saved_files else 'n1_trace.png'}")
+                print(f"  Wave statistics: {total_simple} simple waves, {total_complex} complex waves (with subpeaks)")
             except Exception as e:
                 print(f"警告: 生成独立trace图时出错: {str(e)}")
                 import traceback
                 traceback.print_exc()
         else:
-            # 原有方案：堆叠显示
-            print(f"  模式: 堆叠显示")
+            # Original method: Stacked display
+            print(f"  Mode: Stacked display")
             
             # 确定保存路径
             if trace_save_path is None and save_path is not None:
@@ -1970,9 +2239,11 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
                     fs=fs,
                     neuron_ids=neurons_to_visualize,
                     save_path=trace_save_path,
-                    show_subpeaks=True
+                    show_subpeaks=True,
+                    figsize=trace_figsize,
+                    auto_figsize=auto_trace_figsize
                 )
-                print(f"✓ Trace可视化图已生成: {trace_save_path}")
+                print(f"✓ Trace visualization generated: {trace_save_path}")
             except Exception as e:
                 print(f"警告: 生成trace可视化图时出错: {str(e)}")
                 import traceback
@@ -2042,6 +2313,7 @@ def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='be
         # 计算总体频次（整个时间序列）
         total_transients, _ = detect_calcium_transients(
             neuron_data, fs=fs, params=custom_params, filter_strength=filter_strength,
+            detect_subpeaks=True,  # 启用子峰检测
             apply_preprocessing=apply_preprocessing,
             apply_moving_average=apply_moving_average,
             moving_avg_window=moving_avg_window,
@@ -2049,7 +2321,10 @@ def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='be
             butterworth_cutoff=butterworth_cutoff,
             butterworth_strength=butterworth_strength,
             apply_normalization=apply_normalization,
-            normalization_method=normalization_method
+            normalization_method=normalization_method,
+            apply_savgol=True,  # 默认启用Savgol平滑
+            use_adaptive_threshold=True,
+            use_second_derivative=True
         )
         total_time = len(neuron_data) / fs  # 总时间（秒）
         total_freq = len(total_transients) / total_time if total_time > 0 else 0
@@ -2092,6 +2367,7 @@ def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='be
                 try:
                     behavior_transients, _ = detect_calcium_transients(
                         behavior_data, fs=fs, params=custom_params, filter_strength=filter_strength,
+                        detect_subpeaks=True,  # 启用子峰检测
                         apply_preprocessing=apply_preprocessing,
                         apply_moving_average=apply_moving_average,
                         moving_avg_window=moving_avg_window,
@@ -2099,7 +2375,10 @@ def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='be
                         butterworth_cutoff=butterworth_cutoff,
                         butterworth_strength=butterworth_strength,
                         apply_normalization=apply_normalization,
-                        normalization_method=normalization_method
+                        normalization_method=normalization_method,
+                        apply_savgol=True,  # 默认启用Savgol平滑
+                        use_adaptive_threshold=True,
+                        use_second_derivative=True
                     )
                     behavior_freq = len(behavior_transients) / behavior_time if behavior_time > 0 else 0
                 except Exception as e:
@@ -2193,6 +2472,7 @@ def analyze_behavior_total_calcium_frequency(data_df, neuron_columns, behavior_c
         # 检测该神经元的钙爆发
         neuron_transients, _ = detect_calcium_transients(
             neuron_data, fs=fs, params=custom_params, filter_strength=filter_strength,
+            detect_subpeaks=True,  # 启用子峰检测
             apply_preprocessing=apply_preprocessing,
             apply_moving_average=apply_moving_average,
             moving_avg_window=moving_avg_window,
@@ -2200,7 +2480,10 @@ def analyze_behavior_total_calcium_frequency(data_df, neuron_columns, behavior_c
             butterworth_cutoff=butterworth_cutoff,
             butterworth_strength=butterworth_strength,
             apply_normalization=apply_normalization,
-            normalization_method=normalization_method
+            normalization_method=normalization_method,
+            apply_savgol=True,  # 默认启用Savgol平滑
+            use_adaptive_threshold=True,
+            use_second_derivative=True
         )
         total_calcium_events += len(neuron_transients)
     
@@ -2262,6 +2545,7 @@ def analyze_behavior_total_calcium_frequency(data_df, neuron_columns, behavior_c
             try:
                 behavior_transients, _ = detect_calcium_transients(
                     behavior_data, fs=fs, params=custom_params, filter_strength=filter_strength,
+                    detect_subpeaks=True,  # 启用子峰检测
                     apply_preprocessing=apply_preprocessing,
                     apply_moving_average=apply_moving_average,
                     moving_avg_window=moving_avg_window,
@@ -2269,7 +2553,10 @@ def analyze_behavior_total_calcium_frequency(data_df, neuron_columns, behavior_c
                     butterworth_cutoff=butterworth_cutoff,
                     butterworth_strength=butterworth_strength,
                     apply_normalization=apply_normalization,
-                    normalization_method=normalization_method
+                    normalization_method=normalization_method,
+                    apply_savgol=True,  # 默认启用Savgol平滑
+                    use_adaptive_threshold=True,
+                    use_second_derivative=True
                 )
                 behavior_calcium_events += len(behavior_transients)
             except Exception as e:
@@ -2312,7 +2599,7 @@ if __name__ == "__main__":
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='神经元钙离子特征提取工具')
-    parser.add_argument('--data', type=str, default='../datasets/bla6250EM0626goodtrace.xlsx',
+    parser.add_argument('--data', type=str, default='../datasets/Day6_with_behavior_labels_filled.xlsx',
                         help='数据文件路径，支持.xlsx格式')
     parser.add_argument('--output', type=str, default=None,
                         help='输出目录，不指定则根据数据集名称自动生成')
@@ -2332,13 +2619,17 @@ if __name__ == "__main__":
                         help='禁用Butterworth滤波（默认启用）')
     parser.add_argument('--butterworth_cutoff', type=float, default=20,
                         help='Butterworth滤波器截止频率（默认为20，与smooth_data.py一致）')
-    parser.add_argument('--butterworth_strength', type=float, default=0.05,
+    parser.add_argument('--butterworth_strength', type=float, default=0.15,
                         help='Butterworth滤波强度（默认为0.05，与smooth_data.py一致）')
     parser.add_argument('--enable_normalization', action='store_true',
                         help='启用归一化（默认禁用）')
     parser.add_argument('--normalization_method', type=str, default='standard',
                         choices=['standard', 'minmax', 'robust', 'log_standard', 'log_minmax'],
                         help='归一化方法（默认为standard）')
+    parser.add_argument('--disable_savgol', action='store_true',
+                        help='禁用Savitzky-Golay平滑（默认启用）')
+    parser.add_argument('--smooth_window', type=int, default=21,
+                        help='Savitzky-Golay平滑窗口大小（默认为31，需为奇数）')
     
     # 新增可视化参数
     parser.add_argument('--visualize_trace', action='store_true',
@@ -2352,6 +2643,18 @@ if __name__ == "__main__":
     parser.add_argument('--plot_layout', type=str, default='separate',
                         choices=['separate', 'subplots'],
                         help='布局方式：separate（独立文件）或subplots（多子图），默认为separate')
+    parser.add_argument('--trace_fig_width', type=float, default=None,
+                        help='整体Trace图的宽度（英寸），默认使用固定比例')
+    parser.add_argument('--trace_fig_height', type=float, default=None,
+                        help='整体Trace图的高度（英寸），默认使用固定比例')
+    parser.add_argument('--individual_fig_width', type=float, default=None,
+                        help='单神经元Trace图的宽度（英寸），默认使用固定比例')
+    parser.add_argument('--individual_fig_height', type=float, default=None,
+                        help='单神经元Trace图的高度（英寸），默认使用固定比例')
+    parser.add_argument('--auto_trace_figsize', action='store_true',
+                        help='整体Trace图使用自适应尺寸')
+    parser.add_argument('--auto_individual_figsize', action='store_true',
+                        help='单神经元Trace图使用自适应尺寸')
     
     args = parser.parse_args()
     
@@ -2362,6 +2665,19 @@ if __name__ == "__main__":
     # 如果启用了 individual_plots，自动启用 visualize_trace
     if args.individual_plots:
         args.visualize_trace = True
+    
+    # 处理图像尺寸参数
+    trace_figsize = None
+    if args.trace_fig_width is not None or args.trace_fig_height is not None:
+        trace_width = args.trace_fig_width if args.trace_fig_width is not None else 60.0
+        trace_height = args.trace_fig_height if args.trace_fig_height is not None else 25.0
+        trace_figsize = (trace_width, trace_height)
+    
+    individual_figsize = None
+    if args.individual_fig_width is not None or args.individual_fig_height is not None:
+        indiv_width = args.individual_fig_width if args.individual_fig_width is not None else 20.0
+        indiv_height = args.individual_fig_height if args.individual_fig_height is not None else 6.0
+        individual_figsize = (indiv_width, indiv_height)
     
     # 检查文件是否存在
     if os.path.exists(args.data):
@@ -2375,7 +2691,7 @@ if __name__ == "__main__":
             
             # 提取神经元列
             neuron_columns = [col for col in df.columns if col.startswith('n') and col[1:].isdigit()]
-            print(f"检测到 {len(neuron_columns)} 个神经元数据列")
+            print(f"Detected {len(neuron_columns)} neuron data columns")
             
             # 显示预处理配置
             print(f"\n预处理配置:")
@@ -2384,6 +2700,7 @@ if __name__ == "__main__":
                 print(f"  - 移动平均滤波: {'启用' if not args.disable_moving_average else '禁用'} (窗口大小: {args.moving_avg_window})")
                 print(f"  - Butterworth滤波: {'启用' if not args.disable_butterworth else '禁用'} (截止频率: {args.butterworth_cutoff}, 强度: {args.butterworth_strength})")
                 print(f"  - 归一化: {'启用' if args.enable_normalization else '禁用'} (方法: {args.normalization_method})")
+            print(f"  - Savitzky-Golay平滑: {'启用' if not args.disable_savgol else '禁用'} (窗口: {args.smooth_window})")
             print(f"  - 过滤强度: {args.filter_strength}")
             
             print(f"\n可视化配置:")
@@ -2393,7 +2710,20 @@ if __name__ == "__main__":
                     print(f"  - 可视化神经元数: 所有神经元 ({len(neuron_columns)}个)")
                 else:
                     print(f"  - 最多可视化神经元数: {args.max_neurons_visualize}")
-                print(f"  - 布局方式: {args.plot_layout}")
+                if args.auto_individual_figsize:
+                    individual_size_text = "自适应"
+                elif individual_figsize:
+                    individual_size_text = f"{individual_figsize[0]}x{individual_figsize[1]} in"
+                else:
+                    individual_size_text = "默认 (20x6 in)"
+                print(f"  - 单神经元图尺寸: {individual_size_text}")
+            if args.auto_trace_figsize:
+                trace_size_text = "自适应"
+            elif trace_figsize:
+                trace_size_text = f"{trace_figsize[0]}x{trace_figsize[1]} in"
+            else:
+                trace_size_text = "默认 (60x25 in)"
+            print(f"  - 整体Trace图尺寸: {trace_size_text}")
             
             # 根据数据文件名生成输出目录
             if args.output is None:
@@ -2438,12 +2768,17 @@ if __name__ == "__main__":
                 butterworth_strength=args.butterworth_strength,
                 apply_normalization=args.enable_normalization,
                 normalization_method=args.normalization_method,
+                apply_savgol=not args.disable_savgol,
                 # 传递可视化参数
                 visualize_trace=args.visualize_trace,
                 trace_save_path=None,  # 自动生成路径
                 max_neurons_visualize=args.max_neurons_visualize,
                 individual_plots=args.individual_plots,
-                plot_layout=args.plot_layout
+                plot_layout=args.plot_layout,
+                trace_figsize=trace_figsize,
+                individual_figsize=individual_figsize,
+                auto_trace_figsize=args.auto_trace_figsize,
+                auto_individual_figsize=args.auto_individual_figsize
             )
             print(f"\n共检测到 {len(all_transients)} 个钙爆发")
             
