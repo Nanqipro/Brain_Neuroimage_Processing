@@ -86,6 +86,7 @@ tmp/
 # Project specific large directories
 Pre_analysis/datasets/
 Pre_analysis/graph/
+tif_data/
  
 # Ignore symlinked data directory (works for symlink and real directory)
 CVPR/data
