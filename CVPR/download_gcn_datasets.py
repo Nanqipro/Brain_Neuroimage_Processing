@@ -30,6 +30,26 @@ import argparse
 import sys
 from pathlib import Path
 
+# # -----------------------------------------------------------------
+# # 解决 PyTorch 2.6+ 安全加载问题 (torch.load weights_only=True)
+# # -----------------------------------------------------------------
+# try:
+#     # 导入 torch 和 DataEdgeAttr 所在的模块
+#     import torch
+#     import torch_geometric.data.data 
+    
+#     # 明确告诉 PyTorch 信任这个来自 torch_geometric 的类
+#     torch.serialization.add_safe_globals([
+#         torch_geometric.data.data.DataEdgeAttr,
+#         torch_geometric.data.data.DataTensorAttr,
+#         torch_geometric.data.storage.GlobalStorage
+#     ])
+# except ImportError:
+#     # 如果用户还没安装 torch/torch_geometric，先跳过
+#     # 后续的下载函数会捕获这个错误并提示安装
+#     pass
+# # -----------------------------------------------------------------
+
 
 # ============ 图分类数据集信息 ============
 # 这些数据集适合您的代码（使用 DataLoader + global_pooling）

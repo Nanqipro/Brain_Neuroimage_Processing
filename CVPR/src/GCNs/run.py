@@ -34,6 +34,27 @@ from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 from torch_geometric.loader import DataLoader
 
+# # -----------------------------------------------------------------
+# # 解决 PyTorch 2.6+ 安全加载 OGB/PyG 数据集的问题
+# # (torch.load weights_only=True)
+# # -----------------------------------------------------------------
+# try:
+#     # 导入 torch 和所有需要的 torch_geometric 模块
+#     import torch
+#     import torch_geometric.data.data 
+#     import torch_geometric.data.storage 
+
+#     # 明确告诉 PyTorch 信任这些来自 torch_geometric 的类
+#     torch.serialization.add_safe_globals([
+#         torch_geometric.data.data.DataEdgeAttr,
+#         torch_geometric.data.data.DataTensorAttr,
+#         torch_geometric.data.storage.GlobalStorage
+#     ])
+# except ImportError:
+#     # 如果环境不完整，先跳过，后续代码会正常报错
+#     pass
+# # -----------------------------------------------------------------
+
 # 导入模型和工具函数
 from model import (
     ImprovedGCN, PureGCN, PureGAT, PureGraphSAGE,

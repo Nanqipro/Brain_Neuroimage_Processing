@@ -6,7 +6,7 @@
 
 # 定义所有模型
 # MODELS=("gcn" "gat" "sage" "gin" "chebnet" "edgeconv"  "pna" "gatv2" "deepergcn")
-MODELS=("edgeconv"  "pna" "gatv2" "deepergcn")
+MODELS=("edgeconv"  "pna" )
 # "gunet"  "hybrid" 
 # 定义数据集配置
 # 格式: "data_source:dataset:batch_size:epochs:gpu_id"
