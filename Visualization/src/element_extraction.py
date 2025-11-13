@@ -344,6 +344,60 @@ def compute_second_derivative_features(data: np.ndarray, peak_idx: int, start_id
     
     return features
 
+def compute_composite_metrics(data: np.ndarray,
+                              start_idx: int,
+                              peak_idx: int,
+                              end_idx: int,
+                              fs: float,
+                              amplitude: float,
+                              noise_level: float,
+                              subpeaks: list) -> dict:
+    seg = data[start_idx:end_idx+1]
+    rise = data[start_idx:peak_idx+1]
+    decay = data[peak_idx:end_idx+1]
+    rise_diff = np.diff(rise) if len(rise) > 1 else np.array([])
+    decay_diff = np.diff(decay) if len(decay) > 1 else np.array([])
+    prom_rise = max(noise_level * 0.15, (amplitude / max(1, len(rise))) * 0.1)
+    prom_decay = max(noise_level * 0.15, (amplitude / max(1, len(decay))) * 0.1)
+    dist_pts = max(1, int(fs * 0.2))
+    rise_peaks = []
+    decay_peaks = []
+    if len(rise_diff) > 2:
+        rise_peaks, _ = find_peaks(rise_diff, prominence=prom_rise, distance=dist_pts)
+    if len(decay_diff) > 2:
+        decay_peaks, _ = find_peaks(-decay_diff, prominence=prom_decay, distance=dist_pts)
+    shoulder_count = max(0, len(rise_peaks) - 1)
+    plateau_thr = max(noise_level * 0.2, (amplitude / max(1, end_idx - start_idx)) * 0.15)
+    plateau_ratio = float(np.sum(np.abs(decay_diff) < plateau_thr)) / float(len(decay_diff)) if len(decay_diff) > 0 else 0.0
+    irregular_decay_fraction = float(np.sum(decay_diff > 0)) / float(len(decay_diff)) if len(decay_diff) > 0 else 0.0
+    sp_count = len(subpeaks) if subpeaks is not None else 0
+    score_subpeaks = min(1.0, sp_count * 0.35)
+    score_shoulder = min(1.0, shoulder_count * 0.5)
+    score_plateau = min(1.0, plateau_ratio / 0.4)
+    score_irregular = min(1.0, irregular_decay_fraction)
+    composite_score = max(score_subpeaks, 0.35 * score_shoulder + 0.35 * score_plateau + 0.3 * score_irregular)
+    is_composite = (sp_count > 0) or (composite_score >= 0.5) or (shoulder_count > 0) or (plateau_ratio >= 0.35) or (irregular_decay_fraction >= 0.25)
+    if sp_count >= 2:
+        composite_type = 'multi'
+    elif sp_count == 1:
+        composite_type = 'double'
+    elif plateau_ratio >= 0.35 and irregular_decay_fraction >= 0.25:
+        composite_type = 'continuous'
+    elif shoulder_count > 0:
+        composite_type = 'shoulder'
+    else:
+        composite_type = 'single'
+    return {
+        'shoulder_count': int(shoulder_count),
+        'derivative_peaks_rise': int(len(rise_peaks)),
+        'derivative_peaks_decay': int(len(decay_peaks)),
+        'plateau_ratio': float(plateau_ratio),
+        'irregular_decay_fraction': float(irregular_decay_fraction),
+        'composite_score': float(composite_score),
+        'is_composite': bool(is_composite),
+        'composite_type': composite_type
+    }
+
 def preprocess_neural_signal(
     data: np.ndarray,
     apply_moving_average: bool = True,
@@ -801,8 +855,15 @@ def detect_subpeaks_advanced(
     candidate_peaks = candidate_peaks + start_idx
     
     # 步骤2: 排除主峰及其直接邻近区域
-    # 定义主峰的"禁区"：主峰前后一定范围
-    main_peak_exclusion_radius = max(subpeak_distance, int(5 * fs))  # 至少5秒
+    # 定义主峰的"禁区"：主峰前后一定范围（自适应主峰半高宽）
+    try:
+        w_main, _, _, _ = peak_widths(smoothed_data, [main_peak_idx], rel_height=0.5)
+        fwhm_main_pts = int(w_main[0])
+    except Exception:
+        fwhm_main_pts = int(5 * fs)
+    base_excl = int(5 * fs)
+    adapt_excl = max(int(0.5 * fwhm_main_pts), subpeak_distance)
+    main_peak_exclusion_radius = max(base_excl, adapt_excl)
     candidate_peaks = [
         sp for sp in candidate_peaks 
         if abs(sp - main_peak_idx) > main_peak_exclusion_radius
@@ -1538,8 +1599,18 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
                 min_quality_score=0.30  # 子峰最小质量评分
             )
         
-        # 收集主波形对象特征
-        wave_type = "complex" if len(subpeaks) > 0 else "simple"
+        # 复合峰判定与指标
+        comp_metrics = compute_composite_metrics(
+            smoothed_data,
+            start_idx,
+            peak_idx,
+            end_idx,
+            fs,
+            amplitude,
+            noise_level,
+            subpeaks
+        )
+        wave_type = "complex" if comp_metrics['is_composite'] else "simple"
         subpeaks_count = len(subpeaks)
         
         # 存储此次钙爆发的特征（改进：记录局部baseline）
@@ -1565,6 +1636,14 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
             'asymmetry': asymmetry,
             'exp_decay_score': exp_decay_score
         }
+        # 复合峰相关指标
+        transient['composite_score'] = comp_metrics['composite_score']
+        transient['composite_type'] = comp_metrics['composite_type']
+        transient['shoulder_count'] = comp_metrics['shoulder_count']
+        transient['plateau_ratio'] = comp_metrics['plateau_ratio']
+        transient['derivative_peaks_rise'] = comp_metrics['derivative_peaks_rise']
+        transient['derivative_peaks_decay'] = comp_metrics['derivative_peaks_decay']
+        transient['irregular_decay_fraction'] = comp_metrics['irregular_decay_fraction']
         if apply_deconvolution and deconv_strength is not None:
             transient['deconv_strength'] = deconv_strength
         if fit_kinetics and kinetics is not None:
@@ -1709,9 +1788,13 @@ def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpea
     decay_times = [t['decay_time'] for t in transients]
     aucs = [t['auc'] for t in transients]
     
-    # 统计复杂波形比例
+    # 统计复杂波形比例与复合指标
     complex_waves = [t for t in transients if t['wave_type'] == 'complex']
     complex_waves_ratio = len(complex_waves) / len(transients) if len(transients) > 0 else 0
+    shoulders = [t.get('shoulder_count', 0) for t in transients]
+    plateaus = [t.get('plateau_ratio', 0.0) for t in transients]
+    decay_irregular = [t.get('irregular_decay_fraction', 0.0) for t in transients]
+    composite_scores = [t.get('composite_score', 0.0) for t in transients]
     
     # 计算每个波的平均子峰数
     subpeaks_per_wave = sum(t['subpeaks_count'] for t in transients) / len(transients) if len(transients) > 0 else 0
@@ -1728,7 +1811,11 @@ def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpea
         'mean_auc': np.mean(aucs),
         'frequency': len(transients) / total_time,  # 每秒事件数
         'complex_waves_ratio': complex_waves_ratio,
-        'subpeaks_per_wave': subpeaks_per_wave
+        'subpeaks_per_wave': subpeaks_per_wave,
+        'avg_plateau_ratio': float(np.mean(plateaus)) if len(plateaus) > 0 else 0.0,
+        'avg_shoulders': float(np.mean(shoulders)) if len(shoulders) > 0 else 0.0,
+        'avg_decay_irregularity': float(np.mean(decay_irregular)) if len(decay_irregular) > 0 else 0.0,
+        'avg_composite_score': float(np.mean(composite_scores)) if len(composite_scores) > 0 else 0.0
     }
     
     # 可视化（如果需要）
