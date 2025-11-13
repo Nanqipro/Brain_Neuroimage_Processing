@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 from scipy.signal import find_peaks, peak_widths, savgol_filter, butter, filtfilt
+from scipy.ndimage import maximum_filter1d, minimum_filter1d, gaussian_filter
+from scipy.optimize import curve_fit
 # 兼容不同版本的 NumPy
 try:
     from numpy import trapezoid
@@ -509,6 +511,66 @@ def auto_select_baseline_method(data, fs=4.8, noise_threshold=2.0):
         window_size = int(window_seconds * fs)
         return 'sliding', {'baseline_window_size': window_size}
 
+def maximin_baseline_1d(data, fs=4.8, sig_baseline=10.0, win_baseline=60.0):
+    win = int(win_baseline * fs)
+    Flow = gaussian_filter(data, sig_baseline)
+    Flow = minimum_filter1d(Flow, win)
+    Flow = maximum_filter1d(Flow, win)
+    return Flow
+
+def oasis_deconvolve_1d(F, tau, fs):
+    NT = len(F)
+    g = -1.0 / (tau * fs)
+    v = np.zeros(NT, dtype=np.float32)
+    w = np.zeros(NT, dtype=np.float32)
+    t = np.zeros(NT, dtype=np.int64)
+    l = np.zeros(NT, dtype=np.float32)
+    s = np.zeros(NT, dtype=np.float32)
+    it = 0
+    ip = 0
+    while it < NT:
+        v[ip] = F[it]
+        w[ip] = 1
+        t[ip] = it
+        l[ip] = 1
+        while ip > 0:
+            if v[ip - 1] * np.exp(g * l[ip - 1]) > v[ip]:
+                f1 = np.exp(g * l[ip - 1])
+                f2 = np.exp(2.0 * g * l[ip - 1])
+                wnew = w[ip - 1] + w[ip] * f2
+                v[ip - 1] = (v[ip - 1] * w[ip - 1] + v[ip] * w[ip] * f1) / wnew
+                w[ip - 1] = wnew
+                l[ip - 1] = l[ip - 1] + l[ip]
+                ip -= 1
+            else:
+                break
+        it += 1
+        ip += 1
+    if ip > 1:
+        s[t[1:ip]] = v[1:ip] - v[:ip - 1] * np.exp(g * l[:ip - 1])
+    return s
+
+def fit_transient_kinetics(segment, fs, baseline, t0_time):
+    x = np.arange(len(segment)) / fs
+    y = segment
+    def model(t, A, tau_r, tau_d):
+        tt = t - t0_time
+        tt = np.maximum(tt, 0)
+        return baseline + A * (1.0 - np.exp(-tt / np.maximum(tau_r, 1e-6))) * np.exp(-tt / np.maximum(tau_d, 1e-6))
+    A0 = np.max(y - baseline) if len(y) else 0.1
+    tau_r0 = 0.3
+    tau_d0 = 1.5
+    bounds = ([0.0, 0.05, 0.1], [np.inf, 5.0, 10.0])
+    try:
+        popt, _ = curve_fit(model, x, y, p0=[A0, tau_r0, tau_d0], bounds=bounds, maxfev=2000)
+        y_pred = model(x, *popt)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        ss_res = np.sum((y - y_pred) ** 2)
+        r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+        return {'amplitude_fit': float(popt[0]), 'tau_rise': float(popt[1]), 'tau_decay': float(popt[2]), 'kinetics_r2': float(r2)}
+    except Exception:
+        return {'amplitude_fit': float('nan'), 'tau_rise': float('nan'), 'tau_decay': float('nan'), 'kinetics_r2': 0.0}
+
 
 def find_significant_valleys(data, start_idx, end_idx, min_depth_ratio=0.2):
     """
@@ -865,12 +927,10 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
                              subpeak_width=5, subpeak_distance=8, params=None, 
                              min_morphology_score=0.20, min_exp_decay_score=0.12,
                              filter_strength=1.0,
-                             # Baseline自适应参数（新增）
                              baseline_method='global',
                              baseline_window_size=None,
                              baseline_auto_select=False,
-                             # 新增的预处理参数（与smooth_data.py保持一致）
-                             apply_preprocessing=True,
+                             apply_preprocessing=False,
                              apply_moving_average=True,
                              moving_avg_window=3,
                              apply_butterworth=True,
@@ -878,13 +938,15 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
                              butterworth_strength=0.05,
                              apply_normalization=False,
                              normalization_method='standard',
-                             # Savitzky-Golay平滑控制
                              apply_savgol=True,
-                             # 改进建议1和2的新参数
                              use_adaptive_threshold=True,
                              use_second_derivative=True,
                              ddf_threshold=-0.52,
-                             min_ddf_score=0.3):
+                             min_ddf_score=0.3,
+                             apply_deconvolution=False,
+                             tau_indicator=1.5,
+                             fit_kinetics=True,
+                             min_kinetics_r2=0.2):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
@@ -1084,6 +1146,11 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         is_baseline_array = True
         print(f"  使用滑动baseline: 窗口大小={baseline_window_size if baseline_window_size else 'auto'}, "
               f"中位数={baseline_value:.4f}")
+    elif baseline_method == 'maximin':
+        baseline_array = maximin_baseline_1d(smoothed_data, fs=fs)
+        baseline_value = np.median(baseline_array)
+        is_baseline_array = True
+        print(f"  使用maximin baseline: 中位数={baseline_value:.4f}")
     else:
         raise ValueError(f"未知的baseline方法: {baseline_method}")
     
@@ -1108,16 +1175,24 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         detection_signal = smoothed_data
     
     # 增加prominence参数来要求峰值必须明显突出于背景
-    # 调整prominence_threshold，随filter_strength变化
-    prominence_factor = 1.2 * filter_strength  # 进一步降低prominence_factor以捕获更多微弱峰值
-    prominence_threshold = noise_level * prominence_factor
+    # 调整prominence_threshold，随filter_strength变化，并在低SNR时进一步放宽
+    base_prom_factor = 1.2
+    if quality_metrics is not None and quality_metrics.get('snr', 0) < 5:
+        base_prom_factor = 0.9
+    prominence_factor = base_prom_factor * max(0.6, min(1.5, filter_strength))
+    prominence_threshold = max(noise_level * 0.5, noise_level * prominence_factor)
     
     # 增加width参数来过滤太窄的峰值（可能是尖刺噪声）
-    min_width = min_duration // 6  # 进一步降低最小宽度要求，改为1/6
+    min_width = max(1, min_duration // 6)
     
     # 首次检测所有可能的峰值，使用较低的distance要求
-    initial_peaks, peak_props = find_peaks(detection_signal, height=threshold, 
-                                          prominence=prominence_threshold, width=min_width)
+    initial_peaks, peak_props = find_peaks(
+        detection_signal,
+        height=threshold,
+        prominence=prominence_threshold,
+        width=min_width,
+        distance=max(1, peak_distance // 3)
+    )
     
     # 对找到的峰值使用更智能的选择策略，而不是简单地应用固定距离
     # 如果没有检测到峰值，返回空列表
@@ -1233,13 +1308,19 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         # 如果峰值之间的信号始终高于基线，则使用峰值之间的最低点作为分界
         if i < len(peaks) - 1 and end_idx >= peaks[i+1]:
             # 寻找两个峰值之间的最低点作为分界
-            valley_idx = peak_idx + np.argmin(smoothed_data[peak_idx:peaks[i+1]])
-            end_idx = valley_idx
+            segment_vals = smoothed_data[peak_idx:peaks[i+1]]
+            if len(segment_vals) > 2:
+                valley_local = np.argmin(segment_vals)
+                valley_idx = peak_idx + valley_local
+                end_idx = valley_idx
         
         if i > 0 and start_idx <= peaks[i-1]:
             # 寻找两个峰值之间的最低点作为分界
-            valley_idx = peaks[i-1] + np.argmin(smoothed_data[peaks[i-1]:peak_idx])
-            start_idx = valley_idx
+            segment_vals = smoothed_data[peaks[i-1]:peak_idx]
+            if len(segment_vals) > 2:
+                valley_local = np.argmin(segment_vals)
+                valley_idx = peaks[i-1] + valley_local
+                start_idx = valley_idx
             
         # 计算持续时间
         duration = (end_idx - start_idx) / fs
@@ -1301,6 +1382,13 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         else:
             segment = smoothed_data[start_idx:end_idx+1] - baseline_value
         auc = trapezoid(segment, dx=1.0/fs)
+        deconv_strength = None
+        if apply_deconvolution:
+            local_deconv = oasis_deconvolve_1d(segment, tau_indicator, fs)
+            deconv_strength = float(np.sum(local_deconv))
+        kinetics = None
+        if fit_kinetics:
+            kinetics = fit_transient_kinetics(smoothed_data[start_idx:end_idx+1], fs, local_baseline if is_baseline_array else baseline_value, start_idx / fs)
         
         # 新增：计算典型钙波形态特征评分
         # 1. 上升期陡峭、下降期缓慢的特征 - 钙波通常上升快，下降慢
@@ -1410,29 +1498,25 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
         
         # 综合形态评分 (0-1)，使用折中的权重配置
         morphology_score = (
-            0.28 * rise_decay_score +     # 上升/衰减比例的权重
-            0.2 * asymmetry_score +      # 非对称性的权重
-            0.17 * monotonic_score +     # 单调性的权重
-            0.22 * exp_decay_score +     # 指数衰减特性的权重
-            0.13 * duration_ratio_score  # 持续时间比例的权重
+            0.28 * rise_decay_score +
+            0.2 * asymmetry_score +
+            0.17 * monotonic_score +
+            0.22 * exp_decay_score +
+            0.13 * duration_ratio_score
         )
-        
-        # 设置适中的形态评分阈值，过滤不符合典型钙波形态的峰值
-        min_morphology_score = 0.25  # 进一步降低最低形态评分要求，从0.45降到0.25
-        
-        # 考虑总体形态评分和关键特征
-        if morphology_score < min_morphology_score:
-            continue  # 跳过此峰值，因为总体形态不符合典型钙波特征
-        
-        # 添加关键特征的检查，但使用较为宽松的条件
-        if exp_decay_score < min_exp_decay_score:  # 指数衰减特性是钙波的关键特征
-            continue  # 跳过指数衰减不明显的峰值
-            
-        if rise_decay_ratio > 1.2:  # 放宽上升时间要求，从0.8改为1.2
-            continue  # 跳过上升过慢的峰值
-            
-        if non_monotonic_ratio > 0.7:  # 放宽非单调性要求，从0.5改为0.7
-            continue  # 跳过上升沿过于不规则的峰值
+
+        passes_kinetics = bool(fit_kinetics and kinetics is not None and kinetics['kinetics_r2'] >= min_kinetics_r2)
+        passes_deconv = bool(apply_deconvolution and deconv_strength is not None and deconv_strength > 0)
+
+        if not (passes_kinetics or passes_deconv):
+            if morphology_score < min_morphology_score:
+                continue
+            if exp_decay_score < min_exp_decay_score:
+                continue
+            if rise_decay_ratio > 1.2:
+                continue
+            if non_monotonic_ratio > 0.7:
+                continue
         
         # 检测波形的子峰值（如果启用） - 使用改进的检测算法
         subpeaks = []
@@ -1481,6 +1565,13 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
             'asymmetry': asymmetry,
             'exp_decay_score': exp_decay_score
         }
+        if apply_deconvolution and deconv_strength is not None:
+            transient['deconv_strength'] = deconv_strength
+        if fit_kinetics and kinetics is not None:
+            transient['amplitude_fit'] = kinetics['amplitude_fit']
+            transient['tau_rise'] = kinetics['tau_rise']
+            transient['tau_decay'] = kinetics['tau_decay']
+            transient['kinetics_r2'] = kinetics['kinetics_r2']
         
         # 添加二阶差分特征（改进建议1）
         if ddf_features is not None:
@@ -1516,7 +1607,7 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
 
 def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpeaks=False, params=None, filter_strength=1.0,
                            # 新增的预处理参数（与smooth_data.py保持一致）
-                           apply_preprocessing=True,
+                           apply_preprocessing=False,
                            apply_moving_average=True,
                            moving_avg_window=3,
                            apply_butterworth=True,
@@ -2487,8 +2578,7 @@ def estimate_neuron_params(neuron_data, filter_strength=1.0):
 
 def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=None, adaptive_params=True, start_id=1, 
                             file_info=None, filter_strength=1.0,
-                            # 新增的预处理参数（与smooth_data.py保持一致）
-                            apply_preprocessing=True,
+                            apply_preprocessing=False,
                             apply_moving_average=True,
                             moving_avg_window=3,
                             apply_butterworth=True,
@@ -2497,7 +2587,6 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
                             apply_normalization=False,
                             normalization_method='standard',
                             apply_savgol=True,
-                            # 新增的可视化参数
                             visualize_trace=False,
                             trace_save_path=None,
                             max_neurons_visualize=20,
@@ -2507,11 +2596,17 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
                             individual_figsize=None,
                             auto_trace_figsize=False,
                             auto_individual_figsize=False,
-                            # 改进建议1和2的参数
                             use_adaptive_threshold=True,
                             use_second_derivative=True,
                             ddf_threshold=-0.52,
-                            min_ddf_score=0.3):
+                            min_ddf_score=0.3,
+                            baseline_method='global',
+                            baseline_window_size=None,
+                            baseline_auto_select=False,
+                            apply_deconvolution=False,
+                            tau_indicator=1.5,
+                            fit_kinetics=True,
+                            min_kinetics_r2=0.2):
     """
     分析所有神经元的钙爆发并为每个爆发分配唯一ID
     
@@ -2609,7 +2704,14 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
             use_adaptive_threshold=use_adaptive_threshold,
             use_second_derivative=use_second_derivative,
             ddf_threshold=ddf_threshold,
-            min_ddf_score=min_ddf_score
+            min_ddf_score=min_ddf_score,
+            baseline_method=baseline_method,
+            baseline_window_size=baseline_window_size,
+            baseline_auto_select=baseline_auto_select,
+            apply_deconvolution=apply_deconvolution,
+            tau_indicator=tau_indicator,
+            fit_kinetics=fit_kinetics,
+            min_kinetics_r2=min_kinetics_r2
         )
         
         # 如果需要可视化，存储数据
@@ -2738,15 +2840,21 @@ def analyze_all_neurons_transients(data_df, neuron_columns, fs=4.8, save_path=No
 
 def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='behavior', fs=4.8, 
                                       save_path=None, filter_strength=1.0, adaptive_params=True,
-                                      # 新增的预处理参数（与smooth_data.py保持一致）
-                                      apply_preprocessing=True,
+                                      apply_preprocessing=False,
                                       apply_moving_average=True,
                                       moving_avg_window=3,
                                       apply_butterworth=True,
                                       butterworth_cutoff=20,
                                       butterworth_strength=0.05,
                                       apply_normalization=False,
-                                      normalization_method='standard'):
+                                      normalization_method='standard',
+                                      baseline_method='global',
+                                      baseline_window_size=None,
+                                      baseline_auto_select=False,
+                                      apply_deconvolution=False,
+                                      tau_indicator=1.5,
+                                      fit_kinetics=True,
+                                      min_kinetics_r2=0.2):
     """
     分析不同行为标签下神经元的钙波频次，并生成CSV表格
     
@@ -2809,7 +2917,14 @@ def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='be
             normalization_method=normalization_method,
             apply_savgol=True,  # 默认启用Savgol平滑
             use_adaptive_threshold=True,
-            use_second_derivative=True
+            use_second_derivative=True,
+            baseline_method=baseline_method,
+            baseline_window_size=baseline_window_size,
+            baseline_auto_select=baseline_auto_select,
+            apply_deconvolution=apply_deconvolution,
+            tau_indicator=tau_indicator,
+            fit_kinetics=fit_kinetics,
+            min_kinetics_r2=min_kinetics_r2
         )
         total_time = len(neuron_data) / fs  # 总时间（秒）
         total_freq = len(total_transients) / total_time if total_time > 0 else 0
@@ -2863,7 +2978,14 @@ def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='be
                         normalization_method=normalization_method,
                         apply_savgol=True,  # 默认启用Savgol平滑
                         use_adaptive_threshold=True,
-                        use_second_derivative=True
+                        use_second_derivative=True,
+                        baseline_method=baseline_method,
+                        baseline_window_size=baseline_window_size,
+                        baseline_auto_select=baseline_auto_select,
+                        apply_deconvolution=apply_deconvolution,
+                        tau_indicator=tau_indicator,
+                        fit_kinetics=fit_kinetics,
+                        min_kinetics_r2=min_kinetics_r2
                     )
                     behavior_freq = len(behavior_transients) / behavior_time if behavior_time > 0 else 0
                 except Exception as e:
@@ -2895,15 +3017,21 @@ def analyze_behavior_calcium_frequency(data_df, neuron_columns, behavior_col='be
 
 def analyze_behavior_total_calcium_frequency(data_df, neuron_columns, behavior_col='behavior', fs=4.8, 
                                            save_path=None, filter_strength=1.0, adaptive_params=True,
-                                           # 新增的预处理参数（与smooth_data.py保持一致）
-                                           apply_preprocessing=True,
+                                           apply_preprocessing=False,
                                            apply_moving_average=True,
                                            moving_avg_window=3,
                                            apply_butterworth=True,
                                            butterworth_cutoff=20,
                                            butterworth_strength=0.05,
                                            apply_normalization=False,
-                                           normalization_method='standard'):
+                                           normalization_method='standard',
+                                           baseline_method='global',
+                                           baseline_window_size=None,
+                                           baseline_auto_select=False,
+                                           apply_deconvolution=False,
+                                           tau_indicator=1.5,
+                                           fit_kinetics=True,
+                                           min_kinetics_r2=0.2):
     """
     按行为标签统计所有神经元的钙波总次数，忽略神经元个体差异
     
@@ -2968,7 +3096,14 @@ def analyze_behavior_total_calcium_frequency(data_df, neuron_columns, behavior_c
             normalization_method=normalization_method,
             apply_savgol=True,  # 默认启用Savgol平滑
             use_adaptive_threshold=True,
-            use_second_derivative=True
+            use_second_derivative=True,
+            baseline_method=baseline_method,
+            baseline_window_size=baseline_window_size,
+            baseline_auto_select=baseline_auto_select,
+            apply_deconvolution=apply_deconvolution,
+            tau_indicator=tau_indicator,
+            fit_kinetics=fit_kinetics,
+            min_kinetics_r2=min_kinetics_r2
         )
         total_calcium_events += len(neuron_transients)
     
@@ -3041,7 +3176,14 @@ def analyze_behavior_total_calcium_frequency(data_df, neuron_columns, behavior_c
                     normalization_method=normalization_method,
                     apply_savgol=True,  # 默认启用Savgol平滑
                     use_adaptive_threshold=True,
-                    use_second_derivative=True
+                    use_second_derivative=True,
+                    baseline_method=baseline_method,
+                    baseline_window_size=baseline_window_size,
+                    baseline_auto_select=baseline_auto_select,
+                    apply_deconvolution=apply_deconvolution,
+                    tau_indicator=tau_indicator,
+                    fit_kinetics=fit_kinetics,
+                    min_kinetics_r2=min_kinetics_r2
                 )
                 behavior_calcium_events += len(behavior_transients)
             except Exception as e:
@@ -3094,8 +3236,10 @@ if __name__ == "__main__":
                         help='行为标签列名，不指定则不进行行为相关分析')
     
     # 新增预处理参数
-    parser.add_argument('--disable_preprocessing', action='store_true',
-                        help='禁用预处理（默认启用）')
+    parser.add_argument('--disable_preprocessing', action='store_true', default=True,
+                        help='禁用预处理（默认禁用）')
+    parser.add_argument('--enable_preprocessing', action='store_true',
+                        help='启用预处理（默认禁用）')
     parser.add_argument('--disable_moving_average', action='store_true',
                         help='禁用移动平均滤波（默认启用）')
     parser.add_argument('--moving_avg_window', type=int, default=3,
@@ -3104,7 +3248,7 @@ if __name__ == "__main__":
                         help='禁用Butterworth滤波（默认启用）')
     parser.add_argument('--butterworth_cutoff', type=float, default=20,
                         help='Butterworth滤波器截止频率（默认为20，与smooth_data.py一致）')
-    parser.add_argument('--butterworth_strength', type=float, default=0.15,
+    parser.add_argument('--butterworth_strength', type=float, default=0.05,
                         help='Butterworth滤波强度（默认为0.05，与smooth_data.py一致）')
     parser.add_argument('--enable_normalization', action='store_true',
                         help='启用归一化（默认禁用）')
@@ -3115,6 +3259,22 @@ if __name__ == "__main__":
                         help='禁用Savitzky-Golay平滑（默认启用）')
     parser.add_argument('--smooth_window', type=int, default=21,
                         help='Savitzky-Golay平滑窗口大小（默认为31，需为奇数）')
+
+    # 新增baseline与动力学拟合参数
+    parser.add_argument('--baseline_method', type=str, default='global', choices=['global', 'sliding', 'maximin'],
+                        help='基线估计方法：global、sliding或maximin')
+    parser.add_argument('--baseline_window_size', type=int, default=None,
+                        help='滑动/自适应基线窗口大小（采样点数），默认自动')
+    parser.add_argument('--baseline_auto_select', action='store_true',
+                        help='根据数据自适应选择baseline方法')
+    parser.add_argument('--apply_deconvolution', action='store_true',
+                        help='启用OASIS去卷积以估计事件强度')
+    parser.add_argument('--tau_indicator', type=float, default=1.5,
+                        help='指示剂时间常数tau（秒级），用于OASIS近似')
+    parser.add_argument('--fit_kinetics', action='store_true', default=True,
+                        help='启用事件动力学拟合（指数上升+指数衰减）')
+    parser.add_argument('--min_kinetics_r2', type=float, default=0.2,
+                        help='动力学拟合最小R²阈值，用于过滤低质量事件')
     
     # 新增可视化参数
     parser.add_argument('--visualize_trace', action='store_true',
@@ -3180,8 +3340,8 @@ if __name__ == "__main__":
             
             # 显示预处理配置
             print(f"\n预处理配置:")
-            print(f"  - 预处理: {'启用' if not args.disable_preprocessing else '禁用'}")
-            if not args.disable_preprocessing:
+            print(f"  - 预处理: {'启用' if (args.enable_preprocessing or not args.disable_preprocessing) else '禁用'}")
+            if args.enable_preprocessing or not args.disable_preprocessing:
                 print(f"  - 移动平均滤波: {'启用' if not args.disable_moving_average else '禁用'} (窗口大小: {args.moving_avg_window})")
                 print(f"  - Butterworth滤波: {'启用' if not args.disable_butterworth else '禁用'} (截止频率: {args.butterworth_cutoff}, 强度: {args.butterworth_strength})")
                 print(f"  - 归一化: {'启用' if args.enable_normalization else '禁用'} (方法: {args.normalization_method})")
@@ -3245,7 +3405,7 @@ if __name__ == "__main__":
                 df, neuron_columns, save_path=all_transients_path, adaptive_params=True,
                 file_info=file_info, filter_strength=args.filter_strength,
                 # 传递预处理参数
-                apply_preprocessing=not args.disable_preprocessing,
+                apply_preprocessing=(args.enable_preprocessing or (not args.disable_preprocessing)),
                 apply_moving_average=not args.disable_moving_average,
                 moving_avg_window=args.moving_avg_window,
                 apply_butterworth=not args.disable_butterworth,
@@ -3254,6 +3414,14 @@ if __name__ == "__main__":
                 apply_normalization=args.enable_normalization,
                 normalization_method=args.normalization_method,
                 apply_savgol=not args.disable_savgol,
+                # 基线与动力学参数
+                baseline_method=args.baseline_method,
+                baseline_window_size=args.baseline_window_size,
+                baseline_auto_select=args.baseline_auto_select,
+                apply_deconvolution=args.apply_deconvolution,
+                tau_indicator=args.tau_indicator,
+                fit_kinetics=args.fit_kinetics,
+                min_kinetics_r2=args.min_kinetics_r2,
                 # 传递可视化参数
                 visualize_trace=args.visualize_trace,
                 trace_save_path=None,  # 自动生成路径
@@ -3286,14 +3454,21 @@ if __name__ == "__main__":
                     df, neuron_columns, behavior_col=args.behavior_col, fs=4.8,
                     save_path=behavior_freq_path, filter_strength=args.filter_strength,
                     # 传递预处理参数
-                    apply_preprocessing=not args.disable_preprocessing,
+                    apply_preprocessing=(args.enable_preprocessing or (not args.disable_preprocessing)),
                     apply_moving_average=not args.disable_moving_average,
                     moving_avg_window=args.moving_avg_window,
                     apply_butterworth=not args.disable_butterworth,
                     butterworth_cutoff=args.butterworth_cutoff,
                     butterworth_strength=args.butterworth_strength,
                     apply_normalization=args.enable_normalization,
-                    normalization_method=args.normalization_method
+                    normalization_method=args.normalization_method,
+                    baseline_method=args.baseline_method,
+                    baseline_window_size=args.baseline_window_size,
+                    baseline_auto_select=args.baseline_auto_select,
+                    apply_deconvolution=args.apply_deconvolution,
+                    tau_indicator=args.tau_indicator,
+                    fit_kinetics=args.fit_kinetics,
+                    min_kinetics_r2=args.min_kinetics_r2
                 )
                 print(f"成功生成按神经元的行为钙波频次分析结果")
                 
@@ -3303,14 +3478,21 @@ if __name__ == "__main__":
                     df, neuron_columns, behavior_col=args.behavior_col, fs=4.8,
                     save_path=behavior_total_freq_path, filter_strength=args.filter_strength,
                     # 传递预处理参数
-                    apply_preprocessing=not args.disable_preprocessing,
+                    apply_preprocessing=(args.enable_preprocessing or (not args.disable_preprocessing)),
                     apply_moving_average=not args.disable_moving_average,
                     moving_avg_window=args.moving_avg_window,
                     apply_butterworth=not args.disable_butterworth,
                     butterworth_cutoff=args.butterworth_cutoff,
                     butterworth_strength=args.butterworth_strength,
                     apply_normalization=args.enable_normalization,
-                    normalization_method=args.normalization_method
+                    normalization_method=args.normalization_method,
+                    baseline_method=args.baseline_method,
+                    baseline_window_size=args.baseline_window_size,
+                    baseline_auto_select=args.baseline_auto_select,
+                    apply_deconvolution=args.apply_deconvolution,
+                    tau_indicator=args.tau_indicator,
+                    fit_kinetics=args.fit_kinetics,
+                    min_kinetics_r2=args.min_kinetics_r2
                 )
                 print(f"成功生成按行为统计的总钙波频次分析结果")
             else:
