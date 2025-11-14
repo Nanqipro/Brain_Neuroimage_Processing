@@ -1388,7 +1388,17 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
             deconv_strength = float(np.sum(local_deconv))
         kinetics = None
         if fit_kinetics:
-            kinetics = fit_transient_kinetics(smoothed_data[start_idx:end_idx+1], fs, local_baseline if is_baseline_array else baseline_value, start_idx / fs)
+            kinetics = fit_transient_kinetics(
+                smoothed_data[start_idx:end_idx+1],
+                fs,
+                local_baseline if is_baseline_array else baseline_value,
+                start_idx / fs
+            )
+            if kinetics is not None:
+                amp_fit = kinetics.get('amplitude_fit', np.nan)
+                r2_fit = kinetics.get('kinetics_r2', 0.0)
+                if not np.isnan(amp_fit) and r2_fit >= min_kinetics_r2:
+                    amplitude = float(amp_fit)
         
         # 新增：计算典型钙波形态特征评分
         # 1. 上升期陡峭、下降期缓慢的特征 - 钙波通常上升快，下降慢
@@ -2353,7 +2363,7 @@ def visualize_calcium_transients(raw_data, smoothed_data, transients, fs=4.8):
         # 计算高度百分比标记点
         peak_val = t['peak_value']
         baseline = t['baseline']
-        amplitude = peak_val - baseline
+        amplitude = t.get('amplitude', peak_val - baseline)
         heights = [0.25, 0.5, 0.75]  # 25%, 50%, 75%的高度
         
         # 标记主峰
