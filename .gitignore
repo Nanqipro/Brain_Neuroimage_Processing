@@ -39,9 +39,9 @@ Thumbs.db
 *.npz
 
 # Large images/videos
-*.png
-*.jpg
-*.jpeg
+# *.png
+# *.jpg
+# *.jpeg
 *.gif
 *.mp4
 *.avi
@@ -58,12 +58,12 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
+# logs/
 
 # Results and outputs
-results/
-output/
-outputs/
+# results/
+# output/
+# outputs/
 temp/
 tmp/
 
@@ -84,8 +84,8 @@ tmp/
 *.7z
 
 # Project specific large directories
-Pre_analysis/datasets/
-Pre_analysis/graph/
+# Pre_analysis/datasets/
+# Pre_analysis/graph/
 tif_data/
  
 # Ignore symlinked data directory (works for symlink and real directory)
