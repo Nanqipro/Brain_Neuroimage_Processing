@@ -665,13 +665,8 @@ def evaluate_subpeak_quality(
     # 3. 形态特征评估
     sp_rise_time = (sp_idx - sp_start) / fs
     sp_decay_time = (sp_end - sp_idx) / fs
-    
-    # 上升/衰减比例（钙波通常上升快）
-    if sp_decay_time > 0:
-        rise_decay_ratio = sp_rise_time / sp_decay_time
-        rise_decay_score = 1.0 if rise_decay_ratio < 0.5 else max(0, 1.0 - (rise_decay_ratio - 0.5) / 1.5)
-    else:
-        rise_decay_score = 0.0
+    rise_decay_ratio = (sp_rise_time / sp_decay_time) if sp_decay_time > 0 else float('inf')
+    rise_decay_score = 1.0 if rise_decay_ratio < 0.5 else max(0, 1.0 - (rise_decay_ratio - 0.5) / 1.5)
     
     # 4. 检查上升沿的单调性
     rise_segment = smoothed_data[sp_start:sp_idx+1]
@@ -710,6 +705,155 @@ def evaluate_subpeak_quality(
     return quality_score, is_valid
 
 
+def _sg_derivative_candidates(
+    smoothed_data,
+    start_idx,
+    end_idx,
+    abs_prominence,
+    subpeak_width,
+    subpeak_distance,
+    sg_window,
+    sg_polyorder
+):
+    segment = smoothed_data[start_idx:end_idx+1]
+    if sg_window % 2 == 0:
+        sg_window += 1
+    sg_window = max(5, min(sg_window, len(segment) - (len(segment) % 2 == 0)))
+    if sg_window < 5:
+        return []
+    dd2 = savgol_filter(segment, sg_window, sg_polyorder, deriv=2)
+    peaks, _ = find_peaks(-dd2, prominence=abs_prominence, width=subpeak_width, distance=subpeak_distance)
+    return (peaks + start_idx).tolist()
+
+
+def _cwt_candidates(
+    smoothed_data,
+    start_idx,
+    end_idx,
+    widths,
+    min_scales,
+    subpeak_distance
+):
+    segment = smoothed_data[start_idx:end_idx+1]
+    if end_idx <= start_idx:
+        return []
+    widths = np.array(widths, dtype=int)
+    widths = widths[widths > 1]
+    if len(widths) == 0:
+        return []
+    cwt_matrix = signal.cwt(segment, signal.ricker, widths)
+    votes = np.zeros(len(segment), dtype=int)
+    for i in range(len(widths)):
+        row = cwt_matrix[i]
+        pks, _ = find_peaks(row, distance=subpeak_distance)
+        votes[pks] += 1
+    candidates = np.where(votes >= int(min_scales))[0] + start_idx
+    return candidates.tolist()
+
+
+def richardson_lucy_1d(g, h, iterations=30, eps=1e-12):
+    h = h / np.sum(h) if np.sum(h) > 0 else h
+    x = np.maximum(g, eps)
+    ht = h[::-1]
+    for _ in range(int(iterations)):
+        conv = np.convolve(x, h, mode='same')
+        ratio = g / (conv + eps)
+        corr = np.convolve(ratio, ht, mode='same')
+        x = x * corr
+        x = np.maximum(x, 0)
+    return x
+
+
+def _rl_candidates(
+    smoothed_data,
+    start_idx,
+    end_idx,
+    fs,
+    tau,
+    iterations,
+    subpeak_distance,
+    abs_prominence
+):
+    segment = smoothed_data[start_idx:end_idx+1]
+    if len(segment) < 5:
+        return []
+    kernel_len = max(5, min(len(segment), int(4 * fs * max(tau, 1e-3))))
+    t = np.arange(kernel_len)
+    h = np.exp(-t / (tau * fs))
+    deconv = richardson_lucy_1d(segment, h, iterations=iterations)
+    pks, _ = find_peaks(deconv, prominence=abs_prominence, distance=subpeak_distance)
+    return (pks + start_idx).tolist()
+
+
+def _oasis_candidates(
+    smoothed_data,
+    start_idx,
+    end_idx,
+    baseline,
+    fs,
+    tau,
+    subpeak_distance,
+    subpeak_width,
+    abs_prominence
+):
+    segment = smoothed_data[start_idx:end_idx+1] - baseline
+    s = oasis_deconvolve_1d(segment, tau, fs)
+    s = np.maximum(s, 0)
+    pks, _ = find_peaks(s, prominence=abs_prominence, distance=subpeak_distance, width=subpeak_width)
+    return (pks + start_idx).tolist()
+
+
+def _nlsq_multi_gaussian_candidates(
+    smoothed_data,
+    start_idx,
+    end_idx,
+    initial_indices,
+    fs
+):
+    if len(initial_indices) == 0:
+        return []
+    x = np.arange(end_idx - start_idx + 1) / fs
+    y = smoothed_data[start_idx:end_idx+1]
+    n = len(initial_indices)
+    centers0 = (np.array(initial_indices) - start_idx) / fs
+    amps0 = np.array([smoothed_data[i] for i in initial_indices])
+    width0 = np.full(n, 0.5)
+    baseline0 = np.percentile(y, 5)
+
+    def model(t, *params):
+        b = params[-1]
+        out = np.full_like(t, b, dtype=float)
+        for i in range(n):
+            A = params[3*i]
+            C = params[3*i+1]
+            W = np.maximum(params[3*i+2], 1e-3)
+            out += A * np.exp(-((t - C)**2) / (2.0 * W**2))
+        return out
+
+    p0 = []
+    bounds_lower = []
+    bounds_upper = []
+    for i in range(n):
+        p0 += [amps0[i] - baseline0, centers0[i], width0[i]]
+        bounds_lower += [0.0, max(0.0, centers0[i] - 1.0), 1e-3]
+        bounds_upper += [np.inf, centers0[i] + 1.0, 5.0]
+    p0 += [baseline0]
+    bounds_lower += [np.min(y) - np.std(y)]
+    bounds_upper += [np.max(y)]
+    try:
+        popt, _ = curve_fit(model, x, y, p0=p0, bounds=(bounds_lower, bounds_upper), maxfev=3000)
+        y_pred = model(x, *popt)
+        ss_tot = np.sum((y - np.mean(y))**2)
+        ss_res = np.sum((y - y_pred)**2)
+        r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+        centers = [int(round(popt[3*i+1] * fs)) + start_idx for i in range(n)]
+        if r2 >= 0.15:
+            return centers
+    except Exception:
+        return initial_indices
+    return initial_indices
+
+
 def detect_subpeaks_advanced(
     smoothed_data,
     start_idx,
@@ -724,7 +868,14 @@ def detect_subpeaks_advanced(
     subpeak_distance=8,
     max_duration=800,
     min_subpeak_snr=2.0,
-    min_quality_score=0.30
+    min_quality_score=0.30,
+    subpeak_method="prominence",
+    sg_window=11,
+    sg_polyorder=3,
+    cwt_widths=(3,5,7,9,11),
+    cwt_min_scales=2,
+    rl_iterations=30,
+    tau_indicator=1.5
 ):
     """
     改进的子峰检测算法
@@ -775,30 +926,86 @@ def detect_subpeaks_advanced(
     if (end_idx - start_idx) < 3 * subpeak_width:
         return subpeaks
     
-    # 步骤1: 初步峰值检测
     wave_segment = smoothed_data[start_idx:end_idx+1]
-    
-    # 自适应prominence阈值
-    # 方法1: 基于主峰振幅
     abs_prominence_main = subpeak_prominence * main_amplitude
-    # 方法2: 基于噪声水平
     abs_prominence_noise = 2.0 * noise_level
-    # 使用较大者，确保不会误检噪声
     abs_prominence = max(abs_prominence_main, abs_prominence_noise)
-    
-    # 在波形内找到所有可能的子峰
-    candidate_peaks, properties = find_peaks(
-        wave_segment,
-        prominence=abs_prominence,
-        width=subpeak_width,
-        distance=subpeak_distance
-    )
-    
+    if subpeak_method == "prominence":
+        candidate_peaks, _ = find_peaks(
+            wave_segment,
+            prominence=abs_prominence,
+            width=subpeak_width,
+            distance=subpeak_distance
+        )
+        candidate_peaks = candidate_peaks + start_idx
+    elif subpeak_method == "sg_derivative":
+        candidate_peaks = _sg_derivative_candidates(
+            smoothed_data,
+            start_idx,
+            end_idx,
+            abs_prominence,
+            subpeak_width,
+            subpeak_distance,
+            sg_window,
+            sg_polyorder
+        )
+    elif subpeak_method == "cwt":
+        candidate_peaks = _cwt_candidates(
+            smoothed_data,
+            start_idx,
+            end_idx,
+            cwt_widths,
+            cwt_min_scales,
+            subpeak_distance
+        )
+    elif subpeak_method == "oasis":
+        candidate_peaks = _oasis_candidates(
+            smoothed_data,
+            start_idx,
+            end_idx,
+            baseline,
+            fs,
+            tau_indicator,
+            subpeak_distance,
+            subpeak_width,
+            abs_prominence
+        )
+    elif subpeak_method == "rl":
+        candidate_peaks = _rl_candidates(
+            smoothed_data,
+            start_idx,
+            end_idx,
+            fs,
+            tau_indicator,
+            rl_iterations,
+            subpeak_distance,
+            abs_prominence
+        )
+    elif subpeak_method == "nlsq_fit":
+        base_candidates, _ = find_peaks(
+            wave_segment,
+            prominence=abs_prominence,
+            width=subpeak_width,
+            distance=subpeak_distance
+        )
+        base_candidates = base_candidates + start_idx
+        candidate_peaks = _nlsq_multi_gaussian_candidates(
+            smoothed_data,
+            start_idx,
+            end_idx,
+            base_candidates,
+            fs
+        )
+    else:
+        candidate_peaks, _ = find_peaks(
+            wave_segment,
+            prominence=abs_prominence,
+            width=subpeak_width,
+            distance=subpeak_distance
+        )
+        candidate_peaks = candidate_peaks + start_idx
     if len(candidate_peaks) == 0:
         return subpeaks
-    
-    # 转换为原始数据索引
-    candidate_peaks = candidate_peaks + start_idx
     
     # 步骤2: 排除主峰及其直接邻近区域
     # 定义主峰的"禁区"：主峰前后一定范围
@@ -946,7 +1153,8 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
                              apply_deconvolution=False,
                              tau_indicator=1.5,
                              fit_kinetics=True,
-                             min_kinetics_r2=0.2):
+                             min_kinetics_r2=0.2,
+                             composite_detection_method="prominence"):
     """
     检测钙离子浓度数据中的钙爆发(calcium transients)，包括大波中的小波动
     增强对钙爆发形态的过滤，剔除不符合典型钙波特征的信号
@@ -1545,7 +1753,9 @@ def detect_calcium_transients(data, fs=4.8, min_snr = 3.5, min_duration=12, smoo
                 subpeak_distance=subpeak_distance,
                 max_duration=max_duration,
                 min_subpeak_snr=2.0,  # 子峰最小SNR
-                min_quality_score=0.30  # 子峰最小质量评分
+                min_quality_score=0.30,
+                subpeak_method=composite_detection_method,
+                tau_indicator=tau_indicator
             )
         
         # 收集主波形对象特征
@@ -1630,7 +1840,8 @@ def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpea
                            use_adaptive_threshold=True,
                            use_second_derivative=True,
                            ddf_threshold=-0.52,
-                           min_ddf_score=0.3):
+                           min_ddf_score=0.3,
+                           composite_detection_method="prominence"):
     """
     从钙离子浓度数据中提取关键特征
     
@@ -1693,7 +1904,8 @@ def extract_calcium_features(neuron_data, fs=4.8, visualize=False, detect_subpea
         use_adaptive_threshold=use_adaptive_threshold,
         use_second_derivative=use_second_derivative,
         ddf_threshold=ddf_threshold,
-        min_ddf_score=min_ddf_score
+        min_ddf_score=min_ddf_score,
+        composite_detection_method=composite_detection_method
     )
     
     # 如果没有检测到钙爆发，返回空特征
