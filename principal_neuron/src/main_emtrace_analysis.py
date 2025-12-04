@@ -1,5 +1,5 @@
 """
-神经元主要分析器 - EMtrace01 数据分析脚本
+神经元主要分析器 - 高架数据分析脚本
 
 该脚本用于分析神经元活动数据，包括效应量计算、关键神经元识别和可视化。
 所有的路径配置都统一管理在文件开头的PathConfig类中，方便修改和维护。
@@ -9,8 +9,6 @@
 2. 在main函数中修改dataset_key来切换不同的数据集
 3. 运行脚本即可生成分析结果和可视化图表
 
-作者: Assistant
-日期: 2025年
 """
 
 import pandas as pd
@@ -341,7 +339,8 @@ from plotting_utils import (
     plot_single_behavior_activity_map, 
     plot_shared_neurons_map,
     plot_unique_neurons_map,
-    plot_combined_9_grid
+    plot_combined_9_grid,
+    plot_3d_combined_neuron_distribution
 )
 from effect_size_calculator import EffectSizeCalculator, load_and_calculate_effect_sizes
 
@@ -922,15 +921,31 @@ if __name__ == "__main__":
         print(f"  🎯 独有神经元图表: {total_unique_plots} 张")
         print(f"  📦 总计图表数量: {total_individual_plots + total_shared_plots + total_unique_plots} 张")
 
-        print("\n✅ All plots generated successfully!")
-        print(f"📁 Output directory: {data_paths['output_dir']}")
+    print("\n✅ All plots generated successfully!")
+    print(f"📁 Output directory: {data_paths['output_dir']}")
 
-    else:
-        if df_effect_sizes_transformed is None:
-            print("❌ Could not load effect sizes. Please check the effect size data file.")
-        if df_neuron_positions is None:
-            print("❌ Could not load neuron positions. Please check the position data file.")
+else:
+    if df_effect_sizes_transformed is None:
+        print("❌ Could not load effect sizes. Please check the effect size data file.")
+    if df_neuron_positions is None:
+        print("❌ Could not load neuron positions. Please check the position data file.")
 
-    print("\n" + "=" * 80)
-    print("🎉 Analysis completed!")
-    print("=" * 80)
+print("\n" + "=" * 80)
+print("🎉 Analysis completed!")
+print("=" * 80)
+
+# === 3D 合并分布图（基于给定数据集中心坐标）===
+try:
+    centers = {
+        'emtrace01': (3.0, -1.31, -4.8),
+        '2980': (3.00, -1.37, -4.80),
+        'bla6250': (3.03, -1.60, -4.85),
+    }
+    out3d = os.path.join(PATH_CONFIG.BASE_OUTPUT_DIR, 'combined_3d_distribution.png')
+    plot_3d_combined_neuron_distribution(centers, PATH_CONFIG, out3d,
+                                         scale_xy_mm=1.6,
+                                         dataset_colors={'emtrace01': '#1f77b4', '2980': '#ff7f0e', 'bla6250': '#7f3fbf'},
+                                         marker_size=70, alpha=0.95,
+                                         bg_color="#eaf2ff", z_scale=0.35)
+except Exception as e:
+    print(f"⚠️ 3D合并分布图生成失败: {e}")

@@ -318,6 +318,97 @@ def plot_combined_9_grid(plot_configurations, output_path, main_title_text):
     print(f"3x3组合图已保存到 {output_path}")
     plt.close(fig)
 
+def plot_3d_combined_neuron_distribution(dataset_centers, path_config, output_path,
+                                         scale_xy_mm=1.0, dataset_colors=None,
+                                         marker_size=60, alpha=0.9,
+                                         bg_color="#eaf2ff",
+                                         z_scale=0.4):
+    import os
+    import numpy as np
+    from data_loader import load_neuron_positions
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    fig.patch.set_facecolor(bg_color)
+    ax.set_facecolor(bg_color)
+    if dataset_colors is None:
+        dataset_colors = {'emtrace01': 'royalblue', '2980': 'orange', 'bla6250': 'seagreen'}
+    all_xyz = []
+    z_centers = [c[2] for c in dataset_centers.values()]
+    z_mean = np.mean(z_centers) if len(z_centers) > 0 else 0.0
+
+    for key, center in dataset_centers.items():
+        cx, cy, cz = center
+        position_path = None
+        if hasattr(path_config, 'DATASETS') and key in path_config.DATASETS:
+            position_path = path_config.DATASETS[key].get('position')
+        df = None
+        if position_path:
+            try:
+                df = load_neuron_positions(position_path)
+            except Exception:
+                df = None
+        if df is not None and not df.empty:
+            xs = cx + (df['x'].values - 0.5) * scale_xy_mm
+            ys = cy + (df['y'].values - 0.5) * scale_xy_mm
+            cz_scaled = (cz - z_mean) * z_scale + z_mean
+            zs = np.full_like(xs, cz_scaled)
+            all_xyz.append((xs, ys, zs))
+            ax.scatter(xs, ys, zs, s=marker_size,
+                       c=dataset_colors.get(key, 'gray'), alpha=alpha,
+                       edgecolors='white', linewidths=0.3,
+                       label=f"{key}")
+        else:
+            cz_scaled = (cz - z_mean) * z_scale + z_mean
+            ax.scatter([cx], [cy], [cz_scaled], s=marker_size * 6,
+                       c=dataset_colors.get(key, 'gray'), alpha=1.0,
+                       edgecolors='black', linewidths=0.6,
+                       marker='o', label=f"{key}")
+
+    if all_xyz:
+        xs_all = np.concatenate([p[0] for p in all_xyz])
+        ys_all = np.concatenate([p[1] for p in all_xyz])
+        zs_all = np.concatenate([p[2] for p in all_xyz])
+        rx = xs_all.max() - xs_all.min()
+        ry = ys_all.max() - ys_all.min()
+        rz = zs_all.max() - zs_all.min() if zs_all.size > 0 else 1.0
+        ax.set_xlim(xs_all.min() - 0.08 * rx, xs_all.max() + 0.08 * rx)
+        ax.set_ylim(ys_all.min() - 0.08 * ry, ys_all.max() + 0.08 * ry)
+        ax.set_zlim(zs_all.min() - 0.05 * rz, zs_all.max() + 0.05 * rz)
+
+        try:
+            ax.set_box_aspect((1, 1, z_scale))
+        except Exception:
+            pass
+
+        anchor_x = xs_all.min() - 0.05 * rx
+        anchor_y = ys_all.min() - 0.05 * ry
+        anchor_z = zs_all.min()
+        L = 0.08 * max(rx, ry, rz)
+        ax.plot([anchor_x, anchor_x], [anchor_y, anchor_y], [anchor_z, anchor_z + L], color='black')
+        ax.plot([anchor_x, anchor_x + L], [anchor_y, anchor_y], [anchor_z, anchor_z], color='black')
+        ax.plot([anchor_x, anchor_x], [anchor_y, anchor_y + L], [anchor_z, anchor_z], color='black')
+        ax.text(anchor_x + L, anchor_y, anchor_z, 'AP', color='black', fontsize=12)
+        ax.text(anchor_x, anchor_y + L, anchor_z, 'ML', color='black', fontsize=12)
+        ax.text(anchor_x, anchor_y, anchor_z + L, 'DV', color='black', fontsize=12)
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.view_init(elev=20, azim=-60)
+    leg = ax.legend(loc='upper right', frameon=True)
+    frame = leg.get_frame()
+    frame.set_facecolor('white')
+    frame.set_edgecolor('black')
+    frame.set_alpha(0.95)
+    plt.tight_layout()
+    if output_path:
+        out_dir = os.path.dirname(output_path)
+        if out_dir and not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        plt.savefig(output_path, bbox_inches='tight')
+        print(f"3D分布图已保存到 {output_path}")
+    return fig, ax
+
 if __name__ == '__main__':
     # 此处的示例用法主要用于直接测试本模块的功能。
     # 由于函数现在可以接收 ax, 直接测试单个图的保存依然有效。
