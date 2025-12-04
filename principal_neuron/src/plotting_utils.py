@@ -322,7 +322,8 @@ def plot_3d_combined_neuron_distribution(dataset_centers, path_config, output_pa
                                          scale_xy_mm=1.0, dataset_colors=None,
                                          marker_size=60, alpha=0.9,
                                          bg_color="#eaf2ff",
-                                         z_scale=0.4):
+                                         z_scale=0.4,
+                                         triad_len_ratio=0.14):
     import os
     import numpy as np
     from data_loader import load_neuron_positions
@@ -380,16 +381,24 @@ def plot_3d_combined_neuron_distribution(dataset_centers, path_config, output_pa
         except Exception:
             pass
 
-        anchor_x = xs_all.min() - 0.05 * rx
-        anchor_y = ys_all.min() - 0.05 * ry
-        anchor_z = zs_all.min()
-        L = 0.08 * max(rx, ry, rz)
-        ax.plot([anchor_x, anchor_x], [anchor_y, anchor_y], [anchor_z, anchor_z + L], color='black')
-        ax.plot([anchor_x, anchor_x + L], [anchor_y, anchor_y], [anchor_z, anchor_z], color='black')
-        ax.plot([anchor_x, anchor_x], [anchor_y, anchor_y + L], [anchor_z, anchor_z], color='black')
-        ax.text(anchor_x + L, anchor_y, anchor_z, 'AP', color='black', fontsize=12)
-        ax.text(anchor_x, anchor_y + L, anchor_z, 'ML', color='black', fontsize=12)
-        ax.text(anchor_x, anchor_y, anchor_z + L, 'DV', color='black', fontsize=12)
+        anchor_x = xs_all.min() + 0.03 * rx
+        anchor_y = ys_all.min() + 0.03 * ry
+        anchor_z = zs_all.min() + 0.02 * rz
+        base_len = triad_len_ratio * max(rx, ry)
+        Lx = base_len
+        Ly = base_len
+        Lz = base_len
+        ax.plot([anchor_x, anchor_x], [anchor_y, anchor_y], [anchor_z, anchor_z + Lz], color='black')
+        ax.plot([anchor_x, anchor_x + Lx], [anchor_y, anchor_y], [anchor_z, anchor_z], color='black')
+        ax.plot([anchor_x, anchor_x], [anchor_y, anchor_y + Ly], [anchor_z, anchor_z], color='black')
+        ax.text(anchor_x + Lx * 1.05, anchor_y, anchor_z, 'AP', color='black', fontsize=12)
+        ax.text(anchor_x, anchor_y + Ly * 1.05, anchor_z, 'ML', color='black', fontsize=12)
+        ax.text(anchor_x, anchor_y, anchor_z + Lz * 1.05, 'DV', color='black', fontsize=12)
+
+        z_low, z_high = ax.get_zlim()
+        triad_top = anchor_z + Lz * 1.08
+        if triad_top > z_high:
+            ax.set_zlim(z_low, triad_top)
 
     ax.set_xticks([])
     ax.set_yticks([])
@@ -407,6 +416,177 @@ def plot_3d_combined_neuron_distribution(dataset_centers, path_config, output_pa
             os.makedirs(out_dir)
         plt.savefig(output_path, bbox_inches='tight')
         print(f"3D分布图已保存到 {output_path}")
+    return fig, ax
+
+def _standardize_behavior_labels(df):
+    mapping = {
+        'Open-Arm': 'Open',
+        'Middle-Zone': 'Middle',
+        'Close-Arm': 'Close',
+        'Open': 'Open',
+        'Middle': 'Middle',
+        'Close': 'Close'
+    }
+    df['Behavior'] = df['Behavior'].map(lambda x: mapping.get(x, x))
+    return df
+
+def classify_neuron_activation_categories(df_effects, threshold):
+    df_effects = _standardize_behavior_labels(df_effects.copy())
+    pivot = df_effects.pivot_table(index='NeuronID', columns='Behavior', values='EffectSize', aggfunc='max')
+    for col in ['Open', 'Middle', 'Close']:
+        if col not in pivot.columns:
+            pivot[col] = 0.0
+    categories = {}
+    for nid, row in pivot.iterrows():
+        act = []
+        if row['Open'] >= threshold:
+            act.append('Open')
+        if row['Middle'] >= threshold:
+            act.append('Middle')
+        if row['Close'] >= threshold:
+            act.append('Close')
+        if len(act) == 0:
+            categories[nid] = 'No-Activate'
+        elif len(act) >= 2:
+            categories[nid] = 'all-Activate'
+        else:
+            categories[nid] = f"{act[0]}-Activate"
+    return categories
+
+def plot_3d_activation_categories_combined(dataset_keys, dataset_centers, path_config, output_path,
+                                           threshold, colors_map=None, scale_xy_mm=1.6,
+                                           marker_size=70, alpha=0.95, bg_color="#eaf2ff",
+                                           z_scale=0.15, triad_len_ratio=0.18):
+    import os
+    import numpy as np
+    from data_loader import load_effect_sizes, load_neuron_positions
+    try:
+        from effect_size_calculator import load_and_calculate_effect_sizes
+    except Exception:
+        load_and_calculate_effect_sizes = None
+    if colors_map is None:
+        colors_map = {
+            'Open-Activate': '#1f77b4',
+            'Middle-Activate': '#ff7f0e',
+            'Close-Activate': '#2ca02c',
+            'No-Activate': '#c0c0c0',
+            'all-Activate': '#7f3fbf'
+        }
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    fig.patch.set_facecolor(bg_color)
+    ax.set_facecolor(bg_color)
+    z_centers = [dataset_centers[k][2] for k in dataset_keys]
+    z_mean = float(np.mean(z_centers)) if len(z_centers) > 0 else 0.0
+    legend_done = set()
+    global_counts = { 'Open-Activate':0, 'Middle-Activate':0, 'Close-Activate':0, 'No-Activate':0, 'all-Activate':0 }
+    xs_all, ys_all, zs_all = [], [], []
+    for key in dataset_keys:
+        eff_path = path_config.DATASETS.get(key, {}).get('effect')
+        raw_path = path_config.DATASETS.get(key, {}).get('raw')
+        pos_path = path_config.DATASETS.get(key, {}).get('position')
+        df_eff = None
+        if eff_path and os.path.exists(eff_path):
+            try:
+                df_eff = load_effect_sizes(eff_path)
+            except Exception:
+                df_eff = None
+        if df_eff is None and load_and_calculate_effect_sizes and raw_path and os.path.exists(raw_path):
+            try:
+                res = load_and_calculate_effect_sizes(neuron_data_path=raw_path, behavior_col=None, output_dir=path_config.get_dataset_effect_size_output_dir(key))
+                es = res['effect_sizes']
+                long_data = []
+                for behavior, arr in es.items():
+                    for i, v in enumerate(arr):
+                        long_data.append({'Behavior': behavior, 'NeuronID': i + 1, 'EffectSize': v})
+                import pandas as pd
+                df_eff = pd.DataFrame(long_data)
+            except Exception:
+                df_eff = None
+        cats = {}
+        if df_eff is not None:
+            cats = classify_neuron_activation_categories(df_eff, threshold)
+        df_pos = None
+        if pos_path:
+            try:
+                df_pos = load_neuron_positions(pos_path)
+            except Exception:
+                df_pos = None
+        center = dataset_centers.get(key, (0.0, 0.0, 0.0))
+        cx, cy, cz = center
+        cz_scaled = (cz - z_mean) * z_scale + z_mean
+        if df_pos is not None and not df_pos.empty:
+            df_pos['Category'] = df_pos['NeuronID'].map(lambda n: cats.get(n, 'No-Activate'))
+            # update counts
+            for cat in df_pos['Category'].value_counts().index.tolist():
+                cnt = int(df_pos['Category'].value_counts()[cat])
+                if cat in global_counts:
+                    global_counts[cat] += cnt
+            for cat, color in colors_map.items():
+                sub = df_pos[df_pos['Category'] == cat]
+                if not sub.empty:
+                    xs = cx + (sub['x'].values - 0.5) * scale_xy_mm
+                    ys = cy + (sub['y'].values - 0.5) * scale_xy_mm
+                    zs = np.full_like(xs, cz_scaled)
+                    xs_all.append(xs)
+                    ys_all.append(ys)
+                    zs_all.append(zs)
+                    label = cat if cat not in legend_done else None
+                    ax.scatter(xs, ys, zs, s=marker_size, c=color, alpha=alpha,
+                               edgecolors='white', linewidths=0.3, label=label)
+                    if label:
+                        legend_done.add(cat)
+    if xs_all:
+        xs_all = np.concatenate(xs_all)
+        ys_all = np.concatenate(ys_all)
+        zs_all = np.concatenate(zs_all)
+        rx = xs_all.max() - xs_all.min()
+        ry = ys_all.max() - ys_all.min()
+        rz = zs_all.max() - zs_all.min() if zs_all.size > 0 else 1.0
+        ax.set_xlim(xs_all.min() - 0.08 * rx, xs_all.max() + 0.08 * rx)
+        ax.set_ylim(ys_all.min() - 0.08 * ry, ys_all.max() + 0.08 * ry)
+        ax.set_zlim(zs_all.min() - 0.05 * rz, zs_all.max() + 0.05 * rz)
+        try:
+            ax.set_box_aspect((1, 1, z_scale))
+        except Exception:
+            pass
+        anchor_x = xs_all.min() + 0.03 * rx
+        anchor_y = ys_all.min() + 0.03 * ry
+        anchor_z = zs_all.min() + 0.02 * rz
+        base_len = triad_len_ratio * max(rx, ry)
+        Lx = base_len
+        Ly = base_len
+        Lz = base_len
+        ax.plot([anchor_x, anchor_x], [anchor_y, anchor_y], [anchor_z, anchor_z + Lz], color='black')
+        ax.plot([anchor_x, anchor_x + Lx], [anchor_y, anchor_y], [anchor_z, anchor_z], color='black')
+        ax.plot([anchor_x, anchor_x], [anchor_y, anchor_y + Ly], [anchor_z, anchor_z], color='black')
+        ax.text(anchor_x + Lx * 1.05, anchor_y, anchor_z, 'AP', color='black', fontsize=12)
+        ax.text(anchor_x, anchor_y + Ly * 1.05, anchor_z, 'ML', color='black', fontsize=12)
+        ax.text(anchor_x, anchor_y, anchor_z + Lz * 1.05, 'DV', color='black', fontsize=12)
+        z_low, z_high = ax.get_zlim()
+        triad_top = anchor_z + Lz * 1.08
+        if triad_top > z_high:
+            ax.set_zlim(z_low, triad_top)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.view_init(elev=20, azim=-60)
+    leg = ax.legend(loc='upper right', frameon=True, title='Categories')
+    frame = leg.get_frame()
+    frame.set_facecolor('white')
+    frame.set_edgecolor('black')
+    frame.set_alpha(0.95)
+    plt.tight_layout()
+    if output_path:
+        out_dir = os.path.dirname(output_path)
+        if out_dir and not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        plt.savefig(output_path, bbox_inches='tight')
+        print(f"3D分类分布图已保存到 {output_path}")
+        print(f"分类阈值: {threshold}")
+        print("各类别神经元数量 (合并三个数据集):")
+        for k in ['Open-Activate','Middle-Activate','Close-Activate','all-Activate','No-Activate']:
+            print(f"  {k}: {global_counts.get(k,0)}")
     return fig, ax
 
 if __name__ == '__main__':

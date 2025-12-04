@@ -340,7 +340,8 @@ from plotting_utils import (
     plot_shared_neurons_map,
     plot_unique_neurons_map,
     plot_combined_9_grid,
-    plot_3d_combined_neuron_distribution
+    plot_3d_combined_neuron_distribution,
+    plot_3d_activation_categories_combined
 )
 from effect_size_calculator import EffectSizeCalculator, load_and_calculate_effect_sizes
 
@@ -937,15 +938,34 @@ print("=" * 80)
 # === 3D 合并分布图（基于给定数据集中心坐标）===
 try:
     centers = {
-        'emtrace01': (3.0, -1.31, -4.8),
-        '2980': (3.00, -1.37, -4.80),
-        'bla6250': (3.03, -1.60, -4.85),
+        'emtrace01_plus': (3.0, -1.31, -4.8),
+        '2980_plus': (3.00, -1.37, -4.80),
+        'bla6250_plus': (3.03, -1.60, -4.85),
     }
-    out3d = os.path.join(PATH_CONFIG.BASE_OUTPUT_DIR, 'combined_3d_distribution.png')
+    out3d = os.path.join(PATH_CONFIG.BASE_OUTPUT_DIR, 'combined_3d_distribution_plus.png')
     plot_3d_combined_neuron_distribution(centers, PATH_CONFIG, out3d,
                                          scale_xy_mm=1.6,
-                                         dataset_colors={'emtrace01': '#1f77b4', '2980': '#ff7f0e', 'bla6250': '#7f3fbf'},
+                                         dataset_colors={'emtrace01_plus': '#1f77b4', '2980_plus': '#ff7f0e', 'bla6250_plus': '#7f3fbf'},
                                          marker_size=70, alpha=0.95,
-                                         bg_color="#eaf2ff", z_scale=0.35)
+                                         bg_color="#eaf2ff", z_scale=0.15, triad_len_ratio=0.18)
+
+    # 分类版三维图（Open/Middle/Close 激活与 No/all-Activate）
+    cat_out = os.path.join(PATH_CONFIG.BASE_OUTPUT_DIR, 'combined_3d_distribution_plus_categories.png')
+    plot_3d_activation_categories_combined(
+        dataset_keys=['emtrace01_plus', '2980_plus', 'bla6250_plus'],
+        dataset_centers=centers,
+        path_config=PATH_CONFIG,
+        output_path=cat_out,
+        threshold=EFFECT_SIZE_THRESHOLD,
+        colors_map={
+            'Open-Activate': '#1f77b4',
+            'Middle-Activate': '#ff7f0e',
+            'Close-Activate': '#2ca02c',
+            'No-Activate': '#c0c0c0',
+            'all-Activate': '#7f3fbf',
+        },
+        scale_xy_mm=1.6, marker_size=70, alpha=0.95,
+        bg_color="#eaf2ff", z_scale=0.15, triad_len_ratio=0.18
+    )
 except Exception as e:
     print(f"⚠️ 3D合并分布图生成失败: {e}")
