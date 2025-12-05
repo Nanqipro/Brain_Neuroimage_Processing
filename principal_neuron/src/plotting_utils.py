@@ -480,6 +480,7 @@ def plot_3d_activation_categories_combined(dataset_keys, dataset_centers, path_c
     z_mean = float(np.mean(z_centers)) if len(z_centers) > 0 else 0.0
     legend_done = set()
     global_counts = { 'Open-Activate':0, 'Middle-Activate':0, 'Close-Activate':0, 'No-Activate':0, 'all-Activate':0 }
+    point_records = []
     xs_all, ys_all, zs_all = [], [], []
     for key in dataset_keys:
         eff_path = path_config.DATASETS.get(key, {}).get('effect')
@@ -514,7 +515,7 @@ def plot_3d_activation_categories_combined(dataset_keys, dataset_centers, path_c
                 df_pos = None
         center = dataset_centers.get(key, (0.0, 0.0, 0.0))
         cx, cy, cz = center
-        cz_scaled = (cz - z_mean) * z_scale + z_mean
+        cz_used = cz
         if df_pos is not None and not df_pos.empty:
             df_pos['Category'] = df_pos['NeuronID'].map(lambda n: cats.get(n, 'No-Activate'))
             # update counts
@@ -527,10 +528,24 @@ def plot_3d_activation_categories_combined(dataset_keys, dataset_centers, path_c
                 if not sub.empty:
                     xs = cx + (sub['x'].values - 0.5) * scale_xy_mm
                     ys = cy + (sub['y'].values - 0.5) * scale_xy_mm
-                    zs = np.full_like(xs, cz_scaled)
+                    zs = np.full_like(xs, cz_used)
                     xs_all.append(xs)
                     ys_all.append(ys)
                     zs_all.append(zs)
+                    ids = sub['NeuronID'].values
+                    x_rel = sub['x'].values
+                    y_rel = sub['y'].values
+                    for i in range(len(sub)):
+                        point_records.append({
+                            'Dataset': key,
+                            'NeuronID': int(ids[i]),
+                            'Category': cat,
+                            'x_mm': float(xs[i]),
+                            'y_mm': float(ys[i]),
+                            'z_mm': float(zs[i]),
+                            'x_rel': float(x_rel[i]),
+                            'y_rel': float(y_rel[i])
+                        })
                     label = cat if cat not in legend_done else None
                     ax.scatter(xs, ys, zs, s=marker_size, c=color, alpha=alpha,
                                edgecolors='white', linewidths=0.3, label=label)
@@ -587,6 +602,14 @@ def plot_3d_activation_categories_combined(dataset_keys, dataset_centers, path_c
         print("各类别神经元数量 (合并三个数据集):")
         for k in ['Open-Activate','Middle-Activate','Close-Activate','all-Activate','No-Activate']:
             print(f"  {k}: {global_counts.get(k,0)}")
+        if point_records:
+            csv_path = os.path.splitext(output_path)[0] + '_points.csv'
+            try:
+                df_points = pd.DataFrame(point_records)
+                df_points.to_csv(csv_path, index=False)
+                print(f"3D分类分布坐标CSV已保存到 {csv_path}")
+            except Exception as e:
+                print(f"保存3D分类分布坐标CSV失败: {e}")
     return fig, ax
 
 if __name__ == '__main__':
