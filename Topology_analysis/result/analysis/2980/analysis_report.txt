@@ -1,0 +1,49 @@
+
+图模式(Pattern)与行为(Behavior)关系分析报告
+================================================================================
+
+一、数据概况
+- 总样本数: 2925
+- Pattern类型数: 20
+- Behavior类别数: 9
+- Behavior分布: {'Close': 1847, 'Open': 554, 'Middle': 298, 'Open-Peer': 158, 'Middle-to-OpenPeer': 36, 'Middle-Climb': 12, 'Middle-to-ClosePeer': 8, 'Rat-head-jamming': 7, 'Middle-to-Open': 5}
+
+二、主要发现
+
+1. 显著性检验结果（Kruskal-Wallis H检验）
+   - 显著性patterns（p < 0.05）: 3/20
+   - Top 5 最显著patterns:
+pattern  p_value
+ 3_star 0.000010
+ 1_star 0.000179
+ 2_star 0.001957
+
+2. 效应量分析（Eta-squared）
+   - Large效应（η² > 0.14）: 0个
+   - Medium效应（0.06 < η² ≤ 0.14）: 0个
+   - Top 5 效应量最大patterns:
+                 pattern  eta_squared effect_size
+                  3_star     0.013004       Small
+                  1_star     0.011452       Small
+                  2_star     0.007988       Small
+          7_cycle_2_star     0.000000       Small
+triangle_triangle_2edges     0.000000       Small
+
+3. 特征重要性（随机森林）
+   注意：准确率 0.9949 基于训练集评估（存在过拟合），仅用于参考
+   实际意义：反映各pattern对区分behavior的相对重要性
+   - Top 5 最重要patterns:
+                 pattern  importance
+                  2_star    0.511290
+                  3_star    0.449859
+                  1_star    0.038851
+          7_cycle_2_star    0.000000
+triangle_triangle_2edges    0.000000
+
+三、结论与建议
+1. 显著性高的patterns可用于区分不同behavior
+2. 效应量大的patterns在behavior间差异明显
+3. 特征重要性高的patterns对分类贡献最大
+4. 综合三个指标选择关键patterns进行深入分析
+
+所有结果文件已保存至 ../result/analysis/2980/ 目录
