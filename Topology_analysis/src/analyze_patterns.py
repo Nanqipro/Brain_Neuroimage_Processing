@@ -24,13 +24,13 @@ plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans', 'Arial']
 plt.rcParams['axes.unicode_minus'] = False
 
 # 读取数据
-data_file = 'counts/results_2980.csv'
+data_file = '../datasets/counts/results_2980.csv'
 df = pd.read_csv(data_file)
 
 # 提取数据集名称并创建输出目录
 import os
 dataset_name = os.path.basename(data_file).replace('results_', '').replace('.csv', '')
-output_dir = f'analysis/{dataset_name}'
+output_dir = f'../result/analysis/{dataset_name}'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 

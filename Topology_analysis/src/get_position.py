@@ -350,8 +350,8 @@ def main():
     """
     主函数，运行点标记工具
     """
-    image_path = '../datasets/6250位置.png'
-    output_file = '../datasets/6250_Max_position.csv'
+    image_path = '../datasets/no.29800930openfield神经元编号位置图.jpg'
+    output_file = '../datasets/no.29800930openfield神经元编号位置图.csv'
     start_number = 1  # 从编号1开始
     
     print(f"开始标记工具，起始编号: {start_number}")
