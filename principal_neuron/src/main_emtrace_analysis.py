@@ -106,32 +106,48 @@ class PathConfig:
                 'description': 'BLA6250增强版神经元活动数据'
             },
             
-            # Day系列数据集
-            'day3': {
-                'name': 'Day3数据集',
-                'raw': None,  # 只有效应量数据
-                'effect': os.path.join(self.DATA_DIR, 'day3.csv'),
-                'position': os.path.join(self.DATA_DIR, 'Day3_Max_position.csv'),
-                'description': 'Day3神经元活动数据'
+            # # Day系列数据集
+            # 'day3': {
+            #     'name': 'Day3数据集',
+            #     'raw': None,  # 只有效应量数据
+            #     'effect': os.path.join(self.DATA_DIR, 'day3.csv'),
+            #     'position': os.path.join(self.DATA_DIR, 'Day3_Max_position.csv'),
+            #     'description': 'Day3神经元活动数据'
+            # },
+            # 'day6': {
+            #     'name': 'Day6数据集',
+            #     'raw': None,
+            #     'effect': os.path.join(self.DATA_DIR, 'day6.csv'),
+            #     'position': os.path.join(self.DATA_DIR, 'Day6_Max_position.csv'),
+            #     'description': 'Day6神经元活动数据'
+            # },
+            # 'day9': {
+            #     'name': 'Day9数据集',
+            #     'raw': None,
+            #     'effect': os.path.join(self.DATA_DIR, 'day9.csv'),
+            #     'position': os.path.join(self.DATA_DIR, 'Day9_Max_position.csv'),
+            #     'description': 'Day9神经元活动数据'
+            # },
+            # 矿场系列
+            '29800930openfield': {
+                'name': '29800930openfield',
+                'raw':  os.path.join(self.DATA_DIR, 'no.29800930openfield_CellVideo0_corrected_0_cell_trace.xlsx'),
+                'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv'),
+                'position': os.path.join(self.DATA_DIR, 'no.29800930openfield神经元编号位置图.csv'),
+                'description': '29800930openfield神经元活动数据'
             },
-            'day6': {
-                'name': 'Day6数据集',
-                'raw': None,
-                'effect': os.path.join(self.DATA_DIR, 'day6.csv'),
-                'position': os.path.join(self.DATA_DIR, 'Day6_Max_position.csv'),
-                'description': 'Day6神经元活动数据'
-            },
-            'day9': {
-                'name': 'Day9数据集',
-                'raw': None,
-                'effect': os.path.join(self.DATA_DIR, 'day9.csv'),
-                'position': os.path.join(self.DATA_DIR, 'Day9_Max_position.csv'),
-                'description': 'Day9神经元活动数据'
+            '29800924openfield': {
+                'name': '29800924openfield',
+                'raw':  os.path.join(self.DATA_DIR, 'no.2980240924openfield_CellVideo0_corrected_0_cell_trace.xlsx'),
+                'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_no.2980240924openfield_CellVideo0_corrected_0_cell_trace.csv'),
+                'position': os.path.join(self.DATA_DIR, 'no.2980240924openfield神经元编号位置图.csv'),
+                'description': '29800924openfield神经元活动数据'
             }
         }
         
         # === 默认数据集设置 ===
-        self.DEFAULT_DATASET = 'emtrace01'  # 默认使用EMtrace01数据集
+        self.DEFAULT_DATASET = '29800930openfield'  
+        
         
         # === 创建必要的目录 ===
         self._ensure_base_directories()
@@ -347,6 +363,39 @@ from effect_size_calculator import EffectSizeCalculator, load_and_calculate_effe
 
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+df_effect_sizes_transformed = None
+df_neuron_positions = None
+
+def _load_effect_sizes_flexible(csv_path):
+    df = pd.read_csv(csv_path)
+    if 'Behavior' not in df.columns:
+        raise ValueError('效应量CSV缺少Behavior列')
+    neuron_cols = [c for c in df.columns if c.startswith('Neuron_')]
+    if not neuron_cols:
+        neuron_cols = [c for c in df.columns if c.startswith('n') and c[1:].isdigit()]
+    if not neuron_cols:
+        raise ValueError('未找到神经元列')
+    df_use = df[['Behavior'] + neuron_cols]
+    df_melted = df_use.melt(id_vars=['Behavior'], var_name='Neuron_str', value_name='EffectSize')
+    def _to_id(s):
+        if s.startswith('Neuron_'):
+            return int(s.replace('Neuron_', ''))
+        return int(s.replace('n', ''))
+    df_melted['NeuronID'] = df_melted['Neuron_str'].apply(_to_id)
+    result_df = df_melted[['Behavior', 'NeuronID', 'EffectSize']]
+    print(f"转换后的长格式数据形状: {result_df.shape}")
+    return result_df
+
+def _load_neuron_positions_flexible(csv_path):
+    df = pd.read_csv(csv_path)
+    if {'NeuronID', 'x', 'y'}.issubset(df.columns):
+        return df[['NeuronID', 'x', 'y']]
+    if {'number', 'relative_x', 'relative_y'}.issubset(df.columns):
+        df = df.rename(columns={'number': 'NeuronID', 'relative_x': 'x', 'relative_y': 'y'})
+        df['NeuronID'] = df['NeuronID'].astype(int)
+        return df[['NeuronID', 'x', 'y']]
+    raise ValueError('位置CSV列不匹配')
 
 def analyze_effect_sizes(df_effect_sizes_long):
     """
@@ -592,54 +641,52 @@ def create_effect_sizes_workflow(raw_data_file: str = None,
     if precomputed_file and os.path.exists(precomputed_file):
         print(f"加载预计算的效应量数据: {precomputed_file}")
         try:
-            df_long = load_effect_sizes(precomputed_file)
-            if df_long is not None:
-                print("预计算效应量数据加载成功！")
-                return df_long
-            else:
-                print("预计算效应量数据加载失败")
+            df_long = _load_effect_sizes_flexible(precomputed_file)
+            print("预计算效应量数据加载成功！")
+            return df_long
         except Exception as e:
             print(f"加载预计算效应量数据时出错: {str(e)}")
     
     # 如果所有方法都失败，生成示例数据
     print("所有数据源都不可用，生成示例效应量数据用于演示...")
-    return generate_sample_effect_sizes()
+    return None
+    # return generate_sample_effect_sizes()
 
-def generate_sample_effect_sizes() -> pd.DataFrame:
-    """
-    生成示例效应量数据用于演示
-    """
-    print("生成示例效应量数据...")
+# def generate_sample_effect_sizes() -> pd.DataFrame:
+#     """
+#     生成示例效应量数据用于演示
+#     """
+#     print("生成示例效应量数据...")
     
-    behaviors = ['Close', 'Middle', 'Open']
-    n_neurons = 50
+#     behaviors = ['Close', 'Middle', 'Open']
+#     n_neurons = 50
     
-    # 生成随机效应量数据
-    np.random.seed(42)
-    long_format_data = []
+#     # 生成随机效应量数据
+#     np.random.seed(42)
+#     long_format_data = []
     
-    for behavior in behaviors:
-        # 为每种行为生成效应量，部分神经元有较高效应量
-        effect_sizes = np.random.exponential(scale=0.3, size=n_neurons)
+#     for behavior in behaviors:
+#         # 为每种行为生成效应量，部分神经元有较高效应量
+#         effect_sizes = np.random.exponential(scale=0.3, size=n_neurons)
         
-        # 让某些神经元对特定行为有更高的效应量
-        if behavior == 'Close':
-            effect_sizes[0:10] += np.random.uniform(0.4, 0.8, 10)
-        elif behavior == 'Middle':
-            effect_sizes[15:25] += np.random.uniform(0.4, 0.8, 10)
-        else:  # Open
-            effect_sizes[30:40] += np.random.uniform(0.4, 0.8, 10)
+#         # 让某些神经元对特定行为有更高的效应量
+#         if behavior == 'Close':
+#             effect_sizes[0:10] += np.random.uniform(0.4, 0.8, 10)
+#         elif behavior == 'Middle':
+#             effect_sizes[15:25] += np.random.uniform(0.4, 0.8, 10)
+#         else:  # Open
+#             effect_sizes[30:40] += np.random.uniform(0.4, 0.8, 10)
         
-        for neuron_id in range(1, n_neurons + 1):
-            long_format_data.append({
-                'Behavior': behavior,
-                'NeuronID': neuron_id,
-                'EffectSize': effect_sizes[neuron_id - 1]
-            })
+#         for neuron_id in range(1, n_neurons + 1):
+#             long_format_data.append({
+#                 'Behavior': behavior,
+#                 'NeuronID': neuron_id,
+#                 'EffectSize': effect_sizes[neuron_id - 1]
+#             })
     
-    df_sample = pd.DataFrame(long_format_data)
-    print(f"示例数据生成完成: {df_sample.shape}")
-    return df_sample
+#     df_sample = pd.DataFrame(long_format_data)
+#     print(f"示例数据生成完成: {df_sample.shape}")
+#     return df_sample
 
 if __name__ == "__main__":
     # ===============================================================================
@@ -662,13 +709,16 @@ if __name__ == "__main__":
     # 设置为 None 会自动选择可用的数据集
     
     # dataset_key = None # 🔧 修改这里来指定数据集，None表示自动选择
-    dataset_key = 'emtrace01'    # 使用EMtrace01数据集
+    # dataset_key = 'emtrace01'    # 使用EMtrace01数据集
     # dataset_key = 'emtrace02'    # 使用EMtrace02数据集  
     # dataset_key = '2980'         # 使用2980数据集
     # dataset_key = '2980_plus'      # 使用2980增强版数据集
     # dataset_key = 'bla6250'      # 使用BLA6250数据集
     # dataset_key = 'bla6250_plus' # 使用BLA6250增强版数据集
     # dataset_key = 'day3'         # 使用Day3数据集
+    
+    dataset_key = '29800930openfield'    # 使用29800930openfield数据集
+    # dataset_key = '29800924openfield'    # 使用29800924openfield数据集
     
     # ===============================================================================
     # 智能数据集选择和验证
@@ -735,7 +785,7 @@ if __name__ == "__main__":
     )
     
     print(f"\n📍 Loading neuron positions from: {position_data_identifier}")
-    df_neuron_positions = load_neuron_positions(position_data_identifier)
+    df_neuron_positions = _load_neuron_positions_flexible(position_data_identifier)
 
     if df_effect_sizes_transformed is not None and df_neuron_positions is not None:
         print(f"\n🎯 Using effect size threshold: {EFFECT_SIZE_THRESHOLD} (from config.py)")
@@ -935,37 +985,37 @@ print("\n" + "=" * 80)
 print("🎉 Analysis completed!")
 print("=" * 80)
 
-# === 3D 合并分布图（基于给定数据集中心坐标）===
-try:
-    centers = {
-        'emtrace01_plus': (3.0, -1.31, -4.8),
-        '2980_plus': (3.00, -1.37, -4.80),
-        'bla6250_plus': (3.03, -1.60, -4.85),
-    }
-    out3d = os.path.join(PATH_CONFIG.BASE_OUTPUT_DIR, 'combined_3d_distribution_plus.png')
-    plot_3d_combined_neuron_distribution(centers, PATH_CONFIG, out3d,
-                                         scale_xy_mm=1.6,
-                                         dataset_colors={'emtrace01_plus': '#1f77b4', '2980_plus': '#ff7f0e', 'bla6250_plus': '#7f3fbf'},
-                                         marker_size=70, alpha=0.95,
-                                         bg_color="#eaf2ff", z_scale=0.15, triad_len_ratio=0.18)
+# # === 3D 合并分布图（基于给定数据集中心坐标）===
+# try:
+#     centers = {
+#         'emtrace01_plus': (3.0, -1.31, -4.8),
+#         '2980_plus': (3.00, -1.37, -4.80),
+#         'bla6250_plus': (3.03, -1.60, -4.85),
+#     }
+#     out3d = os.path.join(PATH_CONFIG.BASE_OUTPUT_DIR, 'combined_3d_distribution_plus.png')
+#     plot_3d_combined_neuron_distribution(centers, PATH_CONFIG, out3d,
+#                                          scale_xy_mm=1.6,
+#                                          dataset_colors={'emtrace01_plus': '#1f77b4', '2980_plus': '#ff7f0e', 'bla6250_plus': '#7f3fbf'},
+#                                          marker_size=70, alpha=0.95,
+#                                          bg_color="#eaf2ff", z_scale=0.15, triad_len_ratio=0.18)
 
-    # 分类版三维图（Open/Middle/Close 激活与 No/all-Activate）
-    cat_out = os.path.join(PATH_CONFIG.BASE_OUTPUT_DIR, 'combined_3d_distribution_plus_categories.png')
-    plot_3d_activation_categories_combined(
-        dataset_keys=['emtrace01_plus', '2980_plus', 'bla6250_plus'],
-        dataset_centers=centers,
-        path_config=PATH_CONFIG,
-        output_path=cat_out,
-        threshold=EFFECT_SIZE_THRESHOLD,
-        colors_map={
-            'Open-Activate': '#1f77b4',
-            'Middle-Activate': '#ff7f0e',
-            'Close-Activate': '#2ca02c',
-            'No-Activate': '#c0c0c0',
-            'all-Activate': '#7f3fbf',
-        },
-        scale_xy_mm=1.6, marker_size=70, alpha=0.95,
-        bg_color="#eaf2ff", z_scale=0.15, triad_len_ratio=0.18
-    )
-except Exception as e:
-    print(f"⚠️ 3D合并分布图生成失败: {e}")
+#     # 分类版三维图（Open/Middle/Close 激活与 No/all-Activate）
+#     cat_out = os.path.join(PATH_CONFIG.BASE_OUTPUT_DIR, 'combined_3d_distribution_plus_categories.png')
+#     plot_3d_activation_categories_combined(
+#         dataset_keys=['emtrace01_plus', '2980_plus', 'bla6250_plus'],
+#         dataset_centers=centers,
+#         path_config=PATH_CONFIG,
+#         output_path=cat_out,
+#         threshold=EFFECT_SIZE_THRESHOLD,
+#         colors_map={
+#             'Open-Activate': '#1f77b4',
+#             'Middle-Activate': '#ff7f0e',
+#             'Close-Activate': '#2ca02c',
+#             'No-Activate': '#c0c0c0',
+#             'all-Activate': '#7f3fbf',
+#         },
+#         scale_xy_mm=1.6, marker_size=70, alpha=0.95,
+#         bg_color="#eaf2ff", z_scale=0.15, triad_len_ratio=0.18
+#     )
+# except Exception as e:
+#     print(f"⚠️ 3D合并分布图生成失败: {e}")
