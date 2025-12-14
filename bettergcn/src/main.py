@@ -68,6 +68,8 @@ def main():
     data_file = '../datasets/no.29800930openfield_CellVideo0_corrected_0_cell_trace.xlsx'
     position_file = '../datasets/no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv'
     min_samples = 50
+    effect_size_file = '../datasets/effect_sizes_no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv'
+    effect_threshold = 0.3
     
     # 使用数据文件名和最小样本数来设置结果目录
     result_dir = setup_result_directory(data_file, min_samples)
@@ -81,12 +83,19 @@ def main():
         f.write(f"数据文件: {data_file}\n")
         f.write(f"神经元位置文件: {position_file}\n")
         f.write(f"最小样本数: {min_samples}\n")
+        f.write(f"效应量文件: {effect_size_file}\n")
+        f.write(f"效应量阈值: {effect_threshold}\n")
         f.write(f"设备: {device}\n")
         f.write(f"随机种子: 42\n")
         f.write(f"训练开始时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
     # 设定最小样本数为50，将样本数少于50的标签过滤
-    features, labels, class_weights, class_names = load_data(data_file, min_samples=min_samples)
+    features, labels, class_weights, class_names = load_data(
+        data_file,
+        min_samples=min_samples,
+        effect_size_path=effect_size_file,
+        effect_threshold=effect_threshold
+    )
     
     # 使用增强的数据平衡方法处理不平衡数据
     # 选择合适的数据增强策略
@@ -269,6 +278,7 @@ def main():
     # 保存最终测试结果
     with open(f'{result_dir}/test_results.txt', 'w', encoding='utf-8') as f:
         f.write(f"最小样本数阈值: {min_samples}\n")
+        f.write(f"效应量阈值: {effect_threshold}\n")
         f.write(f"剩余标签数量: {len(class_names)}\n\n")
         f.write(f"测试集准确率: {test_metrics['accuracy']:.4f}\n")
         f.write(f"测试集精确率: {test_metrics['precision']:.4f}\n")

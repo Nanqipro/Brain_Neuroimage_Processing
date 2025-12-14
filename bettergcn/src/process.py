@@ -17,7 +17,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 import os
 from tqdm import tqdm
 
-def load_data(data_path, min_samples=50):
+def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold=None):
     # 根据文件扩展名决定使用哪种方法读取数据
     if data_path.endswith('.csv'):
         data = pd.read_csv(data_path)
@@ -74,6 +74,44 @@ def load_data(data_path, min_samples=50):
     class_weights = compute_class_weight('balanced', classes=np.unique(labels_encoded), y=labels_encoded)
     class_weights = torch.FloatTensor(class_weights)
     print(f"类别权重: {class_weights}")
+    
+    if effect_size_path is not None and effect_threshold is not None:
+        try:
+            if effect_size_path.endswith('.csv'):
+                es_df = pd.read_csv(effect_size_path)
+            elif effect_size_path.endswith('.xlsx') or effect_size_path.endswith('.xls'):
+                es_df = pd.read_excel(effect_size_path)
+            else:
+                raise ValueError(f"不支持的效应量文件格式: {effect_size_path}")
+            
+            if 'Behavior' not in es_df.columns:
+                raise ValueError("效应量文件缺少 'Behavior' 列")
+            
+            es_neuron_cols = [c for c in es_df.columns if c.startswith('n') and c[1:].isdigit()]
+            es_neuron_cols.sort(key=lambda x: int(x[1:]))
+            
+            behavior_masks = {}
+            for _, row in es_df.iterrows():
+                beh = str(row['Behavior'])
+                es_vals = row[es_neuron_cols].astype(float).values
+                mask_len = features_scaled.shape[1]
+                mask = np.zeros(mask_len, dtype=bool)
+                copy_len = min(len(es_vals), mask_len)
+                if copy_len > 0:
+                    mask[:copy_len] = es_vals[:copy_len] > float(effect_threshold)
+                behavior_masks[beh] = mask
+            
+            masked_total = 0
+            for i in range(len(labels)):
+                beh = str(labels[i])
+                m = behavior_masks.get(beh)
+                if m is not None:
+                    inv = ~m
+                    masked_total += int(inv.sum())
+                    features_scaled[i, inv] = 0.0
+            print(f"已应用效应量阈值过滤 (阈值={effect_threshold})，累计掩蔽的特征数量: {masked_total}")
+        except Exception as e:
+            print(f"应用效应量阈值过滤失败: {e}，继续使用未过滤特征")
 
     return features_scaled, labels_encoded, class_weights, encoder.classes_
 
