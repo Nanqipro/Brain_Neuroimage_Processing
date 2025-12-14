@@ -8,6 +8,7 @@ import seaborn as sns
 import os
 import datetime
 import matplotlib as mpl
+import argparse
 from sklearn.metrics import classification_report
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
@@ -64,12 +65,33 @@ def main():
     np.random.seed(42)
     setup_matplotlib_fonts()
     
-    # 定义数据文件路径和最小样本数
-    data_file = '../datasets/no.29800930openfield_CellVideo0_corrected_0_cell_trace.xlsx'
-    position_file = '../datasets/no.29800930openfield神经元编号位置图.csv'
-    min_samples = 50
-    effect_size_file = '../datasets/effect_sizes_no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv'
-    effect_threshold = 0.3
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_file', type=str, default='../datasets/no.29800930openfield_CellVideo0_corrected_0_cell_trace.xlsx')
+    parser.add_argument('--position_file', type=str, default='../datasets/no.29800930openfield神经元编号位置图.csv')
+    parser.add_argument('--min_samples', type=int, default=50)
+    parser.add_argument('--effect_size_file', type=str, default='../datasets/effect_sizes_no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv')
+    parser.add_argument('--effect_threshold', type=float, default=0.3)
+    args = parser.parse_args()
+    data_file = args.data_file
+    position_file = args.position_file
+    min_samples = args.min_samples
+    effect_size_file = args.effect_size_file
+    effect_threshold = args.effect_threshold
+    
+    #  # 定义数据文件路径和最小样本数
+    # data_file = '../datasets/no.2980240924openfield_CellVideo0_corrected_0_cell_trace.xlsx'
+    # position_file = '../datasets/no.2980240924openfield神经元编号位置图.csv'
+    # min_samples = 50
+    # effect_size_file = '../datasets/effect_sizes_no.2980240924openfield_CellVideo0_corrected_0_cell_trace.csv'
+    # effect_threshold = 0.3
+    
+    #  # 定义数据文件路径和最小样本数
+    # data_file = '../datasets/NO5355EM20251106_cell_trace.xlsx'
+    # position_file = '../datasets/NO5355EM20251106_cell_trace.csv'
+    # min_samples = 50
+    # effect_size_file = '../datasets/effect_sizes_NO5355EM20251106_cell_trace.csv'
+    # effect_threshold = 0.3
+    
     
     # 使用数据文件名和最小样本数来设置结果目录
     result_dir = setup_result_directory(data_file, min_samples)
