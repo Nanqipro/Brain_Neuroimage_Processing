@@ -27,7 +27,7 @@ def setup_result_directory(input_file_path, min_samples=None):
     
     # 添加时间戳以确保唯一性
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_dir = f"../results/{file_name}"
+    result_dir = f"../results/{file_name}_{timestamp}"
     
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
