@@ -142,11 +142,18 @@ class PathConfig:
                 'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_no.2980240924openfield_CellVideo0_corrected_0_cell_trace.csv'),
                 'position': os.path.join(self.DATA_DIR, 'no.2980240924openfield神经元编号位置图.csv'),
                 'description': '29800924openfield神经元活动数据'
+            },
+            '5355EM': {
+                'name': '5355EM',
+                'raw':  os.path.join(self.DATA_DIR, 'NO5355EM20251106_cell_trace.xlsx'),
+                'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_NO5355EM20251106_cell_trace.csv'),
+                'position': os.path.join(self.DATA_DIR, 'NO5355EM20251106_cell_trace.csv'),
+                'description': '5355EM神经元活动数据'
             }
         }
         
         # === 默认数据集设置 ===
-        self.DEFAULT_DATASET = '29800930openfield'  
+        self.DEFAULT_DATASET = '5355EM'  
         
         
         # === 创建必要的目录 ===
@@ -717,8 +724,9 @@ if __name__ == "__main__":
     # dataset_key = 'bla6250_plus' # 使用BLA6250增强版数据集
     # dataset_key = 'day3'         # 使用Day3数据集
     
-    dataset_key = '29800930openfield'    # 使用29800930openfield数据集
+    # dataset_key = '29800930openfield'    # 使用29800930openfield数据集
     # dataset_key = '29800924openfield'    # 使用29800924openfield数据集
+    dataset_key = '5355EM'    # 使用5355EM数据集
     
     # ===============================================================================
     # 智能数据集选择和验证
