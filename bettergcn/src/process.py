@@ -44,6 +44,14 @@ def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold
     
     labels = data['behavior'].values
 
+    # 先移除缺失标签的样本（分类任务不应包含NaN标签）
+    if pd.isna(labels).any():
+        valid_label_mask = ~pd.isna(labels)
+        removed = int((~valid_label_mask).sum())
+        features = features[valid_label_mask]
+        labels = labels[valid_label_mask]
+        print(f"已移除缺失标签样本: {removed}")
+
     # 统计每个标签的样本数量
     class_counts = Counter(labels)
     print(f"原始类别分布: {class_counts}")
@@ -113,7 +121,9 @@ def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold
         except Exception as e:
             print(f"应用效应量阈值过滤失败: {e}，继续使用未过滤特征")
 
-    return features_scaled, labels_encoded, class_weights, encoder.classes_
+    # 返回字符串化的类别名称，避免下游报告工具因非字符串类别报错
+    class_names = [str(c) for c in encoder.classes_]
+    return features_scaled, labels_encoded, class_weights, class_names
 
 def oversample_data(features, labels, ramdom_state=42, method='smote'):
     """

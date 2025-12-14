@@ -66,7 +66,7 @@ def main():
     
     # 定义数据文件路径和最小样本数
     data_file = '../datasets/no.29800930openfield_CellVideo0_corrected_0_cell_trace.xlsx'
-    position_file = '../datasets/no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv'
+    position_file = '../datasets/no.29800930openfield神经元编号位置图.csv'
     min_samples = 50
     effect_size_file = '../datasets/effect_sizes_no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv'
     effect_threshold = 0.3
