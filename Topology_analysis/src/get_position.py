@@ -352,7 +352,7 @@ def main():
     """
     image_path = '../datasets/NO5355EM20251106_cell_trace.jpg'
     output_file = '../datasets/NO5355EM20251106_cell_trace.csv'
-    start_number = 1  # 从编号1开始
+    start_number = 4  # 从编号1开始
     
     print(f"开始标记工具，起始编号: {start_number}")
     marker = PointMarker(image_path, start_number=start_number)
