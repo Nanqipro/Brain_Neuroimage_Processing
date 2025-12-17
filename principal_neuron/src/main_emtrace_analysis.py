@@ -769,7 +769,7 @@ if __name__ == "__main__":
     
     # dataset_key = '29800930openfield'    # 使用29800930openfield数据集
     # dataset_key = '29800924openfield'    # 使用29800924openfield数据集
-    dataset_key = '5355EM-plus'    # 使用5355EM数据集
+    dataset_key = '5355EM'    # 使用5355EM数据集
     
     # ===============================================================================
     # 智能数据集选择和验证
