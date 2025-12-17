@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 from collections import OrderedDict # 用于 plot_shared_neurons_map 中的图例处理
+import numpy as np
 
 # 导入并应用matplotlib样式配置
 try:
@@ -52,7 +53,7 @@ def plot_single_behavior_activity_map(key_neurons_df, behavior_name, behavior_co
                                       background_neuron_size=20, 
                                       background_neuron_alpha=0.5, 
                                       show_title=True,
-                                      key_neuron_size=300,
+                                      key_neuron_size=120,
                                       key_neuron_alpha=0.7,
                                       ax=None # New parameter
                                       ):
@@ -139,7 +140,7 @@ def plot_shared_neurons_map(behavior1_name, behavior2_name,
         fig, ax = plt.subplots(figsize=(10, 8))
         fig.patch.set_facecolor('white')
 
-    base_marker_size = 150
+    base_marker_size = 100
 
     if show_background_neurons and all_neuron_positions_df is not None and not all_neuron_positions_df.empty:
         _draw_activity_on_ax(ax, all_neuron_positions_df,
@@ -217,7 +218,7 @@ def plot_unique_neurons_map(unique_neurons_df, behavior_name, behavior_color, ti
                               background_neuron_size=20, 
                               background_neuron_alpha=0.5, 
                               show_title=True,
-                              key_neuron_size=300, # Added for consistency
+                              key_neuron_size=120, # Added for consistency
                               key_neuron_alpha=0.7,  # Added for consistency
                               ax=None # New parameter
                               ):

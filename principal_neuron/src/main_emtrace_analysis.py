@@ -456,6 +456,41 @@ def analyze_effect_sizes(df_effect_sizes_long):
     print("You might want to choose a threshold that captures the upper quartile, for example,")
     print("or a value that seems to separate 'strong' effects from weaker ones based on the plots.")
 
+def plot_top_effect_sizes_per_behavior(df_effect_sizes_long, top_n=5, output_path=None):
+    behaviors = [b for b in df_effect_sizes_long['Behavior'].dropna().unique() if str(b).strip() != '']
+    if len(behaviors) == 0:
+        return None
+    x_pos = np.arange(len(behaviors))
+    width = 0.8 / max(top_n, 1)
+    plt.figure(figsize=(14, 8))
+    colors = plt.cm.tab10(np.linspace(0, 1, top_n))
+    for i in range(top_n):
+        vals = []
+        nids = []
+        for b in behaviors:
+            bdf = df_effect_sizes_long[df_effect_sizes_long['Behavior'] == b].sort_values('EffectSize', ascending=False)
+            if i < len(bdf):
+                vals.append(float(bdf['EffectSize'].iloc[i]))
+                nids.append(bdf['NeuronID'].iloc[i])
+            else:
+                vals.append(0.0)
+                nids.append('')
+        bars = plt.bar(x_pos + i * width, vals, width, color=colors[i], label=f'Top {i+1}')
+        for rect, nid in zip(bars, nids):
+            h = rect.get_height()
+            if h > 0:
+                plt.text(rect.get_x() + rect.get_width() / 2.0, h, f'N{nid}', ha='center', va='bottom', rotation=45, fontsize=10)
+    plt.xlabel('Behavior')
+    plt.ylabel('Effect Size')
+    plt.title('Top Effect Sizes per Behavior')
+    plt.xticks(x_pos + width * (top_n / 2.0), behaviors, rotation=45)
+    plt.legend()
+    plt.tight_layout()
+    if output_path:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    return output_path
 def suggest_threshold_for_neuron_count(df_effects, min_neurons=5, max_neurons=10):
     print(f"\nAnalyzing effect sizes to find a threshold that yields {min_neurons}-{max_neurons} neurons per behavior.")
 
@@ -731,9 +766,9 @@ if __name__ == "__main__":
     # dataset_key = 'bla6250_plus' # 使用BLA6250增强版数据集
     # dataset_key = 'day3'         # 使用Day3数据集
     
-    # dataset_key = '29800930openfield'    # 使用29800930openfield数据集
+    dataset_key = '29800930openfield'    # 使用29800930openfield数据集
     # dataset_key = '29800924openfield'    # 使用29800924openfield数据集
-    dataset_key = '5355EM-plus'    # 使用5355EM数据集
+    # dataset_key = '5355EM'    # 使用5355EM数据集
     
     # ===============================================================================
     # 智能数据集选择和验证
@@ -812,6 +847,20 @@ if __name__ == "__main__":
         all_behaviors = list(key_neurons_by_behavior.keys())
         print(f"\n📊 发现 {len(all_behaviors)} 个有效行为标签: {all_behaviors}")
         
+        behavior_color_map = dict(BEHAVIOR_COLORS)
+        unknown_behaviors = [b for b in all_behaviors if b not in behavior_color_map]
+        if len(unknown_behaviors) > 0:
+            palette = plt.cm.tab20(np.linspace(0, 1, max(len(unknown_behaviors), 1)))
+            for i, b in enumerate(unknown_behaviors):
+                behavior_color_map[b] = palette[i % len(palette)]
+        
+        try:
+            top_bar_path = os.path.join(data_paths['output_dir'], 'top_effect_sizes_per_behavior.png')
+            plot_top_effect_sizes_per_behavior(df_effect_sizes_transformed, top_n=5, output_path=top_bar_path)
+            print(f"\n✅ 保存Top-N效应量柱状图: {top_bar_path}")
+        except Exception as e:
+            print(f"\n❌ 生成Top-N效应量柱状图失败: {str(e)}")
+        
         # ===============================================================================
         # 生成单独的图表（每个行为、每对行为共享、每个行为独有）
         # ===============================================================================
@@ -826,9 +875,6 @@ if __name__ == "__main__":
             
             # 获取该行为的关键神经元
             neuron_ids = key_neurons_by_behavior.get(behavior_name, [])
-            if not neuron_ids:
-                print(f"    ⚠️  {behavior_name} 没有关键神经元，跳过...")
-                continue
                 
             key_neurons_df = df_neuron_positions[df_neuron_positions['NeuronID'].isin(neuron_ids)]
             
@@ -842,7 +888,7 @@ if __name__ == "__main__":
                 plot_single_behavior_activity_map(
                     key_neurons_df=key_neurons_df,
                     behavior_name=behavior_name,
-                    behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'gray'),
+                    behavior_color=behavior_color_map.get(behavior_name, 'gray'),
                     title=f'{behavior_name} Key Neurons',
                     output_path=output_path,
                     all_neuron_positions_df=df_neuron_positions,
@@ -850,7 +896,6 @@ if __name__ == "__main__":
                     background_neuron_color=BACKGROUND_NEURON_COLOR,
                     background_neuron_size=BACKGROUND_NEURON_SIZE,
                     background_neuron_alpha=BACKGROUND_NEURON_ALPHA,
-                    key_neuron_size=300,
                     key_neuron_alpha=STANDARD_KEY_NEURON_ALPHA,
                     show_title=True
                 )
@@ -899,8 +944,8 @@ if __name__ == "__main__":
                     behavior1_all_key_neurons_df=df_b1_all_key,
                     behavior2_all_key_neurons_df=df_b2_all_key,
                     shared_key_neurons_df=df_shared_key,
-                    color1=BEHAVIOR_COLORS.get(b1, 'pink'),
-                    color2=BEHAVIOR_COLORS.get(b2, 'lightblue'),
+                    color1=behavior_color_map.get(b1, 'pink'),
+                    color2=behavior_color_map.get(b2, 'lightblue'),
                     mixed_color=mixed_color,
                     title=f'{b1}-{b2} Shared Neurons',
                     output_path=output_path,
@@ -925,39 +970,23 @@ if __name__ == "__main__":
         
         # 计算每个行为的独有神经元
         all_behavior_sets = {name: set(key_neurons_by_behavior.get(name, [])) for name in all_behaviors}
-        
         for behavior_name in all_behaviors:
             print(f"  🔸 生成 {behavior_name} 行为的独有神经元图...")
-            
-            # 获取该行为的神经元集合
             current_behavior_neurons = all_behavior_sets.get(behavior_name, set())
-            
-            # 获取其他所有行为的神经元集合
             other_behaviors_neurons = set()
             for other_name in all_behaviors:
                 if other_name != behavior_name:
                     other_behaviors_neurons.update(all_behavior_sets.get(other_name, set()))
-            
-            # 计算独有神经元
             unique_ids = list(current_behavior_neurons - other_behaviors_neurons)
-            
-            if not unique_ids:
-                print(f"    ⚠️  {behavior_name} 没有独有关键神经元，跳过...")
-                continue
-            
             unique_neurons_df = df_neuron_positions[df_neuron_positions['NeuronID'].isin(unique_ids)]
-            
-            # 生成安全的文件名
             safe_behavior_name = behavior_name.replace('/', '-').replace('\\', '-').replace(':', '-').replace('*', '-').replace('?', '-').replace('"', '-').replace('<', '-').replace('>', '-').replace('|', '-')
             output_filename = f"unique_{safe_behavior_name}_neurons.png"
             output_path = os.path.join(data_paths['output_dir'], output_filename)
-            
-            # 使用现有的绘图函数
             try:
                 plot_unique_neurons_map(
                     unique_neurons_df=unique_neurons_df,
                     behavior_name=behavior_name,
-                    behavior_color=BEHAVIOR_COLORS.get(behavior_name, 'gray'),
+                    behavior_color=behavior_color_map.get(behavior_name, 'gray'),
                     title=f'{behavior_name} Unique Neurons',
                     output_path=output_path,
                     all_neuron_positions_df=df_neuron_positions,
@@ -965,7 +994,6 @@ if __name__ == "__main__":
                     background_neuron_color=BACKGROUND_NEURON_COLOR,
                     background_neuron_size=BACKGROUND_NEURON_SIZE,
                     background_neuron_alpha=BACKGROUND_NEURON_ALPHA,
-                    key_neuron_size=300,
                     key_neuron_alpha=STANDARD_KEY_NEURON_ALPHA,
                     show_title=True
                 )

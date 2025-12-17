@@ -5,9 +5,12 @@ EFFECT_SIZE_THRESHOLD = 0.5
 
 # 不同行为的颜色配置
 BEHAVIOR_COLORS = {
-    'Close-Arm': 'red',    # "靠近臂"行为
-    'Middle-Zone': 'green', # "中间区域"行为
-    'Open-Arm': 'blue',     # "开放臂"行为
+    'Close-Arm': 'red',
+    'Middle-Zone': 'green',
+    'Open-Arm': 'blue',
+    'Close': 'blue',
+    'Middle': 'green',
+    'Open': 'red',
 }
 
 # 行为对共享神经元的混合颜色配置 (键: 按字母顺序排序的行为名称元组)
