@@ -371,7 +371,8 @@ from plotting_utils import (
     plot_unique_neurons_map,
     plot_combined_9_grid,
     plot_3d_combined_neuron_distribution,
-    plot_3d_activation_categories_combined
+    plot_3d_activation_categories_combined,
+    plot_shared_neurons_map_3way
 )
 from effect_size_calculator import EffectSizeCalculator, load_and_calculate_effect_sizes
 
@@ -766,9 +767,9 @@ if __name__ == "__main__":
     # dataset_key = 'bla6250_plus' # 使用BLA6250增强版数据集
     # dataset_key = 'day3'         # 使用Day3数据集
     
-    dataset_key = '29800930openfield'    # 使用29800930openfield数据集
+    # dataset_key = '29800930openfield'    # 使用29800930openfield数据集
     # dataset_key = '29800924openfield'    # 使用29800924openfield数据集
-    # dataset_key = '5355EM'    # 使用5355EM数据集
+    dataset_key = '5355EM-plus'    # 使用5355EM数据集
     
     # ===============================================================================
     # 智能数据集选择和验证
@@ -965,6 +966,70 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"    ❌ 生成 {b1}-{b2} 共享图表失败: {str(e)}")
         
+        # --- 2.5 为每三组行为生成共享神经元图 (如果有3个或更多行为) ---
+        if len(all_behaviors) >= 3:
+            print(f"\n🔗 生成每三组行为的共享神经元图...")
+            behavior_triplets = list(combinations(all_behaviors, 3))
+            print(f"  📊 总共需要生成 {len(behavior_triplets)} 个三组共享神经元图")
+            
+            for b1, b2, b3 in behavior_triplets:
+                print(f"  🔸 生成 {b1}, {b2}, {b3} 的共享神经元图...")
+                
+                ids1 = set(key_neurons_by_behavior.get(b1, []))
+                ids2 = set(key_neurons_by_behavior.get(b2, []))
+                ids3 = set(key_neurons_by_behavior.get(b3, []))
+                shared_ids = list(ids1.intersection(ids2).intersection(ids3))
+                
+                if not shared_ids:
+                    print(f"    ⚠️  {b1}, {b2}, {b3} 没有共同共享的关键神经元，跳过...")
+                    continue
+
+                df_b1_all_key = df_neuron_positions[df_neuron_positions['NeuronID'].isin(list(ids1))]
+                df_b2_all_key = df_neuron_positions[df_neuron_positions['NeuronID'].isin(list(ids2))]
+                df_b3_all_key = df_neuron_positions[df_neuron_positions['NeuronID'].isin(list(ids3))]
+                df_shared_key = df_neuron_positions[df_neuron_positions['NeuronID'].isin(shared_ids)]
+                
+                safe_b1 = b1.replace('/', '-').replace('\\', '-').replace(':', '-').replace('*', '-').replace('?', '-').replace('"', '-').replace('<', '-').replace('>', '-').replace('|', '-')
+                safe_b2 = b2.replace('/', '-').replace('\\', '-').replace(':', '-').replace('*', '-').replace('?', '-').replace('"', '-').replace('<', '-').replace('>', '-').replace('|', '-')
+                safe_b3 = b3.replace('/', '-').replace('\\', '-').replace(':', '-').replace('*', '-').replace('?', '-').replace('"', '-').replace('<', '-').replace('>', '-').replace('|', '-')
+                
+                output_filename = f"shared_3way_{safe_b1}_{safe_b2}_{safe_b3}.png"
+                output_path = os.path.join(data_paths['output_dir'], output_filename)
+                
+                try:
+                    # Determine colors
+                    c1 = behavior_color_map.get(b1, 'pink')
+                    c2 = behavior_color_map.get(b2, 'lightblue')
+                    c3 = behavior_color_map.get(b3, 'lightgreen')
+                    
+                    # For mixed color, maybe use black or a distinct color
+                    mixed_color = 'black' 
+                    
+                    plot_shared_neurons_map_3way(
+                        behavior1_name=b1, behavior2_name=b2, behavior3_name=b3,
+                        behavior1_all_key_neurons_df=df_b1_all_key,
+                        behavior2_all_key_neurons_df=df_b2_all_key,
+                        behavior3_all_key_neurons_df=df_b3_all_key,
+                        shared_key_neurons_df=df_shared_key,
+                        color1=c1, color2=c2, color3=c3,
+                        mixed_color=mixed_color,
+                        title=f'{b1}-{b2}-{b3} Shared Neurons',
+                        output_path=output_path,
+                        all_neuron_positions_df=df_neuron_positions,
+                        scheme='B',
+                        show_background_neurons=SHOW_BACKGROUND_NEURONS,
+                        background_neuron_color=BACKGROUND_NEURON_COLOR,
+                        background_neuron_size=BACKGROUND_NEURON_SIZE,
+                        background_neuron_alpha=BACKGROUND_NEURON_ALPHA,
+                        standard_key_neuron_alpha=STANDARD_KEY_NEURON_ALPHA,
+                        use_standard_alpha_for_unshared_in_scheme_b=USE_STANDARD_ALPHA_FOR_UNSHARED_IN_SCHEME_B,
+                        alpha_non_shared=0.3,
+                        shared_marker_size_factor=1.5
+                    )
+                    print(f"    ✅ 保存到: {output_filename} (三方共享神经元数: {len(shared_ids)})")
+                except Exception as e:
+                    print(f"    ❌ 生成 {b1}-{b2}-{b3} 共享图表失败: {str(e)}")
+
         # --- 3. 为每个行为生成独有神经元图 ---
         print(f"\n🎯 生成每个行为的独有神经元图...")
         

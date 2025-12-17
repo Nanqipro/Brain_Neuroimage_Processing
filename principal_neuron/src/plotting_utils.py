@@ -211,6 +211,114 @@ def plot_shared_neurons_map(behavior1_name, behavior2_name,
     elif fig is not None and output_path is None and ax is None:
         plt.close(fig)
 
+def plot_shared_neurons_map_3way(behavior1_name, behavior2_name, behavior3_name,
+                                 behavior1_all_key_neurons_df, behavior2_all_key_neurons_df, behavior3_all_key_neurons_df,
+                                 shared_key_neurons_df,
+                                 color1, color2, color3, mixed_color,
+                                 title, output_path=None,
+                                 all_neuron_positions_df=None,
+                                 show_background_neurons=False,
+                                 background_neuron_color='lightgray',
+                                 background_neuron_size=20,
+                                 background_neuron_alpha=0.5,
+                                 standard_key_neuron_alpha=0.7,
+                                 use_standard_alpha_for_unshared_in_scheme_b=True,
+                                 scheme='B', show_title=True, alpha_non_shared=0.3, shared_marker_size_factor=1.5,
+                                 ax=None
+                                 ):
+    """
+    绘制三种行为间共享的关键神经元图。
+    如果提供了 ax 参数，则在该 ax 上绘图，否则创建新图并保存到 output_path。
+    """
+    fig = None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
+        fig.patch.set_facecolor('white')
+
+    base_marker_size = 100
+
+    # Draw background
+    if show_background_neurons and all_neuron_positions_df is not None and not all_neuron_positions_df.empty:
+        _draw_activity_on_ax(ax, all_neuron_positions_df,
+                             color=background_neuron_color, 
+                             size=background_neuron_size, 
+                             alpha=background_neuron_alpha,
+                             edgecolors=background_neuron_color, 
+                             label='All Neurons (Background)',
+                             annotate_ids=False, 
+                             z_order=1)
+
+    if scheme == 'A':
+        # Scheme A: Only draw shared neurons
+        if shared_key_neurons_df.empty:
+            if fig is not None: print(f"行为 {behavior1_name}, {behavior2_name}, {behavior3_name} 之间无共享神经元。")
+        else:
+            _draw_activity_on_ax(ax, shared_key_neurons_df, color=mixed_color, size=base_marker_size,
+                                 alpha=0.9, edgecolors='black', label=f'Shared ({len(shared_key_neurons_df)})',
+                                 z_order=4, annotation_fontsize=9 if fig is None else 8)
+    
+    elif scheme == 'B':
+        # Scheme B: Draw non-shared (relative to the triple intersection) + Shared
+        current_alpha_for_unshared = alpha_non_shared
+        if use_standard_alpha_for_unshared_in_scheme_b:
+            current_alpha_for_unshared = standard_key_neuron_alpha
+
+        shared_ids = shared_key_neurons_df['NeuronID'].tolist() if not shared_key_neurons_df.empty else []
+
+        # Draw B1 non-shared
+        non_shared_b1_df = behavior1_all_key_neurons_df[~behavior1_all_key_neurons_df['NeuronID'].isin(shared_ids)]
+        if not non_shared_b1_df.empty:
+            _draw_activity_on_ax(ax, non_shared_b1_df, color=color1, size=base_marker_size,
+                                 alpha=current_alpha_for_unshared, edgecolors=color1,
+                                 label=f'{behavior1_name} (Unique Key: {len(non_shared_b1_df)})', z_order=2,
+                                 annotation_fontsize=8, annotation_weight='normal', annotation_offset=(0,8)) 
+
+        # Draw B2 non-shared
+        non_shared_b2_df = behavior2_all_key_neurons_df[~behavior2_all_key_neurons_df['NeuronID'].isin(shared_ids)]
+        if not non_shared_b2_df.empty:
+            _draw_activity_on_ax(ax, non_shared_b2_df, color=color2, size=base_marker_size,
+                                 alpha=current_alpha_for_unshared, edgecolors=color2,
+                                 label=f'{behavior2_name} (Unique Key: {len(non_shared_b2_df)})', z_order=2,
+                                 annotation_fontsize=8, annotation_weight='normal', annotation_offset=(0,8))
+
+        # Draw B3 non-shared
+        non_shared_b3_df = behavior3_all_key_neurons_df[~behavior3_all_key_neurons_df['NeuronID'].isin(shared_ids)]
+        if not non_shared_b3_df.empty:
+            _draw_activity_on_ax(ax, non_shared_b3_df, color=color3, size=base_marker_size,
+                                 alpha=current_alpha_for_unshared, edgecolors=color3,
+                                 label=f'{behavior3_name} (Unique Key: {len(non_shared_b3_df)})', z_order=2,
+                                 annotation_fontsize=8, annotation_weight='normal', annotation_offset=(0,8))
+
+        # Draw Shared
+        if not shared_key_neurons_df.empty:
+            _draw_activity_on_ax(ax, shared_key_neurons_df, color=mixed_color,
+                                 size=base_marker_size * shared_marker_size_factor,
+                                 alpha=1.0, edgecolors='black',
+                                 label=f'Shared ({len(shared_key_neurons_df)})', z_order=4,
+                                 annotation_fontsize=9 if fig is None else 8, annotation_weight='bold')
+        elif fig is not None:
+             print(f"行为 {behavior1_name}, {behavior2_name}, {behavior3_name} 之间无共享神经元。")
+
+    else:
+        if fig is not None: raise ValueError(f"未知绘图方案: {scheme}")
+        else: ax.text(0.5,0.5, f"Error: Unknown scheme '{scheme}'", transform=ax.transAxes)
+
+    if show_title: ax.set_title(title, fontsize=24 if fig is None else 22, fontweight='bold')
+    
+    _style_activity_plot_ax(ax)
+    
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        by_label = OrderedDict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=18, markerscale=1.5)
+
+    if fig is not None and output_path is not None:
+        plt.savefig(output_path, bbox_inches='tight')
+        print(f"图表已保存到 {output_path}")
+        plt.close(fig)
+    elif fig is not None and output_path is None and ax is None:
+        plt.close(fig)
+
 def plot_unique_neurons_map(unique_neurons_df, behavior_name, behavior_color, title, output_path=None, 
                               all_neuron_positions_df=None, 
                               show_background_neurons=False, 
