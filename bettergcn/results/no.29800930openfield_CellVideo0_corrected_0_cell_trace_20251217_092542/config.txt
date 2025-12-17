@@ -1,0 +1,8 @@
+数据文件: ../datasets/no.29800930openfield_CellVideo0_corrected_0_cell_trace.xlsx
+神经元位置文件: ../datasets/no.29800930openfield神经元编号位置图.csv
+最小样本数: 50
+效应量文件: ../datasets/effect_sizes_no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv
+效应量阈值: 0.5
+设备: cuda
+随机种子: 42
+训练开始时间: 2025-12-17 09:25:42
