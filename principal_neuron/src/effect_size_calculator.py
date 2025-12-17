@@ -26,12 +26,12 @@ class PathConfig:
         
         # === 输入数据路径配置 ===
         self.data_dir = os.path.join(self.principal_neuron_dir, "data")
-        self.default_data_file = "NO5355EM20251106_cell_trace.xlsx"  # 默认数据文件名
+        self.default_data_file = "NO5355EM20251106_cell_trace-三区域.xlsx"  # 默认数据文件名
         self.default_data_path = os.path.join(self.data_dir, self.default_data_file)
         
         # === 输出路径配置 ===
         self.output_dir = os.path.join(self.principal_neuron_dir, "effect_size_output")
-        self.effect_sizes_filename = "effect_sizes_NO5355EM20251106_cell_trace.csv"  # 效应量结果文件名
+        self.effect_sizes_filename = "effect_sizes_NO5355EM20251106_cell_trace-三区域.csv"  # 效应量结果文件名
         self.effect_sizes_path = os.path.join(self.output_dir, self.effect_sizes_filename)
         
         # # === 其他可选数据文件路径 ===

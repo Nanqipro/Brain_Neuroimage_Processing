@@ -149,6 +149,13 @@ class PathConfig:
                 'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_NO5355EM20251106_cell_trace.csv'),
                 'position': os.path.join(self.DATA_DIR, 'NO5355EM20251106_cell_trace.csv'),
                 'description': '5355EM神经元活动数据'
+            },
+            '5355EM-plus': {
+                'name': '5355EM',
+                'raw':  os.path.join(self.DATA_DIR, 'NO5355EM20251106_cell_trace-三区域.xlsx'),
+                'effect': os.path.join(self.BASE_EFFECT_SIZE_OUTPUT_DIR, 'effect_sizes_NO5355EM20251106_cell_trace-三区域.csv'),
+                'position': os.path.join(self.DATA_DIR, 'NO5355EM20251106_cell_trace.csv'),
+                'description': '5355EM神经元活动数据'
             }
         }
         
@@ -726,7 +733,7 @@ if __name__ == "__main__":
     
     # dataset_key = '29800930openfield'    # 使用29800930openfield数据集
     # dataset_key = '29800924openfield'    # 使用29800924openfield数据集
-    dataset_key = '5355EM'    # 使用5355EM数据集
+    dataset_key = '5355EM-plus'    # 使用5355EM数据集
     
     # ===============================================================================
     # 智能数据集选择和验证
