@@ -13,11 +13,11 @@ from scipy import stats
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/29790930糖水铁网糖水trace2.xlsx'
+    INPUT_FILE = '../../datasets/5355homecage1107merge.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort-'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 1  # 最小时间戳
+    STAMP_MIN = 0  # 最小时间戳
     STAMP_MAX = 2999  # 最大时间戳
     # 排序方式：'peak'（默认，按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
@@ -294,7 +294,7 @@ if has_behavior:
 vmin, vmax = -2, 2  # 控制颜色对比度
 
 # 创建图形和轴，使用更高的高度比例和精确调整来确保对齐
-fig = plt.figure(figsize=(60, 25))
+fig = plt.figure(figsize=(80, 30))
 
 # 使用更精确的GridSpec布局系统
 # 修改为2行2列布局：左侧为行为线条和热图，右侧为图例
@@ -345,11 +345,10 @@ if has_behavior and len(global_unique_behaviors) > 0:
         'Store-seeds': '#FF6666',           # 亮红色
         'Water': '#CC99FF',                 # 亮紫色
         
-        
         # === 高架十字迷宫行为标签 ===
         'Close-arm': '#8B0000',             # 深红色 - 封闭臂
         'Close-armed-Exp': '#CD5C5C',       # 印度红 - 封闭臂探索
-        'Closed-arm-freezing': '#2F2F2F',  # 深灰色 - 封闭臂僵直
+        'Closed-arm-freezing': '#2F2F2F',   # 深灰色 - 封闭臂僵直
         'Middle-zone': '#FFD700',           # 金色 - 中央区域
         'Middle-zone-freezing': '#B8860B',  # 深金黄色 - 中央区域僵直
         'Open-arm': '#32CD32',              # 酸橙绿 - 开放臂
@@ -365,7 +364,24 @@ if has_behavior and len(global_unique_behaviors) > 0:
         'Scratch + Groom': '#DDA0DD',       # 李子色 - 抓挠+整理组合行为
         'Sleep': '#2F4F4F',                 # 深灰绿色 - 睡眠
         'Wake': '#FFD700',                  # 金色 - 清醒
-        'zone-out': '#708090'               # 石板灰 - 发呆状态
+        'zone-out': '#708090',              # 石板灰 - 发呆状态
+
+        # === 新增：神经行为标签 (From Image) ===
+        'Digging': '#8B4513',               # 鞍褐色 - 挖掘行为（类似于土色）
+        'Drinking': '#1E90FF',              # 道奇蓝 - 通用饮水
+        'Drinking (Water)': '#4169E1',      # 皇家蓝 - 饮纯水
+        'Drinking_Quinine': '#5F9EA0',      # 军校蓝 - 饮奎宁（区别于普通水的苦味）
+        'Drinking_Sucrose': '#FF69B4',      # 热粉色 - 饮糖水（区别于水的奖励色）
+        'Feeding': '#228B22',               # 森林绿 - 进食
+        'Freezing': '#483D8B',              # 暗板岩蓝 - 冻结/僵直（深冷色调）
+        'Grooming': '#00CED1',              # 暗青色 - 理毛
+        'Grooming/Face Washing': '#40E0D0', # 绿松石 - 洗脸（理毛的变体）
+        'Quinine_Spray': '#FF0000',         # 纯红 - 奎宁喷射（突发刺激/警告色）
+        'Scratching': '#D2691E',            # 巧克力色 - 抓挠
+        'Sniffing_Quinine': '#9ACD32',      # 黄绿色 - 嗅探
+        'Stand': '#FFD700',                 # 金色 - 站立
+        'StandClimbing': '#DAA520',         # 金麒麟色 - 站立攀爬
+        'Tremble': '#8A2BE2'                # 蓝紫色 - 战栗（这种颜色通常代表神经异常或高频动作）
     }
     
     # 为全局行为类型创建颜色映射（确保图例一致性）

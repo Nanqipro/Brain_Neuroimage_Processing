@@ -4,7 +4,7 @@ import os
 
 def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataFrame:
     """
-    处理原始数据，确保FrameLost列每行都有对应标签
+    处理原始数据，确保behavior列每行都有对应标签
     支持Excel文件(.xlsx, .xls)和CSV文件(.csv)的自动识别
     
     Parameters
@@ -40,7 +40,7 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
             data = pd.read_csv(input_file_path)
         elif file_extension in ['.xlsx', '.xls']:
             print(f"正在读取Excel文件: {input_file_path}")
-            data = pd.read_excel(input_file_path, sheet_name='Sheet1')
+            data = pd.read_excel(input_file_path, sheet_name='merge')
         else:
             raise ValueError(f"不支持的文件格式: {file_extension}. 支持的格式: .csv, .xlsx, .xls")
     except Exception as e:
@@ -50,7 +50,7 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
     print(f"成功读取文件，共 {len(data)} 行，{len(data.columns)} 列")
     
     # 确保数据列存在
-    required_columns = ['stamp', 'FrameLost']
+    required_columns = ['stamp', 'behavior']
     for col in required_columns:
         if col not in data.columns:
             # 如果列不存在，创建空列
@@ -58,9 +58,9 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
             print(f"警告: 创建了缺失的列 '{col}'")
     
     # 将空字符串替换为NaN以便正确填充
-    data['FrameLost'] = data['FrameLost'].replace('', np.nan)
+    data['behavior'] = data['behavior'].replace('', np.nan)
     # 使用前向填充填充空值
-    data['FrameLost'] = data['FrameLost'].ffill()
+    data['behavior'] = data['behavior'].ffill()
     
     # 将所有仍为NaN的值替换为'NULL'字符串
     data = data.fillna('NULL')
@@ -83,8 +83,8 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
 
 if __name__ == "__main__":
     # 定义输入和输出文件路径
-    input_path = '../../raw_data/BLA62500627homecagecelltrace.xlsx'
-    output_path = '../../processed_data/BLA62500627homecagecelltrace_processed.xlsx'
+    input_path = '../../raw_data/5355homecage1107merge.xlsx'
+    output_path = '../../processed_data/5355homecage1107merge_processed.xlsx'
     
     try:
         # 处理数据
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         
         # 打印处理结果统计信息
         print(f"处理完成，共处理 {len(processed_data)} 行数据")
-        print(f"FrameLost列非空值数量: {processed_data['FrameLost'].ne('NULL').sum()}")
+        print(f"behavior列非空值数量: {processed_data['behavior'].ne('NULL').sum()}")
         
     except Exception as e:
         print(f"程序执行失败: {e}")

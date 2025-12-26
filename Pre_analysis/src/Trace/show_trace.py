@@ -13,12 +13,12 @@ plt.rcParams['lines.linewidth'] = 2.0  # 设置默认线宽
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/EMtrace01.xlsx'
+    INPUT_FILE = '../../datasets/5355homecage1107merge.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = None  # 最小时间戳
-    STAMP_MAX = None  # 最大时间戳
+    STAMP_MIN = 0  # 最小时间戳
+    STAMP_MAX = 12495  # 最大时间戳
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
@@ -243,7 +243,7 @@ else:
 print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
 if has_behavior and behavior_data.dropna().unique().size > 0:
     # 如果有行为数据，使用2行2列的布局，与热图保持一致
-    fig = plt.figure(figsize=(60, 25))
+    fig = plt.figure(figsize=(200, 30))
     # 使用GridSpec，与heatmap_sort-EM.py保持一致的布局
     grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
     ax_behavior = fig.add_subplot(grid[0, 0])
@@ -251,70 +251,85 @@ if has_behavior and behavior_data.dropna().unique().size > 0:
     ax_legend = fig.add_subplot(grid[1, 1])
 else:
     # 没有行为数据，只创建一个图表
-    fig = plt.figure(figsize=(60, 25))
+    fig = plt.figure(figsize=(200, 30))
     ax_trace = fig.add_subplot(111)
 
 # 预定义颜色映射，与热图保持一致
 fixed_color_map = {
-        # === 原有配色（保持不变）===
-        'Crack-seeds-shells': '#FF9500',    # 明亮橙色
-        'Eat-feed': '#0066CC',              # 深蓝色
-        'Eat-seed-kernels': '#00CC00',      # 亮绿色
-        'Explore': '#FF0000',               # 鲜红色
-        'Explore-search-seeds': '#9900FF',  # 亮紫色
-        'Find-seeds': '#994C00',            # 深棕色
-        'Get-feed': '#FF00CC',              # 亮粉色
-        'Get-seeds': '#000000',             # 黑色
-        'Grab-seeds': '#AACC00',            # 亮黄绿色
-        'Groom': '#00CCFF',                 # 亮蓝绿色
-        'Smell-feed': '#66B3FF',            # 亮蓝色
-        'Smell-Get-seeds': '#33FF33',       # 鲜绿色
-        'Store-seeds': '#FF6666',           # 亮红色
-        'Water': '#CC99FF',                 # 亮紫色
-        
-        # === 新增配色选项 ===
-        'Rest': '#8B4513',                  # 深褐色
-        'Sleep': '#2F4F4F',                 # 深灰绿色
-        'Social': '#FF1493',                # 深粉色
-        'Climbing': '#32CD32',              # 酸橙绿
-        'Digging': '#8B008B',               # 深洋红色
-        'Running': '#FF4500',               # 橙红色
-        'Swimming': '#1E90FF',              # 道奇蓝
-        'Freezing': '#708090',              # 石板灰
-        'Hiding': '#556B2F',                # 暗橄榄绿
-        'Aggressive': '#DC143C',            # 深红色
-        'Defensive': '#9932CC',             # 深兰花紫
-        'Play': '#FFD700',                  # 金色
-        'Sniffing': '#20B2AA',              # 浅海绿色
-        'Licking': '#FF69B4',               # 热粉色
-        'Scratching': '#CD853F',            # 秘鲁色
-        'Stretching': '#4169E1',            # 皇家蓝
-        'Turning': '#DA70D6',               # 兰花紫
-        'Jumping': '#FF6347',               # 番茄色
-        'Rearing': '#40E0D0',               # 青绿色
-        'Grooming-self': '#9370DB',         # 中紫色
-        'Grooming-other': '#3CB371',        # 中海绿色
-        'Feeding-young': '#F0E68C',         # 卡其色
-        'Nesting': '#DDA0DD',               # 李子色
-        'Mating': '#FA8072',                # 鲑鱼色
-        'Territory-marking': '#87CEEB',     # 天蓝色
-        'Escape': '#B22222',                # 火砖色
-        'Approach': '#228B22',              # 森林绿
-        'Avoid': '#4B0082',                 # 靛蓝色
-        'Investigate': '#FF8C00',           # 深橙色
-        'Vocalization': '#6A5ACD',          # 石蓝色
-        
-        # === 高架十字迷宫行为标签 ===
-        'Close-arm': '#8B0000',             # 深红色 - 封闭臂
-        'Close-armed-Exp': '#CD5C5C',       # 印度红 - 封闭臂探索
-        'Closed-arm-freezing': '#2F2F2F',  # 深灰色 - 封闭臂僵直
-        'Middle-zone': '#FFD700',           # 金色 - 中央区域
-        'Middle-zone-freezing': '#B8860B',  # 深金黄色 - 中央区域僵直
-        'Open-arm': '#32CD32',              # 酸橙绿 - 开放臂
-        'Open-arm-exp': '#00FF7F',          # 春绿色 - 开放臂探索
-        'open-arm-freezing': '#006400',     # 深绿色 - 开放臂僵直
-        'Open-arm-head dipping': '#7CFC00'  # 草绿色 - 开放臂头部探测
-    }
+    # === 原有配色（保持不变）===
+    'Crack-seeds-shells': '#FF9500',    # 明亮橙色
+    'Eat-feed': '#0066CC',              # 深蓝色
+    'Eat-seed-kernels': '#00CC00',      # 亮绿色
+    'Explore': '#FF0000',               # 鲜红色
+    'Explore-search-seeds': '#9900FF',  # 亮紫色
+    'Find-seeds': '#994C00',            # 深棕色
+    'Get-feed': '#FF00CC',              # 亮粉色
+    'Get-seeds': '#000000',             # 黑色
+    'Grab-seeds': '#AACC00',            # 亮黄绿色
+    'Groom': '#00CCFF',                 # 亮蓝绿色
+    'Smell-feed': '#66B3FF',            # 亮蓝色
+    'Smell-Get-seeds': '#33FF33',       # 鲜绿色
+    'Store-seeds': '#FF6666',           # 亮红色
+    'Water': '#CC99FF',                 # 亮紫色
+    
+    # === 新增配色选项 (通用行为库) ===
+    'Rest': '#8B4513',                  # 深褐色
+    'Sleep': '#2F4F4F',                 # 深灰绿色
+    'Social': '#FF1493',                # 深粉色
+    'Climbing': '#32CD32',              # 酸橙绿
+    'Digging': '#8B008B',               # 深洋红色
+    'Running': '#FF4500',               # 橙红色
+    'Swimming': '#1E90FF',              # 道奇蓝
+    'Freezing': '#708090',              # 石板灰
+    'Hiding': '#556B2F',                # 暗橄榄绿
+    'Aggressive': '#DC143C',            # 深红色
+    'Defensive': '#9932CC',             # 深兰花紫
+    'Play': '#FFD700',                  # 金色
+    'Sniffing': '#20B2AA',              # 浅海绿色
+    'Licking': '#FF69B4',               # 热粉色
+    'Scratching': '#CD853F',            # 秘鲁色
+    'Stretching': '#4169E1',            # 皇家蓝
+    'Turning': '#DA70D6',               # 兰花紫
+    'Jumping': '#FF6347',               # 番茄色
+    'Rearing': '#40E0D0',               # 青绿色
+    'Grooming-self': '#9370DB',         # 中紫色
+    'Grooming-other': '#3CB371',        # 中海绿色
+    'Feeding-young': '#F0E68C',         # 卡其色
+    'Nesting': '#DDA0DD',               # 李子色
+    'Mating': '#FA8072',                # 鲑鱼色
+    'Territory-marking': '#87CEEB',     # 天蓝色
+    'Escape': '#B22222',                # 火砖色
+    'Approach': '#228B22',              # 森林绿
+    'Avoid': '#4B0082',                 # 靛蓝色
+    'Investigate': '#FF8C00',           # 深橙色
+    'Vocalization': '#6A5ACD',          # 石蓝色
+    
+    # === 高架十字迷宫行为标签 ===
+    'Close-arm': '#8B0000',             # 深红色 - 封闭臂
+    'Close-armed-Exp': '#CD5C5C',       # 印度红 - 封闭臂探索
+    'Closed-arm-freezing': '#2F2F2F',   # 深灰色 - 封闭臂僵直
+    'Middle-zone': '#FFD700',           # 金色 - 中央区域
+    'Middle-zone-freezing': '#B8860B',  # 深金黄色 - 中央区域僵直
+    'Open-arm': '#32CD32',              # 酸橙绿 - 开放臂
+    'Open-arm-exp': '#00FF7F',          # 春绿色 - 开放臂探索
+    'open-arm-freezing': '#006400',     # 深绿色 - 开放臂僵直
+    'Open-arm-head dipping': '#7CFC00', # 草绿色 - 开放臂头部探测
+
+    # === [NEW] 补充：来自图片数据集的特定行为标签 ===
+    # 包含了奎宁、糖水实验特有的行为定义，颜色选取尽量符合直觉
+    'Drinking': '#1E90FF',              # 道奇蓝 - 通用饮水
+    'Drinking (Water)': '#4169E1',      # 皇家蓝 - 明确的饮水行为(与Water区分)
+    'Drinking_Quinine': '#5F9EA0',      # 军校蓝 - 饮苦味剂(冷色调，示区别)
+    'Drinking_Sucrose': '#FF1493',      # 深粉色 - 饮糖水(奖励色，类似Licking)
+    'Feeding': '#228B22',               # 森林绿 - 进食(比Eat-feed稍亮)
+    'Grooming': '#00CED1',              # 暗青色 - 理毛(对应Image标签)
+    'Grooming/Face Washing': '#48D1CC', # 中绿松石 - 洗脸
+    'Quinine_Spray': '#FF4500',         # 橙红色 - 刺激/惩罚(警戒色)
+    'Sniffing_Quinine': '#9ACD32',      # 黄绿色 - 嗅探刺激物
+    'Stand': '#FFD700',                 # 金色 - 站立(与Play/Middle-zone近似但通用)
+    'StandClimbing': '#DAA520',         # 金麒麟色 - 站立攀爬
+    'Tremble': '#8A2BE2'                # 蓝紫色 - 战栗/抖动(神经异常色)
+}
 
 # 绘制Trace图
 for i, column in enumerate(sorted_neurons):
@@ -591,7 +606,7 @@ output_file = f"{Config.OUTPUT_DIR}traces_{Config.SORT_METHOD}_{input_filename}{
 print(f"正在保存图像到 {output_file}")
 
 # 保存图像
-plt.savefig(output_file, dpi=300)
+plt.savefig(output_file, dpi=150)
 print(f"图像已保存")
 
 # 显示图像（可选，可以根据需要取消注释）
