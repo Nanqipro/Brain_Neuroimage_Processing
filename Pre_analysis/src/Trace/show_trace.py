@@ -17,7 +17,7 @@ class Config:
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 0  # 最小时间戳
+    STAMP_MIN = 9000  # 最小时间戳
     STAMP_MAX = 12495  # 最大时间戳
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
@@ -243,7 +243,7 @@ else:
 print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
 if has_behavior and behavior_data.dropna().unique().size > 0:
     # 如果有行为数据，使用2行2列的布局，与热图保持一致
-    fig = plt.figure(figsize=(200, 30))
+    fig = plt.figure(figsize=(80, 30))
     # 使用GridSpec，与heatmap_sort-EM.py保持一致的布局
     grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
     ax_behavior = fig.add_subplot(grid[0, 0])
@@ -251,7 +251,7 @@ if has_behavior and behavior_data.dropna().unique().size > 0:
     ax_legend = fig.add_subplot(grid[1, 1])
 else:
     # 没有行为数据，只创建一个图表
-    fig = plt.figure(figsize=(200, 30))
+    fig = plt.figure(figsize=(80, 30))
     ax_trace = fig.add_subplot(111)
 
 # 预定义颜色映射，与热图保持一致
@@ -602,11 +602,32 @@ if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     max_seconds = max_stamp / Config.SAMPLING_RATE
     stamp_info = f'_{min_seconds:.2f}s_{max_seconds:.2f}s'
 
+# output_file = f"{Config.OUTPUT_DIR}traces_{Config.SORT_METHOD}_{input_filename}{stamp_info}.png"
+# print(f"正在保存图像到 {output_file}")
+
+# # 保存图像
+# plt.savefig(output_file, dpi=150)
+# print(f"图像已保存")
+
+# # 显示图像（可选，可以根据需要取消注释）
+# # plt.show()
+# print("程序执行完成")
+
 output_file = f"{Config.OUTPUT_DIR}traces_{Config.SORT_METHOD}_{input_filename}{stamp_info}.png"
+
+# === 【修改点 1】自动创建目录，防止报错 ===
+output_dir = os.path.dirname(output_file)
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+# =======================================
+
 print(f"正在保存图像到 {output_file}")
 
-# 保存图像
-plt.savefig(output_file, dpi=150)
+# === 【修改点 2】关键修改：添加 bbox_inches='tight' 去除白边 ===
+# pad_inches=0.1 留一点点缝隙防止文字被切，dpi=150 保证清晰度且不超限
+plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.1)
+# ==========================================================
+
 print(f"图像已保存")
 
 # 显示图像（可选，可以根据需要取消注释）
