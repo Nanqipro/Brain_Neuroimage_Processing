@@ -342,7 +342,7 @@ else:
 print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
 if has_behavior and behavior_data.dropna().unique().size > 0:
     # 如果有行为数据，使用2行2列的布局，与热图保持一致
-    fig = plt.figure(figsize=(200, 30))
+    fig = plt.figure(figsize=(60, 30))
     # 使用GridSpec，与heatmap_sort-EM.py保持一致的布局
     grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
     ax_behavior = fig.add_subplot(grid[0, 0])
@@ -350,7 +350,7 @@ if has_behavior and behavior_data.dropna().unique().size > 0:
     ax_legend = fig.add_subplot(grid[1, 1])
 else:
     # 没有行为数据，只创建一个图表
-    fig = plt.figure(figsize=(200, 30))
+    fig = plt.figure(figsize=(60, 30))
     ax_trace = fig.add_subplot(111)
 
 # 预定义颜色映射，与热图保持一致
