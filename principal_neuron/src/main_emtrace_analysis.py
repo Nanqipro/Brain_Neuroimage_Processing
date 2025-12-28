@@ -762,7 +762,7 @@ if __name__ == "__main__":
     # dataset_key = 'emtrace01'    # 使用EMtrace01数据集
     # dataset_key = 'emtrace02'    # 使用EMtrace02数据集  
     # dataset_key = 'emtrace01_plus'    # 使用EMtrace01增强版数据集
-    # dataset_key = 'emtrace02_plus'    # 使用EMtrace02增强版数据集
+    dataset_key = 'emtrace02_plus'    # 使用EMtrace02增强版数据集
 
     # dataset_key = '2980'         # 使用2980数据集
     # dataset_key = '2980_plus'      # 使用2980增强版数据集
