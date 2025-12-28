@@ -338,20 +338,171 @@ else:
         behavior_data = behavior_data_full
 # ================= 替换结束 =================
 
-# ===== 开始绘制Trace图 =====
-print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
-if has_behavior and behavior_data.dropna().unique().size > 0:
-    # 如果有行为数据，使用2行2列的布局，与热图保持一致
-    fig = plt.figure(figsize=(60, 30))
-    # 使用GridSpec，与heatmap_sort-EM.py保持一致的布局
-    grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
-    ax_behavior = fig.add_subplot(grid[0, 0])
-    ax_trace = fig.add_subplot(grid[1, 0])
-    ax_legend = fig.add_subplot(grid[1, 1])
-else:
-    # 没有行为数据，只创建一个图表
+def extract_behavior_intervals(behavior_series: pd.Series):
+    intervals = {}
+    current_behavior = None
+    start_stamp = None
+    prev_stamp = None
+
+    for stamp, behavior in behavior_series.items():
+        if pd.isna(behavior):
+            if current_behavior is not None and start_stamp is not None and prev_stamp is not None:
+                intervals.setdefault(current_behavior, []).append((start_stamp, prev_stamp))
+            current_behavior = None
+            start_stamp = None
+            prev_stamp = stamp
+            continue
+
+        if behavior != current_behavior:
+            if current_behavior is not None and start_stamp is not None and prev_stamp is not None:
+                intervals.setdefault(current_behavior, []).append((start_stamp, prev_stamp))
+            current_behavior = behavior
+            start_stamp = stamp
+
+        prev_stamp = stamp
+
+    if current_behavior is not None and start_stamp is not None and prev_stamp is not None:
+        intervals.setdefault(current_behavior, []).append((start_stamp, prev_stamp))
+
+    return intervals
+
+
+def build_concatenated_trace(neural_df: pd.DataFrame, intervals, gap_stamps: int):
+    pieces = []
+    cursor = 0
+    mapped_stamps = []
+
+    for start_stamp, end_stamp in intervals:
+        seg = neural_df.loc[start_stamp:end_stamp]
+        if seg.empty:
+            continue
+
+        seg_index = np.arange(cursor, cursor + len(seg), dtype=int)
+        cursor += len(seg)
+        mapped_stamps.append(seg.index.to_numpy())
+        pieces.append(seg.set_index(seg_index))
+
+        if gap_stamps > 0:
+            gap_index = np.arange(cursor, cursor + gap_stamps, dtype=int)
+            cursor += gap_stamps
+            mapped_stamps.append(np.full(gap_stamps, np.nan))
+            pieces.append(pd.DataFrame(np.nan, index=gap_index, columns=neural_df.columns))
+
+    if pieces and pieces[-1].isna().all(axis=None):
+        pieces = pieces[:-1]
+        if mapped_stamps:
+            mapped_stamps = mapped_stamps[:-1]
+
+    if not pieces:
+        return pd.DataFrame(columns=neural_df.columns), np.array([])
+
+    concat_df = pd.concat(pieces).sort_index()
+    mapped_stamps_arr = np.concatenate(mapped_stamps) if mapped_stamps else np.array([])
+    return concat_df, mapped_stamps_arr
+
+
+def plot_trace_figure(trace_df: pd.DataFrame, sorted_neurons, peak_times_dict, title_text: str, mapped_stamps=None):
     fig = plt.figure(figsize=(60, 30))
     ax_trace = fig.add_subplot(111)
+
+    x_seconds = trace_df.index.to_numpy(dtype=float) / Config.SAMPLING_RATE
+
+    if mapped_stamps is not None and len(mapped_stamps) == len(trace_df.index):
+        import matplotlib.ticker as ticker
+        from matplotlib.ticker import FuncFormatter
+
+        mapped_seconds = mapped_stamps / Config.SAMPLING_RATE
+
+        def _fmt(x, pos):
+            if len(x_seconds) == 0:
+                return ''
+            idx = int(np.argmin(np.abs(x_seconds - x)))
+            v = mapped_seconds[idx]
+            if np.isnan(v):
+                return ''
+            return f'{v:.1f}'
+
+        ax_trace.xaxis.set_major_locator(ticker.MaxNLocator(nbins=12, prune=None))
+        ax_trace.xaxis.set_major_formatter(FuncFormatter(_fmt))
+
+    for i, column in enumerate(sorted_neurons):
+        if i >= Config.MAX_NEURONS:
+            break
+
+        if Config.SORT_METHOD in ['peak', 'calcium_wave']:
+            position = Config.MAX_NEURONS - i if i < Config.MAX_NEURONS else 1
+        else:
+            position = i + 1
+
+        y = trace_df[column].to_numpy(dtype=float) * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET
+        ax_trace.plot(
+            x_seconds,
+            y,
+            linewidth=Config.LINE_WIDTH,
+            alpha=Config.TRACE_ALPHA,
+            label=column
+        )
+
+        if peak_times_dict is not None and column in peak_times_dict:
+            peak_ts = peak_times_dict[column]
+            if isinstance(peak_ts, (int, float, np.integer, np.floating)):
+                peak_ts_int = int(peak_ts)
+            else:
+                peak_ts_int = peak_ts
+
+            if peak_ts_int in sorted_trace_data.index:
+                if peak_ts_int in trace_df.index:
+                    peak_time_sec = peak_ts_int / Config.SAMPLING_RATE
+                    ax_trace.scatter(
+                        peak_time_sec,
+                        trace_df.loc[peak_ts_int, column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
+                        color='red',
+                        s=30,
+                        zorder=3
+                    )
+
+    yticks = []
+    ytick_labels = []
+    for i, column in enumerate(sorted_neurons):
+        if i >= Config.MAX_NEURONS:
+            break
+        if Config.SORT_METHOD in ['peak', 'calcium_wave']:
+            position = Config.MAX_NEURONS - i if i < Config.MAX_NEURONS else 1
+        else:
+            position = i + 1
+        yticks.append(position * Config.TRACE_OFFSET)
+        ytick_labels.append(str(column))
+
+    ax_trace.set_yticks(yticks)
+    ax_trace.set_yticklabels(ytick_labels)
+
+    ax_trace.set_xlim(0, max(0, x_seconds.max() if len(x_seconds) else 0))
+
+    ax_trace.set_xlabel('Time (seconds)', fontsize=50, fontweight='bold')
+    if Config.SORT_METHOD == 'peak':
+        ylabel = 'Neuron ID (Sorted by Peak Time)'
+    elif Config.SORT_METHOD == 'calcium_wave':
+        ylabel = 'Neuron ID (Sorted by First Calcium Wave)'
+    elif Config.SORT_METHOD == 'custom':
+        ylabel = 'Neuron ID (Custom Order)'
+    else:
+        ylabel = 'Neuron ID'
+    ax_trace.set_ylabel(ylabel, fontsize=50, fontweight='bold')
+
+    ax_trace.tick_params(axis='x', labelsize=30, rotation=45)
+    ax_trace.tick_params(axis='y', labelsize=23)
+
+    ax_trace.grid(False)
+
+    ax_trace.set_title(title_text, fontsize=40, pad=20, fontweight='bold')
+
+    fig.canvas.draw()
+    for label in ax_trace.get_xticklabels():
+        label.set_fontweight('bold')
+    for label in ax_trace.get_yticklabels():
+        label.set_fontweight('bold')
+
+    return fig, ax_trace
 
 # 预定义颜色映射，与热图保持一致
 fixed_color_map = {
@@ -430,281 +581,15 @@ fixed_color_map = {
     'Tremble': '#8A2BE2'                # 蓝紫色 - 战栗/抖动(神经异常色)
 }
 
-# 绘制Trace图
-for i, column in enumerate(sorted_neurons):
-    if i >= Config.MAX_NEURONS:
-        break
-    
-    # 计算当前神经元trace的垂直偏移量，并应用缩放因子
-    # 根据排序方式调整位置
-    if Config.SORT_METHOD in ['peak', 'calcium_wave']:
-        # 对于峰值排序和钙波排序，使用反向位置（早期的在上方）
-        position = Config.MAX_NEURONS - i if i < Config.MAX_NEURONS else 1
-    else:
-        # 对于原始顺序和自定义顺序，使用正向位置
-        position = i + 1
-    
-    ax_trace.plot(
-        sorted_trace_data.index / Config.SAMPLING_RATE,  # x轴是时间(秒) = 时间戳 / 采样率
-        sorted_trace_data[column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,  # 应用缩放并偏移
-        linewidth=Config.LINE_WIDTH,
-        alpha=Config.TRACE_ALPHA,
-        label=column
-    )
-    
-    # # 如果是峰值排序或钙波排序，标记峰值点
-    # if peak_times_dict is not None and column in peak_times_dict:
-    #     peak_time = peak_times_dict[column] / Config.SAMPLING_RATE
-    #     ax_trace.scatter(
-    #         peak_time, 
-    #         sorted_trace_data.loc[peak_times_dict[column], column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
-    #         color='red', s=30, zorder=3  # zorder确保点在线的上方
-    #     )
+def safe_filename(text: str):
+    return ''.join(c if (c.isalnum() or c in ['-', '_', '.']) else '_' for c in str(text)).strip('_')
 
-    # 如果是峰值排序或钙波排序，标记峰值点
-    if peak_times_dict is not None and column in peak_times_dict:
-        peak_ts = peak_times_dict[column]
-        # 【关键修改】只有当峰值时间在当前显示的区间内时，才绘制红点
-        if peak_ts in sorted_trace_data.index:
-            peak_time_sec = peak_ts / Config.SAMPLING_RATE
-            ax_trace.scatter(
-                peak_time_sec, 
-                sorted_trace_data.loc[peak_ts, column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
-                color='red', s=30, zorder=3
-            )
 
-# 设置Y轴标签，简化显示格式
-total_positions = min(Config.MAX_NEURONS, len(sorted_neurons))
-yticks = []
-ytick_labels = []
+print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
 
-# 为每个trace计算正确的位置和标签
-for i, column in enumerate(sorted_neurons):
-    if i >= Config.MAX_NEURONS:
-        break
-    
-    # 计算位置 - 这需要与上面绘制时的position计算完全一致
-    if Config.SORT_METHOD in ['peak', 'calcium_wave']:
-        position = Config.MAX_NEURONS - i if i < Config.MAX_NEURONS else 1
-    else:
-        position = i + 1
-    
-    # 将位置和对应的标签添加到列表
-    yticks.append(position * Config.TRACE_OFFSET)
-    ytick_labels.append(str(column))
-
-# 设置Y轴刻度和标签
-ax_trace.set_yticks(yticks)
-ax_trace.set_yticklabels(ytick_labels)
-
-# 设置X轴范围
-if Config.STAMP_MIN is not None and Config.STAMP_MAX is not None:
-    min_seconds = Config.STAMP_MIN / Config.SAMPLING_RATE
-    max_seconds = Config.STAMP_MAX / Config.SAMPLING_RATE
-    # 确保起始时间不小于0
-    min_seconds = max(0, min_seconds)
-    ax_trace.set_xlim(min_seconds, max_seconds)
-else:
-    # 如果没有指定时间范围，从0开始显示
-    min_seconds = max(0, sorted_trace_data.index.min() / Config.SAMPLING_RATE)
-    max_seconds = sorted_trace_data.index.max() / Config.SAMPLING_RATE
-    ax_trace.set_xlim(min_seconds, max_seconds)
-
-# 设置轴标签和标题
-ax_trace.set_xlabel('Time (seconds)', fontsize=50, fontweight='bold')
-# 根据排序方式设置不同的Y轴标签
-if Config.SORT_METHOD == 'peak':
-    ylabel = 'Neuron ID (Sorted by Peak Time)'
-elif Config.SORT_METHOD == 'calcium_wave':
-    ylabel = 'Neuron ID (Sorted by First Calcium Wave)'
-elif Config.SORT_METHOD == 'custom':
-    ylabel = 'Neuron ID (Custom Order)'
-else:
-    ylabel = 'Neuron ID'
-ax_trace.set_ylabel(ylabel, fontsize=50, fontweight='bold')
-
-# 设置刻度标签字体大小
-ax_trace.tick_params(axis='x', labelsize=30, rotation=45)  # X轴刻度旋转45度
-ax_trace.tick_params(axis='y', labelsize=23)  # Y轴刻度字体大小改为23
-
-# 设置X轴刻度间隔为10秒
-import matplotlib.ticker as ticker
-ax_trace.xaxis.set_major_locator(ticker.MultipleLocator(10))
-
-# 添加网格线，使trace更容易阅读
-ax_trace.grid(False)
-
-# 处理行为区间数据
-behavior_intervals = {}
-unique_behaviors = []
-
-# 只有当behavior列存在时才处理行为标签
-if has_behavior:
-    # 获取所有不同的行为标签
-    unique_behaviors = behavior_data.dropna().unique()
-    
-    # 初始化所有行为的区间字典
-    for behavior in unique_behaviors:
-        behavior_intervals[behavior] = []
-    
-    # 对behavior_data进行处理，找出每种行为的连续区间
-    current_behavior = None
-    start_time = None
-    
-    # 为了确保最后一个区间也被记录，将索引列表扩展一个元素
-    extended_index = list(behavior_data.index) + [None]
-    extended_values = list(behavior_data.values) + [None]
-    
-    for i, (timestamp, behavior) in enumerate(zip(extended_index, extended_values)):
-        # 最后一个元素特殊处理
-        if i == len(behavior_data):
-            if start_time is not None and current_behavior is not None:
-                behavior_intervals[current_behavior].append((start_time / Config.SAMPLING_RATE, extended_index[i-1] / Config.SAMPLING_RATE))
-            break
-        
-        # 跳过空值
-        if pd.isna(behavior):
-            # 如果之前有行为，则结束当前区间
-            if start_time is not None and current_behavior is not None:
-                behavior_intervals[current_behavior].append((start_time / Config.SAMPLING_RATE, timestamp / Config.SAMPLING_RATE))
-                start_time = None
-                current_behavior = None
-            continue
-        
-        # 如果是新的行为类型或第一个行为
-        if behavior != current_behavior:
-            # 如果之前有行为，先结束当前区间
-            if start_time is not None and current_behavior is not None:
-                behavior_intervals[current_behavior].append((start_time / Config.SAMPLING_RATE, timestamp / Config.SAMPLING_RATE))
-            
-            # 开始新的行为区间
-            start_time = timestamp
-            current_behavior = behavior
-
-# 绘制行为标记（如果存在）
-if has_behavior and len(unique_behaviors) > 0:
-    # 创建图例补丁列表
-    legend_patches = []
-    
-    # 将所有行为绘制在同一条水平线上（与heatmap_sort-EM.py一致）
-    y_position = 0.5  # 固定的Y轴位置，居中
-    line_height = 0.8  # 线条的高度
-    
-    # 设置行为子图的Y轴范围，只显示一条线
-    ax_behavior.set_ylim(0, 1)
-    
-    # 移除Y轴刻度和标签
-    ax_behavior.set_yticks([])
-    ax_behavior.set_yticklabels([])
-    
-    # 特别重要：移除X轴刻度，让它只在trace图上显示
-    ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-    ax_behavior.set_title('Behavior Timeline', fontsize=40, pad=10)
-    ax_behavior.set_xlabel('')
-    
-    # 确保行为图和trace图水平对齐
-    ax_behavior.set_xlim(ax_trace.get_xlim())  # 确保与主图x轴范围一致
-    ax_behavior.set_anchor('SW')
-    
-    # 去除行为子图边框
-    ax_behavior.spines['top'].set_visible(False)
-    ax_behavior.spines['right'].set_visible(False)
-    ax_behavior.spines['bottom'].set_visible(False)
-    ax_behavior.spines['left'].set_visible(False)
-    
-    # 为每种行为绘制区间，都在同一水平线上
-    for behavior, intervals in behavior_intervals.items():
-        behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(list(unique_behaviors).index(behavior) % 10))
-        
-        for start_time, end_time in intervals:
-            # 如果区间有宽度
-            if end_time - start_time > 0:  
-                # 在行为标记子图中绘制区间
-                rect = plt.Rectangle(
-                    (start_time, y_position - line_height/2), 
-                    end_time - start_time, line_height, 
-                    color=behavior_color, alpha=0.9, 
-                    ec='black', linewidth=0.5  # 添加黑色边框以增强可见度
-                )
-                ax_behavior.add_patch(rect)
-                
-                # 在trace图中添加区间边界垂直线
-                # 使用垂直线表示行为区间开始和结束
-                ax_trace.axvline(x=start_time, color='white', linestyle='--', linewidth=0.8, alpha=0.7)
-                ax_trace.axvline(x=end_time, color='white', linestyle='--', linewidth=0.8, alpha=0.7)
-        
-        # 添加到图例
-        legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
-    
-    # 在单独的图例子图中添加图例（右侧）
-    ax_legend.axis('off')  # 隐藏图例子图的坐标轴
-    
-    # 计算图例的行数，垂直排列所有行为类型
-    num_behaviors = len(legend_patches)
-    
-    legend_fontsize = 40  # 设置您想要的字体大小
-    title_fontsize = 40   # 设置标题字体大小
-    
-    legend = ax_legend.legend(handles=legend_patches, loc='center left', fontsize=legend_fontsize, 
-                           title='Behavior Types', title_fontsize=title_fontsize, ncol=1,
-                           frameon=True, fancybox=True, shadow=True, bbox_to_anchor=(0, 0.5))
-
-# # 生成标题，包含排序方式和时间区间信息
-# title_text = f'Traces with Increased Amplitude ({sort_method_str})'
-# if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
-#     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else sorted_trace_data.index.min()
-#     max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else sorted_trace_data.index.max()
-#     min_seconds = min_stamp / Config.SAMPLING_RATE
-#     max_seconds = max_stamp / Config.SAMPLING_RATE
-#     title_text += f' (Time Range: {min_seconds:.2f}s - {max_seconds:.2f}s)'
-
-# # 添加标题
-# plt.suptitle(title_text, fontsize=40, y=0.98)
-
-# 调整布局（与heatmap_sort-EM.py保持一致）
-# 不使用tight_layout()，因为它与GridSpec布局不兼容
-# 使用精确的位置对齐方法
-if has_behavior:
-    # 强制更新布局
-    fig.canvas.draw()
-    
-    # 获取热图的实际边界位置
-    trace_bbox = ax_trace.get_position()
-    behavior_bbox = ax_behavior.get_position()
-    
-    # 使用Bbox的坐标创建新的位置
-    from matplotlib.transforms import Bbox
-    new_behavior_pos = Bbox([[trace_bbox.x0, behavior_bbox.y0], 
-                            [trace_bbox.x0 + trace_bbox.width, behavior_bbox.y0 + behavior_bbox.height]])
-    
-    # 设置新的位置
-    ax_behavior.set_position(new_behavior_pos)
-
-# 在布局调整完成后设置刻度标签加粗
-# 强制更新图形以确保所有刻度标签都已生成
-fig.canvas.draw()
-# 设置X轴刻度标签加粗
-for label in ax_trace.get_xticklabels():
-    label.set_fontweight('bold')
-# 设置Y轴刻度标签加粗  
-for label in ax_trace.get_yticklabels():
-    label.set_fontweight('bold')
-else:
-    # 没有行为数据的情况，也需要设置刻度标签加粗
-    # 强制更新图形以确保所有刻度标签都已生成
-    fig.canvas.draw()
-    # 设置X轴刻度标签加粗
-    for label in ax_trace.get_xticklabels():
-        label.set_fontweight('bold')
-    # 设置Y轴刻度标签加粗  
-    for label in ax_trace.get_yticklabels():
-        label.set_fontweight('bold')
-
-# 从输入文件路径中提取文件名（不包括路径和扩展名）
 input_filename = os.path.basename(Config.INPUT_FILE)
-input_filename = os.path.splitext(input_filename)[0]  # 去除扩展名
+input_filename = os.path.splitext(input_filename)[0]
 
-# 构建输出文件名：目录 + 前缀 + 排序方式 + 输入文件名 + 时间戳信息
 stamp_info = ''
 if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else sorted_trace_data.index.min()
@@ -713,34 +598,39 @@ if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
     max_seconds = max_stamp / Config.SAMPLING_RATE
     stamp_info = f'_{min_seconds:.2f}s_{max_seconds:.2f}s'
 
-# output_file = f"{Config.OUTPUT_DIR}traces_{Config.SORT_METHOD}_{input_filename}{stamp_info}.png"
-# print(f"正在保存图像到 {output_file}")
-
-# # 保存图像
-# plt.savefig(output_file, dpi=150)
-# print(f"图像已保存")
-
-# # 显示图像（可选，可以根据需要取消注释）
-# # plt.show()
-# print("程序执行完成")
-
-output_file = f"{Config.OUTPUT_DIR}traces_{Config.SORT_METHOD}_{input_filename}{stamp_info}.png"
-
-# === 【修改点 1】自动创建目录，防止报错 ===
-output_dir = os.path.dirname(output_file)
+output_dir = Config.OUTPUT_DIR
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
-# =======================================
 
-print(f"正在保存图像到 {output_file}")
+gap_stamps = 3
 
-# === 【修改点 2】关键修改：添加 bbox_inches='tight' 去除白边 ===
-# pad_inches=0.1 留一点点缝隙防止文字被切，dpi=150 保证清晰度且不超限
-plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.1)
-# ==========================================================
+if has_behavior and behavior_data is not None and behavior_data.dropna().unique().size > 0:
+    behavior_intervals_by_label = extract_behavior_intervals(behavior_data)
 
-print(f"图像已保存")
+    for behavior_label, intervals in behavior_intervals_by_label.items():
+        concat_trace, mapped_stamps = build_concatenated_trace(sorted_trace_data, intervals, gap_stamps=gap_stamps)
+        if concat_trace.empty:
+            continue
 
-# 显示图像（可选，可以根据需要取消注释）
-# plt.show()
-print("程序执行完成")
+        title_text = f'{behavior_label} | {sort_method_str} | gap={gap_stamps} stamps'
+        fig, _ = plot_trace_figure(concat_trace, sorted_neurons, peak_times_dict=None, title_text=title_text, mapped_stamps=mapped_stamps)
+
+        behavior_slug = safe_filename(behavior_label)
+        output_file = os.path.join(
+            output_dir,
+            f"traces_{Config.SORT_METHOD}_{input_filename}_{behavior_slug}{stamp_info}.png"
+        )
+        print(f"正在保存图像到 {output_file}")
+        plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.1)
+        plt.close(fig)
+
+    print("程序执行完成")
+else:
+    title_text = f'All Traces | {sort_method_str}'
+    fig, _ = plot_trace_figure(sorted_trace_data, sorted_neurons, peak_times_dict=peak_times_dict, title_text=title_text)
+
+    output_file = os.path.join(output_dir, f"traces_{Config.SORT_METHOD}_{input_filename}{stamp_info}.png")
+    print(f"正在保存图像到 {output_file}")
+    plt.savefig(output_file, dpi=150, bbox_inches='tight', pad_inches=0.1)
+    plt.close(fig)
+    print("程序执行完成")

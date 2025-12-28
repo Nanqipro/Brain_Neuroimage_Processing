@@ -17,7 +17,7 @@ class Config:
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 0  # 最小时间戳
+    STAMP_MIN = 9000  # 最小时间戳
     STAMP_MAX = 12495  # 最大时间戳
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
@@ -30,7 +30,7 @@ class Config:
     TRACE_ALPHA = 0.8   # trace线的透明度
     LINE_WIDTH = 2.0    # trace线的宽度
     # 采样率 (Hz)
-    SAMPLING_RATE = 4.8  # 采样频率，用于将时间戳转换为秒
+    SAMPLING_RATE = 9.02  # 采样频率，用于将时间戳转换为秒
     # 钙爆发检测参数
     CALCIUM_THRESHOLD = 2.0  # 标准差的倍数，超过此阈值视为钙爆发
     # 钙波检测参数（用于calcium_wave排序）
@@ -350,7 +350,7 @@ if has_behavior and behavior_data.dropna().unique().size > 0:
     ax_legend = fig.add_subplot(grid[1, 1])
 else:
     # 没有行为数据，只创建一个图表
-    fig = plt.figure(figsize=(60, 30))
+    fig = plt.figure(figsize=(200, 30))
     ax_trace = fig.add_subplot(111)
 
 # 预定义颜色映射，与热图保持一致

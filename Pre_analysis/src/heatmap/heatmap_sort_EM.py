@@ -18,13 +18,13 @@ class Config:
     OUTPUT_PREFIX = '../../graph/heatmap_sort-'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = 0  # 最小时间戳
-    STAMP_MAX = 2999  # 最大时间戳
+    STAMP_MAX = 12495  # 最大时间戳
     # 排序方式：'peak'（默认，按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
     CUSTOM_NEURON_ORDER = ['n53', 'n40', 'n29', 'n34', 'n4', 'n32', 'n25', 'n27', 'n22', 'n55', 'n21', 'n5', 'n19']
     # 采样率 (Hz)
-    SAMPLING_RATE = 4.8  # 采样频率，用于将时间戳转换为秒
+    SAMPLING_RATE = 9.02  # 采样频率，用于将时间戳转换为秒
     # 钙波检测参数
     CALCIUM_WAVE_THRESHOLD = 1.5  # 钙波阈值（标准差的倍数）
     MIN_PROMINENCE = 1.0  # 最小峰值突出度
@@ -294,7 +294,7 @@ if has_behavior:
 vmin, vmax = -2, 2  # 控制颜色对比度
 
 # 创建图形和轴，使用更高的高度比例和精确调整来确保对齐
-fig = plt.figure(figsize=(80, 30))
+fig = plt.figure(figsize=(200, 30))
 
 # 使用更精确的GridSpec布局系统
 # 修改为2行2列布局：左侧为行为线条和热图，右侧为图例
