@@ -16,7 +16,7 @@ from model import ImprovedGCN
 from process import load_data, oversample_data, compute_correlation_matrix, create_pyg_dataset, visualize_graph, enhance_balanced_dataset
 from train import train_model, evaluate_model, plot_confusion_matrix, plot_training_metrics, plot_learning_curve
 
-def setup_result_directory(input_file_path, min_samples=None):
+def setup_result_directory(input_file_path, min_samples=None, effect_threshold=None, effect_filter_mode=None):
     # 提取文件名（不含路径和扩展名）
     file_name = os.path.basename(input_file_path)
     file_name = os.path.splitext(file_name)[0]
@@ -27,7 +27,14 @@ def setup_result_directory(input_file_path, min_samples=None):
     
     # 添加时间戳以确保唯一性
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_dir = f"../results/{file_name}_{timestamp}"
+    suffix = ""
+    if effect_threshold is not None:
+        mode = str(effect_filter_mode or 'gt').lower()
+        if mode == 'lt':
+            suffix = f"_阈值{effect_threshold}_反向"
+        else:
+            suffix = f"_阈值{effect_threshold}"
+    result_dir = f"../results/{file_name}_{timestamp}{suffix}"
     
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
@@ -71,12 +78,14 @@ def main():
     parser.add_argument('--min_samples', type=int, default=50)
     parser.add_argument('--effect_size_file', type=str, default='../datasets/effect_sizes_no.29800930openfield_CellVideo0_corrected_0_cell_trace.csv')
     parser.add_argument('--effect_threshold', type=float, default=0.3)
+    parser.add_argument('--effect_filter_mode', type=str, default='gt', choices=['gt', 'lt'])
     args = parser.parse_args()
     data_file = args.data_file
     position_file = args.position_file
     min_samples = args.min_samples
     effect_size_file = args.effect_size_file
     effect_threshold = args.effect_threshold
+    effect_filter_mode = args.effect_filter_mode
     
     #  # 定义数据文件路径和最小样本数
     # data_file = '../datasets/no.2980240924openfield_CellVideo0_corrected_0_cell_trace.xlsx'
@@ -94,7 +103,12 @@ def main():
     
     
     # 使用数据文件名和最小样本数来设置结果目录
-    result_dir = setup_result_directory(data_file, min_samples)
+    result_dir = setup_result_directory(
+        data_file,
+        min_samples=min_samples,
+        effect_threshold=effect_threshold,
+        effect_filter_mode=effect_filter_mode
+    )
     print(f"结果将保存到: {result_dir}")
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -107,6 +121,7 @@ def main():
         f.write(f"最小样本数: {min_samples}\n")
         f.write(f"效应量文件: {effect_size_file}\n")
         f.write(f"效应量阈值: {effect_threshold}\n")
+        f.write(f"效应量筛选模式: {effect_filter_mode}\n")
         f.write(f"设备: {device}\n")
         f.write(f"随机种子: 42\n")
         f.write(f"训练开始时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -116,7 +131,8 @@ def main():
         data_file,
         min_samples=min_samples,
         effect_size_path=effect_size_file,
-        effect_threshold=effect_threshold
+        effect_threshold=effect_threshold,
+        effect_filter_mode=effect_filter_mode
     )
     
     # 使用增强的数据平衡方法处理不平衡数据

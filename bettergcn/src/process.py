@@ -17,7 +17,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 import os
 from tqdm import tqdm
 
-def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold=None):
+def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold=None, effect_filter_mode='gt'):
     # 根据文件扩展名决定使用哪种方法读取数据
     if data_path.endswith('.csv'):
         data = pd.read_csv(data_path)
@@ -85,6 +85,10 @@ def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold
     
     if effect_size_path is not None and effect_threshold is not None:
         try:
+            mode = str(effect_filter_mode or 'gt').lower()
+            if mode not in {'gt', 'lt'}:
+                raise ValueError(f"不支持的效应量筛选模式: {effect_filter_mode}，请使用 'gt' 或 'lt'")
+
             if effect_size_path.endswith('.csv'):
                 es_df = pd.read_csv(effect_size_path)
             elif effect_size_path.endswith('.xlsx') or effect_size_path.endswith('.xls'):
@@ -106,7 +110,10 @@ def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold
                 mask = np.zeros(mask_len, dtype=bool)
                 copy_len = min(len(es_vals), mask_len)
                 if copy_len > 0:
-                    mask[:copy_len] = es_vals[:copy_len] > float(effect_threshold)
+                    if mode == 'gt':
+                        mask[:copy_len] = es_vals[:copy_len] > float(effect_threshold)
+                    else:
+                        mask[:copy_len] = es_vals[:copy_len] < float(effect_threshold)
                 behavior_masks[beh] = mask
             
             masked_total = 0
@@ -117,7 +124,7 @@ def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold
                     inv = ~m
                     masked_total += int(inv.sum())
                     features_scaled[i, inv] = 0.0
-            print(f"已应用效应量阈值过滤 (阈值={effect_threshold})，累计掩蔽的特征数量: {masked_total}")
+            print(f"已应用效应量阈值过滤 (模式={mode}, 阈值={effect_threshold})，累计掩蔽的特征数量: {masked_total}")
         except Exception as e:
             print(f"应用效应量阈值过滤失败: {e}，继续使用未过滤特征")
 
