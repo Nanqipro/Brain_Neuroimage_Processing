@@ -1,0 +1,9 @@
+数据文件: ../datasets/bla6250EM0626goodtrace.xlsx
+神经元位置文件: ../datasets/6250_Max_position.csv
+最小样本数: 50
+效应量文件: ../datasets/effect_sizes_bla6250EM0626goodtrace.csv
+效应量阈值: 0.5
+效应量筛选模式: gt
+设备: cuda
+随机种子: 42
+训练开始时间: 2025-12-29 03:16:03
