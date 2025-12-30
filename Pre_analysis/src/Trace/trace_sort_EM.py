@@ -17,7 +17,7 @@ class Config:
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 9000  # 最小时间戳
+    STAMP_MIN = 0  # 最小时间戳
     STAMP_MAX = 12495  # 最大时间戳
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
@@ -31,6 +31,8 @@ class Config:
     LINE_WIDTH = 2.0    # trace线的宽度
     # 采样率 (Hz)
     SAMPLING_RATE = 9.02  # 采样频率，用于将时间戳转换为秒
+    # 横坐标单位：'stamp'（默认，使用原始stamp）或 'seconds'（stamp/采样率）
+    X_AXIS_UNIT = 'stamp'
     # 钙爆发检测参数
     CALCIUM_THRESHOLD = 2.0  # 标准差的倍数，超过此阈值视为钙爆发
     # 钙波检测参数（用于calcium_wave排序）
@@ -46,6 +48,8 @@ def parse_args():
     parser.add_argument('--output-dir', type=str, help='输出目录')
     parser.add_argument('--stamp-min', type=float, help='最小时间戳值')
     parser.add_argument('--stamp-max', type=float, help='最大时间戳值')
+    parser.add_argument('--x-unit', type=str, choices=['stamp', 'seconds'], default=Config.X_AXIS_UNIT,
+                        help="横坐标单位：stamp（原始时间戳）或 seconds（stamp/采样率）")
     parser.add_argument('--max-neurons', type=int, help='最大显示神经元数量')
     parser.add_argument('--scaling', type=float, help='信号振幅缩放因子')
     parser.add_argument('--sort-method', type=str, choices=['original', 'peak', 'calcium_wave', 'custom'], 
@@ -65,6 +69,8 @@ if args.stamp_min is not None:
     Config.STAMP_MIN = args.stamp_min
 if args.stamp_max is not None:
     Config.STAMP_MAX = args.stamp_max
+if args.x_unit:
+    Config.X_AXIS_UNIT = args.x_unit
 if args.max_neurons is not None:
     Config.MAX_NEURONS = args.max_neurons
 if args.scaling is not None:
@@ -340,9 +346,9 @@ else:
 
 # ===== 开始绘制Trace图 =====
 print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
-if has_behavior and behavior_data.dropna().unique().size > 0:
+if has_behavior:
     # 如果有行为数据，使用2行2列的布局，与热图保持一致
-    fig = plt.figure(figsize=(60, 30))
+    fig = plt.figure(figsize=(200, 30))
     # 使用GridSpec，与heatmap_sort-EM.py保持一致的布局
     grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
     ax_behavior = fig.add_subplot(grid[0, 0])
@@ -430,6 +436,13 @@ fixed_color_map = {
     'Tremble': '#8A2BE2'                # 蓝紫色 - 战栗/抖动(神经异常色)
 }
 
+def _stamp_to_x(stamp_value: float):
+    return stamp_value / Config.SAMPLING_RATE if Config.X_AXIS_UNIT == 'seconds' else stamp_value
+
+x_values = sorted_trace_data.index.to_numpy(dtype=float)
+if Config.X_AXIS_UNIT == 'seconds':
+    x_values = x_values / Config.SAMPLING_RATE
+
 # 绘制Trace图
 for i, column in enumerate(sorted_neurons):
     if i >= Config.MAX_NEURONS:
@@ -445,7 +458,7 @@ for i, column in enumerate(sorted_neurons):
         position = i + 1
     
     ax_trace.plot(
-        sorted_trace_data.index / Config.SAMPLING_RATE,  # x轴是时间(秒) = 时间戳 / 采样率
+        x_values,
         sorted_trace_data[column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,  # 应用缩放并偏移
         linewidth=Config.LINE_WIDTH,
         alpha=Config.TRACE_ALPHA,
@@ -466,9 +479,9 @@ for i, column in enumerate(sorted_neurons):
         peak_ts = peak_times_dict[column]
         # 【关键修改】只有当峰值时间在当前显示的区间内时，才绘制红点
         if peak_ts in sorted_trace_data.index:
-            peak_time_sec = peak_ts / Config.SAMPLING_RATE
+            peak_time_x = _stamp_to_x(peak_ts)
             ax_trace.scatter(
-                peak_time_sec, 
+                peak_time_x, 
                 sorted_trace_data.loc[peak_ts, column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
                 color='red', s=30, zorder=3
             )
@@ -499,19 +512,18 @@ ax_trace.set_yticklabels(ytick_labels)
 
 # 设置X轴范围
 if Config.STAMP_MIN is not None and Config.STAMP_MAX is not None:
-    min_seconds = Config.STAMP_MIN / Config.SAMPLING_RATE
-    max_seconds = Config.STAMP_MAX / Config.SAMPLING_RATE
-    # 确保起始时间不小于0
-    min_seconds = max(0, min_seconds)
-    ax_trace.set_xlim(min_seconds, max_seconds)
+    min_x = _stamp_to_x(Config.STAMP_MIN)
+    max_x = _stamp_to_x(Config.STAMP_MAX)
+    min_x = max(0, min_x)
+    ax_trace.set_xlim(min_x, max_x)
 else:
     # 如果没有指定时间范围，从0开始显示
-    min_seconds = max(0, sorted_trace_data.index.min() / Config.SAMPLING_RATE)
-    max_seconds = sorted_trace_data.index.max() / Config.SAMPLING_RATE
-    ax_trace.set_xlim(min_seconds, max_seconds)
+    min_x = max(0, _stamp_to_x(float(sorted_trace_data.index.min())))
+    max_x = _stamp_to_x(float(sorted_trace_data.index.max()))
+    ax_trace.set_xlim(min_x, max_x)
 
 # 设置轴标签和标题
-ax_trace.set_xlabel('Time (seconds)', fontsize=50, fontweight='bold')
+ax_trace.set_xlabel('stamp' if Config.X_AXIS_UNIT == 'stamp' else 'Time (seconds)', fontsize=50, fontweight='bold')
 # 根据排序方式设置不同的Y轴标签
 if Config.SORT_METHOD == 'peak':
     ylabel = 'Neuron ID (Sorted by Peak Time)'
@@ -529,7 +541,8 @@ ax_trace.tick_params(axis='y', labelsize=23)  # Y轴刻度字体大小改为23
 
 # 设置X轴刻度间隔为10秒
 import matplotlib.ticker as ticker
-ax_trace.xaxis.set_major_locator(ticker.MultipleLocator(10))
+tick_step = 10 if Config.X_AXIS_UNIT == 'seconds' else max(1, int(round(10 * Config.SAMPLING_RATE)))
+ax_trace.xaxis.set_major_locator(ticker.MultipleLocator(tick_step))
 
 # 添加网格线，使trace更容易阅读
 ax_trace.grid(False)
@@ -537,9 +550,12 @@ ax_trace.grid(False)
 # 处理行为区间数据
 behavior_intervals = {}
 unique_behaviors = []
+behavior_change_times = []
 
 # 只有当behavior列存在时才处理行为标签
 if has_behavior:
+    behavior_data = behavior_data.where(behavior_data.astype(str).str.strip().ne(''), np.nan)
+
     # 获取所有不同的行为标签
     unique_behaviors = behavior_data.dropna().unique()
     
@@ -559,14 +575,14 @@ if has_behavior:
         # 最后一个元素特殊处理
         if i == len(behavior_data):
             if start_time is not None and current_behavior is not None:
-                behavior_intervals[current_behavior].append((start_time / Config.SAMPLING_RATE, extended_index[i-1] / Config.SAMPLING_RATE))
+                behavior_intervals[current_behavior].append((_stamp_to_x(start_time), _stamp_to_x(extended_index[i-1])))
             break
         
         # 跳过空值
         if pd.isna(behavior):
             # 如果之前有行为，则结束当前区间
             if start_time is not None and current_behavior is not None:
-                behavior_intervals[current_behavior].append((start_time / Config.SAMPLING_RATE, timestamp / Config.SAMPLING_RATE))
+                behavior_intervals[current_behavior].append((_stamp_to_x(start_time), _stamp_to_x(timestamp)))
                 start_time = None
                 current_behavior = None
             continue
@@ -575,79 +591,76 @@ if has_behavior:
         if behavior != current_behavior:
             # 如果之前有行为，先结束当前区间
             if start_time is not None and current_behavior is not None:
-                behavior_intervals[current_behavior].append((start_time / Config.SAMPLING_RATE, timestamp / Config.SAMPLING_RATE))
+                behavior_intervals[current_behavior].append((_stamp_to_x(start_time), _stamp_to_x(timestamp)))
             
             # 开始新的行为区间
             start_time = timestamp
             current_behavior = behavior
 
-# 绘制行为标记（如果存在）
-if has_behavior and len(unique_behaviors) > 0:
-    # 创建图例补丁列表
-    legend_patches = []
-    
-    # 将所有行为绘制在同一条水平线上（与heatmap_sort-EM.py一致）
-    y_position = 0.5  # 固定的Y轴位置，居中
-    line_height = 0.8  # 线条的高度
-    
-    # 设置行为子图的Y轴范围，只显示一条线
+    aligned_behavior = behavior_data.reindex(sorted_trace_data.index)
+    filled_behavior = aligned_behavior.fillna('__MISSING__')
+    change_mask = filled_behavior.ne(filled_behavior.shift(1))
+    change_positions = [int(i) for i in np.where(change_mask.values)[0] if i != 0]
+    behavior_change_times = [_stamp_to_x(float(sorted_trace_data.index[i])) for i in change_positions]
+
+if has_behavior:
     ax_behavior.set_ylim(0, 1)
-    
-    # 移除Y轴刻度和标签
     ax_behavior.set_yticks([])
     ax_behavior.set_yticklabels([])
-    
-    # 特别重要：移除X轴刻度，让它只在trace图上显示
     ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
     ax_behavior.set_title('Behavior Timeline', fontsize=40, pad=10)
     ax_behavior.set_xlabel('')
-    
-    # 确保行为图和trace图水平对齐
-    ax_behavior.set_xlim(ax_trace.get_xlim())  # 确保与主图x轴范围一致
+    ax_behavior.set_xlim(ax_trace.get_xlim())
     ax_behavior.set_anchor('SW')
-    
-    # 去除行为子图边框
     ax_behavior.spines['top'].set_visible(False)
     ax_behavior.spines['right'].set_visible(False)
     ax_behavior.spines['bottom'].set_visible(False)
     ax_behavior.spines['left'].set_visible(False)
-    
-    # 为每种行为绘制区间，都在同一水平线上
-    for behavior, intervals in behavior_intervals.items():
-        behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(list(unique_behaviors).index(behavior) % 10))
-        
-        for start_time, end_time in intervals:
-            # 如果区间有宽度
-            if end_time - start_time > 0:  
-                # 在行为标记子图中绘制区间
-                rect = plt.Rectangle(
-                    (start_time, y_position - line_height/2), 
-                    end_time - start_time, line_height, 
-                    color=behavior_color, alpha=0.9, 
-                    ec='black', linewidth=0.5  # 添加黑色边框以增强可见度
-                )
-                ax_behavior.add_patch(rect)
-                
-                # 在trace图中添加区间边界垂直线
-                # 使用垂直线表示行为区间开始和结束
-                ax_trace.axvline(x=start_time, color='white', linestyle='--', linewidth=0.8, alpha=0.7)
-                ax_trace.axvline(x=end_time, color='white', linestyle='--', linewidth=0.8, alpha=0.7)
-        
-        # 添加到图例
-        legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
-    
-    # 在单独的图例子图中添加图例（右侧）
-    ax_legend.axis('off')  # 隐藏图例子图的坐标轴
-    
-    # 计算图例的行数，垂直排列所有行为类型
-    num_behaviors = len(legend_patches)
-    
-    legend_fontsize = 40  # 设置您想要的字体大小
-    title_fontsize = 40   # 设置标题字体大小
-    
-    legend = ax_legend.legend(handles=legend_patches, loc='center left', fontsize=legend_fontsize, 
-                           title='Behavior Types', title_fontsize=title_fontsize, ncol=1,
-                           frameon=True, fancybox=True, shadow=True, bbox_to_anchor=(0, 0.5))
+
+    for x in behavior_change_times:
+        ax_trace.axvline(x=x, color='black', linestyle='--', linewidth=2, alpha=0.8)
+        ax_behavior.axvline(x=x, color='black', linestyle='--', linewidth=2, alpha=0.8)
+
+    ax_legend.axis('off')
+
+    if len(unique_behaviors) > 0:
+        legend_patches = []
+        y_position = 0.5
+        line_height = 0.8
+
+        for behavior, intervals in behavior_intervals.items():
+            behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(list(unique_behaviors).index(behavior) % 10))
+
+            for start_time, end_time in intervals:
+                if end_time - start_time > 0:
+                    rect = plt.Rectangle(
+                        (start_time, y_position - line_height/2),
+                        end_time - start_time,
+                        line_height,
+                        color=behavior_color,
+                        alpha=0.9,
+                        ec='black',
+                        linewidth=0.5,
+                    )
+                    ax_behavior.add_patch(rect)
+
+            legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
+
+        legend_fontsize = 40
+        title_fontsize = 40
+
+        legend = ax_legend.legend(
+            handles=legend_patches,
+            loc='center left',
+            fontsize=legend_fontsize,
+            title='Behavior Types',
+            title_fontsize=title_fontsize,
+            ncol=1,
+            frameon=True,
+            fancybox=True,
+            shadow=True,
+            bbox_to_anchor=(0, 0.5),
+        )
 
 # # 生成标题，包含排序方式和时间区间信息
 # title_text = f'Traces with Increased Amplitude ({sort_method_str})'

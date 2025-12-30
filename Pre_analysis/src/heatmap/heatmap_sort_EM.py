@@ -17,7 +17,7 @@ class Config:
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort-'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 0  # 最小时间戳
+    STAMP_MIN = 9000  # 最小时间戳
     STAMP_MAX = 12495  # 最大时间戳
     # 排序方式：'peak'（默认，按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
@@ -25,6 +25,8 @@ class Config:
     CUSTOM_NEURON_ORDER = ['n53', 'n40', 'n29', 'n34', 'n4', 'n32', 'n25', 'n27', 'n22', 'n55', 'n21', 'n5', 'n19']
     # 采样率 (Hz)
     SAMPLING_RATE = 9.02  # 采样频率，用于将时间戳转换为秒
+    # 横坐标单位：'stamp'（默认，使用原始stamp）或 'seconds'（stamp/采样率）
+    X_AXIS_UNIT = 'stamp'
     # 钙波检测参数
     CALCIUM_WAVE_THRESHOLD = 1.5  # 钙波阈值（标准差的倍数）
     MIN_PROMINENCE = 1.0  # 最小峰值突出度
@@ -38,6 +40,8 @@ def parse_args():
     parser.add_argument('--output-prefix', type=str, help='输出文件名前缀')
     parser.add_argument('--stamp-min', type=float, help='最小时间戳值')
     parser.add_argument('--stamp-max', type=float, help='最大时间戳值')
+    parser.add_argument('--x-unit', type=str, choices=['stamp', 'seconds'], default=Config.X_AXIS_UNIT,
+                        help="横坐标单位：stamp（原始时间戳）或 seconds（stamp/采样率）")
     parser.add_argument('--sort-method', type=str, choices=['peak', 'calcium_wave', 'custom'], 
                         help='排序方式：peak（按峰值时间排序）、calcium_wave（按第一次真实钙波时间排序）或custom（按自定义顺序排序）')
     parser.add_argument('--ca-threshold', type=float, help='钙波检测阈值（标准差的倍数）')
@@ -54,6 +58,8 @@ if args.stamp_min is not None:
     Config.STAMP_MIN = args.stamp_min
 if args.stamp_max is not None:
     Config.STAMP_MAX = args.stamp_max
+if args.x_unit:
+    Config.X_AXIS_UNIT = args.x_unit
 if args.sort_method:
     Config.SORT_METHOD = args.sort_method
 if args.ca_threshold is not None:
@@ -239,9 +245,13 @@ sorted_day6_data = neural_data_interval_standardized[sorted_neurons]
 behavior_intervals = {}
 unique_behaviors = []
 global_unique_behaviors = []  # 全局行为类型
+behavior_change_positions = []
 
 # 只有当behavior列存在时才处理行为标签
 if has_behavior:
+    behavior_data_full = behavior_data_full.where(behavior_data_full.astype(str).str.strip().ne(''), np.nan)
+    frame_lost = frame_lost.where(frame_lost.astype(str).str.strip().ne(''), np.nan)
+
     # 获取全局数据中所有不同的行为标签（用于创建一致的图例）
     global_unique_behaviors = behavior_data_full.dropna().unique()
     print(f"全局行为类型: {list(global_unique_behaviors)}")
@@ -288,13 +298,18 @@ if has_behavior:
             start_time = timestamp
             current_behavior = behavior
 
+    aligned_behavior = frame_lost.reindex(sorted_day6_data.index)
+    filled_behavior = aligned_behavior.fillna('__MISSING__')
+    change_mask = filled_behavior.ne(filled_behavior.shift(1))
+    behavior_change_positions = [int(i) for i in np.where(change_mask.values)[0] if i != 0]
+
 # **步骤5：绘制热图并标注所有行为区间**
 
 # 设置绘图颜色范围
 vmin, vmax = -2, 2  # 控制颜色对比度
 
 # 创建图形和轴，使用更高的高度比例和精确调整来确保对齐
-fig = plt.figure(figsize=(200, 30))
+fig = plt.figure(figsize=(80, 30))
 
 # 使用更精确的GridSpec布局系统
 # 修改为2行2列布局：左侧为行为线条和热图，右侧为图例
@@ -323,6 +338,12 @@ ax_behavior.set_xlim(-0.5, len(sorted_day6_data.index) - 0.5)
 
 # 创建图例子图（右下角，与热图对齐）
 ax_legend = fig.add_subplot(grid[1, 1])
+
+if has_behavior and len(behavior_change_positions) > 0:
+    for pos in behavior_change_positions:
+        x = pos - 0.5
+        ax_heatmap.axvline(x=x, color='white', linestyle='--', linewidth=2, alpha=0.8)
+        ax_behavior.axvline(x=x, color='white', linestyle='--', linewidth=2, alpha=0.8)
 
 # 只有当behavior列存在时才添加行为标记
 if has_behavior and len(global_unique_behaviors) > 0:
@@ -497,6 +518,20 @@ if has_behavior and len(global_unique_behaviors) > 0:
                            title='Behavior Types', title_fontsize=title_fontsize, ncol=1,
                            frameon=True, fancybox=True, shadow=True, bbox_to_anchor=(0, 0.5))
 
+ax_behavior.set_ylim(0, 1)
+ax_behavior.set_yticks([])
+ax_behavior.set_yticklabels([])
+ax_behavior.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+ax_behavior.set_title('Behavior Timeline', fontsize=40, pad=10)
+ax_behavior.set_xlabel('')
+ax_behavior.set_anchor('SW')
+ax_behavior.spines['top'].set_visible(False)
+ax_behavior.spines['right'].set_visible(False)
+ax_behavior.spines['bottom'].set_visible(False)
+ax_behavior.spines['left'].set_visible(False)
+
+ax_legend.axis('off')
+
 # 在第426帧处添加白色虚线
 # 检查数据中是否有足够的时间戳
 if len(sorted_day6_data.index) > 426:
@@ -504,7 +539,7 @@ if len(sorted_day6_data.index) > 426:
     ax_heatmap.axvline(x=426 - 0.5, color='white', linestyle='--', linewidth=4)
 
 # 移除热图标题，直接设置轴标签
-ax_heatmap.set_xlabel('Time (s)', fontsize=40)      # 增大X轴标签字体
+ax_heatmap.set_xlabel('stamp' if Config.X_AXIS_UNIT == 'stamp' else 'Time (seconds)', fontsize=40)      # 增大X轴标签字体
 ax_heatmap.set_ylabel('neuron', fontsize=40)        # 增大Y轴标签字体
 
 # 修改Y轴标签（神经元标签）的字体大小和粗细，设置为水平方向
@@ -551,7 +586,10 @@ for t in time_ticks_seconds:
         # 获取在筛选后数据中的索引位置
         pos = sorted_day6_data.index.get_loc(timestamp)
         xtick_positions.append(pos)
-        xtick_labels.append(f'{int(t)}')
+        if Config.X_AXIS_UNIT == 'stamp':
+            xtick_labels.append(f'{int(round(timestamp))}')
+        else:
+            xtick_labels.append(f'{int(t)}')
 
 # 如果没有找到合适的刻度位置，使用默认方法
 if len(xtick_positions) == 0:
@@ -563,8 +601,11 @@ if len(xtick_positions) == 0:
     xtick_labels = []
     for pos in xtick_positions:
         timestamp = sorted_day6_data.index[pos]
-        seconds = timestamp / Config.SAMPLING_RATE
-        xtick_labels.append(f'{int(seconds)}')
+        if Config.X_AXIS_UNIT == 'stamp':
+            xtick_labels.append(f'{int(round(timestamp))}')
+        else:
+            seconds = timestamp / Config.SAMPLING_RATE
+            xtick_labels.append(f'{int(seconds)}')
 
 # 设置X轴刻度位置和标签
 ax_heatmap.set_xticks(xtick_positions)
