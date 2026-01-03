@@ -13,12 +13,12 @@ from scipy import stats
 # 可以根据需要修改默认值
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/5355homecage1107merge.xlsx'
+    INPUT_FILE = '../../datasets/NO5355homecage1111.xlsx'
     # 输出文件名前缀
     OUTPUT_PREFIX = '../../graph/heatmap_sort-'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 9000  # 最小时间戳
-    STAMP_MAX = 12495  # 最大时间戳
+    STAMP_MIN = 0  # 最小时间戳
+    STAMP_MAX = 19998  # 最大时间戳
     # 排序方式：'peak'（默认，按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
@@ -377,7 +377,7 @@ if has_behavior and len(global_unique_behaviors) > 0:
         'open-arm-freezing': '#006400',     # 深绿色 - 开放臂僵直
         'Open-arm-head dipping': '#7CFC00', # 草绿色 - 开放臂头部探测
         
-        # === 新增家庭笼行为标签 ===
+        # === 新增家庭笼行为标签 (通用) ===
         'Active': '#FF4500',                # 橙红色 - 活跃状态
         'Drink': '#1E90FF',                 # 道奇蓝 - 饮水
         'Move': '#32CD32',                  # 酸橙绿 - 移动
@@ -387,22 +387,40 @@ if has_behavior and len(global_unique_behaviors) > 0:
         'Wake': '#FFD700',                  # 金色 - 清醒
         'zone-out': '#708090',              # 石板灰 - 发呆状态
 
-        # === 新增：神经行为标签 (From Image) ===
-        'Digging': '#8B4513',               # 鞍褐色 - 挖掘行为（类似于土色）
+        # === [UPDATED] 严格匹配图片数据的标签 ===
+        # 1. 饮食饮水类
         'Drinking': '#1E90FF',              # 道奇蓝 - 通用饮水
-        'Drinking (Water)': '#4169E1',      # 皇家蓝 - 饮纯水
-        'Drinking_Quinine': '#5F9EA0',      # 军校蓝 - 饮奎宁（区别于普通水的苦味）
-        'Drinking_Sucrose': '#FF69B4',      # 热粉色 - 饮糖水（区别于水的奖励色）
-        'Feeding': '#228B22',               # 森林绿 - 进食
-        'Freezing': '#483D8B',              # 暗板岩蓝 - 冻结/僵直（深冷色调）
-        'Grooming': '#00CED1',              # 暗青色 - 理毛
-        'Grooming/Face Washing': '#40E0D0', # 绿松石 - 洗脸（理毛的变体）
-        'Quinine_Spray': '#FF0000',         # 纯红 - 奎宁喷射（突发刺激/警告色）
+        'Drinking Water': '#4169E1',        # 皇家蓝 - (修正：去除括号，匹配图片)
+        'Drinking Quinine': '#5F9EA0',      # 军校蓝 - (修正：去除下划线)
+        'Drinking Sucrose': '#FF69B4',      # 热粉色 - (修正：去除下划线)
+        'Eating Food': '#228B22',           # 森林绿 - (新增：匹配图片)
+        'Eating Seeds': '#32CD32',          # 酸橙绿 - (新增：匹配图片)
+        'Feeding': '#006400',               # 深绿色 - 进食
+
+        # 2. 垫料与探索类
+        'Digging': '#8B4513',               # 鞍褐色 - 通用挖掘
+        'Digging Bedding': '#800080',       # 紫色 - (新增：匹配图片)
+        'Digging Bedding/Finding Food': '#8B4513', # 鞍褐色 - (新增：匹配图片)
+        'Cotton Interaction': '#FFB6C1',    # 浅粉色 - (新增：玩棉花)
+        'Dropped Seed': '#778899',          # 亮石板灰 - (新增：瓜子掉了)
+
+        # 3. 清洁与休息类
+        'Grooming': '#00CED1',              # 暗青色
+        'Grooming/Face Wash': '#40E0D0',    # 绿松石 - (修正：Washing改为Wash)
+        'Resting': '#A0522D',               # 赭色 - (新增：匹配图片)
         'Scratching': '#D2691E',            # 巧克力色 - 抓挠
-        'Sniffing_Quinine': '#9ACD32',      # 黄绿色 - 嗅探
-        'Stand': '#FFD700',                 # 金色 - 站立
-        'StandClimbing': '#DAA520',         # 金麒麟色 - 站立攀爬
-        'Tremble': '#8A2BE2'                # 蓝紫色 - 战栗（这种颜色通常代表神经异常或高频动作）
+
+        # 4. 姿态与运动类
+        'Stand': '#FFD700',                 # 金色
+        'Stand/Climb': '#DAA520',           # 金麒麟色 - (修正：StandClimbing改为Stand/Climb)
+        'Freezing': '#483D8B',              # 暗板岩蓝
+        'Tremble': '#8A2BE2',               # 蓝紫色
+
+        # 5. 刺激与惊吓类 (Aversive)
+        'Sprayed by Water': '#FF4500',      # 橙红色 - (修正：Quinine_Spray改为图片中的标签)
+        'Startled by Water': '#800000',     # 栗色 - (新增：匹配图片)
+        'Sniffing_Quinine': '#9ACD32',      # 黄绿色
+        'Quinine_Spray': '#FF0000'          # 纯红 - 保留作为备用兼容
     }
     
     # 为全局行为类型创建颜色映射（确保图例一致性）

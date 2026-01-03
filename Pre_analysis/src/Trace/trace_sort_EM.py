@@ -13,12 +13,12 @@ plt.rcParams['lines.linewidth'] = 2.0  # 设置默认线宽
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/5355homecage1107merge.xlsx'
+    INPUT_FILE = '../../datasets/NO5355homecage1111.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 0  # 最小时间戳
-    STAMP_MAX = 12495  # 最大时间戳
+    STAMP_MIN = 18000  # 最小时间戳
+    STAMP_MAX = 19998  # 最大时间戳
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
@@ -377,7 +377,7 @@ fixed_color_map = {
     'Store-seeds': '#FF6666',           # 亮红色
     'Water': '#CC99FF',                 # 亮紫色
     
-    # === 新增配色选项 (通用行为库) ===
+    # === 通用行为库 ===
     'Rest': '#8B4513',                  # 深褐色
     'Sleep': '#2F4F4F',                 # 深灰绿色
     'Social': '#FF1493',                # 深粉色
@@ -392,7 +392,7 @@ fixed_color_map = {
     'Play': '#FFD700',                  # 金色
     'Sniffing': '#20B2AA',              # 浅海绿色
     'Licking': '#FF69B4',               # 热粉色
-    'Scratching': '#CD853F',            # 秘鲁色
+    'Scratching': '#CD853F',            # 秘鲁色 (对应图片 Image 3)
     'Stretching': '#4169E1',            # 皇家蓝
     'Turning': '#DA70D6',               # 兰花紫
     'Jumping': '#FF6347',               # 番茄色
@@ -410,30 +410,47 @@ fixed_color_map = {
     'Vocalization': '#6A5ACD',          # 石蓝色
     
     # === 高架十字迷宫行为标签 ===
-    'Close-arm': '#8B0000',             # 深红色 - 封闭臂
-    'Close-armed-Exp': '#CD5C5C',       # 印度红 - 封闭臂探索
-    'Closed-arm-freezing': '#2F2F2F',   # 深灰色 - 封闭臂僵直
-    'Middle-zone': '#FFD700',           # 金色 - 中央区域
-    'Middle-zone-freezing': '#B8860B',  # 深金黄色 - 中央区域僵直
-    'Open-arm': '#32CD32',              # 酸橙绿 - 开放臂
-    'Open-arm-exp': '#00FF7F',          # 春绿色 - 开放臂探索
-    'open-arm-freezing': '#006400',     # 深绿色 - 开放臂僵直
-    'Open-arm-head dipping': '#7CFC00', # 草绿色 - 开放臂头部探测
+    'Close-arm': '#8B0000',             # 深红色
+    'Close-armed-Exp': '#CD5C5C',       # 印度红
+    'Closed-arm-freezing': '#2F2F2F',   # 深灰色
+    'Middle-zone': '#FFD700',           # 金色
+    'Middle-zone-freezing': '#B8860B',  # 深金黄色
+    'Open-arm': '#32CD32',              # 酸橙绿
+    'Open-arm-exp': '#00FF7F',          # 春绿色
+    'open-arm-freezing': '#006400',     # 深绿色
+    'Open-arm-head dipping': '#7CFC00', # 草绿色
 
-    # === [NEW] 补充：来自图片数据集的特定行为标签 ===
-    # 包含了奎宁、糖水实验特有的行为定义，颜色选取尽量符合直觉
-    'Drinking': '#1E90FF',              # 道奇蓝 - 通用饮水
-    'Drinking (Water)': '#4169E1',      # 皇家蓝 - 明确的饮水行为(与Water区分)
-    'Drinking_Quinine': '#5F9EA0',      # 军校蓝 - 饮苦味剂(冷色调，示区别)
-    'Drinking_Sucrose': '#FF1493',      # 深粉色 - 饮糖水(奖励色，类似Licking)
-    'Feeding': '#228B22',               # 森林绿 - 进食(比Eat-feed稍亮)
-    'Grooming': '#00CED1',              # 暗青色 - 理毛(对应Image标签)
-    'Grooming/Face Washing': '#48D1CC', # 中绿松石 - 洗脸
-    'Quinine_Spray': '#FF4500',         # 橙红色 - 刺激/惩罚(警戒色)
-    'Sniffing_Quinine': '#9ACD32',      # 黄绿色 - 嗅探刺激物
-    'Stand': '#FFD700',                 # 金色 - 站立(与Play/Middle-zone近似但通用)
-    'StandClimbing': '#DAA520',         # 金麒麟色 - 站立攀爬
-    'Tremble': '#8A2BE2'                # 蓝紫色 - 战栗/抖动(神经异常色)
+    # === [UPDATED] 图片中的特定行为标签 (严格匹配字符串) ===
+    # 饮水/饮食类
+    'Drinking': '#1E90FF',              # 道奇蓝 - 通用
+    'Drinking Water': '#4169E1',        # 皇家蓝 - (Image 2)
+    'Drinking Quinine': '#5F9EA0',      # 军校蓝 - (Image 2) 冷色调表示厌恶/苦味
+    'Drinking Sucrose': '#FF1493',      # 深粉色 - (Image 2) 暖色调表示糖水/奖励
+    'Eating Food': '#228B22',           # 森林绿 - (Image 2)
+    'Eating Seeds': '#32CD32',          # 酸橙绿 - (Image 2) 与 Grab-seeds 同色系
+    'Feeding': '#006400',               # 深绿色 - (Image 2)
+    
+    # 垫料/探索类
+    'Digging Bedding': '#800080',       # 紫色 - (Image 2)
+    'Digging Bedding/Finding Food': '#8B4513', # 鞍褐色 - (Image 2) 混合了挖掘和寻找
+    'Cotton Interaction': '#FFB6C1',    # 浅粉色 - (Image 2) 玩棉花/筑巢，柔和色
+    'Dropped Seed': '#778899',          # 亮石板灰 - (Image 2) 意外事件，使用中性色
+    
+    # 清洁/休息类
+    'Grooming': '#00CED1',              # 暗青色 - (Image 2)
+    'Grooming/Face Wash': '#48D1CC',    # 中绿松石 - (Image 2) 与 Grooming 相近
+    'Resting': '#A0522D',               # 赭色 - (Image 2) 与 Rest 相近
+    
+    # 站立/运动类
+    'Stand': '#DAA520',                 # 金麒麟色 - (Image 3)
+    'Stand/Climb': '#B8860B',           # 暗金黄色 - (Image 3) 垂直运动
+    
+    # 刺激/惊吓类 (Aversive Events)
+    'Sprayed by Water': '#FF4500',      # 橙红色 - (Image 3) 突发刺激，警示色
+    'Startled by Water': '#800000',     #栗色 - (Image 3) 惊吓反应，深警示色
+    'Quinine_Spray': '#FF6347',         # 番茄色 - 补充：奎宁喷射
+    'Sniffing_Quinine': '#9ACD32',      # 黄绿色 - 补充：嗅探刺激物
+    'Tremble': '#8A2BE2'                # 蓝紫色 - 战栗
 }
 
 def _stamp_to_x(stamp_value: float):
