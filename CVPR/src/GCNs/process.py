@@ -139,6 +139,270 @@ def create_pyg_dataset(features, labels, correlation_matrix, threshold=0.4):
 
 
 # ============================================================================
+# 以下函数用于加载自定义图结构数据集（如random数据集）
+# ============================================================================
+
+def load_custom_graph_dataset(data_dir, feature_dim=16, num_classes=2, use_degree_feature=False):
+    """
+    【用于自定义图结构数据集】
+    从目录加载图数据集，支持多种格式
+    
+    支持的文件格式：
+    1. PyTorch格式 (.pt 或 .pth): 包含PyG Data对象列表
+    2. Pickle格式 (.pkl): 包含PyG Data对象列表
+    3. NetworkX格式 (.graphml): 每个文件一个图
+    4. 边列表格式 (无扩展名或.txt): 每行两个整数表示一条边
+    
+    目录结构示例：
+        data_dir/
+            graphs_list.pt  # PyTorch格式：包含所有图的列表
+        或
+        data_dir/
+            graph_0001_seed42  # 边列表格式（无扩展名）
+            graph_0002_seed43
+            ...
+        或
+        data_dir/
+            graph_0001_seed42.txt  # 边列表格式（.txt扩展名）
+            graph_0002_seed43.txt
+            ...
+    
+    Args:
+        data_dir: 数据集目录路径
+        feature_dim: 随机节点特征维度（仅用于边列表格式）
+        num_classes: 类别数（仅用于边列表格式）
+        use_degree_feature: 是否使用节点度数作为特征（仅用于边列表格式）
+    
+    Returns:
+        data_list: PyG Data对象列表
+        num_features: 节点特征维度
+        num_classes: 类别数
+    """
+    import os
+    import pickle
+    
+    data_dir = os.path.abspath(data_dir)
+    print(f"\n加载自定义图数据集: {data_dir}")
+    
+    # 方法1: 尝试加载单个PyTorch文件（包含所有图）
+    pt_files = ['graphs_list.pt', 'graphs.pt', 'dataset.pt', 'data.pt']
+    for pt_file in pt_files:
+        pt_path = os.path.join(data_dir, pt_file)
+        if os.path.exists(pt_path):
+            print(f"  - 从文件加载: {pt_file}")
+            data_list = torch.load(pt_path)
+            if isinstance(data_list, list) and len(data_list) > 0:
+                num_features = data_list[0].num_node_features
+                labels = [data.y.item() for data in data_list]
+                num_classes = len(set(labels))
+                
+                print(f"\n数据集信息:")
+                print(f"  - 图数量: {len(data_list)}")
+                print(f"  - 特征维度: {num_features}")
+                print(f"  - 类别数: {num_classes}")
+                print(f"  - 标签分布: {Counter(labels)}")
+                
+                return data_list, num_features, num_classes
+    
+    # 方法2: 尝试加载Pickle文件
+    pkl_files = ['graphs_list.pkl', 'graphs.pkl', 'dataset.pkl', 'data.pkl']
+    for pkl_file in pkl_files:
+        pkl_path = os.path.join(data_dir, pkl_file)
+        if os.path.exists(pkl_path):
+            print(f"  - 从文件加载: {pkl_file}")
+            with open(pkl_path, 'rb') as f:
+                data_list = pickle.load(f)
+            if isinstance(data_list, list) and len(data_list) > 0:
+                num_features = data_list[0].num_node_features
+                labels = [data.y.item() for data in data_list]
+                num_classes = len(set(labels))
+                
+                print(f"\n数据集信息:")
+                print(f"  - 图数量: {len(data_list)}")
+                print(f"  - 特征维度: {num_features}")
+                print(f"  - 类别数: {num_classes}")
+                print(f"  - 标签分布: {Counter(labels)}")
+                
+                return data_list, num_features, num_classes
+    
+    # 方法3: 尝试加载多个单独的.pt文件
+    graph_files = sorted([f for f in os.listdir(data_dir) if f.endswith('.pt') and f.startswith('graph_')])
+    if len(graph_files) > 0:
+        print(f"  - 找到 {len(graph_files)} 个单独的图文件")
+        data_list = []
+        for graph_file in graph_files:
+            graph_path = os.path.join(data_dir, graph_file)
+            graph_data = torch.load(graph_path)
+            data_list.append(graph_data)
+        
+        num_features = data_list[0].num_node_features
+        labels = [data.y.item() for data in data_list]
+        num_classes = len(set(labels))
+        
+        print(f"\n数据集信息:")
+        print(f"  - 图数量: {len(data_list)}")
+        print(f"  - 特征维度: {num_features}")
+        print(f"  - 类别数: {num_classes}")
+        print(f"  - 标签分布: {Counter(labels)}")
+        
+        return data_list, num_features, num_classes
+    
+    # 方法4: 尝试加载GraphML文件
+    graphml_files = sorted([f for f in os.listdir(data_dir) if f.endswith('.graphml')])
+    if len(graphml_files) > 0:
+        print(f"  - 找到 {len(graphml_files)} 个GraphML文件")
+        data_list = []
+        for graphml_file in graphml_files:
+            graphml_path = os.path.join(data_dir, graphml_file)
+            G = nx.read_graphml(graphml_path)
+            
+            # 转换为PyG格式
+            # 假设节点特征存储在节点属性'features'中，标签存储在图属性'label'中
+            x = torch.tensor([[float(G.nodes[n].get('feature', 0))] for n in G.nodes()], dtype=torch.float)
+            edge_index = torch.tensor([[int(e[0]), int(e[1])] for e in G.edges()], dtype=torch.long).t()
+            y = torch.tensor([int(G.graph.get('label', 0))], dtype=torch.long)
+            
+            data = Data(x=x, edge_index=edge_index, y=y)
+            data_list.append(data)
+        
+        num_features = data_list[0].num_node_features
+        labels = [data.y.item() for data in data_list]
+        num_classes = len(set(labels))
+        
+        print(f"\n数据集信息:")
+        print(f"  - 图数量: {len(data_list)}")
+        print(f"  - 特征维度: {num_features}")
+        print(f"  - 类别数: {num_classes}")
+        print(f"  - 标签分布: {Counter(labels)}")
+        
+        return data_list, num_features, num_classes
+    
+    # 方法5: 尝试加载边列表格式文件（如random数据集）
+    # 查找所有符合graph_*格式的文件（有或无.txt扩展名）
+    all_files = os.listdir(data_dir)
+    edge_list_files = sorted([f for f in all_files if f.startswith('graph_') and (not f.endswith('.pt') and not f.endswith('.pkl'))])
+    
+    if len(edge_list_files) > 0:
+        print(f"  - 找到 {len(edge_list_files)} 个边列表文件")
+        print(f"  - 使用{'节点度数' if use_degree_feature else f'{feature_dim}维随机'}特征")
+        print(f"  - 生成 {num_classes} 个类别的随机标签")
+        
+        data_list = []
+        np.random.seed(42)  # 固定随机种子以保证可重复性
+        
+        for idx, edge_file in enumerate(edge_list_files):
+            edge_path = os.path.join(data_dir, edge_file)
+            
+            try:
+                # 读取边列表
+                edges = []
+                with open(edge_path, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                src, dst = int(parts[0]), int(parts[1])
+                                edges.append([src, dst])
+                
+                if len(edges) == 0:
+                    continue
+                
+                # 转换为PyG格式
+                edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
+                
+                # 获取节点数量
+                num_nodes = int(edge_index.max().item()) + 1
+                
+                # 生成节点特征
+                if use_degree_feature:
+                    # 使用节点度数作为特征
+                    degrees = torch.zeros(num_nodes, dtype=torch.float)
+                    for i in range(edge_index.shape[1]):
+                        degrees[edge_index[0, i]] += 1
+                        degrees[edge_index[1, i]] += 1
+                    x = degrees.unsqueeze(1)  # (num_nodes, 1)
+                    actual_feature_dim = 1
+                else:
+                    # 使用随机特征
+                    x = torch.randn(num_nodes, feature_dim, dtype=torch.float)
+                    actual_feature_dim = feature_dim
+                
+                # 生成随机标签（基于图索引的哈希，确保一致性）
+                y = torch.tensor([idx % num_classes], dtype=torch.long)
+                
+                data = Data(x=x, edge_index=edge_index, y=y)
+                data_list.append(data)
+                
+            except Exception as e:
+                print(f"  警告: 跳过文件 {edge_file}: {e}")
+                continue
+        
+        if len(data_list) == 0:
+            raise ValueError(f"未能从 {data_dir} 中加载任何有效的图数据")
+        
+        num_features = data_list[0].num_node_features
+        labels = [data.y.item() for data in data_list]
+        actual_num_classes = len(set(labels))
+        
+        print(f"\n数据集信息:")
+        print(f"  - 图数量: {len(data_list)}")
+        print(f"  - 节点特征维度: {num_features}")
+        print(f"  - 类别数: {actual_num_classes}")
+        print(f"  - 标签分布: {Counter(labels)}")
+        print(f"  - 平均节点数: {np.mean([data.num_nodes for data in data_list]):.1f}")
+        print(f"  - 平均边数: {np.mean([data.num_edges for data in data_list]):.1f}")
+        
+        return data_list, num_features, actual_num_classes
+    
+    raise FileNotFoundError(
+        f"在目录 {data_dir} 中未找到有效的图数据集文件。\n"
+        f"支持的格式：\n"
+        f"  1. PyTorch格式: graphs_list.pt, graphs.pt, dataset.pt, data.pt\n"
+        f"  2. Pickle格式: graphs_list.pkl, graphs.pkl, dataset.pkl, data.pkl\n"
+        f"  3. 多文件格式: graph_0.pt, graph_1.pt, ...\n"
+        f"  4. GraphML格式: *.graphml\n"
+        f"  5. 边列表格式: graph_* (每行两个整数表示一条边)"
+    )
+
+
+def save_custom_graph_dataset(data_list, save_path, format='pt'):
+    """
+    【用于自定义图结构数据集】
+    保存PyG格式图数据集到文件
+    
+    Args:
+        data_list: PyG Data对象列表
+        save_path: 保存路径（文件或目录）
+        format: 保存格式 ('pt', 'pkl', 'separate')
+            - 'pt': 保存为单个PyTorch文件
+            - 'pkl': 保存为单个Pickle文件
+            - 'separate': 保存为多个单独的.pt文件
+    """
+    import os
+    import pickle
+    
+    os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else '.', exist_ok=True)
+    
+    if format == 'pt':
+        torch.save(data_list, save_path)
+        print(f"数据集已保存到: {save_path} (PyTorch格式)")
+    elif format == 'pkl':
+        with open(save_path, 'wb') as f:
+            pickle.dump(data_list, f)
+        print(f"数据集已保存到: {save_path} (Pickle格式)")
+    elif format == 'separate':
+        save_dir = save_path
+        os.makedirs(save_dir, exist_ok=True)
+        for i, data in enumerate(data_list):
+            graph_path = os.path.join(save_dir, f'graph_{i}.pt')
+            torch.save(data, graph_path)
+        print(f"数据集已保存到: {save_dir} ({len(data_list)}个单独文件)")
+    else:
+        raise ValueError(f"不支持的格式: {format}，请使用 'pt', 'pkl', 或 'separate'")
+
+
+# ============================================================================
 # 以下函数是通用的可视化工具，可以用于任何PyG图数据
 # ============================================================================
 
