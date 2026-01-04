@@ -309,7 +309,7 @@ if has_behavior:
 vmin, vmax = -2, 2  # 控制颜色对比度
 
 # 创建图形和轴，使用更高的高度比例和精确调整来确保对齐
-fig = plt.figure(figsize=(80, 30))
+fig = plt.figure(figsize=(200, 30))
 
 # 使用更精确的GridSpec布局系统
 # 修改为2行2列布局：左侧为行为线条和热图，右侧为图例
