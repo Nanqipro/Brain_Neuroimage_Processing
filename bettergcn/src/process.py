@@ -15,7 +15,6 @@ from scipy.stats import pearsonr
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import os
-from tqdm import tqdm
 
 def load_data(data_path, min_samples=50, effect_size_path=None, effect_threshold=None, effect_filter_mode='gt'):
     # 根据文件扩展名决定使用哪种方法读取数据
@@ -539,7 +538,7 @@ class VAE(nn.Module):
 
 # 使用GAN进行数据增强
 def augment_with_gan(features, labels, noise_dim=100, batch_size=32, epochs=50, 
-                   samples_per_class=None, device=None):
+                   samples_per_class=None, device=None, random_state=42):
     """
     使用GAN生成神经元数据样本
     
@@ -568,6 +567,11 @@ def augment_with_gan(features, labels, noise_dim=100, batch_size=32, epochs=50,
     """
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    if random_state is not None:
+        random_state = int(random_state)
+        np.random.seed(random_state)
+        torch.manual_seed(random_state)
     
     print(f"使用GAN进行数据增强，设备: {device}")
     
@@ -603,7 +607,7 @@ def augment_with_gan(features, labels, noise_dim=100, batch_size=32, epochs=50,
         # 如果样本太少，使用过采样增加训练数据
         if len(class_features) < 10:
             print(f"类别 {label} 的样本数量过少 ({len(class_features)})，使用SMOTE增加训练数据")
-            sm = SMOTE(random_state=42, k_neighbors=min(5, len(class_features)-1))
+            sm = SMOTE(random_state=random_state, k_neighbors=min(5, len(class_features)-1))
             try:
                 class_features_ext, _ = sm.fit_resample(
                     class_features, 
@@ -712,7 +716,7 @@ def augment_with_gan(features, labels, noise_dim=100, batch_size=32, epochs=50,
 
 # 使用VAE进行数据增强
 def augment_with_vae(features, labels, latent_dim=20, batch_size=32, epochs=50, 
-                   samples_per_class=None, device=None):
+                   samples_per_class=None, device=None, random_state=42):
     """
     使用VAE生成神经元数据样本
     
@@ -741,6 +745,11 @@ def augment_with_vae(features, labels, latent_dim=20, batch_size=32, epochs=50,
     """
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    if random_state is not None:
+        random_state = int(random_state)
+        np.random.seed(random_state)
+        torch.manual_seed(random_state)
     
     print(f"使用VAE进行数据增强，设备: {device}")
     
@@ -776,7 +785,7 @@ def augment_with_vae(features, labels, latent_dim=20, batch_size=32, epochs=50,
         # 如果样本太少，使用过采样增加训练数据
         if len(class_features) < 10:
             print(f"类别 {label} 的样本数量过少 ({len(class_features)})，使用SMOTE增加训练数据")
-            sm = SMOTE(random_state=42, k_neighbors=min(5, len(class_features)-1))
+            sm = SMOTE(random_state=random_state, k_neighbors=min(5, len(class_features)-1))
             try:
                 class_features_ext, _ = sm.fit_resample(
                     class_features, 
@@ -864,7 +873,7 @@ def augment_with_vae(features, labels, latent_dim=20, batch_size=32, epochs=50,
     return all_features, all_labels
 
 # 更新增强平衡数据集函数以包含GAN和VAE
-def enhance_balanced_dataset(features, labels, methods=None):
+def enhance_balanced_dataset(features, labels, methods=None, random_state=42):
     """
     使用多种数据增强方法组合处理不平衡数据集
     
@@ -893,6 +902,11 @@ def enhance_balanced_dataset(features, labels, methods=None):
     """
     if methods is None:
         methods = ['combined', 'timeseries']
+
+    if random_state is not None:
+        random_state = int(random_state)
+        np.random.seed(random_state)
+        torch.manual_seed(random_state)
     
     print("开始多步骤数据增强处理...")
     print(f"原始数据分布: {Counter(labels)}")
@@ -903,26 +917,31 @@ def enhance_balanced_dataset(features, labels, methods=None):
         if method == 'combined':
             # 使用组合重采样（下采样+过采样）
             current_features, current_labels = oversample_data(
-                current_features, current_labels, 
-                ramdom_state=42, method='combined'
+                current_features, current_labels,
+                ramdom_state=random_state, method='combined'
             )
         elif method == 'smote':
             # 使用标准SMOTE
             current_features, current_labels = oversample_data(
-                current_features, current_labels, 
-                ramdom_state=42, method='smote'
+                current_features, current_labels,
+                ramdom_state=random_state, method='smote'
             )
         elif method == 'borderline':
             # 使用边界SMOTE
             current_features, current_labels = oversample_data(
-                current_features, current_labels, 
-                ramdom_state=42, method='borderline_smote'
+                current_features, current_labels,
+                ramdom_state=random_state, method='borderline_smote'
             )
         elif method == 'adasyn':
             # 使用ADASYN
             current_features, current_labels = oversample_data(
-                current_features, current_labels, 
-                ramdom_state=42, method='adasyn'
+                current_features, current_labels,
+                ramdom_state=random_state, method='adasyn'
+            )
+        elif method == 'random_under':
+            current_features, current_labels = oversample_data(
+                current_features, current_labels,
+                ramdom_state=random_state, method='random_under'
             )
         elif method == 'noise':
             # 添加随机噪声
@@ -944,14 +963,16 @@ def enhance_balanced_dataset(features, labels, methods=None):
             current_features, current_labels = augment_with_gan(
                 current_features, current_labels,
                 epochs=100,  # 减少训练轮数以加快处理速度
-                batch_size=16
+                batch_size=16,
+                random_state=random_state
             )
         elif method == 'vae':
             # 使用VAE进行增强
             current_features, current_labels = augment_with_vae(
                 current_features, current_labels,
                 epochs=100,  # 减少训练轮数以加快处理速度
-                batch_size=16
+                batch_size=16,
+                random_state=random_state
             )
     
     print(f"最终增强后数据分布: {Counter(current_labels)}")
@@ -1023,7 +1044,7 @@ def create_pyg_dataset(features, labels, correlation_matrix, threshold=0.4):
     return data_list
     
 # 将生成的拓扑图可视化
-def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", result_dir='result', position_file=None):
+def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", result_dir='result', position_file=None, seed=42):
     plt.figure(figsize=(10, 10))
     graph_data = data[sample_index]
     G = nx.Graph()
@@ -1091,7 +1112,7 @@ def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", resul
                             temp_g.remove_node(node)
                         
                         if temp_g.number_of_nodes() > 0:
-                            temp_pos = nx.spring_layout(temp_g, seed=42)
+                            temp_pos = nx.spring_layout(temp_g, seed=seed)
                             # 合并两个位置字典
                             pos = {**position_map, **temp_pos}
                         else:
@@ -1103,20 +1124,20 @@ def visualize_graph(data, sample_index=0, title="Neuron Connection Graph", resul
                     print("缺失位置数据过多，使用布局算法")
                     try:
                         pos = nx.kamada_kawai_layout(G)
-                    except:
-                        pos = nx.spring_layout(G, seed=42)
+                    except Exception:
+                        pos = nx.spring_layout(G, seed=seed)
         except Exception as e:
             print(f"读取位置数据时出错：{e}，将使用布局算法")
             try:
                 pos = nx.kamada_kawai_layout(G)
-            except:
-                pos = nx.spring_layout(G, seed=42)
+            except Exception:
+                pos = nx.spring_layout(G, seed=seed)
     else:
         # 如果没有位置文件，使用布局算法
         try:
             pos = nx.kamada_kawai_layout(G)
-        except:
-            pos = nx.spring_layout(G, seed=42)
+        except Exception:
+            pos = nx.spring_layout(G, seed=seed)
 
     # 获取节点值以用于颜色映射
     node_values = [G.nodes[i]['value'] for i in range(len(G.nodes))]
