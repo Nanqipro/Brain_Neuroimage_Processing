@@ -1,0 +1,23 @@
+最小样本数阈值: 50
+效应量阈值: 0.0
+剩余标签数量: 7
+
+测试集准确率: 0.8092
+测试集精确率: 0.8250
+测试集召回率: 0.8092
+测试集F1分数: 0.7760
+
+分类报告:
+                         precision    recall  f1-score   support
+
+       Closed-Armed-Exp       0.93      1.00      0.96       356
+             Closed-arm       0.90      0.23      0.37       356
+            Middle-Zone       0.84      0.51      0.63       356
+Middle-Zone-to-Open-arm       0.83      1.00      0.91       356
+         Open-Armed-Exp       0.76      0.99      0.86       355
+               Open-arm       0.73      0.96      0.83       356
+         Open-arm-probe       0.79      0.98      0.87       355
+
+               accuracy                           0.81      2490
+              macro avg       0.82      0.81      0.78      2490
+           weighted avg       0.83      0.81      0.78      2490

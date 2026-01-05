@@ -1,0 +1,10 @@
+num_runs: 20
+initial_seed: 42
+train_ratio: 0.6
+val_ratio: 0.2
+test_ratio: 0.2
+run_init: prev_last
+accuracy: mean=0.804545, std=0.017556
+precision: mean=0.849343, std=0.042484
+recall: mean=0.804545, std=0.017556
+f1: mean=0.750795, std=0.022553
