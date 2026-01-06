@@ -1,0 +1,22 @@
+{
+  "effect_threshold": 0.5,
+  "effect_filter_mode": "gt",
+  "val_accuracy": 0.9642426677380475,
+  "val_precision_weighted": 0.9658593870657408,
+  "val_recall_weighted": 0.9642426677380475,
+  "val_f1_weighted": 0.9642154837980632
+}
+
+                         precision    recall  f1-score   support
+
+       Closed-Armed-Exp       1.00      1.00      1.00       355
+             Closed-arm       0.99      0.88      0.93       356
+            Middle-Zone       0.88      0.92      0.90       355
+Middle-Zone-to-Open-arm       1.00      0.98      0.99       356
+         Open-Armed-Exp       1.00      1.00      1.00       355
+               Open-arm       0.97      0.98      0.97       356
+         Open-arm-probe       0.92      1.00      0.96       356
+
+               accuracy                           0.96      2489
+              macro avg       0.97      0.96      0.96      2489
+           weighted avg       0.97      0.96      0.96      2489

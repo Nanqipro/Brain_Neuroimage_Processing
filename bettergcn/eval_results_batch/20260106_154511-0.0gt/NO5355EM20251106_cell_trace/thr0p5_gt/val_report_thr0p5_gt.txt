@@ -1,0 +1,19 @@
+{
+  "effect_threshold": 0.5,
+  "effect_filter_mode": "gt",
+  "val_accuracy": 0.25008732099196646,
+  "val_precision_weighted": 0.06254366812093887,
+  "val_recall_weighted": 0.25008732099196646,
+  "val_f1_weighted": 0.10006287892162502
+}
+
+              precision    recall  f1-score   support
+
+           G       0.25      1.00      0.40       716
+           M       0.00      0.00      0.00       715
+         Oth       0.00      0.00      0.00       716
+          ST       0.00      0.00      0.00       716
+
+    accuracy                           0.25      2863
+   macro avg       0.06      0.25      0.10      2863
+weighted avg       0.06      0.25      0.10      2863

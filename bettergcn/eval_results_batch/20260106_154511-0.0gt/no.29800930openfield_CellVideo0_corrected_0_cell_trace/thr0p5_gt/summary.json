@@ -1,0 +1,10 @@
+[
+  {
+    "effect_threshold": 0.5,
+    "effect_filter_mode": "gt",
+    "val_accuracy": 0.4997067448680352,
+    "val_precision_weighted": 0.5049400883408862,
+    "val_recall_weighted": 0.4997067448680352,
+    "val_f1_weighted": 0.4958380745822753
+  }
+]

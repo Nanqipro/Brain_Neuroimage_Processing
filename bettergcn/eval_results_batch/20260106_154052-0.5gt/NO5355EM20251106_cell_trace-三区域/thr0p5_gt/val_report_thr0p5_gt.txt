@@ -1,0 +1,18 @@
+{
+  "effect_threshold": 0.5,
+  "effect_filter_mode": "gt",
+  "val_accuracy": 0.9889397406559878,
+  "val_precision_weighted": 0.9892584375994187,
+  "val_recall_weighted": 0.9889397406559878,
+  "val_f1_weighted": 0.9889585095429989
+}
+
+              precision    recall  f1-score   support
+
+       Close       0.97      1.00      0.98       874
+      Middle       1.00      0.97      0.99       874
+        Open       1.00      1.00      1.00       874
+
+    accuracy                           0.99      2622
+   macro avg       0.99      0.99      0.99      2622
+weighted avg       0.99      0.99      0.99      2622
