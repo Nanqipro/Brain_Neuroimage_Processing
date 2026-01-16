@@ -1,0 +1,9 @@
+tensorflow
+nibabel
+h5py
+matplotlib
+numpy
+python-dateutil
+scipy
+tifffile
+tqdm
