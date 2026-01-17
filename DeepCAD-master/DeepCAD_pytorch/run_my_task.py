@@ -7,7 +7,9 @@ from pathlib import Path
 PROJECT_NAME = 'my_experiment'
 
 # 显卡编号
-GPU_ID = '0'
+GPU_ID = '0,1,2,3'
+
+BATCH_SIZE = '4'
 
 # 显存优化参数 (核心)
 # 默认是 128，但 8G 显存跑 3D 卷积容易崩，改成 64 非常安全且快
@@ -24,6 +26,9 @@ GAP_S = '60'
 
 # 训练轮数 (15轮通常足够去除雪花噪点)
 EPOCHS = '15'
+
+TEST_SAVE_ALL_PTH = False
+TEST_PTH_NAME = ''
 # ===================================================================
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -69,6 +74,7 @@ def run_training():
         f"--gap_h {GAP_H} --gap_w {GAP_W} --gap_s {GAP_S} "
         f"--n_epochs {EPOCHS} "
         f"--GPU {GPU_ID} "
+        f"--batch_size {BATCH_SIZE} "
         f"--train_datasets_size 4000 " # 提取多少个样本用于训练
         f"--select_img_num 10000"       # 限制读取的最大帧数
     )
@@ -82,6 +88,11 @@ def run_inference():
     print(f"🚀 [阶段 2/2] 开始使用模型去噪 (推理) ...")
     _ensure_dataset_ready()
     latest_model_dir = _get_latest_model_dir()
+    extra_args = ""
+    if TEST_SAVE_ALL_PTH:
+        extra_args += " --save_all_pth"
+    if TEST_PTH_NAME:
+        extra_args += f" --pth_name {TEST_PTH_NAME}"
     # 推理时使用同样的切片大小，防止 OOM
     cmd = (
         f"{_python()} test.py "
@@ -91,11 +102,14 @@ def run_inference():
         f"--datasets_folder {PROJECT_NAME} "
         f"--img_h {IMG_H} --img_w {IMG_W} --img_s {IMG_S} "
         f"--gap_h {GAP_H} --gap_w {GAP_W} --gap_s {GAP_S} "
-        f"--test_datasize 10000" # 这里设置你想要输出多少帧，设大一点没关系，它会自动截止
+        f"--GPU {GPU_ID} "
+        f"--batch_size {BATCH_SIZE} "
+        f"--test_datasize 10000 "
+        f"{extra_args}"
     )
     os.system(cmd)
     print(f"✅ 全部完成！去噪结果请在 results/{PROJECT_NAME} 中查看。")
 
 if __name__ == "__main__":
-    run_training()
+    # run_training()
     run_inference()

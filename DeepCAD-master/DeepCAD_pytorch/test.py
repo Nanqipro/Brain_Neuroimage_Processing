@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=100, help="number of training epochs")
 parser.add_argument('--cuda', action='store_true', help='use GPU computation')
-parser.add_argument('--GPU', type=int, default=0, help="the index of GPU you will use for computation")
+parser.add_argument('--GPU', type=str, default="0", help="GPU index(es), e.g. '0' or '0,1,2,3'")
 
 parser.add_argument('--batch_size', type=int, default=1, help="batch size")
 parser.add_argument('--img_s', type=int, default=150, help="the slices of image sequence")
@@ -42,6 +42,8 @@ parser.add_argument('--datasets_folder', type=str, default='DataForPytorch', hel
 parser.add_argument('--denoise_model', type=str, default='ModelForPytorch', help='A folder containing models to be tested')
 parser.add_argument('--test_datasize', type=int, default=6000, help='dataset size to be tested')
 parser.add_argument('--train_datasets_size', type=int, default=1000, help='datasets size for training')
+parser.add_argument('--save_all_pth', action='store_true', help='save results for every .pth in the model folder')
+parser.add_argument('--pth_name', type=str, default='', help='only run this .pth file name (e.g. G_15.pth)')
 
 opt = parser.parse_args()
 print('the parameter of your training ----->')
@@ -79,27 +81,68 @@ if not os.path.exists(output_path1):
 
 yaml_name = output_path1+'//para.yaml'
 save_yaml(opt, yaml_name)
-denoise_generator = Network_3D_Unet(in_channels = 1,
-                                    out_channels = 1,
-                                    final_sigmoid = True)
-if torch.cuda.is_available():
-    print('Using GPU.')
-for pth_index in range(len(model_list)):
-    aaa = model_list[pth_index]
-    if '.pth' in aaa:
-        pth_name = model_list[pth_index]
-        output_path = output_path1 + '//' + pth_name.replace('.pth','')
-        if not os.path.exists(output_path): 
-            os.mkdir(output_path)
-        denoise_generator.load_state_dict(torch.load(opt.pth_path+'//'+opt.denoise_model+'//'+pth_name))
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if device.type == "cuda":
+    visible_gpu_count = torch.cuda.device_count()
+    print(f'Using GPU. visible_gpu_count={visible_gpu_count}')
+else:
+    print('Using CPU.')
 
-        denoise_generator.cuda()
-        prev_time = time.time()
-        time_start=time.time()
-        denoise_img = np.zeros(noise_img.shape)
-        input_img = np.zeros(noise_img.shape)
-        for index in range(len(name_list)):
-            single_coordinate = coordinate_list[name_list[index]]
+def _load_state_dict_compat(model, state_dict):
+    try:
+        model.load_state_dict(state_dict)
+        return
+    except RuntimeError as e:
+        load_error = e
+
+    keys = list(state_dict.keys())
+    if not keys:
+        raise load_error
+
+    if keys[0].startswith("module."):
+        stripped = {k.replace("module.", "", 1): v for k, v in state_dict.items()}
+        model.load_state_dict(stripped)
+        return
+
+    raise load_error
+
+use_data_parallel = device.type == "cuda" and torch.cuda.device_count() > 1
+pth_files = [n for n in model_list if n.endswith('.pth')]
+if opt.pth_name:
+    selected_pth_files = [opt.pth_name]
+elif opt.save_all_pth:
+    selected_pth_files = pth_files
+else:
+    selected_pth_files = [
+        max(
+            pth_files,
+            key=lambda n: os.path.getmtime(os.path.join(model_path, n)),
+        )
+    ] if pth_files else []
+
+for pth_name in selected_pth_files:
+    output_path = output_path1 + '//' + pth_name.replace('.pth','')
+    if not os.path.exists(output_path): 
+        os.mkdir(output_path)
+    denoise_generator = Network_3D_Unet(in_channels = 1,
+                                        out_channels = 1,
+                                        final_sigmoid = True)
+    state_dict = torch.load(opt.pth_path+'//'+opt.denoise_model+'//'+pth_name, map_location='cpu')
+    _load_state_dict_compat(denoise_generator, state_dict)
+    denoise_generator = denoise_generator.to(device)
+    if use_data_parallel:
+        denoise_generator = nn.DataParallel(denoise_generator)
+    denoise_generator.eval()
+    prev_time = time.time()
+    time_start=time.time()
+    denoise_img = np.zeros(noise_img.shape)
+    input_img = np.zeros(noise_img.shape)
+    for index in range(0, len(name_list), opt.batch_size):
+        batch_names = name_list[index:index + opt.batch_size]
+        real_A_list = []
+        batch_coordinates = []
+        for n in batch_names:
+            single_coordinate = coordinate_list[n]
             init_h = single_coordinate['init_h']
             end_h = single_coordinate['end_h']
             init_w = single_coordinate['init_w']
@@ -107,35 +150,35 @@ for pth_index in range(len(model_list)):
             init_s = single_coordinate['init_s']
             end_s = single_coordinate['end_s']
             noise_patch = noise_img[init_s:end_s,init_h:end_h,init_w:end_w]
-            # print(noise_patch.shape)
-            real_A = torch.from_numpy(np.expand_dims(np.expand_dims(noise_patch, 3),0)).cuda()
-            # print('real_A -----> ',real_A.shape)
-            real_A = real_A.permute([0,4,1,2,3])
-            input_name = name_list[index]
-            print(' input_name -----> ',input_name)
-            print(' single_coordinate -----> ',single_coordinate)
-            print('real_A -----> ',real_A.shape)
-            real_A = Variable(real_A)
+            real_A_list.append(torch.from_numpy(noise_patch).unsqueeze(0).unsqueeze(0))
+            batch_coordinates.append(single_coordinate)
+
+        real_A = torch.cat(real_A_list, dim=0).to(device)
+        real_A = Variable(real_A)
+        with torch.no_grad():
             fake_B = denoise_generator(real_A)
-            ################################################################################################################
-            # Determine approximate time left
-            batches_done = index
-            batches_left = 1 * len(name_list) - batches_done
-            time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
-            prev_time = time.time()
-            prev_time = time.time()
-            ################################################################################################################
-            if index%1 == 0:
-                time_end=time.time()
-                time_cost=datetime.timedelta(seconds= (time_end - time_start))
-                sys.stdout.write("\r [Batch %d/%d] [Time Left: %s] [Time Cost: %s]"
-                % (index,
-                len(name_list),
-                time_left,
-                time_cost,))
-            ################################################################################################################
-            output_image = np.squeeze(fake_B.cpu().detach().numpy())
-            raw_image = np.squeeze(real_A.cpu().detach().numpy())
+        ################################################################################################################
+        # Determine approximate time left
+        samples_done = min(index + len(batch_names), len(name_list))
+        samples_left = len(name_list) - samples_done
+        time_left = datetime.timedelta(seconds=samples_left * (time.time() - prev_time))
+        prev_time = time.time()
+        prev_time = time.time()
+        ################################################################################################################
+        if index%1 == 0:
+            time_end=time.time()
+            time_cost=datetime.timedelta(seconds= (time_end - time_start))
+            sys.stdout.write("\r [Batch %d/%d] [Time Left: %s] [Time Cost: %s]"
+            % (index,
+            len(name_list),
+            time_left,
+            time_cost,))
+        ################################################################################################################
+        output_batch = fake_B.detach().cpu().numpy()
+        raw_batch = real_A.detach().cpu().numpy()
+        for b_i, single_coordinate in enumerate(batch_coordinates):
+            output_image = np.squeeze(output_batch[b_i])
+            raw_image = np.squeeze(raw_batch[b_i])
             stack_start_w = int(single_coordinate['stack_start_w'])
             stack_end_w = int(single_coordinate['stack_end_w'])
             patch_start_w = int(single_coordinate['patch_start_w'])
@@ -159,20 +202,19 @@ for pth_index in range(len(model_list)):
             input_img[stack_start_s:stack_end_s, stack_start_h:stack_end_h, stack_start_w:stack_end_w] \
             = raw_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]
 
-        # del noise_img
-        output_img = denoise_img.squeeze().astype(np.float32)*opt.normalize_factor
-        del denoise_img
-        # output_img = output_img1[0:raw_noise_img.shape[0],0:raw_noise_img.shape[1],0:raw_noise_img.shape[2]]
-        output_img = output_img-output_img.min()
-        output_img = output_img/output_img.max()*65535
-        output_img = np.clip(output_img, 0, 65535).astype('uint16')
-        output_img = output_img-output_img.min()
-        # output_img = output_img.astype('uint16')
-        input_img = input_img.squeeze().astype(np.float32)*opt.normalize_factor
-        # input_img = input_img1[0:raw_noise_img.shape[0],0:raw_noise_img.shape[1],0:raw_noise_img.shape[2]]
-        input_img = np.clip(input_img, 0, 65535).astype('uint16')
-        result_name = output_path + '//' +pth_name.replace('.pth','')+ '_output.tif'
-        input_name = output_path + '//' +pth_name.replace('.pth','')+ '_input.tif'
-        io.imsave(result_name, output_img)
-        io.imsave(input_name, input_img)
-
+    # del noise_img
+    output_img = denoise_img.squeeze().astype(np.float32)*opt.normalize_factor
+    del denoise_img
+    # output_img = output_img1[0:raw_noise_img.shape[0],0:raw_noise_img.shape[1],0:raw_noise_img.shape[2]]
+    output_img = output_img-output_img.min()
+    output_img = output_img/output_img.max()*65535
+    output_img = np.clip(output_img, 0, 65535).astype('uint16')
+    output_img = output_img-output_img.min()
+    # output_img = output_img.astype('uint16')
+    input_img = input_img.squeeze().astype(np.float32)*opt.normalize_factor
+    # input_img = input_img1[0:raw_noise_img.shape[0],0:raw_noise_img.shape[1],0:raw_noise_img.shape[2]]
+    input_img = np.clip(input_img, 0, 65535).astype('uint16')
+    result_name = output_path + '//' +pth_name.replace('.pth','')+ '_output.tif'
+    input_name = output_path + '//' +pth_name.replace('.pth','')+ '_input.tif'
+    io.imsave(result_name, output_img)
+    io.imsave(input_name, input_img)

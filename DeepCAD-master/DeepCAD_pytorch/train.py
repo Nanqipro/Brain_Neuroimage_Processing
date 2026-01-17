@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=100, help="number of training epochs")
 parser.add_argument('--cuda', action='store_true', help='use GPU computation')
-parser.add_argument('--GPU', type=int, default=0, help="the index of GPU you will use for computation")
+parser.add_argument('--GPU', type=str, default="0", help="GPU index(es), e.g. '0' or '0,1,2,3'")
 
 parser.add_argument('--batch_size', type=int, default=1, help="batch size")
 parser.add_argument('--img_s', type=int, default=150, help="the slices of image sequence")
@@ -72,11 +72,17 @@ L2_pixelwise = torch.nn.MSELoss()
 denoise_generator = Network_3D_Unet(in_channels = 1,
                                 out_channels = 1,
                                 final_sigmoid = True)
-if torch.cuda.is_available():
-    print('Using GPU.')
-    denoise_generator.cuda()
-    L2_pixelwise.cuda()
-    L1_pixelwise.cuda()
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if device.type == "cuda":
+    visible_gpu_count = torch.cuda.device_count()
+    print(f'Using GPU. visible_gpu_count={visible_gpu_count}')
+    denoise_generator = denoise_generator.to(device)
+    L2_pixelwise = L2_pixelwise.to(device)
+    L1_pixelwise = L1_pixelwise.to(device)
+    if visible_gpu_count > 1:
+        denoise_generator = nn.DataParallel(denoise_generator)
+else:
+    print('Using CPU.')
 ########################################################################################################################
 optimizer_G = torch.optim.Adam( denoise_generator.parameters(), 
                                 lr=opt.lr, betas=(opt.b1, opt.b2))
@@ -91,23 +97,26 @@ for epoch in range(opt.epoch, opt.n_epochs):
     name_list = shuffle_datasets_lessMemory(name_list)
     # print('name list -----> ',name_list)
     ####################################################################################################################     
-    for index in range(len(name_list)):
-        single_coordinate = coordinate_list[name_list[index]]
-        init_h = single_coordinate['init_h']
-        end_h = single_coordinate['end_h']
-        init_w = single_coordinate['init_w']
-        end_w = single_coordinate['end_w']
-        init_s = single_coordinate['init_s']
-        end_s = single_coordinate['end_s']
-        noise_patch1 = noise_img[init_s:end_s:2,init_h:end_h,init_w:end_w]
-        noise_patch2 = noise_img[init_s+1:end_s:2,init_h:end_h,init_w:end_w]
-        real_A = torch.from_numpy(np.expand_dims(np.expand_dims(noise_patch1, 3),0)).cuda()
-        real_A = real_A.permute([0,4,1,2,3])
-        real_B = torch.from_numpy(np.expand_dims(np.expand_dims(noise_patch2, 3),0)).cuda()
-        real_B = real_B.permute([0,4,1,2,3])
-        # print('real_A shape -----> ',real_A.shape)
-        # print('real_B shape -----> ',real_B.shape)
-        input_name = name_list[index]
+    for index in range(0, len(name_list), batch_size):
+        batch_names = name_list[index:index + batch_size]
+        real_A_list = []
+        real_B_list = []
+        for n in batch_names:
+            single_coordinate = coordinate_list[n]
+            init_h = single_coordinate['init_h']
+            end_h = single_coordinate['end_h']
+            init_w = single_coordinate['init_w']
+            end_w = single_coordinate['end_w']
+            init_s = single_coordinate['init_s']
+            end_s = single_coordinate['end_s']
+            noise_patch1 = noise_img[init_s:end_s:2,init_h:end_h,init_w:end_w]
+            noise_patch2 = noise_img[init_s+1:end_s:2,init_h:end_h,init_w:end_w]
+            real_A_list.append(torch.from_numpy(noise_patch1).unsqueeze(0).unsqueeze(0))
+            real_B_list.append(torch.from_numpy(noise_patch2).unsqueeze(0).unsqueeze(0))
+
+        real_A = torch.cat(real_A_list, dim=0).to(device)
+        real_B = torch.cat(real_B_list, dim=0).to(device)
+        input_name = batch_names[-1]
         real_A = Variable(real_A)
         fake_B = denoise_generator(real_A)
         # Pixel-wise loss
@@ -120,20 +129,20 @@ for epoch in range(opt.epoch, opt.n_epochs):
         Total_loss.backward()
         optimizer_G.step()
         ################################################################################################################
-        batches_done = epoch * len(name_list) + index
-        batches_left = opt.n_epochs * len(name_list) - batches_done
-        time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+        samples_done = epoch * len(name_list) + min(index + len(batch_names), len(name_list))
+        samples_left = opt.n_epochs * len(name_list) - samples_done
+        time_left = datetime.timedelta(seconds=samples_left * (time.time() - prev_time))
         prev_time = time.time()
         ################################################################################################################
-        if index%50 == 0:
+        if (index + len(batch_names)) % 50 == 0:
             time_end=time.time()
             print('time cost',time_end-time_start,'s \n')
             sys.stdout.write(
-            "\r[Epoch %d/%d] [Batch %d/%d] [Total loss: %f, L1 Loss: %f, L2 Loss: %f] ETA: %s"
+            "\r[Epoch %d/%d] [Sample %d/%d] [Total loss: %f, L1 Loss: %f, L2 Loss: %f] ETA: %s"
             % (
                 epoch,
                 opt.n_epochs,
-                index,
+                min(index + len(batch_names), len(name_list)),
                 len(name_list),
                 Total_loss.item(),
                 L1_loss.item(),
@@ -144,12 +153,13 @@ for epoch in range(opt.epoch, opt.n_epochs):
         ################################################################################################################
     # if (epoch+1)%1 == 0:
         # torch.save(denoise_generator.state_dict(), pth_path + '//G_' + str(epoch) + '.pth')
-        if (index+1)%300 == 0:
-            torch.save(denoise_generator.state_dict(), pth_path + '//G_' + str(epoch) +'_'+ str(index) + '.pth')
+        if (index + len(batch_names)) % 300 == 0:
+            model_to_save = denoise_generator.module if isinstance(denoise_generator, nn.DataParallel) else denoise_generator
+            torch.save(model_to_save.state_dict(), pth_path + '//G_' + str(epoch) +'_'+ str(index) + '.pth')
     if (epoch+1)%1 == 0:
-        output_img = fake_B.cpu().detach().numpy()
-        train_GT = real_B.cpu().detach().numpy()
-        train_input = real_A.cpu().detach().numpy()
+        output_img = fake_B[0:1].cpu().detach().numpy()
+        train_GT = real_B[0:1].cpu().detach().numpy()
+        train_input = real_A[0:1].cpu().detach().numpy()
         image_name = input_name
 
         train_input = train_input.squeeze().astype(np.float32)*opt.normalize_factor
@@ -166,4 +176,5 @@ for epoch in range(opt.epoch, opt.n_epochs):
         io.imsave(noise_img2_name, train_GT)
 
 
-torch.save(denoise_generator.state_dict(), pth_path +'//G_' + str(opt.n_epochs) + '.pth')
+model_to_save = denoise_generator.module if isinstance(denoise_generator, nn.DataParallel) else denoise_generator
+torch.save(model_to_save.state_dict(), pth_path +'//G_' + str(opt.n_epochs) + '.pth')
