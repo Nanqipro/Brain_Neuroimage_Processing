@@ -42,8 +42,6 @@ parser.add_argument('--datasets_folder', type=str, default='DataForPytorch', hel
 parser.add_argument('--denoise_model', type=str, default='ModelForPytorch', help='A folder containing models to be tested')
 parser.add_argument('--test_datasize', type=int, default=6000, help='dataset size to be tested')
 parser.add_argument('--train_datasets_size', type=int, default=1000, help='datasets size for training')
-parser.add_argument('--save_all_pth', action='store_true', help='save results for every .pth in the model folder')
-parser.add_argument('--pth_name', type=str, default='', help='only run this .pth file name (e.g. G_15.pth)')
 
 opt = parser.parse_args()
 print('the parameter of your training ----->')
@@ -107,114 +105,104 @@ def _load_state_dict_compat(model, state_dict):
     raise load_error
 
 use_data_parallel = device.type == "cuda" and torch.cuda.device_count() > 1
-pth_files = [n for n in model_list if n.endswith('.pth')]
-if opt.pth_name:
-    selected_pth_files = [opt.pth_name]
-elif opt.save_all_pth:
-    selected_pth_files = pth_files
-else:
-    selected_pth_files = [
-        max(
-            pth_files,
-            key=lambda n: os.path.getmtime(os.path.join(model_path, n)),
-        )
-    ] if pth_files else []
-
-for pth_name in selected_pth_files:
-    output_path = output_path1 + '//' + pth_name.replace('.pth','')
-    if not os.path.exists(output_path): 
-        os.mkdir(output_path)
-    denoise_generator = Network_3D_Unet(in_channels = 1,
-                                        out_channels = 1,
-                                        final_sigmoid = True)
-    state_dict = torch.load(opt.pth_path+'//'+opt.denoise_model+'//'+pth_name, map_location='cpu')
-    _load_state_dict_compat(denoise_generator, state_dict)
-    denoise_generator = denoise_generator.to(device)
-    if use_data_parallel:
-        denoise_generator = nn.DataParallel(denoise_generator)
-    denoise_generator.eval()
-    prev_time = time.time()
-    time_start=time.time()
-    denoise_img = np.zeros(noise_img.shape)
-    input_img = np.zeros(noise_img.shape)
-    for index in range(0, len(name_list), opt.batch_size):
-        batch_names = name_list[index:index + opt.batch_size]
-        real_A_list = []
-        batch_coordinates = []
-        for n in batch_names:
-            single_coordinate = coordinate_list[n]
-            init_h = single_coordinate['init_h']
-            end_h = single_coordinate['end_h']
-            init_w = single_coordinate['init_w']
-            end_w = single_coordinate['end_w']
-            init_s = single_coordinate['init_s']
-            end_s = single_coordinate['end_s']
-            noise_patch = noise_img[init_s:end_s,init_h:end_h,init_w:end_w]
-            real_A_list.append(torch.from_numpy(noise_patch).unsqueeze(0).unsqueeze(0))
-            batch_coordinates.append(single_coordinate)
-
-        real_A = torch.cat(real_A_list, dim=0).to(device)
-        real_A = Variable(real_A)
-        with torch.no_grad():
-            fake_B = denoise_generator(real_A)
-        ################################################################################################################
-        # Determine approximate time left
-        samples_done = min(index + len(batch_names), len(name_list))
-        samples_left = len(name_list) - samples_done
-        time_left = datetime.timedelta(seconds=samples_left * (time.time() - prev_time))
+for pth_index in range(len(model_list)):
+    aaa = model_list[pth_index]
+    if '.pth' in aaa:
+        pth_name = model_list[pth_index]
+        output_path = output_path1 + '//' + pth_name.replace('.pth','')
+        if not os.path.exists(output_path): 
+            os.mkdir(output_path)
+        denoise_generator = Network_3D_Unet(in_channels = 1,
+                                            out_channels = 1,
+                                            final_sigmoid = True)
+        state_dict = torch.load(opt.pth_path+'//'+opt.denoise_model+'//'+pth_name, map_location='cpu')
+        _load_state_dict_compat(denoise_generator, state_dict)
+        denoise_generator = denoise_generator.to(device)
+        if use_data_parallel:
+            denoise_generator = nn.DataParallel(denoise_generator)
+        denoise_generator.eval()
         prev_time = time.time()
-        prev_time = time.time()
-        ################################################################################################################
-        if index%1 == 0:
-            time_end=time.time()
-            time_cost=datetime.timedelta(seconds= (time_end - time_start))
-            sys.stdout.write("\r [Batch %d/%d] [Time Left: %s] [Time Cost: %s]"
-            % (index,
-            len(name_list),
-            time_left,
-            time_cost,))
-        ################################################################################################################
-        output_batch = fake_B.detach().cpu().numpy()
-        raw_batch = real_A.detach().cpu().numpy()
-        for b_i, single_coordinate in enumerate(batch_coordinates):
-            output_image = np.squeeze(output_batch[b_i])
-            raw_image = np.squeeze(raw_batch[b_i])
-            stack_start_w = int(single_coordinate['stack_start_w'])
-            stack_end_w = int(single_coordinate['stack_end_w'])
-            patch_start_w = int(single_coordinate['patch_start_w'])
-            patch_end_w = int(single_coordinate['patch_end_w'])
+        time_start=time.time()
+        denoise_img = np.zeros(noise_img.shape)
+        input_img = np.zeros(noise_img.shape)
+        for index in range(0, len(name_list), opt.batch_size):
+            batch_names = name_list[index:index + opt.batch_size]
+            real_A_list = []
+            batch_coordinates = []
+            for n in batch_names:
+                single_coordinate = coordinate_list[n]
+                init_h = single_coordinate['init_h']
+                end_h = single_coordinate['end_h']
+                init_w = single_coordinate['init_w']
+                end_w = single_coordinate['end_w']
+                init_s = single_coordinate['init_s']
+                end_s = single_coordinate['end_s']
+                noise_patch = noise_img[init_s:end_s,init_h:end_h,init_w:end_w]
+                real_A_list.append(torch.from_numpy(noise_patch).unsqueeze(0).unsqueeze(0))
+                batch_coordinates.append(single_coordinate)
 
-            stack_start_h = int(single_coordinate['stack_start_h'])
-            stack_end_h = int(single_coordinate['stack_end_h'])
-            patch_start_h = int(single_coordinate['patch_start_h'])
-            patch_end_h = int(single_coordinate['patch_end_h'])
+            real_A = torch.cat(real_A_list, dim=0).to(device)
+            real_A = Variable(real_A)
+            with torch.no_grad():
+                fake_B = denoise_generator(real_A)
+            ################################################################################################################
+            # Determine approximate time left
+            samples_done = min(index + len(batch_names), len(name_list))
+            samples_left = len(name_list) - samples_done
+            time_left = datetime.timedelta(seconds=samples_left * (time.time() - prev_time))
+            prev_time = time.time()
+            prev_time = time.time()
+            ################################################################################################################
+            if index%1 == 0:
+                time_end=time.time()
+                time_cost=datetime.timedelta(seconds= (time_end - time_start))
+                sys.stdout.write("\r [Batch %d/%d] [Time Left: %s] [Time Cost: %s]"
+                % (index,
+                len(name_list),
+                time_left,
+                time_cost,))
+            ################################################################################################################
+            output_batch = fake_B.detach().cpu().numpy()
+            raw_batch = real_A.detach().cpu().numpy()
+            for b_i, single_coordinate in enumerate(batch_coordinates):
+                output_image = np.squeeze(output_batch[b_i])
+                raw_image = np.squeeze(raw_batch[b_i])
+                stack_start_w = int(single_coordinate['stack_start_w'])
+                stack_end_w = int(single_coordinate['stack_end_w'])
+                patch_start_w = int(single_coordinate['patch_start_w'])
+                patch_end_w = int(single_coordinate['patch_end_w'])
 
-            stack_start_s = int(single_coordinate['stack_start_s'])
-            stack_end_s = int(single_coordinate['stack_end_s'])
-            patch_start_s = int(single_coordinate['patch_start_s'])
-            patch_end_s = int(single_coordinate['patch_end_s'])
+                stack_start_h = int(single_coordinate['stack_start_h'])
+                stack_end_h = int(single_coordinate['stack_end_h'])
+                patch_start_h = int(single_coordinate['patch_start_h'])
+                patch_end_h = int(single_coordinate['patch_end_h'])
 
-            aaaa = output_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]
-            bbbb = raw_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]
+                stack_start_s = int(single_coordinate['stack_start_s'])
+                stack_end_s = int(single_coordinate['stack_end_s'])
+                patch_start_s = int(single_coordinate['patch_start_s'])
+                patch_end_s = int(single_coordinate['patch_end_s'])
 
-            denoise_img[stack_start_s:stack_end_s, stack_start_h:stack_end_h, stack_start_w:stack_end_w] \
-            = output_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]*(np.sum(bbbb)/np.sum(aaaa))**0.5
-            input_img[stack_start_s:stack_end_s, stack_start_h:stack_end_h, stack_start_w:stack_end_w] \
-            = raw_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]
+                aaaa = output_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]
+                bbbb = raw_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]
 
-    # del noise_img
-    output_img = denoise_img.squeeze().astype(np.float32)*opt.normalize_factor
-    del denoise_img
-    # output_img = output_img1[0:raw_noise_img.shape[0],0:raw_noise_img.shape[1],0:raw_noise_img.shape[2]]
-    output_img = output_img-output_img.min()
-    output_img = output_img/output_img.max()*65535
-    output_img = np.clip(output_img, 0, 65535).astype('uint16')
-    output_img = output_img-output_img.min()
-    # output_img = output_img.astype('uint16')
-    input_img = input_img.squeeze().astype(np.float32)*opt.normalize_factor
-    # input_img = input_img1[0:raw_noise_img.shape[0],0:raw_noise_img.shape[1],0:raw_noise_img.shape[2]]
-    input_img = np.clip(input_img, 0, 65535).astype('uint16')
-    result_name = output_path + '//' +pth_name.replace('.pth','')+ '_output.tif'
-    input_name = output_path + '//' +pth_name.replace('.pth','')+ '_input.tif'
-    io.imsave(result_name, output_img)
-    io.imsave(input_name, input_img)
+                denoise_img[stack_start_s:stack_end_s, stack_start_h:stack_end_h, stack_start_w:stack_end_w] \
+                = output_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]*(np.sum(bbbb)/np.sum(aaaa))**0.5
+                input_img[stack_start_s:stack_end_s, stack_start_h:stack_end_h, stack_start_w:stack_end_w] \
+                = raw_image[patch_start_s:patch_end_s, patch_start_h:patch_end_h, patch_start_w:patch_end_w]
+
+        # del noise_img
+        output_img = denoise_img.squeeze().astype(np.float32)*opt.normalize_factor
+        del denoise_img
+        # output_img = output_img1[0:raw_noise_img.shape[0],0:raw_noise_img.shape[1],0:raw_noise_img.shape[2]]
+        output_img = output_img-output_img.min()
+        output_img = output_img/output_img.max()*65535
+        output_img = np.clip(output_img, 0, 65535).astype('uint16')
+        output_img = output_img-output_img.min()
+        # output_img = output_img.astype('uint16')
+        input_img = input_img.squeeze().astype(np.float32)*opt.normalize_factor
+        # input_img = input_img1[0:raw_noise_img.shape[0],0:raw_noise_img.shape[1],0:raw_noise_img.shape[2]]
+        input_img = np.clip(input_img, 0, 65535).astype('uint16')
+        result_name = output_path + '//' +pth_name.replace('.pth','')+ '_output.tif'
+        input_name = output_path + '//' +pth_name.replace('.pth','')+ '_input.tif'
+        io.imsave(result_name, output_img)
+        io.imsave(input_name, input_img)

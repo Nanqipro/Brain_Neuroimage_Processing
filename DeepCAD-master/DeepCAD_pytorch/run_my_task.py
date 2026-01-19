@@ -1,16 +1,10 @@
 import os
 import sys
 from pathlib import Path
-import numpy as np
-from skimage import io
-import tifffile as tiff
 
 # ================= 配置区域 (针对 RTX 4060 8G 优化) =================
 # 项目名称 (对应 datasets 下的文件夹名)
 PROJECT_NAME = 'my_experiment'
-DATASETS_FOLDER = 'single_img'
-MODEL_PREFIX = PROJECT_NAME
-DENOISE_MODEL_DIR = ''
 
 # 显卡编号
 GPU_ID = '0,1,2,3'
@@ -35,9 +29,6 @@ EPOCHS = '15'
 
 TEST_SAVE_ALL_PTH = False
 TEST_PTH_NAME = ''
-
-SINGLE_IMAGE_PATH = './datasets/images/test.jpg'
-SINGLE_IMAGE_STACK_NAME = 'single_image_stack.tif'
 # ===================================================================
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -50,7 +41,7 @@ def _python() -> str:
 
 
 def _ensure_dataset_ready() -> None:
-    project_dir = DATASETS_PATH / DATASETS_FOLDER
+    project_dir = DATASETS_PATH / PROJECT_NAME
     if not project_dir.exists():
         raise FileNotFoundError(f"找不到数据目录: {project_dir}")
     tif_files = sorted(list(project_dir.glob("*.tif")) + list(project_dir.glob("*.tiff")))
@@ -58,61 +49,27 @@ def _ensure_dataset_ready() -> None:
         raise FileNotFoundError(f"数据目录下未找到 .tif/.tiff 文件: {project_dir}")
 
 
-def _prepare_single_image_stack() -> None:
-    if not SINGLE_IMAGE_PATH:
-        return
-    src = Path(SINGLE_IMAGE_PATH).expanduser()
-    if not src.exists():
-        raise FileNotFoundError(f"找不到图片: {src}")
-    project_dir = DATASETS_PATH / DATASETS_FOLDER
-    project_dir.mkdir(parents=True, exist_ok=True)
-
-    img = io.imread(str(src))
-    if img.ndim == 3:
-        img = img.mean(axis=2)
-    if img.ndim != 2:
-        raise ValueError(f"不支持的图片维度: {img.shape}")
-
-    img = img.astype(np.float32)
-    img = img - float(np.min(img))
-    max_v = float(np.max(img))
-    if max_v > 0:
-        img = img / max_v
-    img16 = np.clip(img * 65535.0, 0, 65535).astype(np.uint16)
-    stack = np.repeat(img16[None, ...], int(IMG_S), axis=0)
-
-    dst = project_dir / SINGLE_IMAGE_STACK_NAME
-    tiff.imwrite(str(dst), stack)
-
-
-
 def _get_latest_model_dir() -> Path:
-    if DENOISE_MODEL_DIR:
-        p = PTH_PATH / DENOISE_MODEL_DIR
-        if not p.exists():
-            raise FileNotFoundError(f"找不到模型文件夹: {p}")
-        return p
     if not PTH_PATH.exists():
         raise FileNotFoundError(f"找不到模型目录: {PTH_PATH}")
     candidates = [
         p for p in PTH_PATH.iterdir()
-        if p.is_dir() and p.name.startswith(f"{MODEL_PREFIX}_")
+        if p.is_dir() and p.name.startswith(f"{PROJECT_NAME}_")
     ]
     if not candidates:
         raise FileNotFoundError(
-            f"未找到训练输出的模型文件夹（期望位于 {PTH_PATH}/ 下，且以 {MODEL_PREFIX}_ 开头）"
+            f"未找到训练输出的模型文件夹（期望位于 {PTH_PATH}/ 下，且以 {PROJECT_NAME}_ 开头）"
         )
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
 def run_training():
-    print(f"🚀 [阶段 1/2] 开始训练 DeepCAD 模型: {DATASETS_FOLDER} ...")
-    _prepare_single_image_stack()
+    print(f"🚀 [阶段 1/2] 开始训练 DeepCAD 模型: {PROJECT_NAME} ...")
     _ensure_dataset_ready()
     cmd = (
         f"{_python()} train.py "
         f"--datasets_path datasets "
-        f"--datasets_folder {DATASETS_FOLDER} "
+        f"--datasets_folder {PROJECT_NAME} "
         f"--img_h {IMG_H} --img_w {IMG_W} --img_s {IMG_S} "
         f"--gap_h {GAP_H} --gap_w {GAP_W} --gap_s {GAP_S} "
         f"--n_epochs {EPOCHS} "
@@ -129,7 +86,6 @@ def run_training():
 
 def run_inference():
     print(f"🚀 [阶段 2/2] 开始使用模型去噪 (推理) ...")
-    _prepare_single_image_stack()
     _ensure_dataset_ready()
     latest_model_dir = _get_latest_model_dir()
     extra_args = ""
@@ -143,7 +99,7 @@ def run_inference():
         f"--pth_path pth "
         f"--denoise_model {latest_model_dir.name} "
         f"--datasets_path datasets "
-        f"--datasets_folder {DATASETS_FOLDER} "
+        f"--datasets_folder {PROJECT_NAME} "
         f"--img_h {IMG_H} --img_w {IMG_W} --img_s {IMG_S} "
         f"--gap_h {GAP_H} --gap_w {GAP_W} --gap_s {GAP_S} "
         f"--GPU {GPU_ID} "
@@ -152,7 +108,7 @@ def run_inference():
         f"{extra_args}"
     )
     os.system(cmd)
-    print(f"✅ 全部完成！去噪结果请在 results/{DATASETS_FOLDER} 中查看。")
+    print(f"✅ 全部完成！去噪结果请在 results/{PROJECT_NAME} 中查看。")
 
 if __name__ == "__main__":
     # run_training()
