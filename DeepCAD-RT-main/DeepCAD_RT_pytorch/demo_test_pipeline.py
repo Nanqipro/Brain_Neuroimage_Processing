@@ -14,20 +14,20 @@ from deepcad.movie_display import display
 from deepcad.utils import get_first_filename,download_demo
 
 # %% Select file(s) to be processed (download if not present)
-download_demo_file = True
+download_demo_file = False
 if download_demo_file:
     file_name= 'fish_localbrain' # select the demo file you want to test (e.g. 'ATP_3D', 'fish_localbrain', 'NP_3D', ...)
     datasets_path, denoise_model = download_demo(download_filename=file_name)
 else:
-    datasets_path = 'datasets/fish_localbrain_demo'  # folder containing tif files for testing
+    datasets_path = 'datasets/my_data'  # folder containing tif files for testing
     denoise_model = 'fish_localbrain_best_model_demo'  # A folder containing pth models to be tested
 
 # %% First setup some parameters for testing
-test_datasize = 100000                # the number of frames to be tested (test all frames if the number exceeds the total number of frames in a .tif file)
-GPU = '0,1,2,3'                             # the index of GPU you will use for computation (e.g. '0', '0,1', '0,1,2')
-patch_xy = 150                        # the width and height of 3D patches
-patch_t = 150                         # the time dimension of 3D patches
-overlap_factor = 0.6                  # the overlap factor between two adjacent patches. 
+test_datasize = 2999                 # the number of frames to be tested (test all frames if the number exceeds the total number of frames in a .tif file)
+GPU = '0,1,2,3'                       # the index of GPU you will use for computation (e.g. '0', '0,1', '0,1,2')
+patch_xy = 200                        # the width and height of 3D patches
+patch_t = 149                         # the time dimension of 3D patches
+overlap_factor = 0.45                 # the overlap factor between two adjacent patches. 
                                       # Since the receptive field of 3D-Unet is ~90, seamless stitching requires an overlap (patch_xyt*overlap_factor）of at least 90 pixels.
 num_workers = 4                       # if you use Windows system, set this to 0.
 

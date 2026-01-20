@@ -16,19 +16,19 @@ from deepcad.utils import get_first_filename,download_demo
 import os
 
 # %% Select file(s) to be processed (download if not present)
-download_demo_file = True
+download_demo_file = False
 if download_demo_file:
     file_name='fish_localbrain' # select the demo file to be trained (e.g. 'ATP_3D', 'fish_localbrain', 'NP_3D', ...)
     datasets_path, _ = download_demo(download_filename=file_name)
 else:
-    datasets_path = 'datasets/fish_localbrain_demo'  # folder containing tif files for training
+    datasets_path = 'datasets/my_data'  # folder containing tif files for training
 
 # %% First setup some parameters for training
 n_epochs = 10               # the number of training epochs
 GPU = '0,1,2,3'             # the index of GPU used for computation (e.g. '0', '0,1', '0,1,2')
 train_datasets_size = 6000  # dataset size for training (the number of patches)
-patch_xy = 150              # the width and height of 3D patches
-patch_t = 150               # the time dimension of 3D patches
+patch_xy = 200              # the width and height of 3D patches
+patch_t = 149               # the time dimension of 3D patches
 overlap_factor = 0.25       # the overlap factor between two adjacent patches
 pth_dir = './pth'           # pth file and visualization result file path
 num_workers = 4             # if you use Windows system, set this to 0.
