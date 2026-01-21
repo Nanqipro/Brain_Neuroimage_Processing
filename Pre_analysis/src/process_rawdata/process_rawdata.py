@@ -116,8 +116,8 @@ def process_data(input_file_path: str, output_file_path: str = None) -> pd.DataF
 
 if __name__ == "__main__":
     # 定义输入和输出文件路径
-    input_path = '../../raw_data/5355homecage1107merge.xlsx'
-    output_path = '../../processed_data/5355homecage1107merge_processed.xlsx'
+    input_path = '../../raw_data/5355homecage1107merge-new.xlsx'
+    output_path = '../../processed_data/5355homecage1107merge-new_processed.xlsx'
     
     try:
         # 处理数据

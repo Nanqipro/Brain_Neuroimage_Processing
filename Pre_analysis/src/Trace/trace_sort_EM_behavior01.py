@@ -402,7 +402,7 @@ def build_concatenated_trace(neural_df: pd.DataFrame, intervals, gap_stamps: int
 
 
 def plot_trace_figure(trace_df: pd.DataFrame, sorted_neurons, peak_times_dict, title_text: str, mapped_stamps=None):
-    fig = plt.figure(figsize=(60, 30))
+    fig = plt.figure(figsize=(80, 30))
     ax_trace = fig.add_subplot(111)
 
     x_seconds = trace_df.index.to_numpy(dtype=float) / Config.SAMPLING_RATE
