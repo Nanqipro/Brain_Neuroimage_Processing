@@ -9,20 +9,21 @@ import os
 
 # 确保matplotlib能够正确处理大线宽
 plt.rcParams['lines.linewidth'] = 2.0  # 设置默认线宽
+plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'Noto Sans CJK SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei']
+plt.rcParams['axes.unicode_minus'] = False
 
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/NO5355homecage1111.xlsx'
+    INPUT_FILE = '../../datasets/5355homecage1107merge-new.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 0  # 最小时间戳
-    STAMP_MAX = 100000  # 最大时间戳
-    # 多时间戳区间（用于截取多段并画在同一张图中；设置后将优先生效）
-    # 例：[(260, 861), (4606, 4980)]
-    STAMP_RANGES = [(260, 861), (4606, 4980)]
-    SEGMENT_GAP_STAMPS = 3
+    STAMP_MIN = None  # 最小时间戳
+    STAMP_MAX = None  # 最大时间戳
+    # STAMP_RANGES = [(260, 861), (4606, 4980)]
+    STAMP_RANGES = [(1041, 1068), (1648, 1788), (2311, 2593), (2976, 3128), (4976, 5029)]
+    STAMP_GAP = 3
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
@@ -52,8 +53,6 @@ def parse_args():
     parser.add_argument('--output-dir', type=str, help='输出目录')
     parser.add_argument('--stamp-min', type=float, help='最小时间戳值')
     parser.add_argument('--stamp-max', type=float, help='最大时间戳值')
-    parser.add_argument('--stamp-ranges', type=str, help='多时间戳区间，如 "260-861,4606-4980"；设置后覆盖 stamp-min/max')
-    parser.add_argument('--segment-gap', type=float, help='多时间戳区间拼接间隔（单位：stamp）')
     parser.add_argument('--x-unit', type=str, choices=['stamp', 'seconds'], default=Config.X_AXIS_UNIT,
                         help="横坐标单位：stamp（原始时间戳）或 seconds（stamp/采样率）")
     parser.add_argument('--max-neurons', type=int, help='最大显示神经元数量')
@@ -75,23 +74,6 @@ if args.stamp_min is not None:
     Config.STAMP_MIN = args.stamp_min
 if args.stamp_max is not None:
     Config.STAMP_MAX = args.stamp_max
-if args.stamp_ranges:
-    parsed_ranges = []
-    for part in str(args.stamp_ranges).split(','):
-        part = part.strip()
-        if not part:
-            continue
-        if '-' not in part:
-            continue
-        left, right = part.split('-', 1)
-        try:
-            parsed_ranges.append((float(left.strip()), float(right.strip())))
-        except ValueError:
-            continue
-    if parsed_ranges:
-        Config.STAMP_RANGES = parsed_ranges
-if args.segment_gap is not None:
-    Config.SEGMENT_GAP_STAMPS = float(args.segment_gap)
 if args.x_unit:
     Config.X_AXIS_UNIT = args.x_unit
 if args.max_neurons is not None:
@@ -288,6 +270,9 @@ else:
     neural_data_full = full_data
     behavior_data_full = None
 
+neural_data_full = neural_data_full.apply(pd.to_numeric, errors='coerce')
+neural_data_full = neural_data_full.dropna(axis=1, how='all')
+
 # 数据预处理：标准化全量数据（用于计算排序）
 print("正在基于全局数据计算排序...")
 neural_data_full_std = (neural_data_full - neural_data_full.mean()) / neural_data_full.std()
@@ -347,66 +332,85 @@ else:  # calcium_wave
 
 print(f"神经元排序方式: {sort_method_str}")
 
-# 最后步骤：根据时间区间筛选用于绘图的数据 (Slicing)
-segments = []
-if Config.STAMP_RANGES:
-    for seg_min, seg_max in Config.STAMP_RANGES:
-        seg_min = float(seg_min)
-        seg_max = float(seg_max)
-        if seg_max < seg_min:
-            seg_min, seg_max = seg_max, seg_min
-        seg_trace = neural_data_full.loc[seg_min:seg_max][sorted_neurons]
-        seg_behavior = behavior_data_full.loc[seg_min:seg_max] if has_behavior else None
-        segments.append(
-            {
-                "trace": seg_trace,
-                "behavior": seg_behavior,
-                "min_stamp": seg_min,
-                "max_stamp": seg_max,
-                "label": f"{int(seg_min)}-{int(seg_max)}",
-            }
-        )
-        print(f"已筛选时间戳区间: {seg_min} 到 {seg_max}")
+use_stamp_ranges = bool(Config.STAMP_RANGES)
+stamp_mapping = []
+break_positions = []
+
+if use_stamp_ranges:
+    neural_parts = []
+    behavior_parts = [] if has_behavior else None
+    current_display_start = float(Config.STAMP_RANGES[0][0])
+
+    for range_idx, (range_start, range_end) in enumerate(Config.STAMP_RANGES):
+        range_start = float(range_start)
+        range_end = float(range_end)
+        part_neural = neural_data_full.loc[range_start:range_end]
+        if part_neural.empty:
+            continue
+
+        offset = current_display_start - range_start
+        stamp_mapping.append((range_start, range_end, offset))
+
+        part_neural = part_neural.copy()
+        part_neural.index = part_neural.index.to_numpy(dtype=float) + offset
+        neural_parts.append(part_neural)
+
+        if has_behavior:
+            part_behavior = behavior_data_full.loc[range_start:range_end].copy()
+            part_behavior.index = part_behavior.index.to_numpy(dtype=float) + offset
+            behavior_parts.append(part_behavior)
+
+        display_end = float(part_neural.index.max())
+
+        if range_idx < len(Config.STAMP_RANGES) - 1 and int(Config.STAMP_GAP) > 0:
+            gap = int(Config.STAMP_GAP)
+            gap_start = display_end + 1
+            gap_end = display_end + gap
+            break_positions.append((gap_start, gap_end))
+            gap_index = np.arange(gap_start, gap_end + 1, dtype=float)
+            gap_neural = pd.DataFrame(index=gap_index, columns=neural_data_full.columns, dtype=float)
+            neural_parts.append(gap_neural)
+            if has_behavior:
+                gap_behavior = pd.Series([np.nan] * len(gap_index), index=gap_index, name=behavior_data_full.name)
+                behavior_parts.append(gap_behavior)
+
+        current_display_start = display_end + 1 + float(max(0, int(Config.STAMP_GAP)))
+
+    sorted_trace_data = pd.concat(neural_parts, axis=0)
+    sorted_trace_data = sorted_trace_data[sorted_neurons]
+
+    if has_behavior:
+        behavior_data = pd.concat(behavior_parts, axis=0)
+
+    print(f"已筛选时间戳区间: {Config.STAMP_RANGES}，中间空 {Config.STAMP_GAP} 个stamp")
 else:
     if Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
         min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else neural_data_full.index.min()
         max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else neural_data_full.index.max()
-        sorted_trace_data = neural_data_full.loc[min_stamp:max_stamp][sorted_neurons]
-        behavior_data = behavior_data_full.loc[min_stamp:max_stamp] if has_behavior else None
-        segments.append(
-            {
-                "trace": sorted_trace_data,
-                "behavior": behavior_data,
-                "min_stamp": float(min_stamp),
-                "max_stamp": float(max_stamp),
-                "label": f"{int(min_stamp)}-{int(max_stamp)}",
-            }
-        )
+
+        sorted_trace_data = neural_data_full.loc[min_stamp:max_stamp]
+        sorted_trace_data = sorted_trace_data[sorted_neurons]
+
+        if has_behavior:
+            behavior_data = behavior_data_full.loc[min_stamp:max_stamp]
+
         print(f"已筛选时间戳区间: {min_stamp} 到 {max_stamp}")
     else:
         sorted_trace_data = neural_data_full[sorted_neurons]
-        behavior_data = behavior_data_full if has_behavior else None
-        segments.append(
-            {
-                "trace": sorted_trace_data,
-                "behavior": behavior_data,
-                "min_stamp": float(sorted_trace_data.index.min()),
-                "max_stamp": float(sorted_trace_data.index.max()),
-                "label": f"{int(sorted_trace_data.index.min())}-{int(sorted_trace_data.index.max())}",
-            }
-        )
+        if has_behavior:
+            behavior_data = behavior_data_full
 # ================= 替换结束 =================
 
 # ===== 开始绘制Trace图 =====
 print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
 if has_behavior:
-    fig = plt.figure(figsize=(50, 30))
+    fig = plt.figure(figsize=(20, 30))
     grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
     ax_behavior = fig.add_subplot(grid[0, 0])
     ax_trace = fig.add_subplot(grid[1, 0])
     ax_legend = fig.add_subplot(grid[1, 1])
 else:
-    fig = plt.figure(figsize=(50, 30))
+    fig = plt.figure(figsize=(20, 30))
     ax_trace = fig.add_subplot(111)
 
 # 预定义颜色映射，与热图保持一致
@@ -504,51 +508,64 @@ fixed_color_map = {
 }
 
 def _stamp_to_x(stamp_value: float):
+    stamp_value = float(stamp_value)
     return stamp_value / Config.SAMPLING_RATE if Config.X_AXIS_UNIT == 'seconds' else stamp_value
 
-def _gap_in_x_units():
-    return Config.SEGMENT_GAP_STAMPS / Config.SAMPLING_RATE if Config.X_AXIS_UNIT == 'seconds' else Config.SEGMENT_GAP_STAMPS
+def _map_stamp_to_display_stamp(stamp_value: float):
+    stamp_value = float(stamp_value)
+    if not use_stamp_ranges:
+        return stamp_value
+    for start, end, offset in stamp_mapping:
+        if start <= stamp_value <= end:
+            return stamp_value + offset
+    return None
 
-def _index_to_x_values(index: pd.Index):
-    x = index.to_numpy(dtype=float)
-    if Config.X_AXIS_UNIT == 'seconds':
-        x = x / Config.SAMPLING_RATE
-    return x
+x_values = sorted_trace_data.index.to_numpy(dtype=float)
+if Config.X_AXIS_UNIT == 'seconds':
+    x_values = x_values / Config.SAMPLING_RATE
 
-def _plot_traces(ax, segment_trace_data: pd.DataFrame, x_shift: float):
-    x_values = segment_trace_data.index.to_numpy(dtype=float)
-    if Config.X_AXIS_UNIT == 'seconds':
-        x_values = x_values / Config.SAMPLING_RATE
-    x_values = x_values + x_shift
+# 绘制Trace图
+for i, column in enumerate(sorted_neurons):
+    if i >= Config.MAX_NEURONS:
+        break
+    
+    # 计算当前神经元trace的垂直偏移量，并应用缩放因子
+    # 根据排序方式调整位置
+    if Config.SORT_METHOD in ['peak', 'calcium_wave']:
+        # 对于峰值排序和钙波排序，使用反向位置（早期的在上方）
+        position = Config.MAX_NEURONS - i if i < Config.MAX_NEURONS else 1
+    else:
+        # 对于原始顺序和自定义顺序，使用正向位置
+        position = i + 1
+    
+    ax_trace.plot(
+        x_values,
+        sorted_trace_data[column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
+        linewidth=Config.LINE_WIDTH,
+        alpha=Config.TRACE_ALPHA,
+        label=column
+    )
+    
+    # # 如果是峰值排序或钙波排序，标记峰值点
+    # if peak_times_dict is not None and column in peak_times_dict:
+    #     peak_time = peak_times_dict[column] / Config.SAMPLING_RATE
+    #     ax_trace.scatter(
+    #         peak_time, 
+    #         sorted_trace_data.loc[peak_times_dict[column], column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
+    #         color='red', s=30, zorder=3  # zorder确保点在线的上方
+    #     )
 
-    for i, column in enumerate(sorted_neurons):
-        if i >= Config.MAX_NEURONS:
-            break
-
-        if Config.SORT_METHOD in ['peak', 'calcium_wave']:
-            position = Config.MAX_NEURONS - i if i < Config.MAX_NEURONS else 1
-        else:
-            position = i + 1
-
-        ax.plot(
-            x_values,
-            segment_trace_data[column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
-            linewidth=Config.LINE_WIDTH,
-            alpha=Config.TRACE_ALPHA,
-            label=column,
-        )
-
-        if peak_times_dict is not None and column in peak_times_dict:
-            peak_ts = peak_times_dict[column]
-            if peak_ts in segment_trace_data.index:
-                peak_time_x = _stamp_to_x(peak_ts) + x_shift
-                ax.scatter(
-                    peak_time_x,
-                    segment_trace_data.loc[peak_ts, column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
-                    color='red',
-                    s=30,
-                    zorder=3,
-                )
+    # 如果是峰值排序或钙波排序，标记峰值点
+    if peak_times_dict is not None and column in peak_times_dict:
+        peak_ts = float(peak_times_dict[column])
+        display_stamp = _map_stamp_to_display_stamp(peak_ts)
+        if display_stamp is not None and display_stamp in sorted_trace_data.index:
+            peak_time_x = _stamp_to_x(display_stamp)
+            ax_trace.scatter(
+                peak_time_x, 
+                sorted_trace_data.loc[display_stamp, column] * Config.SCALING_FACTOR + position * Config.TRACE_OFFSET,
+                color='red', s=30, zorder=3
+            )
 
 # 设置Y轴标签，简化显示格式
 total_positions = min(Config.MAX_NEURONS, len(sorted_neurons))
@@ -570,33 +587,28 @@ for i, column in enumerate(sorted_neurons):
     yticks.append(position * Config.TRACE_OFFSET)
     ytick_labels.append(str(column))
 
-segment_shifts = []
-current_end_x = None
-gap_x = _gap_in_x_units()
-for seg in segments:
-    seg_x_values = _index_to_x_values(seg["trace"].index)
-    if len(seg_x_values) == 0:
-        segment_shifts.append(0.0)
-        continue
-    if current_end_x is None:
-        shift = 0.0
-    else:
-        shift = current_end_x + gap_x - float(seg_x_values[0])
-    segment_shifts.append(shift)
-    current_end_x = float(seg_x_values[-1]) + shift
-
-for seg_idx, seg in enumerate(segments):
-    _plot_traces(ax_trace, seg["trace"], segment_shifts[seg_idx])
-
+# 设置Y轴刻度和标签
 ax_trace.set_yticks(yticks)
 ax_trace.set_yticklabels(ytick_labels)
 
+# 设置X轴范围
+if use_stamp_ranges:
+    min_x = max(0, _stamp_to_x(float(sorted_trace_data.index.min())))
+    max_x = _stamp_to_x(float(sorted_trace_data.index.max()))
+    ax_trace.set_xlim(min_x, max_x)
+elif Config.STAMP_MIN is not None and Config.STAMP_MAX is not None:
+    min_x = _stamp_to_x(Config.STAMP_MIN)
+    max_x = _stamp_to_x(Config.STAMP_MAX)
+    min_x = max(0, min_x)
+    ax_trace.set_xlim(min_x, max_x)
+else:
+    min_x = max(0, _stamp_to_x(float(sorted_trace_data.index.min())))
+    max_x = _stamp_to_x(float(sorted_trace_data.index.max()))
+    ax_trace.set_xlim(min_x, max_x)
+
+# 设置轴标签和标题
 ax_trace.set_xlabel('stamp' if Config.X_AXIS_UNIT == 'stamp' else 'Time (seconds)', fontsize=50, fontweight='bold')
-if current_end_x is not None and len(segments) > 0:
-    min_x = _index_to_x_values(segments[0]["trace"].index)
-    min_x = float(min_x[0]) if len(min_x) > 0 else 0.0
-    ax_trace.set_xlim(max(0, min_x), current_end_x)
-# 根据排序方式设置不同的Y轴标签
+
 if Config.SORT_METHOD == 'peak':
     ylabel = 'Neuron ID (Sorted by Peak Time)'
 elif Config.SORT_METHOD == 'calcium_wave':
@@ -614,58 +626,74 @@ ax_trace.tick_params(axis='y', labelsize=23)
 # 设置X轴刻度间隔为10秒
 import matplotlib.ticker as ticker
 tick_step = 10 if Config.X_AXIS_UNIT == 'seconds' else max(1, int(round(10 * Config.SAMPLING_RATE)))
-ax_trace.xaxis.set_major_locator(ticker.MultipleLocator(tick_step))
-
-# 添加网格线，使trace更容易阅读
+if use_stamp_ranges:
+    tick_positions = []
+    tick_labels = []
+    for start, end, offset in stamp_mapping:
+        tick_stamps = np.arange(start, end + 1, tick_step)
+        for stamp in tick_stamps:
+            display_stamp = stamp + offset
+            tick_positions.append(_stamp_to_x(display_stamp))
+            label_value = stamp / Config.SAMPLING_RATE if Config.X_AXIS_UNIT == 'seconds' else stamp
+            tick_labels.append(f"{label_value:g}")
+    ax_trace.set_xticks(tick_positions)
+    ax_trace.set_xticklabels(tick_labels)
+else:
+    ax_trace.xaxis.set_major_locator(ticker.MultipleLocator(tick_step))
 ax_trace.grid(False)
 
-# 处理行为区间数据
-def _process_behavior_for_segment(segment_trace_index: pd.Index, segment_behavior: pd.Series, x_shift: float):
-    if segment_behavior is None:
-        return {}, [], []
+if use_stamp_ranges and len(break_positions) > 0:
+    d = 0.015
+    for gap_start, gap_end in break_positions:
+        left_x = _stamp_to_x(gap_start - 0.5)
+        right_x = _stamp_to_x(gap_end + 0.5)
+        for x in [left_x, right_x]:
+            ax_trace.plot((x - d, x + d), (-d, +d), transform=ax_trace.get_xaxis_transform(), color='k', clip_on=False)
+            ax_trace.plot((x - d, x + d), (1 - d, 1 + d), transform=ax_trace.get_xaxis_transform(), color='k', clip_on=False)
+            if has_behavior:
+                ax_behavior.plot((x - d, x + d), (-d, +d), transform=ax_behavior.get_xaxis_transform(), color='k', clip_on=False)
+                ax_behavior.plot((x - d, x + d), (1 - d, 1 + d), transform=ax_behavior.get_xaxis_transform(), color='k', clip_on=False)
 
-    segment_behavior = segment_behavior.where(segment_behavior.astype(str).str.strip().ne(''), np.nan)
-    unique_behaviors_local = segment_behavior.dropna().unique()
+behavior_intervals = {}
+unique_behaviors = []
+behavior_change_times = []
 
-    behavior_intervals_local = {behavior: [] for behavior in unique_behaviors_local}
+if has_behavior:
+    behavior_data = behavior_data.where(behavior_data.astype(str).str.strip().ne(''), np.nan)
+    unique_behaviors = behavior_data.dropna().unique()
+    for behavior in unique_behaviors:
+        behavior_intervals[behavior] = []
+
     current_behavior = None
     start_time = None
-
-    extended_index = list(segment_behavior.index) + [None]
-    extended_values = list(segment_behavior.values) + [None]
+    extended_index = list(behavior_data.index) + [None]
+    extended_values = list(behavior_data.values) + [None]
 
     for i, (timestamp, behavior) in enumerate(zip(extended_index, extended_values)):
-        if i == len(segment_behavior):
+        if i == len(behavior_data):
             if start_time is not None and current_behavior is not None:
-                behavior_intervals_local[current_behavior].append(
-                    (_stamp_to_x(start_time) + x_shift, _stamp_to_x(extended_index[i - 1]) + x_shift)
-                )
+                behavior_intervals[current_behavior].append((_stamp_to_x(start_time), _stamp_to_x(extended_index[i-1])))
             break
 
         if pd.isna(behavior):
             if start_time is not None and current_behavior is not None:
-                behavior_intervals_local[current_behavior].append(
-                    (_stamp_to_x(start_time) + x_shift, _stamp_to_x(timestamp) + x_shift)
-                )
+                behavior_intervals[current_behavior].append((_stamp_to_x(start_time), _stamp_to_x(timestamp)))
                 start_time = None
                 current_behavior = None
             continue
 
         if behavior != current_behavior:
             if start_time is not None and current_behavior is not None:
-                behavior_intervals_local[current_behavior].append(
-                    (_stamp_to_x(start_time) + x_shift, _stamp_to_x(timestamp) + x_shift)
-                )
+                behavior_intervals[current_behavior].append((_stamp_to_x(start_time), _stamp_to_x(timestamp)))
             start_time = timestamp
             current_behavior = behavior
 
-    aligned_behavior = segment_behavior.reindex(segment_trace_index)
+    aligned_behavior = behavior_data.reindex(sorted_trace_data.index)
     filled_behavior = aligned_behavior.fillna('__MISSING__')
-    change_mask = filled_behavior.ne(filled_behavior.shift(1))
+    change_mask = filled_behavior.ne(filled_behavior.shift(1)) & filled_behavior.ne('__MISSING__') & filled_behavior.shift(1).ne('__MISSING__')
     change_positions = [int(i) for i in np.where(change_mask.values)[0] if i != 0]
-    behavior_change_times_local = [_stamp_to_x(float(segment_trace_index[i])) + x_shift for i in change_positions]
-
-    return behavior_intervals_local, list(unique_behaviors_local), behavior_change_times_local
+    behavior_change_times = [_stamp_to_x(float(sorted_trace_data.index[i])) for i in change_positions]
+    behavior_change_times = [x for x in behavior_change_times if x is not None]
 
 if has_behavior:
     ax_behavior.set_ylim(0, 1)
@@ -681,36 +709,24 @@ if has_behavior:
     ax_behavior.spines['bottom'].set_visible(False)
     ax_behavior.spines['left'].set_visible(False)
 
-    all_unique_behaviors = []
-    segment_behavior_payloads = []
-    for seg_idx, seg in enumerate(segments):
-        behavior_intervals, unique_behaviors, behavior_change_times = _process_behavior_for_segment(
-            seg["trace"].index, seg["behavior"], segment_shifts[seg_idx]
-        )
-        segment_behavior_payloads.append(
-            {
-                "intervals": behavior_intervals,
-                "unique": unique_behaviors,
-                "change_times": behavior_change_times,
-            }
-        )
-        for b in unique_behaviors:
-            if b not in all_unique_behaviors:
-                all_unique_behaviors.append(b)
+    for x in behavior_change_times:
+        ax_trace.axvline(x=x, color='black', linestyle='--', linewidth=2, alpha=0.8)
+        ax_behavior.axvline(x=x, color='black', linestyle='--', linewidth=2, alpha=0.8)
 
-    for payload in segment_behavior_payloads:
-        for x in payload["change_times"]:
-            ax_trace.axvline(x=x, color='black', linestyle='--', linewidth=2, alpha=0.8)
-            ax_behavior.axvline(x=x, color='black', linestyle='--', linewidth=2, alpha=0.8)
+    ax_legend.axis('off')
 
+    if len(unique_behaviors) > 0:
+        legend_patches = []
         y_position = 0.5
         line_height = 0.8
-        for behavior, intervals in payload["intervals"].items():
-            behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(all_unique_behaviors.index(behavior) % 10))
+
+        for behavior, intervals in behavior_intervals.items():
+            behavior_color = fixed_color_map.get(behavior, plt.cm.tab10(list(unique_behaviors).index(behavior) % 10))
+
             for start_time, end_time in intervals:
                 if end_time - start_time > 0:
                     rect = plt.Rectangle(
-                        (start_time, y_position - line_height / 2),
+                        (start_time, y_position - line_height/2),
                         end_time - start_time,
                         line_height,
                         color=behavior_color,
@@ -720,18 +736,17 @@ if has_behavior:
                     )
                     ax_behavior.add_patch(rect)
 
-    ax_legend.axis('off')
-    if len(all_unique_behaviors) > 0:
-        legend_patches = [
-            plt.Rectangle((0, 0), 1, 1, color=fixed_color_map.get(behavior, plt.cm.tab10(i % 10)), alpha=0.9, label=behavior)
-            for i, behavior in enumerate(all_unique_behaviors)
-        ]
-        legend = ax_legend.legend(
+            legend_patches.append(plt.Rectangle((0, 0), 1, 1, color=behavior_color, alpha=0.9, label=behavior))
+
+        legend_fontsize = 40
+        title_fontsize = 40
+
+        ax_legend.legend(
             handles=legend_patches,
             loc='center left',
-            fontsize=40,
+            fontsize=legend_fontsize,
             title='Behavior Types',
-            title_fontsize=40,
+            title_fontsize=title_fontsize,
             ncol=1,
             frameon=True,
             fancybox=True,
@@ -755,22 +770,15 @@ if has_behavior:
 # 不使用tight_layout()，因为它与GridSpec布局不兼容
 # 使用精确的位置对齐方法
 if has_behavior:
-    # 强制更新布局
     fig.canvas.draw()
-    
-    # 获取热图的实际边界位置
+    from matplotlib.transforms import Bbox
     trace_bbox = ax_trace.get_position()
     behavior_bbox = ax_behavior.get_position()
-    from matplotlib.transforms import Bbox
-    new_behavior_pos = Bbox(
-        [[trace_bbox.x0, behavior_bbox.y0], [trace_bbox.x0 + trace_bbox.width, behavior_bbox.y0 + behavior_bbox.height]]
-    )
+    new_behavior_pos = Bbox([[trace_bbox.x0, behavior_bbox.y0],
+                            [trace_bbox.x0 + trace_bbox.width, behavior_bbox.y0 + behavior_bbox.height]])
     ax_behavior.set_position(new_behavior_pos)
 
-# 在布局调整完成后设置刻度标签加粗
-# 强制更新图形以确保所有刻度标签都已生成
 fig.canvas.draw()
-# 设置X轴刻度标签加粗
 for label in ax_trace.get_xticklabels():
     label.set_fontweight('bold')
 for label in ax_trace.get_yticklabels():
@@ -782,13 +790,13 @@ input_filename = os.path.splitext(input_filename)[0]  # 去除扩展名
 
 # 构建输出文件名：目录 + 前缀 + 排序方式 + 输入文件名 + 时间戳信息
 stamp_info = ''
-if Config.STAMP_RANGES:
-    stamp_info = '_' + '_'.join([f"seg{int(a)}-{int(b)}" for a, b in Config.STAMP_RANGES])
+if use_stamp_ranges:
+    stamp_info = "_seg" + "_".join([f"{int(a)}-{int(b)}" for a, b in Config.STAMP_RANGES]) + f"_gap{int(Config.STAMP_GAP)}"
 elif Config.STAMP_MIN is not None or Config.STAMP_MAX is not None:
-    min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else segments[0]["trace"].index.min()
-    max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else segments[0]["trace"].index.max()
-    min_seconds = float(min_stamp) / Config.SAMPLING_RATE
-    max_seconds = float(max_stamp) / Config.SAMPLING_RATE
+    min_stamp = Config.STAMP_MIN if Config.STAMP_MIN is not None else sorted_trace_data.index.min()
+    max_stamp = Config.STAMP_MAX if Config.STAMP_MAX is not None else sorted_trace_data.index.max()
+    min_seconds = min_stamp / Config.SAMPLING_RATE
+    max_seconds = max_stamp / Config.SAMPLING_RATE
     stamp_info = f'_{min_seconds:.2f}s_{max_seconds:.2f}s'
 
 # output_file = f"{Config.OUTPUT_DIR}traces_{Config.SORT_METHOD}_{input_filename}{stamp_info}.png"
