@@ -15,25 +15,25 @@ plt.rcParams['axes.unicode_minus'] = False
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/5355homecage1107merge-new.xlsx'
+    INPUT_FILE = '../../datasets/5355homecage1107merge20260122-new2.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
     # STAMP_RANGES = [(260, 861), (4606, 4980)]
-    STAMP_RANGES = [(1041, 1068), (1648, 1788), (2311, 2593), (2976, 3128), (4976, 5029)]
+    STAMP_RANGES = [(3500, 4500), (7000, 9000)]
     STAMP_GAP = 3
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
     CUSTOM_NEURON_ORDER = ['n53', 'n40', 'n29', 'n34', 'n4', 'n32', 'n25', 'n27', 'n22', 'n55', 'n21', 'n5', 'n19']
     # Trace图的显示参数
-    TRACE_OFFSET = 60  # 不同神经元trace之间的垂直偏移量（增加间隔以改善可读性）
+    TRACE_OFFSET = 80  # 不同神经元trace之间的垂直偏移量（增加间隔以改善可读性）
     SCALING_FACTOR = 80  # 信号振幅缩放因子（增加振幅以提高信号可见性）
-    MAX_NEURONS = 60    # 最大显示神经元数量（避免图表过于拥挤）
+    MAX_NEURONS = 100    # 最大显示神经元数量（避免图表过于拥挤）
     TRACE_ALPHA = 0.8   # trace线的透明度
-    LINE_WIDTH = 2.0    # trace线的宽度
+    LINE_WIDTH = 3.0    # trace线的宽度
     # 采样率 (Hz)
     SAMPLING_RATE = 9.02  # 采样频率，用于将时间戳转换为秒
     # 横坐标单位：'stamp'（默认，使用原始stamp）或 'seconds'（stamp/采样率）
@@ -404,7 +404,7 @@ else:
 # ===== 开始绘制Trace图 =====
 print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
 if has_behavior:
-    fig = plt.figure(figsize=(20, 30))
+    fig = plt.figure(figsize=(100, 100))
     grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
     ax_behavior = fig.add_subplot(grid[0, 0])
     ax_trace = fig.add_subplot(grid[1, 0])
