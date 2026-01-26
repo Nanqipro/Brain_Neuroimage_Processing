@@ -1,6 +1,7 @@
 # 神经元活动 Trace 图绘制，基于热图代码修改而来
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 import numpy as np
 import argparse
 from matplotlib.gridspec import GridSpec
@@ -9,20 +10,43 @@ import os
 
 # 确保matplotlib能够正确处理大线宽
 plt.rcParams['lines.linewidth'] = 2.0  # 设置默认线宽
-plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'Noto Sans CJK SC', 'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei']
 plt.rcParams['axes.unicode_minus'] = False
+
+def _set_chinese_font():
+    candidates = [
+        'PingFang SC',
+        'Heiti SC',
+        'Songti SC',
+        'STHeiti',
+        'Hiragino Sans GB',
+        'Arial Unicode MS',
+        'Noto Sans CJK SC',
+        'Source Han Sans SC',
+        'Microsoft YaHei',
+        'SimHei',
+        'WenQuanYi Micro Hei',
+        'WenQuanYi Zen Hei',
+    ]
+    available = {f.name for f in font_manager.fontManager.ttflist}
+    chosen = [name for name in candidates if name in available]
+    plt.rcParams['font.family'] = 'sans-serif'
+    if chosen:
+        plt.rcParams['font.sans-serif'] = chosen
+
+
+_set_chinese_font()
 
 # 简化后的参数配置类
 class Config:
     # 输入文件路径
-    INPUT_FILE = '../../datasets/5355homecage1107merge20260122-new2.xlsx'
+    INPUT_FILE = '../../datasets/NO5355homecage1111-new.xlsx'
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
     STAMP_MIN = None  # 最小时间戳
     STAMP_MAX = None  # 最大时间戳
     # STAMP_RANGES = [(260, 861), (4606, 4980)]
-    STAMP_RANGES = [(3500, 4500), (7000, 9000)]
+    STAMP_RANGES = [(0, 2000)]
     STAMP_GAP = 3
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
@@ -404,7 +428,7 @@ else:
 # ===== 开始绘制Trace图 =====
 print(f"开始绘制Trace图，排序方式: {sort_method_str}...")
 if has_behavior:
-    fig = plt.figure(figsize=(100, 100))
+    fig = plt.figure(figsize=(80, 80))
     grid = GridSpec(2, 2, height_ratios=[0.5, 6], width_ratios=[6, 0.5], hspace=0.05, wspace=0.02, figure=fig)
     ax_behavior = fig.add_subplot(grid[0, 0])
     ax_trace = fig.add_subplot(grid[1, 0])
