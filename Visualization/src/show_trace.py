@@ -7,16 +7,28 @@ from matplotlib.patches import Patch
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 
+def setup_matplotlib_fonts():
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'DejaVu Sans', 'Arial Unicode MS', 'Arial']
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams['font.weight'] = 'bold'
+    plt.rcParams['axes.labelweight'] = 'bold'
+    plt.rcParams['axes.titleweight'] = 'bold'
+    plt.rcParams['axes.labelsize'] = 28
+    plt.rcParams['xtick.labelsize'] = 24
+    plt.rcParams['ytick.labelsize'] = 24
+    plt.rcParams['axes.titlesize'] = 32
+    plt.rcParams['legend.fontsize'] = 24
+
 def parse_args():
     """
     解析命令行参数
     """
     parser = argparse.ArgumentParser(description='绘制神经元分组的钙离子浓度轨迹图')
     parser.add_argument('--input', type=str, 
-                        default='../datasets/No.297920240925homecagefamilarmice.xlsx',
+                        default='../datasets/Day6_with_behavior_labels_filled.xlsx',
                         help='输入数据文件路径')
     parser.add_argument('--output-dir', type=str, 
-                        default='../results/CD1_traces_homecage/',
+                        default='../results/CD1_traces_Day6/',
                         help='输出图像目录')
     parser.add_argument('--position-file', type=str,
                         default='../datasets/homecage_Max_position.csv',
@@ -89,12 +101,12 @@ def group_neurons(data):
     # group2 = ['n20', 'n33', 'n21', 'n5', 'n1', 'n26', 'n25', 'n36', 'n44', 
     #           'n34', 'n4', 'n24', 'n10', 'n11', 'n9', 'n3', 'n41', 'n35', 'n48', 'n19']
     
-    # # 定义神经元分组 day6
-    # group1 = ['n2', 'n10', 'n15', 'n17', 'n18', 'n22', 'n40', 'n24', 'n27', 
-    #           'n39', 'n25', 'n59', 'n42', 'n38', 'n50', 'n51', 'n46', 'n52']
+    # 定义神经元分组 day6
+    group1 = ['n2', 'n10', 'n15', 'n17', 'n18', 'n22', 'n40', 'n24', 'n27', 
+              'n39', 'n25', 'n59', 'n42', 'n38', 'n50', 'n51', 'n46', 'n52']
     
-    # group2 = ['n3', 'n4', 'n34', 'n12', 'n13', 'n14', 'n21', 'n29', 'n31', 
-    #           'n4', 'n57', 'n5', 'n32', 'n60', 'n41']
+    group2 = ['n3', 'n4', 'n34', 'n12', 'n13', 'n14', 'n21', 'n29', 'n31', 
+              'n4', 'n57', 'n5', 'n32', 'n60', 'n41']
 
     # # 定义神经元分组 day9
     # group1 = ['n38', 'n9', 'n17', 'n31', 'n23', 'n20', 'n22', 'n26', 'n12', 
@@ -138,11 +150,11 @@ def group_neurons(data):
     
     
     
-    # homecage 单独分组
-    # 定义神经元分组
-    group1 = ['n4', 'n41', 'n43', 'n34', 'n13', 'n33', 'n27', 'n12']
+    # # homecage 单独分组
+    # # 定义神经元分组
+    # group1 = ['n4', 'n41', 'n43', 'n34', 'n13', 'n33', 'n27', 'n12']
     
-    group2 = ['n37', 'n30', 'n17', 'n20', 'n18', 'n32', 'n31', 'n21', 'n25', 'n11', 'n10', 'n29', 'n7', 'n22']
+    # group2 = ['n37', 'n30', 'n17', 'n20', 'n18', 'n32', 'n31', 'n21', 'n25', 'n11', 'n10', 'n29', 'n7', 'n22']
 
     
     
@@ -370,17 +382,17 @@ def plot_trace_before_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=
     # 阴影区域显示已移除
     
     # 添加图例和标签
-    plt.legend(fontsize=12)
-    plt.xlabel('Time (seconds)', fontsize=14)
-    plt.ylabel('Δ F /F', fontsize=14)
-    plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps Before CD1', fontsize=16)
+    plt.legend(fontsize=24)
+    plt.xlabel('Time (seconds)', fontsize=28)
+    plt.ylabel('Δ F /F', fontsize=28)
+    plt.title(f'Average Calcium Concentration of Neurons\n{n_stamps} Timestamps Before CD1', fontsize=32)
     
     # 设置统一的y轴范围
     plt.ylim([-0.6, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=plot_data['relative_time'].max(), color='k', linestyle='--', linewidth=3)
-    plt.text(plot_data['relative_time'].max()-5, 0.35, 'CD1', fontsize=14)
+    plt.text(plot_data['relative_time'].max()-5, 0.35, 'CD1', fontsize=24)
     
     # 网格线
     plt.grid(False)
@@ -473,17 +485,17 @@ def plot_trace_after_cd1(data, cd1_index, n_stamps, output_path, sampling_rate=4
     # 阴影区域显示已移除
     
     # 添加图例和标签
-    plt.legend(fontsize=12)
-    plt.xlabel('Time (seconds)', fontsize=14)
-    plt.ylabel('Δ F /F', fontsize=14)
-    plt.title(f'Average Calcium Concentration of Neurons {n_stamps} Timestamps After CD1', fontsize=16)
+    plt.legend(fontsize=24)
+    plt.xlabel('Time (seconds)', fontsize=28)
+    plt.ylabel('Δ F /F', fontsize=28)
+    plt.title(f'Average Calcium Concentration of Neurons\n{n_stamps} Timestamps After CD1', fontsize=32)
     
     # 设置统一的y轴范围
     plt.ylim([-0.6, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
-    plt.text(5, 0.35, 'CD1', fontsize=14)
+    plt.text(5, 0.35, 'CD1', fontsize=24)
     
     # 网格线
     plt.grid(False)
@@ -622,21 +634,21 @@ def plot_combined_cd1_trace(data, cd1_index, before_stamps, after_stamps, output
     # 阴影区域显示已移除
     
     # 添加图例和标签
-    plt.legend(fontsize=12)
-    plt.xlabel('Time (seconds)', fontsize=14)
-    plt.ylabel('Δ F /F', fontsize=14)
-    plt.title(f'Comparison of Average Calcium Concentration of Neurons Before and After CD1 ({before_stamps}/{after_stamps} timestamps)', fontsize=16)
+    plt.legend(fontsize=24)
+    plt.xlabel('Time (seconds)', fontsize=28)
+    plt.ylabel('Δ F /F', fontsize=28)
+    plt.title(f'Comparison of Average Calcium Concentration of Neurons\nBefore and After CD1 ({before_stamps}/{after_stamps} timestamps)', fontsize=32)
     
     # 设置统一的y轴范围
     plt.ylim([-0.6, 0.5])
     
     # 添加垂直线标记CD1出现时间点
     plt.axvline(x=0, color='k', linestyle='--', linewidth=3)
-    plt.text(0.05, 0.35, 'CD1', fontsize=14)
+    plt.text(0.05, 0.35, 'CD1', fontsize=24)
     
     # 在图中标记CD1前后
-    plt.text(-before_stamps*sampling_period*0.5, 0.3, 'Before CD1', fontsize=12, ha='center')
-    plt.text(after_stamps*sampling_period*0.5, 0.3, 'After CD1', fontsize=12, ha='center')
+    plt.text(-before_stamps*sampling_period*0.5, 0.3, 'Before CD1', fontsize=24, ha='center')
+    plt.text(after_stamps*sampling_period*0.5, 0.3, 'After CD1', fontsize=24, ha='center')
     
     # 网格线
     plt.grid(False)
@@ -710,7 +722,7 @@ def plot_neuron_topology(positions_df, group1_cols, group2_cols, group3_cols, ou
         # 添加神经元ID标签
         for _, row in group1_positions.iterrows():
             plt.text(row['relative_x'], row['relative_y'], str(int(row['number'])), 
-                    fontsize=10, ha='center', va='center', color='white')
+                    fontsize=14, ha='center', va='center', color='white')
     
     # 处理第二组 - 黄色
     group2_positions = positions_df[positions_df['neuron_id'].isin(group2_cols)]
@@ -722,7 +734,7 @@ def plot_neuron_topology(positions_df, group1_cols, group2_cols, group3_cols, ou
         # 添加神经元ID标签 - 黄色背景使用黑色标签更清晰
         for _, row in group2_positions.iterrows():
             plt.text(row['relative_x'], row['relative_y'], str(int(row['number'])), 
-                    fontsize=10, ha='center', va='center', color='black')
+                    fontsize=14, ha='center', va='center', color='black')
     
     # 处理第三组 - 黑色
     group3_positions = positions_df[positions_df['neuron_id'].isin(group3_cols)]
@@ -734,19 +746,19 @@ def plot_neuron_topology(positions_df, group1_cols, group2_cols, group3_cols, ou
         # 添加神经元ID标签
         for _, row in group3_positions.iterrows():
             plt.text(row['relative_x'], row['relative_y'], str(int(row['number'])), 
-                    fontsize=10, ha='center', va='center', color='white')
+                    fontsize=14, ha='center', va='center', color='white')
     
     # 设置图表属性
-    plt.title('Neuron Spatial Topology Distribution (Colored by Group)', fontsize=16)
-    plt.xlabel('Relative X Coordinate', fontsize=14)
-    plt.ylabel('Relative Y Coordinate', fontsize=14)
+    plt.title('Neuron Spatial Topology Distribution\n(Colored by Group)', fontsize=32)
+    plt.xlabel('Relative X Coordinate', fontsize=28)
+    plt.ylabel('Relative Y Coordinate', fontsize=28)
     plt.grid(True, linestyle='--', alpha=0.7)
     
     # 保持坐标轴比例一致
     plt.axis('equal')
     
     # 添加图例
-    plt.legend(handles=legend_elements, fontsize=12)
+    plt.legend(handles=legend_elements, fontsize=24)
     
     # 保存图像
     plt.tight_layout()
@@ -761,6 +773,8 @@ def main():
     
     # 确保输出目录存在
     ensure_dir(args.output_dir)
+    
+    setup_matplotlib_fonts()
     
     # 加载数据
     data = load_data(args.input)
