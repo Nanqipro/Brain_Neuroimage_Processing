@@ -17,8 +17,8 @@ class Config:
     # 输出目录
     OUTPUT_DIR = '../../graph/'
     # 时间戳区间默认值（None表示不限制）
-    STAMP_MIN = 18000  # 最小时间戳
-    STAMP_MAX = 19998  # 最大时间戳
+    STAMP_MIN = 0  # 最小时间戳
+    STAMP_MAX = 3000  # 最大时间戳
     # 排序方式：'original'（原始顺序）、'peak'（按峰值时间排序）、'calcium_wave'（按第一次真实钙波发生时间排序）或'custom'（按自定义顺序排序）
     SORT_METHOD = 'peak'
     # 自定义神经元排序顺序（仅在SORT_METHOD='custom'时使用）
