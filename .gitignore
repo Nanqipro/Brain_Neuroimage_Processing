@@ -117,9 +117,10 @@ outputs/
 /StateClassifier/datasets
 /StateClassifier/logs
 /StateClassifier/results
-/LSTM/datasets/
-/LSTM/models/
-/LSTM/results/
+/Cluster_analysis/datasets
+/LSTM/datasets
+/LSTM/models
+/LSTM/results
 /Markov/results
 /Visualization/datasets
 /Visualization/logs
@@ -162,3 +163,6 @@ outputs/
 
 # Existing local CVPR data link/directory
 /CVPR/data
+
+# Legacy local-only script retained outside the public source tree
+/Pre_analysis/src/heatmap/heatmap_sort-EM.py
