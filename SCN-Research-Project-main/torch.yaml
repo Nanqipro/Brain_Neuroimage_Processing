@@ -63,4 +63,3 @@ dependencies:
       - urllib3==1.26.13
       - zipp==3.17.0
       - captum==0.6.0
-prefix: /home/zhuyu/miniconda3/yes/envs/torch

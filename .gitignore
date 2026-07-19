@@ -133,19 +133,21 @@ outputs/
 /bettergcn/eval_results_batch
 /bettergcn/results
 /CVPR/data/
-/CVPR/src/GCNs/experiment_logs_*/
-/CVPR/src/GCNs/multi_run_logs_*/
+/CVPR/src/GCNs/experiment_logs_*
+/CVPR/src/GCNs/multi_run_logs_*
 /SCN-Research-Project-main/**/data/
 /SCN-Research-Project-main/**/result/
+/SCN-Research-Project-main/StateClassifier/data
+/SCN-Research-Project-main/StateClassifier/result
 
 # Web application runtime data
-/ai-mouse/BN/calcium_analysis_platform/backend/uploads/
-/ai-mouse/BN/calcium_analysis_platform/backend/results/
-/ai-mouse/BN/calcium_analysis_platform/backend/temp/
+/ai-mouse/BN/calcium_analysis_platform/backend/uploads
+/ai-mouse/BN/calcium_analysis_platform/backend/results
+/ai-mouse/BN/calcium_analysis_platform/backend/temp
 /ai-mouse/BN/calcium_analysis_platform/frontend/dist/
-/ai-mouse/BN/calcium_app/uploads/
-/ai-mouse/BN/calcium_app/results/
-/ai-mouse/BN/calcium_app/temp/
+/ai-mouse/BN/calcium_app/uploads
+/ai-mouse/BN/calcium_app/results
+/ai-mouse/BN/calcium_app/temp
 /ai-mouse/BN/calcium_analysis_platform/test_data.xlsx
 
 # Local-only upstream source checkouts. Install or clone them separately.

@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import Extraction from '../views/Extraction.vue'
-import Clustering from '../views/Clustering.vue'
+
+const Home = () => import('../views/Home.vue')
+const Extraction = () => import('../views/Extraction.vue')
+const Clustering = () => import('../views/Clustering.vue')
 
 const routes = [
   {

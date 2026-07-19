@@ -1,7 +1,0 @@
-graphs_10000 + gin
-graphs_10000 + chebnet
-graphs_10000 + edgeconv
-graphs_10000 + gunet
-graphs_10000 + pna
-graphs_10000 + gatv2
-graphs_10000 + deepergcn

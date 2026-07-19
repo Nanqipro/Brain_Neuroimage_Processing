@@ -1,8 +1,0 @@
-graphs_1000 + hybrid
-graphs_1000 + gin
-graphs_1000 + chebnet
-graphs_1000 + edgeconv
-graphs_1000 + gunet
-graphs_1000 + pna
-graphs_1000 + gatv2
-graphs_1000 + deepergcn

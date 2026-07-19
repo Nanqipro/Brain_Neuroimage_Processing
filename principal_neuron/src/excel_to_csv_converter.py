@@ -1,3 +1,6 @@
+import argparse
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 
@@ -49,16 +52,18 @@ def process_and_simplify_excel(excel_file_path, output_csv_path, label_column_na
         labels_to_fill = df['Simplified_Label'].replace('Other', np.nan).copy()
         
         # Forward fill
-        labels_to_fill.ffill(inplace=True)
+        labels_to_fill = labels_to_fill.ffill()
         # Backward fill for any 'Other' at the very beginning
-        labels_to_fill.bfill(inplace=True)
+        labels_to_fill = labels_to_fill.bfill()
         
         # Assign back to the DataFrame
         df['Simplified_Label'] = labels_to_fill
         
         # If any NaNs remain (e.g., if all original labels were 'Other'), mark them explicitly.
         # This is unlikely in the current scenario given previous outputs.
-        df['Simplified_Label'].fillna('Other_Unresolved_By_Context', inplace=True)
+        df['Simplified_Label'] = df['Simplified_Label'].fillna(
+            'Other_Unresolved_By_Context'
+        )
         
         print("\nSimplified Label counts (after contextual fill for 'Other'):")
         print(df['Simplified_Label'].value_counts(dropna=False))
@@ -75,13 +80,31 @@ def process_and_simplify_excel(excel_file_path, output_csv_path, label_column_na
     except Exception as e:
         print(f"An error occurred: {e}")
 
+def main():
+    project_dir = Path(__file__).resolve().parents[1]
+    parser = argparse.ArgumentParser(
+        description="Simplify behavioral labels in an Excel workbook and export CSV."
+    )
+    parser.add_argument("input", type=Path, help="Input Excel workbook")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=project_dir / "data" / "processed_trace_simplified.csv",
+        help="Output CSV path",
+    )
+    parser.add_argument(
+        "--label-column",
+        default="behavior",
+        help="Name of the behavior-label column",
+    )
+    args = parser.parse_args()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    process_and_simplify_excel(
+        args.input,
+        args.output,
+        label_column_name=args.label_column,
+    )
+
+
 if __name__ == '__main__':
-    excel_path = "/home/torpedo/Workspace/主神经元ID/data/processed_EMtrace.xlsx"
-    # Output to a new file to keep the original converted CSV if needed
-    simplified_csv_path = "/home/torpedo/Workspace/主神经元ID/data/processed_EMtrace_simplified.csv"
-    
-    # **** IMPORTANT: Review this label_column_name based on the output of column names ****
-    # Assuming the label column is named 'Behavior'. If it's different, change it here.
-    label_column_to_simplify = 'behavior'
-    
-    process_and_simplify_excel(excel_path, simplified_csv_path, label_column_name=label_column_to_simplify) 
+    main()

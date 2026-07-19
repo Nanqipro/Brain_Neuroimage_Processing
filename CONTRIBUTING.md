@@ -19,6 +19,9 @@
 ## 最小验证
 
 ```bash
+python scripts/check_python_syntax.py
+python scripts/check_readme_links.py
+
 cd ai-mouse/BN/calcium_analysis_platform/backend
 python -m unittest discover -s tests
 ```

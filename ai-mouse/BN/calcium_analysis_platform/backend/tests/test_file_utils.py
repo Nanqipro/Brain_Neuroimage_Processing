@@ -33,7 +33,7 @@ class FileUtilsTests(unittest.TestCase):
             root = Path(temp_dir)
             expected = root / "result.xlsx"
             expected.write_bytes(b"test")
-            self.assertEqual(resolve_existing_file(root, "result.xlsx"), expected)
+            self.assertEqual(resolve_existing_file(root, "result.xlsx"), expected.resolve())
             with self.assertRaises(FileNotFoundError):
                 resolve_existing_file(root, "missing.xlsx")
             with self.assertRaises(InvalidFile):

@@ -75,7 +75,7 @@
       </h2>
       
       <el-steps :active="-1" align-center class="workflow-steps">
-        <el-step title="准备数据" icon="Document">
+        <el-step title="准备数据" :icon="Document">
           <template #description>
             <div class="step-description">
               确保你的 Excel 文件格式正确，包含神经元活动的时间序列数据，
@@ -84,7 +84,7 @@
           </template>
         </el-step>
         
-        <el-step title="事件提取" icon="DataAnalysis">
+        <el-step title="事件提取" :icon="DataAnalysis">
           <template #description>
             <div class="step-description">
               进入"事件提取"页面，上传数据并调整参数，
@@ -93,7 +93,7 @@
           </template>
         </el-step>
         
-        <el-step title="聚类分析" icon="PieChart">
+        <el-step title="聚类分析" :icon="PieChart">
           <template #description>
             <div class="step-description">
               进入"聚类分析"页面，上传上一步生成的特征文件，
@@ -102,7 +102,7 @@
           </template>
         </el-step>
         
-        <el-step title="结果下载" icon="Download">
+        <el-step title="结果下载" :icon="Download">
           <template #description>
             <div class="step-description">
               下载分析结果，包含聚类标签和详细的统计信息，
@@ -169,7 +169,9 @@ import {
   Lightning,
   View,
   Files,
-  TrendCharts
+  TrendCharts,
+  Document,
+  Download
 } from '@element-plus/icons-vue'
 </script>
 
