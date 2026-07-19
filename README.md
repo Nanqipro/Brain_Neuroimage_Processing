@@ -6,7 +6,7 @@
 
 > **项目状态：研究原型 / active research prototype。** 仓库由多个可独立使用的实验模块组成，目前不是单一、稳定、经过端到端验证的软件包。建议先运行 Web 演示，再按研究问题选择模块。所有输出都需要结合原始数据质量、实验设计和领域知识复核。
 
-[快速体验](#快速体验web-演示) · [模块导航](#模块导航) · [数据约定](#数据与结果) · [上游工具](docs/UPSTREAM_TOOLS.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
+[快速体验](#快速体验web-演示) · [专利成果](#专利成果) · [模块导航](#模块导航) · [数据约定](#数据与结果) · [上游工具](docs/UPSTREAM_TOOLS.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
 
 ## 项目能做什么
 
@@ -21,6 +21,26 @@
 ![从研究数据到事件、模式、模型和可视化输出的五阶段流程](docs/readme-assets/analysis-workflow.svg)
 
 这里的箭头表示推荐的研究路径，不表示所有模块已经串成一个自动流水线。多数目录仍是面向单项实验的脚本集合。
+
+## 专利成果
+
+[![授权发明专利：一种基于多模态数据的行为分析方法、系统、设备及介质](docs/readme-assets/patent-highlight.svg)](docs/patents/cn-zl2026100142306-invention-patent-certificate.pdf)
+
+本仓库收录以下与研究方向相关的知识产权成果：
+
+| 项目 | 信息 |
+| --- | --- |
+| 发明名称 | 一种基于多模态数据的行为分析方法、系统、设备及介质 |
+| 专利号 | ZL 2026 1 0014230.6 |
+| 授权公告号 | CN 121456446 B |
+| 专利权人 | 南昌大学 |
+| 发明人 | 徐子晨、赵劲、胡文昊、吴琳鑫、聂维、胡成斌、胡佳慧、孙曼玉、潘秉兴、马帅 |
+| 专利申请日 | 2026-01-07 |
+| 授权公告日 | 2026-03-31 |
+
+[查看发明专利证书（PDF，约 1.1 MB）](docs/patents/cn-zl2026100142306-invention-patent-certificate.pdf)
+
+> **专利说明：** 证书在此作为相关知识产权成果记录收录。该记录不表示仓库中的每个模块均实施或受上述专利权利要求覆盖，也不通过本仓库授予任何专利许可。专利权有效性、权利人变更及其他法律状态以国家知识产权局专利登记簿和公告信息为准。
 
 ## 快速体验：Web 演示
 
@@ -123,6 +143,7 @@ Brain_Neuroimage_Processing/
 ├── SCN-Research-Project-main/   # SCN 专项工作流
 ├── docs/
 │   ├── readme-assets/           # README 本地视觉素材
+│   ├── patents/                 # 专利证书与知识产权材料
 │   ├── research-notes/          # 方法研究记录
 │   └── UPSTREAM_TOOLS.md        # 上游工具边界与链接
 ├── CONTRIBUTING.md
@@ -153,4 +174,4 @@ CaImAn、suite2p、DeepCAD、DeepCAD-RT 和 DeepInterpolation 不属于本仓库
 
 ## English summary
 
-Brain Neuroimage Processing is a research-oriented collection of calcium-imaging analysis scripts and prototypes. It covers trace preprocessing, transient feature extraction, clustering, functional topology, sequence/graph models, and local Web visualization. Start with the synthetic-data Web demo above; treat the remaining directories as independent experimental modules. No real research data, model checkpoints, benchmark claims, or top-level software license are provided, and every scientific output requires domain review.
+Brain Neuroimage Processing is a research-oriented collection of calcium-imaging analysis scripts and prototypes. It covers trace preprocessing, transient feature extraction, clustering, functional topology, sequence/graph models, and local Web visualization. The repository also records a [related authorized invention patent](docs/patents/cn-zl2026100142306-invention-patent-certificate.pdf) owned by Nanchang University. Start with the synthetic-data Web demo above; treat the remaining directories as independent experimental modules. No real research data, model checkpoints, benchmark claims, or top-level software license are provided, and every scientific output requires domain review.
