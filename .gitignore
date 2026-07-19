@@ -1,94 +1,162 @@
+# Operating-system metadata
+.DS_Store
+**/.DS_Store
+._*
+Thumbs.db
+Desktop.ini
 
-# Python
+# Local editor and agent state
+.idea/
+.vscode/
+.cursor/
+.claude/
+.codex/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+
+# Python caches, packaging, tests, and virtual environments
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 *.egg
 *.egg-info/
-dist/
-build/
 .eggs/
-
-# Virtual environments
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.venv/
 venv/
 env/
 ENV/
-.venv/
 *-env/
 *.virtualenv
+.ipynb_checkpoints/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Node/Vite dependencies and build output
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# OS
-.DS_Store
-Thumbs.db
+# Runtime scratch space and generated reports
+*.log
+*.bak
+*.backup
+*.tmp
+temp/
+tmp/
+uploads/
+logs/
+results/
+result/
+output/
+outputs/
 
-# Large data files (consider using Git LFS)
-*.xlsx
-*.csv
+# Model checkpoints and serialized runtime state
+*.ckpt
+*.joblib
+*.pickle
+*.pkl
+*.pt
+*.pth
+
+# Large scientific and microscopy data formats
 *.h5
 *.hdf5
 *.mat
 *.npy
 *.npz
-
-# Large images/videos
-# *.png
-# *.jpg
-# *.jpeg
-*.gif
-*.mp4
-*.avi
-*.mov
+*.sbx
 *.tif
+*.tiff
+*.xls
+*.xlsx
 
-# Model files
-*.pkl
-*.pickle
-*.joblib
-*.h5
-*.pth
-*.pt
-*.ckpt
-
-# Logs
-*.log
-# logs/
-
-# Results and outputs
-# results/
-# output/
-# outputs/
-temp/
-tmp/
-
-# Jupyter checkpoints
-.ipynb_checkpoints/
-
-# Large HTML files
-*.html
-
-# Backup files
-*.bak
-*.backup
-
-# Archives
-*.zip
-*.tar.gz
-*.rar
+# Archives and generated media
 *.7z
+*.avi
+*.gif
+*.mov
+*.mp4
+*.rar
+*.tar
+*.tar.gz
+*.zip
 
-# Project specific large directories
-# Pre_analysis/datasets/
-# Pre_analysis/graph/
-tif_data/
- 
-# Ignore symlinked data directory (works for symlink and real directory)
-CVPR/data
-CVPR/data/
+# Private research inputs and reproducible outputs
+/Pre_analysis/datasets
+/Pre_analysis/graph
+/Pre_analysis/processed_data
+/Pre_analysis/raw_data
+/Topology_analysis/datasets
+/Topology_analysis/graph
+/Topology_analysis/result
+/StateClassifier/datasets
+/StateClassifier/logs
+/StateClassifier/results
+/LSTM/datasets/
+/LSTM/models/
+/LSTM/results/
+/Markov/results
+/Visualization/datasets
+/Visualization/logs
+/Visualization/results
+/principal_neuron/community_demo_plots
+/principal_neuron/data
+/principal_neuron/output_plots
+/principal_neuron/temporal_analysis_plots
+/rawgcn/dataset
+/rawgcn/results
+/bettergcn/eval_results_batch
+/bettergcn/results
+/CVPR/data/
+/CVPR/src/GCNs/experiment_logs_*/
+/CVPR/src/GCNs/multi_run_logs_*/
+/SCN-Research-Project-main/**/data/
+/SCN-Research-Project-main/**/result/
+
+# Web application runtime data
+/ai-mouse/BN/calcium_analysis_platform/backend/uploads/
+/ai-mouse/BN/calcium_analysis_platform/backend/results/
+/ai-mouse/BN/calcium_analysis_platform/backend/temp/
+/ai-mouse/BN/calcium_analysis_platform/frontend/dist/
+/ai-mouse/BN/calcium_app/uploads/
+/ai-mouse/BN/calcium_app/results/
+/ai-mouse/BN/calcium_app/temp/
+/ai-mouse/BN/calcium_analysis_platform/test_data.xlsx
+
+# Local-only upstream source checkouts. Install or clone them separately.
+/CaImAn-main
+/suite2p-main
+/DeepCAD-master
+/DeepCAD-RT-main
+/deepinterpolation-master
+
+# Optional local archive used while preparing a public snapshot
+/.local/
+
+# Existing local CVPR data link/directory
+/CVPR/data

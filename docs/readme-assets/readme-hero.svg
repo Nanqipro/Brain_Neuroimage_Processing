@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="560" viewBox="0 0 1440 560" role="img" aria-labelledby="title desc">
+  <title id="title">Brain Neuroimage Processing</title>
+  <desc id="desc">A stylized calcium trace flows into a neural network, representing the repository's signal-analysis workflow.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071526"/>
+      <stop offset="0.52" stop-color="#102a43"/>
+      <stop offset="1" stop-color="#173f5f"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38d9a9"/>
+      <stop offset="1" stop-color="#60a5fa"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#38d9a9" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#38d9a9" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" fill="none" stroke="#8ecae6" stroke-opacity="0.08"/>
+    </pattern>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="560" rx="28" fill="url(#background)"/>
+  <rect width="1440" height="560" rx="28" fill="url(#grid)"/>
+  <circle cx="1150" cy="278" r="285" fill="url(#glow)"/>
+
+  <g transform="translate(92 98)">
+    <rect width="74" height="8" rx="4" fill="url(#accent)"/>
+    <text x="0" y="76" fill="#f8fafc" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="58" font-weight="750">Brain Neuroimage</text>
+    <text x="0" y="140" fill="#f8fafc" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="58" font-weight="750">Processing</text>
+    <text x="2" y="196" fill="#a9c5da" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="25">脑神经钙成像信号分析与研究工具集</text>
+    <text x="2" y="238" fill="#7898af" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="19">From calcium traces to events, topology, models, and visual evidence.</text>
+
+    <g transform="translate(0 286)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" font-weight="600">
+      <rect width="142" height="42" rx="21" fill="#123c4a" stroke="#38d9a9" stroke-opacity="0.48"/>
+      <text x="71" y="27" text-anchor="middle" fill="#7ff3d0">Signal analysis</text>
+      <rect x="156" width="124" height="42" rx="21" fill="#173858" stroke="#60a5fa" stroke-opacity="0.48"/>
+      <text x="218" y="27" text-anchor="middle" fill="#9dcbff">Graph learning</text>
+      <rect x="294" width="132" height="42" rx="21" fill="#29365d" stroke="#a78bfa" stroke-opacity="0.48"/>
+      <text x="360" y="27" text-anchor="middle" fill="#c4b5fd">Visualization</text>
+    </g>
+  </g>
+
+  <g transform="translate(760 58)">
+    <path d="M6 374 C45 374 43 320 78 320 S108 410 140 410 S176 208 210 208 S241 346 274 346 S307 275 340 275 S371 315 410 315"
+          fill="none" stroke="#38d9a9" stroke-width="5" stroke-linecap="round" filter="url(#softGlow)"/>
+    <path d="M6 410H410" fill="none" stroke="#8ecae6" stroke-opacity="0.22" stroke-width="2"/>
+
+    <g stroke="#91c9db" stroke-opacity="0.46" stroke-width="2">
+      <path d="M433 198L526 104L622 142L700 86"/>
+      <path d="M433 198L502 242L603 212L710 254"/>
+      <path d="M433 198L478 334L588 352L692 326"/>
+      <path d="M526 104L603 212L588 352"/>
+      <path d="M622 142L603 212L710 254"/>
+      <path d="M502 242L588 352L692 326"/>
+      <path d="M700 86L710 254L692 326"/>
+    </g>
+    <g filter="url(#softGlow)">
+      <circle cx="433" cy="198" r="12" fill="#38d9a9"/>
+      <circle cx="526" cy="104" r="15" fill="#60a5fa"/>
+      <circle cx="622" cy="142" r="11" fill="#a78bfa"/>
+      <circle cx="700" cy="86" r="8" fill="#38d9a9"/>
+      <circle cx="502" cy="242" r="10" fill="#a78bfa"/>
+      <circle cx="603" cy="212" r="18" fill="#38d9a9"/>
+      <circle cx="710" cy="254" r="13" fill="#60a5fa"/>
+      <circle cx="478" cy="334" r="8" fill="#60a5fa"/>
+      <circle cx="588" cy="352" r="14" fill="#a78bfa"/>
+      <circle cx="692" cy="326" r="10" fill="#38d9a9"/>
+    </g>
+    <path d="M392 195H423" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>
+    <path d="M414 185L426 195L414 205" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

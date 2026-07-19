@@ -1,40 +1,49 @@
-import pandas as pd
+"""Generate a deterministic synthetic workbook for the Web demo."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
 import numpy as np
+import pandas as pd
 
-# 创建测试数据
-np.random.seed(42)
-time_points = 1000
-neurons = 5
 
-# 生成模拟钙信号数据
-data = {}
-data['Time'] = np.arange(time_points)
+def build_test_data(time_points: int = 1000, neurons: int = 5) -> pd.DataFrame:
+    """Build synthetic calcium traces without reading any research data."""
 
-for i in range(1, neurons + 1):
-    # 基线信号
-    baseline = np.random.normal(100, 5, time_points)
-    
-    # 添加一些钙瞬变
-    signal = baseline.copy()
-    for _ in range(np.random.randint(3, 8)):
-        start = np.random.randint(0, time_points - 100)
-        duration = np.random.randint(20, 80)
-        amplitude = np.random.uniform(20, 50)
-        
-        # 创建钙瞬变形状
-        x = np.arange(duration)
-        transient = amplitude * np.exp(-x/20) * (1 - np.exp(-x/5))
-        
-        end = min(start + duration, time_points)
-        signal[start:end] += transient[:end-start]
-    
-    data[f'Neuron_{i}'] = signal
+    rng = np.random.default_rng(42)
+    data: dict[str, np.ndarray] = {"Time": np.arange(time_points)}
 
-# 创建DataFrame并保存
-df = pd.DataFrame(data)
+    for index in range(1, neurons + 1):
+        calcium_signal = rng.normal(100, 5, time_points)
+        for _ in range(rng.integers(3, 8)):
+            start = int(rng.integers(0, time_points - 100))
+            duration = int(rng.integers(20, 80))
+            amplitude = float(rng.uniform(20, 50))
+            x = np.arange(duration)
+            transient = amplitude * np.exp(-x / 20) * (1 - np.exp(-x / 5))
+            end = min(start + duration, time_points)
+            calcium_signal[start:end] += transient[: end - start]
+        data[f"Neuron_{index}"] = calcium_signal
 
-# 使用ExcelWriter保存到dF工作表
-with pd.ExcelWriter('test_data.xlsx') as writer:
-    df.to_excel(writer, sheet_name='dF', index=False)
+    return pd.DataFrame(data)
 
-print('测试数据文件已创建')
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path(__file__).resolve().parent / "test_data.xlsx",
+        help="Output workbook path (default: next to this script)",
+    )
+    args = parser.parse_args()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with pd.ExcelWriter(args.output) as writer:
+        build_test_data().to_excel(writer, sheet_name="dF", index=False)
+    print(f"Synthetic test workbook created: {args.output}")
+
+
+if __name__ == "__main__":
+    main()

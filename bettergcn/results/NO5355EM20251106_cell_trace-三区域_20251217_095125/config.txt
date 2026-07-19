@@ -1,8 +1,0 @@
-数据文件: ../datasets/NO5355EM20251106_cell_trace-三区域.xlsx
-神经元位置文件: ../datasets/NO5355EM20251106_cell_trace.csv
-最小样本数: 50
-效应量文件: ../datasets/effect_sizes_NO5355EM20251106_cell_trace-三区域.csv
-效应量阈值: 0.5
-设备: cuda
-随机种子: 42
-训练开始时间: 2025-12-17 09:51:25

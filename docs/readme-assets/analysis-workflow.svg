@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="470" viewBox="0 0 1400 470" role="img" aria-labelledby="title desc">
+  <title id="title">Calcium imaging analysis workflow</title>
+  <desc id="desc">Five stages connect research data preparation, transient extraction, feature analysis, graph and sequence models, and visual outputs.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fafc"/>
+      <stop offset="1" stop-color="#eef6fb"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#102a43" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <rect width="1400" height="470" rx="24" fill="url(#bg)"/>
+  <text x="70" y="68" fill="#102a43" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="32" font-weight="750">Analysis workflow · 分析工作流</text>
+  <text x="70" y="103" fill="#627d98" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18">Each module can be used independently; the arrows describe the intended research path.</text>
+
+  <g transform="translate(62 150)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <g filter="url(#shadow)">
+      <rect width="220" height="224" rx="18" fill="#ffffff"/>
+      <rect width="220" height="10" rx="5" fill="#38b2ac"/>
+      <circle cx="42" cy="58" r="22" fill="#e6fffa"/>
+      <path d="M25 60C34 60 34 43 43 43S51 72 60 72" fill="none" stroke="#319795" stroke-width="4" stroke-linecap="round"/>
+      <text x="28" y="106" fill="#102a43" font-size="21" font-weight="700">1 · Research input</text>
+      <text x="28" y="137" fill="#486581" font-size="16">Excel / CSV / MAT / TIFF</text>
+      <text x="28" y="166" fill="#486581" font-size="16">calcium traces &amp; labels</text>
+      <text x="28" y="201" fill="#829ab1" font-size="14">local data, not published</text>
+    </g>
+
+    <g transform="translate(260)" filter="url(#shadow)">
+      <rect width="220" height="224" rx="18" fill="#ffffff"/>
+      <rect width="220" height="10" rx="5" fill="#4299e1"/>
+      <circle cx="42" cy="58" r="22" fill="#ebf8ff"/>
+      <path d="M29 48V68M38 42V74M47 51V65M56 45V71" stroke="#3182ce" stroke-width="4" stroke-linecap="round"/>
+      <text x="28" y="106" fill="#102a43" font-size="21" font-weight="700">2 · Preprocess</text>
+      <text x="28" y="137" fill="#486581" font-size="16">smoothing · correlation</text>
+      <text x="28" y="166" fill="#486581" font-size="16">frequency · behavior</text>
+      <text x="28" y="201" fill="#829ab1" font-size="14">Pre_analysis / Visualization</text>
+    </g>
+
+    <g transform="translate(520)" filter="url(#shadow)">
+      <rect width="220" height="224" rx="18" fill="#ffffff"/>
+      <rect width="220" height="10" rx="5" fill="#805ad5"/>
+      <circle cx="42" cy="58" r="22" fill="#faf5ff"/>
+      <circle cx="34" cy="62" r="5" fill="#805ad5"/><circle cx="48" cy="50" r="5" fill="#805ad5"/><circle cx="53" cy="67" r="5" fill="#b794f4"/>
+      <text x="28" y="106" fill="#102a43" font-size="21" font-weight="700">3 · Find patterns</text>
+      <text x="28" y="137" fill="#486581" font-size="16">event features · clustering</text>
+      <text x="28" y="166" fill="#486581" font-size="16">PCA · t-SNE · UMAP</text>
+      <text x="28" y="201" fill="#829ab1" font-size="14">Cluster_analysis / Web UI</text>
+    </g>
+
+    <g transform="translate(780)" filter="url(#shadow)">
+      <rect width="220" height="224" rx="18" fill="#ffffff"/>
+      <rect width="220" height="10" rx="5" fill="#ed8936"/>
+      <circle cx="42" cy="58" r="22" fill="#fffaf0"/>
+      <path d="M31 51L43 45L55 55L46 70L31 64Z" fill="none" stroke="#dd6b20" stroke-width="3"/>
+      <circle cx="31" cy="51" r="4" fill="#dd6b20"/><circle cx="43" cy="45" r="4" fill="#dd6b20"/><circle cx="55" cy="55" r="4" fill="#dd6b20"/><circle cx="46" cy="70" r="4" fill="#dd6b20"/><circle cx="31" cy="64" r="4" fill="#dd6b20"/>
+      <text x="28" y="106" fill="#102a43" font-size="21" font-weight="700">4 · Model structure</text>
+      <text x="28" y="137" fill="#486581" font-size="16">topology · LSTM · GCN</text>
+      <text x="28" y="166" fill="#486581" font-size="16">GAT · phase space</text>
+      <text x="28" y="201" fill="#829ab1" font-size="14">Topology / LSTM / GNN</text>
+    </g>
+
+    <g transform="translate(1040)" filter="url(#shadow)">
+      <rect width="220" height="224" rx="18" fill="#ffffff"/>
+      <rect width="220" height="10" rx="5" fill="#e53e3e"/>
+      <circle cx="42" cy="58" r="22" fill="#fff5f5"/>
+      <path d="M29 70V55M40 70V45M51 70V59" stroke="#e53e3e" stroke-width="5" stroke-linecap="round"/>
+      <text x="28" y="106" fill="#102a43" font-size="21" font-weight="700">5 · Inspect &amp; export</text>
+      <text x="28" y="137" fill="#486581" font-size="16">plots · networks · tables</text>
+      <text x="28" y="166" fill="#486581" font-size="16">FastAPI / Vue interface</text>
+      <text x="28" y="201" fill="#829ab1" font-size="14">evidence for expert review</text>
+    </g>
+
+    <g fill="none" stroke="#9fb3c8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M226 112H250M244 105L251 112L244 119"/>
+      <path d="M486 112H510M504 105L511 112L504 119"/>
+      <path d="M746 112H770M764 105L771 112L764 119"/>
+      <path d="M1006 112H1030M1024 105L1031 112L1024 119"/>
+    </g>
+  </g>
+</svg>
