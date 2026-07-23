@@ -6,7 +6,7 @@
 
 > **项目状态：研究原型 / active research prototype。** 仓库由多个可独立使用的实验模块组成，目前不是单一、稳定、经过端到端验证的软件包。建议先运行 Web 演示，再按研究问题选择模块。所有输出都需要结合原始数据质量、实验设计和领域知识复核。
 
-[快速体验](#快速体验web-演示) · [专利成果](#专利成果) · [模块导航](#模块导航) · [数据约定](#数据与结果) · [上游工具](docs/UPSTREAM_TOOLS.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
+[快速体验](#快速体验web-演示) · [专利成果](#专利成果) · [模块导航](#模块导航) · [数据约定](#数据与结果) · [相关项目](#相关项目) · [上游工具](docs/UPSTREAM_TOOLS.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
 
 ## 项目能做什么
 
@@ -168,10 +168,17 @@ CaImAn、suite2p、DeepCAD、DeepCAD-RT 和 DeepInterpolation 不属于本仓库
 - Web 原型的部署边界与漏洞报告：[`SECURITY.md`](SECURITY.md)
 - suite2p 与 CaImAn 对钙波研究的能力边界：[`docs/research-notes/calcium-wave-extraction.md`](docs/research-notes/calcium-wave-extraction.md)
 
+## 相关项目
+
+| 仓库 | 与本项目的关系 |
+| --- | --- |
+| [Nanqipro/ai-mouse-analysis](https://github.com/Nanqipro/ai-mouse-analysis) | 在本仓库算法探索基础上继续开发的集成分析平台，通过 Vue 与 FastAPI 串联事件提取、聚类、行为对齐热图、Trace 和关键神经元分析。 |
+| [Nanqipro/NeuroBehavior-Pred](https://github.com/Nanqipro/NeuroBehavior-Pred) | 聚焦“从神经活动预测行为并解释关键神经元”的算法仓库，整理了 GCN 基线、GCN/GraphSAGE/GAT 混合实验，以及效应量、社区和时序模式分析。 |
+
 ## 许可证
 
 仓库当前**没有顶层 `LICENSE` 文件**。公开可见不等于获得开源许可；在权利人明确选择许可证前，请不要假定代码、数据或文档可以被复制、修改或再分发。上游项目分别适用它们自己的许可证。
 
 ## English summary
 
-Brain Neuroimage Processing is a research-oriented collection of calcium-imaging analysis scripts and prototypes. It covers trace preprocessing, transient feature extraction, clustering, functional topology, sequence/graph models, and local Web visualization. The repository also records a [related authorized invention patent](docs/patents/cn-zl2026100142306-invention-patent-certificate.pdf) owned by Nanchang University. Start with the synthetic-data Web demo above; treat the remaining directories as independent experimental modules. No real research data, model checkpoints, benchmark claims, or top-level software license are provided, and every scientific output requires domain review.
+Brain Neuroimage Processing is a research-oriented collection of calcium-imaging analysis scripts and prototypes. It covers trace preprocessing, transient feature extraction, clustering, functional topology, sequence/graph models, and local Web visualization. The repository also records a [related authorized invention patent](docs/patents/cn-zl2026100142306-invention-patent-certificate.pdf) owned by Nanchang University. Follow-on projects include the integrated [AI Mouse Analysis](https://github.com/Nanqipro/ai-mouse-analysis) platform and the behavior-prediction-focused [NeuroBehavior-Pred](https://github.com/Nanqipro/NeuroBehavior-Pred) repository. Start with the synthetic-data Web demo above; treat the remaining directories as independent experimental modules. No real research data, model checkpoints, benchmark claims, or top-level software license are provided, and every scientific output requires domain review.
