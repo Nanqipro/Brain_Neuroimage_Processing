@@ -9,28 +9,66 @@ import os
 class DataProcessor:
     """数据处理器类,用于数据预处理和平衡"""
     @staticmethod
-    def balance_data(X, y, min_samples):
+    def balance_data(X, y, min_samples, strategy='default', random_state=114):
         """
         通过下采样多数类来平衡数据集
         参数:
             X: 特征矩阵
             y: 标签数组
             min_samples: 每个类别的最小样本数
+            strategy: 平衡策略,默认为'default'
+            random_state: 随机种子
         返回:
             平衡后的特征矩阵和标签数组
         """
-        unique_labels, counts = np.unique(y, return_counts=True)
-        min_count = max(min_samples, min(counts[counts > 0]))
+        if strategy == 'default':
+            unique_labels, counts = np.unique(y, return_counts=True)
+            min_count = max(min_samples, min(counts[counts > 0]))
+            
+            balanced_indices = []
+            for label in unique_labels:
+                label_indices = np.where(y == label)[0]
+                if len(label_indices) >= min_samples:
+                    balanced_indices.extend(
+                        np.random.choice(label_indices, min_count, replace=False)
+                    )
+            
+            return X[balanced_indices], y[balanced_indices]
         
-        balanced_indices = []
-        for label in unique_labels:
-            label_indices = np.where(y == label)[0]
-            if len(label_indices) >= min_samples:
-                balanced_indices.extend(
-                    np.random.choice(label_indices, min_count, replace=False)
-                )
-        
-        return X[balanced_indices], y[balanced_indices]
+        # 新增混合采样策略
+        elif strategy in ['hybrid', 'smote', 'adasyn']:
+            from imblearn.over_sampling import SMOTE, ADASYN
+            from imblearn.under_sampling import RandomUnderSampler
+            from imblearn.pipeline import Pipeline
+            
+            # 处理NaN值
+            nan_mask = np.isnan(X).any(axis=1)
+            X = X[~nan_mask]
+            y = y[~nan_mask]
+
+            # 动态计算目标采样数量
+            unique, counts = np.unique(y, return_counts=True)
+            
+            # 计算每个类别的最小目标数
+            adjusted_min = max(min_samples, counts.min())
+            target_counts = {k: max(adjusted_min, counts[k]) for k in unique}
+            
+            # 过采样和欠采样融合
+            if strategy == 'hybrid':
+                over = SMOTE(sampling_strategy=target_counts, random_state=random_state)
+                under = RandomUnderSampler(sampling_strategy=target_counts)
+                pipeline = Pipeline([('o', over), ('u', under)])
+            
+            # 单独的过采样
+            elif strategy == 'smote':
+                pipeline = SMOTE(sampling_strategy=target_counts, random_state=random_state)
+            elif strategy == 'adasyn':
+                pipeline = ADASYN(sampling_strategy=target_counts, random_state=random_state)
+                
+            return pipeline.fit_resample(X, y)
+
+        else:
+            raise ValueError(f"unsupported strategy: {strategy}")
     
     @staticmethod
     def merge_rare_behaviors(X, y, labels, min_samples):
@@ -244,4 +282,4 @@ class NumpyEncoder(json.JSONEncoder):
             return int(obj)
         if isinstance(obj, np.floating):
             return float(obj)
-        return super(NumpyEncoder, self).default(obj) 
+        return super(NumpyEncoder, self).default(obj)
